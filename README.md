@@ -2,7 +2,7 @@
 
 A drum machine and an easy-to-program bass synth in one box. Built in Pure Data, designed to run on a Raspberry Pi with a 7" touchscreen and a few knobs.
 
-Current version: **v0.7**
+Current version: **v0.8**
 
 ## How to open it
 
@@ -86,6 +86,20 @@ Open `OCKM_GENERATOR.pd` in plugdata. Keep the folder together: the main patch f
 | `seq/` | Sequencers: the drum row, the bass pattern and the bass generator (which also holds the bass presets) |
 | `patterns/` | Saved pattern slots, 8 per track. Edited by the patch, not by hand |
 | `sketches/` | Early experiments, kept for reference |
+| `tools/build.py` | Builds every `.pd` file. Structural changes are made here, then the patch files are rebuilt |
+| `tests/run_tests.py` | Plays the patch headless and checks it still works (sounds, accents, patterns, swing, bass, effects, MIDI clock) |
+
+## Working on the project
+
+**Version history.** The folder is a git repository. Every version is saved, and you can go back to any of them. It all stays on your Mac. Pushing a copy to GitHub as an off-site backup is optional.
+
+**Two kinds of change.**
+- *Sound tweaks* (tune, levels, knobs, patterns): use the controls in the patch, as normal.
+- *Structural changes* (new objects, new voices, rewiring): made in `tools/build.py`, then rebuilt with `python3 tools/build.py`. Don't rewire the generated `.pd` files by hand, because the next rebuild would overwrite it. The build never touches `patterns/` unless you add `--reset-patterns`.
+
+**Tests.** `python3 tests/run_tests.py` runs 12 checks in about a minute. It needs vanilla Pure Data's `pd` command, which comes with the Pi's `puredata` package. It works on a temporary copy, so your patterns are safe.
+
+**Internal names.** Every shared name starts with `ockm-` so nothing clashes with other patches. Pattern tables are `ockm-pat-<track>`, slot banks are `ockm-bank-<track>`, and the step squares are `ockm-sq-<track>-<step>`.
 
 ## Named hooks
 

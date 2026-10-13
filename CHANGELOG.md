@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.8 (13 October 2026)
+
+Housekeeping release. Sounds and behaviour are unchanged.
+
+**Added**
+- Git version history for the whole folder
+- `tools/build.py`: the generator that writes every patch file now lives in the project
+- `tests/run_tests.py`: 12 automatic checks covering voices, accents, step edits, pattern saving, swing, bar-locked switching, the bass generator, all six bass engines, delay, reverb, MIDI clock and mix level
+
+**Changed**
+- Shared names that lacked the `ockm-` prefix renamed: `kick-pat` is now `ockm-pat-kick`, `kick-bank` is `ockm-bank-kick`, `bass-note` is `ockm-pat-bass-note`, and the step squares are `ockm-sq-<track>-<step>`. Pattern files on disk are unchanged
+
 ## v0.7 (13 October 2026)
 
 **Added**
