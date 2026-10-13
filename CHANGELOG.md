@@ -1,0 +1,87 @@
+# Changelog
+
+## v0.7 (13 October 2026)
+
+**Added**
+- Reverb in the master effects, with size and tone controls
+- Reverb and delay sends on every track (8 drums and the bass), set in drum-settings and master-fx
+- Sensible default sends: clap, snare, rimshot and tom in the reverb, rim and rimshot in the delay, kick and bass dry
+
+**Changed**
+- The delay is now fed by the per-track sends instead of sitting across the whole mix. The old "delay mix" is now "delay level", the return level
+- Perc track is now a 909-style rimshot. The cowbell moved to `sketches/ockm-cowbell.pd`
+
+## v0.6 (13 October 2026)
+
+**Added**
+- Saw bass engine (engine 5): a raw sawtooth with a tone control, an optional detuned second saw and a sub saw. Turn k1 to 1 for the fully raw sound
+
+## v0.5.1 (13 October 2026)
+
+**Fixed**
+- Pluck bass sounded almost the same as acid. Rebuilt it: notes now ring out and fade instead of being cut short, with a saw-to-square blend, a gentler filter and a sub an octave down
+
+## v0.5 (13 October 2026)
+
+**Added**
+- MIDI clock leader: sends clock (24 per beat), start and stop
+- MIDI clock follower: steps to incoming clock, follows start, continue and stop, and measures the tempo
+- A midi-sync panel to switch between leader and follower and turn clock out on or off
+- Hooks for tempo, sync mode and play state
+
+## v0.4 (13 October 2026)
+
+**Added**
+- Five bass engines: acid, sub, FM, reese and pluck. Switch with one number. Only the chosen engine runs
+- Bass drive, after the engine
+- Master effects: DJ filter (low-pass and high-pass on one control), drive, and a delay locked to the tempo
+- A soft limiter at the very end, so the output can't hard-clip
+
+**Changed**
+- Bass knobs now run 0 to 1 for every engine, ready for real knobs
+- All engines share one piece of note logic (`ockm-bass-core`), so accent and slide behave the same everywhere
+- The old acid voice moved to `sketches/ockm-acid-v02.pd`
+
+## v0.3 (13 October 2026)
+
+**Added**
+- Four new drums: snare, rim, tom and perc (808-style cowbell). Eight drum tracks in total
+- Accents per drum step, plus an accent amount control
+- Tune, decay and level for every drum, in a drum-settings panel and as hooks
+- Hooks to edit a single drum step or bass step, ready for the touchscreen
+- Starter patterns now use the new drums and include accented hats
+
+**Changed**
+- Every drum voice now takes a hit strength instead of a plain trigger
+
+## v0.2 (13 October 2026)
+
+**Added**
+- Bass generator: builds a bassline from a rhythm preset, a note pattern, a key and a scale
+- 8 rhythm presets, 8 note patterns, 6 scales, all 12 keys
+- Notes are always in key, whatever you pick
+- Temporary number boxes to try it out. The real controls come with the touchscreen
+- Hooks for rhythm, notes, key, scale and rebuild
+
+**Fixed**
+- Added a visible declare object, so the patch still finds its subfolders after you save it in plugdata
+
+## v0.1 (13 October 2026)
+
+First proper version, moved into the OCKM_GENERATOR folder.
+
+**Added**
+- 8 pattern slots, saved to disk with the save button
+- Pattern switching waits for the end of the bar while playing
+- 4 starter patterns: house, tech house, broken beat, hip hop feel
+- Swing control (50 to 75%)
+- Acid bass voice with accent and slide, plus cutoff, resonance, env amount and decay controls
+- Fixed basslines in each starter pattern
+- Named hooks for play, pattern, save, step and master output
+
+**Fixed**
+- Drum rows no longer share one pattern. Clicking a square only affects its own row
+- Clap no longer clips
+
+**Changed**
+- Files renamed from `dm-` to `ockm-` and sorted into `voices/`, `seq/` and `patterns/`
