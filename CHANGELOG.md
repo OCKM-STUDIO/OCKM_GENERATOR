@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.14 (13 October 2026)
+
+**Added**
+- Tabs for **perform**, **drums** and **synths** on every screen, in the top bar next to play and tempo. They replace the "< perform" button
+- A sound strip on perform: pick bass, lead or chord and play its four main knobs, named for the engine
+- The master filter on perform
+
+**Changed**
+- Perform's track lanes are a little thinner to make room
+
 ## v0.13 (13 October 2026)
 
 **Added**

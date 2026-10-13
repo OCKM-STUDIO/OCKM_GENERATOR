@@ -2,7 +2,7 @@
 
 A drum machine and easy-to-program synths in one box. Built in Pure Data, designed to run on a Raspberry Pi with a touchscreen and a few knobs.
 
-Current version: **v0.13**
+Current version: **v0.14**
 
 ## How to open it
 
@@ -10,11 +10,14 @@ Open `OCKM_GENERATOR.pd` in plugdata. Keep the folder together: the main patch f
 
 The window is the instrument: three touch screens, drawn in Lua (plugdata has Lua built in). Click with the mouse on the Mac, tap with a finger on the Pi. If clicks do nothing, the patch is in edit mode: press Cmd+E.
 
+**Moving between screens:** the tabs along the top (**perform**, **drums**, **synths**) are on every screen, next to play and tempo. Or tap a track's name on perform to jump straight to it.
+
 **Perform** (home)
 - **Play** and **tempo** top left. Drag the tempo number up or down
 - **Patterns 1 to 8**: tap to switch. While playing it waits for the end of the bar; the queued one gets an orange outline
 - **Now**: all 11 tracks for the 16 steps that are playing, with the playhead running above them. It's a picture, not an editor
 - Tap a track's **name** to open it
+- **Sound strip**: pick bass, lead or chord, then play its four main knobs (named for the engine it's using). The **filter** next to length is the master DJ filter
 - **Length**: 16, 32, 64 or 128 steps. Making it longer repeats what's there
 - **Save** and **revert**, top right
 
@@ -32,7 +35,7 @@ The window is the instrument: three touch screens, drawn in Lua (plugdata has Lu
 - **Sound**: engine and its four knobs (named for the engine), plus drive, or chord type for the chord
 - **Fill**: pick a rhythm and notes (or a chord rhythm and progression) and press **new** to write the whole pattern. Then swipe and tweak single steps
 
-Swing, accent amount, master effects and MIDI clock aren't on the screens yet. They're still saved, and they're in **pd test-panel**.
+Swing, accent amount, the other master effects and MIDI clock aren't on the screens yet. They're still saved, and they're in **pd test-panel**.
 
 **Under the screen:** `pd engine` is the sound and sequencer (open it only if you're curious). `pd test-panel` is the old v0.12 panel with every control on one sheet, kept for testing.
 

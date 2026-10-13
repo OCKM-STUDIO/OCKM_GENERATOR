@@ -83,6 +83,7 @@ function ui:initialize(sel, atoms)
   self.screen = "perform"
   self.slot = 1               -- open drum slot
   self.part = 1               -- open synth part
+  self.perf_part = 1          -- synth on the perform screen's sound strip
   self.sel_step = 0           -- selected synth step (on the current block)
   self.page = 0
   self.step = 0
@@ -97,7 +98,7 @@ end
 
 function ui:defaults()
   local v = self.v
-  v["ockm-bpm"] = 124; v["ockm-len"] = 16; v["ockm-root"] = 9; v["ockm-scale"] = 0
+  v["ockm-bpm"] = 124; v["ockm-len"] = 16; v["ockm-filter"] = 0; v["ockm-root"] = 9; v["ockm-scale"] = 0
   for i, nm in ipairs(SLOTS) do
     v["ockm-"..nm.."-sound"] = ({0,1,2,4,5,7,3,6})[i]
     v["ockm-"..nm.."-level"] = 1; v["ockm-"..nm.."-tune"] = 0; v["ockm-"..nm.."-decay"] = 100
@@ -109,7 +110,7 @@ function ui:defaults()
 end
 
 function ui:hooks()
-  local h = { "ockm-bpm","ockm-len","ockm-root","ockm-scale" }
+  local h = { "ockm-bpm","ockm-len","ockm-root","ockm-scale","ockm-filter" }
   for _, nm in ipairs(SLOTS) do
     for _, p in ipairs(DRUM_PARAMS) do h[#h+1] = "ockm-"..nm.."-"..p[1] end
     h[#h+1] = "ockm-"..nm.."-sound"
@@ -227,56 +228,63 @@ function ui:layout()
   return L
 end
 
+-- top bar, the same on every screen: play, tempo, the three screens as tabs, save and revert
+local TABS = { { "perform", "perform" }, { "drums", "drums" }, { "synth", "synths" } }
 function ui:layout_top(add)
-  local x = 16
-  if self.screen ~= "perform" then
-    add{ kind="btn", x=x, y=12, w=96, h=48, label="< perform", tap=function() self.screen = "perform" end }
-    x = x + 108
-  end
-  add{ kind="play", x=x, y=12, w=64, h=48, tap=function() self:send("ockm-play", self.playing ~= 0 and 0 or 1) end }
-  add{ kind="bpm", x=x + 76, y=12, w=130, h=48 }
-  if self.screen ~= "perform" then
-    add{ kind="text", x=x + 220, y=24, w=300, h=24, label=self:title(), size=18, col="txt" }
+  add{ kind="play", x=16, y=12, w=64, h=48, tap=function() self:send("ockm-play", self.playing ~= 0 and 0 or 1) end }
+  add{ kind="bpm", x=92, y=12, w=140, h=48 }
+  for i, t in ipairs(TABS) do
+    add{ kind="tab", x=250 + (i - 1) * 126, y=12, w=120, h=48, label=t[2], sel=(self.screen == t[1]),
+         tap=function() if self.screen ~= t[1] then self:open(t[1]) end end }
   end
   add{ kind="btn", x=W - 208, y=12, w=92, h=48, label="save", quiet=true, tap=function() pd.send("ockm-save", "bang", {}) end }
   add{ kind="btn", x=W - 108, y=12, w=92, h=48, label="revert", quiet=true, tap=function() pd.send("ockm-revert", "bang", {}) end }
 end
 
-function ui:title()
-  if self.screen == "drums" then
-    return "drum " .. self.slot .. "  " .. SOUNDS[(self.v["ockm-"..SLOTS[self.slot].."-sound"] or 0) + 1]
-  end
-  return SYNTHS[self.part]
-end
+local LANE_Y, LANE_H, LANE_P = 144, 22, 24
+function ui:lane_y(i) return LANE_Y + (i - 1) * LANE_P + ((i > 8) and 6 or 0) end
 
 function ui:layout_perform(add)
   -- patterns 1 to 8
   local pw = (W - 32 - 7 * 8) / 8
   for i = 0, 7 do
-    add{ kind="pattern", x=16 + i * (pw + 8), y=76, w=pw, h=60, n=i, tap=function()
+    add{ kind="pattern", x=16 + i * (pw + 8), y=72, w=pw, h=56, n=i, tap=function()
       pd.send("ockm-want", "float", { i })
       if self.playing ~= 0 and i ~= self.cur then self.want = i end
     end }
   end
-  -- now: 8 drum lanes and 3 synth lanes, a picture of the block that is playing
-  local y = 152
+  -- now: 8 drum lanes and 3 synth lanes, a picture of the block that is playing. Tap a name to open it
   for i = 1, 11 do
     local isdrum = i <= 8
+    local y = self:lane_y(i)
     local name = isdrum and SHORT[(self.v["ockm-"..SLOTS[i].."-sound"] or 0) + 1] or SYNTHS[i - 8]
-    add{ kind="lanename", x=16, y=y, w=120, h=28, label=name, tap=function()
+    add{ kind="lanename", x=16, y=y, w=120, h=LANE_H, label=name, tap=function()
       if isdrum then self.slot = i; self:open("drums") else self.part = i - 8; self:open("synth") end
     end }
-    add{ kind="lane", x=148, y=y, w=W - 164, h=28, track=i }
-    y = y + 30 + ((i == 8) and 10 or 0)
+    add{ kind="lane", x=148, y=y, w=W - 164, h=LANE_H, track=i }
   end
-  -- length and where we are
+  -- live sound strip: pick a synth, play its four main knobs
+  local part = SYNTHS[self.perf_part or 1]
+  for i, t in ipairs(SYNTHS) do
+    add{ kind="choice", x=16 + (i - 1) * 68, y=430, w=62, h=76, label=t, sel=((self.perf_part or 1) == i),
+         tap=function() self.perf_part = i end }
+  end
+  local eng = (part == "chord") and CHORD_ENG or MONO_ENG
+  local kn = KNOBS[eng[(self.v["ockm-"..part.."-engine"] or 0) + 1]] or KNOBS.acid
+  local cw = (W - 236 - 16 - 12) / 2
+  for k = 1, 4 do
+    local col, row = (k - 1) % 2, math.floor((k - 1) / 2)
+    add{ kind="slider", x=236 + col * (cw + 12), y=430 + row * 42, w=cw, h=34, hook="ockm-"..part.."-k"..k, lo=0, hi=1, label=kn[k] }
+  end
+  -- length, where we are, and the master filter
   local lens = { 16, 32, 64, 128 }
-  add{ kind="text", x=16, y=520, w=100, h=16, label="length", size=11 }
+  add{ kind="text", x=16, y=516, w=100, h=12, label="length", size=10 }
   for i, n in ipairs(lens) do
-    add{ kind="choice", x=16 + (i - 1) * 80, y=538, w=72, h=48, label=tostring(n),
+    add{ kind="choice", x=16 + (i - 1) * 70, y=532, w=64, h=52, label=tostring(n),
          sel=(self.v["ockm-len"] == n), tap=function() pd.send("ockm-length", "float", { n }) end }
   end
-  add{ kind="blockinfo", x=360, y=538, w=W - 376, h=48, follow=true }
+  add{ kind="blockinfo", x=306, y=532, w=210, h=52, follow=true }
+  add{ kind="slider", x=520, y=541, w=W - 536, h=34, hook="ockm-filter", lo=-1, hi=1, label="filter" }
 end
 
 function ui:open(screen)
@@ -583,7 +591,7 @@ function ui:paint_layer_2(g)
   local pitch = (W - 32) / 16
   if self.screen == "perform" then
     local lw = (W - 164) / 16
-    self:col(g, "acc"); g:fill_rect(148 + i * lw + 2, 146, lw - 4, 3)
+    self:col(g, "acc"); g:fill_rect(148 + i * lw + 2, LANE_Y - 7, lw - 4, 3)
   elseif self:play_block() == self.page then
     -- under the step pads, over the beat marks
     local y = (self.screen == "drums") and (220 + 96 + 3) or (176 + 84 + 3)
@@ -597,6 +605,9 @@ function ui:draw(g, w)
   if k == "btn" then
     self:col(g, w.accent and "acc" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
     self:ctext(g, w.label, w, 14, w.accent and "#ffffff" or (w.quiet and "mute" or "txt"))
+  elseif k == "tab" then
+    self:col(g, w.sel and "on" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
+    self:ctext(g, w.label, w, 15, w.sel and "bg" or "txt")
   elseif k == "play" then
     local on = self.playing ~= 0
     self:col(g, on and "acc" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
@@ -620,7 +631,7 @@ function ui:draw(g, w)
     self:col(g, sel and (w.accent and "acc" or "on") or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
     self:ctext(g, w.label, w, w.small and 11 or 13, sel and (w.accent and "#ffffff" or "bg") or "txt")
   elseif k == "lanename" then
-    self:text(g, w.label, w.x, w.y + 7, 13, "txt", w.w)
+    self:text(g, w.label, w.x, w.y + 4, 13, "txt", w.w)
   elseif k == "lane" then
     self:draw_lane(g, w)
   elseif k == "blockinfo" then

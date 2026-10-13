@@ -85,8 +85,8 @@ def render(lines, label, path):
 
 SHOTS = [
     ("perform", ["send ockm-play float 1", "send ockm-step float 4"]),
-    ("drums", ["test tap 60 165"]),                    # tap the kick lane name
-    ("bass", ["test tap 16 30", "test tap 60 405", "test tap 89 210"]),   # back, open bass, select step 2
+    ("drums", ["test tap 60 155"]),                    # tap the kick lane name
+    ("bass", ["test tap 300 36", "test tap 60 352", "test tap 89 210"]),  # perform tab, open bass, select step 2
     ("chord", ["test tap 260 94", "test tap 89 210"]),
 ]
 

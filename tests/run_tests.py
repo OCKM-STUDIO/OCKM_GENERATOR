@@ -513,24 +513,26 @@ def front_panel_drives_the_engine(work):
 def touchscreen_drives_the_engine(work):
     if not PDLUA:
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
-    h = Harness(); h.show("ockm-edit", "ockm-page", "ockm-len", "ockm-load", "ockm-d1-sound", "ockm-bass-edit", "ockm-want")
+    h = Harness(); h.show("ockm-edit", "ockm-page", "ockm-len", "ockm-load", "ockm-d1-sound", "ockm-bass-edit", "ockm-want", "ockm-lead-k1", "ockm-filter")
     tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
     h.at(100, "ockm-resync bang")
-    tap(150, 60, 165)                    # perform: open the kick lane
+    tap(150, 60, 155)                    # perform: open the kick lane
     tap(160, 300, 170)                   # drums: sound pad 3 (clap)
     tap(170, 160, 260); tap(180, 160, 260)   # step 3: on, then accent
-    tap(190, 60, 36)                     # back to perform
-    tap(200, 130, 560)                   # length 32
-    tap(210, 60, 165)                    # open the kick lane again
+    tap(190, 300, 36)                    # perform tab
+    tap(200, 118, 556)                   # length 32
+    tap(210, 430, 36)                    # drums tab (back to the kick slot)
     h.at(220, "ockm-ui-test drag 600 260 200 260")   # swipe left: steps 17-32
     tap(230, 45, 260)                    # step 17
     h.at(240, "ockm-ui-test drag 200 260 600 260")   # swipe right: back to 1-16
-    tap(250, 60, 36)                     # back
-    tap(260, 60, 405)                    # open bass
+    tap(250, 300, 36)                    # perform tab
+    tap(255, 116, 468); tap(258, 430, 449)   # sound strip: lead, then its first knob
+    tap(260, 60, 352)                    # open bass
     tap(270, 45, 210)                    # bass step 1
     tap(280, 600, 328)                   # note picker: third note of the scale
-    tap(290, 16 + 30, 36)                # back
+    tap(290, 300, 36)                    # perform tab
     tap(300, 300, 100)                   # pattern 3
+    tap(310, 752, 558)                   # master filter, middle
     f = os.path.join(work, "t_touch.pd"); h.finish(600, f)
     out = run(work, f)
     edits = printed(out, "ockm-edit")
@@ -543,6 +545,9 @@ def touchscreen_drives_the_engine(work):
     be = printed(out, "ockm-bass-edit")
     assert len(be) >= 2 and be[-1].split()[:2] == ["0", "36"], f"bass step 1 should become C (A minor, third step): {be}"
     assert "2" in printed(out, "ockm-load"), "pattern 3 button didn't load pattern 3"
+    lk = [float(x) for x in printed(out, "ockm-lead-k1")]
+    assert any(0.4 < x < 0.6 for x in lk), f"perform strip: lead knob 1 should be about halfway: {lk}"
+    assert any(abs(float(x)) < 0.1 for x in printed(out, "ockm-filter")), "perform strip: filter in the middle should be about 0"
     assert not [l for l in out.splitlines() if "error" in l.lower()], "errors: " + " | ".join(l for l in out.splitlines() if "error" in l.lower())
 
 @test
