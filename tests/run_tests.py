@@ -162,9 +162,9 @@ def accents_and_step_edits(work):
     h.add("#X obj 400 70 print ROWOUT;"); h.con(h.dut, len([o for o in h.objs if not o[1]]) - 1)
     h.at(100, "ockm-pat-zz 0 1 2 0 ; ockm-accent 0.3")
     h.at(120, "test-in 0 , 1 , 2")
-    h.at(150, "ockm-edit kick 3 2 ; ockm-bass-edit 0 40 1 1 0")
+    h.at(150, "ockm-edit d1 3 2 ; ockm-bass-edit 0 40 1 1 0")
     g = h.add("#X obj 10 300 r test-get;"); t = h.add("#X obj 10 330 t b b;")
-    a1 = h.add("#X obj 10 360 array get ockm-pat-kick;"); p1 = h.add("#X obj 10 390 print KICK;")
+    a1 = h.add("#X obj 10 360 array get ockm-pat-d1;"); p1 = h.add("#X obj 10 390 print KICK;")
     a2 = h.add("#X obj 150 360 array get ockm-pat-bass-note 0 1;"); p2 = h.add("#X obj 150 390 print BASSNOTE;")
     for c in [(g, t), (a1, p1), (a2, p2)]: h.con(*c)
     h.con(t, a1, 1); h.con(t, a2, 0)
@@ -172,24 +172,54 @@ def accents_and_step_edits(work):
     f = os.path.join(work, "t_accent.pd"); h.finish(300, f)
     out = run(work, f)
     assert printed(out, "ROWOUT") == ["0.7", "1"], f"accent strengths wrong: {printed(out, 'ROWOUT')}"
-    assert printed(out, "KICK")[0].split()[3] == "2", "ockm-edit did not set kick step 4 to accent"
+    assert printed(out, "KICK")[0].split()[3] == "2", "ockm-edit did not set drum slot 1 step 4 to accent"
     assert printed(out, "BASSNOTE")[0] == "40", "ockm-bass-edit did not set bass step 1"
 
 @test
 def pattern_save_and_reload(work):
     h = Harness()
     h.at(100, "ockm-want 7")
-    h.at(200, "ockm-pat-kick 0 1 0 1 1 0 0 0 0 0 0 1 0 0 0 0 1 ; ockm-save bang")
+    h.at(200, "ockm-pat-d1 0 1 0 1 1 0 0 0 0 0 0 1 0 0 0 0 1 ; ockm-save bang")
     h.at(300, "ockm-want 0"); h.at(400, "ockm-want 7")
-    g = h.add("#X obj 10 300 r test-get;"); a = h.add("#X obj 10 330 array get ockm-pat-kick;"); p = h.add("#X obj 10 360 print RELOADED;")
+    g = h.add("#X obj 10 300 r test-get;"); a = h.add("#X obj 10 330 array get ockm-pat-d1 0 16;"); p = h.add("#X obj 10 360 print RELOADED;")
     h.con(g, a); h.con(a, p)
     h.at(500, "test-get bang")
     f = os.path.join(work, "t_save.pd"); h.finish(600, f)
     out = run(work, f)
     want = "1 0 1 1 0 0 0 0 0 0 1 0 0 0 0 1"
     assert printed(out, "RELOADED") == [want], f"reload gave {printed(out, 'RELOADED')}"
-    disk = open(os.path.join(work, "patterns", "kick.txt")).read().split()[112:128]
+    disk = open(os.path.join(work, "patterns", "d1.txt")).read().split()[7 * 128:7 * 128 + 16]
     assert " ".join(disk) == want, "slot 8 not written to disk"
+
+@test
+def drum_slot_switches_sound(work):
+    rates = []
+    for snd in [0, 4]:
+        h = Harness(dut="ockm-drum zz")
+        h.record(os.path.join(work, f"slot{snd}.wav"), source="dut")
+        h.at(20, f"ockm-zz-sound {snd}"); h.at(60, "test-in 1")
+        _, (s, sr) = play(work, h, f"t_slot{snd}", with_main=False, ms=400)
+        x = s[int(0.06 * sr):int(0.1 * sr)]
+        assert peak(x) > 0.05, f"slot is silent with sound {snd}"
+        rates.append(sum(1 for i in range(1, len(x)) if x[i - 1] < 0 <= x[i]) / 0.04)
+    assert rates[0] < 400 < 2000 < rates[1], f"sound 0 should be a low kick and 4 a bright hat, got {rates}"
+
+@test
+def longer_patterns_and_pages(work):
+    h = Harness(); h.show("ockm-step")
+    h.at(100, "ockm-length 32")
+    h.at(150, "ockm-page 1 ; ockm-sq-d1-1 1")
+    g = h.add("#X obj 10 300 r test-get;"); a = h.add("#X obj 10 330 array get ockm-pat-d1 0 32;"); pr = h.add("#X obj 10 360 print PAT;")
+    h.con(g, a); h.con(a, pr)
+    h.at(200, "test-get bang")
+    h.at(300, "ockm-play 1"); h.at(300 + 32 * 15000 / 124 + 30, "ockm-play 0")
+    f = os.path.join(work, "t_len.pd"); h.finish(4600, f)
+    out = run(work, f)
+    pat = [int(float(x)) for x in printed(out, "PAT")[0].split()]
+    assert pat[16:32] == [1, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0], f"steps 17-32 should repeat 1-16, plus the edit on step 18: {pat[16:32]}"
+    assert pat[0:16] == [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0], "editing page 2 changed page 1"
+    steps = [int(float(x)) for x in printed(out, "ockm-step")]
+    assert steps[:33] == list(range(32)) + [0], f"a 32-step pattern should count 1-32 then wrap: {steps[:34]}"
 
 @test
 def swing_and_bar_quantised_switching(work):
@@ -220,7 +250,7 @@ def bass_generator(work):
     def grab(ms, label):
         g = h.add(f"#X obj 10 300 r test-{label};"); t = h.add("#X obj 10 330 t b b b;")
         for i, nm in enumerate(["note", "on", "acc"]):
-            a = h.add(f"#X obj 10 360 array get ockm-pat-bass-{nm};"); l = h.add(f"#X obj 10 390 list prepend {label}-{nm};")
+            a = h.add(f"#X obj 10 360 array get ockm-pat-bass-{nm} 0 16;"); l = h.add(f"#X obj 10 390 list prepend {label}-{nm};")
             p = h.add("#X obj 10 420 list trim;"); pr = h.add("#X obj 10 450 print GEN;")
             h.con(t, a, 2 - i); h.con(a, l); h.con(l, p); h.con(p, pr)
         h.con(g, t)
@@ -236,6 +266,23 @@ def bass_generator(work):
     assert hits("a") == [33] * 4, "root notes in A minor should all be 33"
     assert hits("b") == [33, 33, 45, 33, 36, 33, 43, 40, 33, 33, 45, 33, 36], f"acid riff wrong: {hits('b')}"
     assert hits("c") == [36, 36, 31, 32] * 3, f"dub pattern in C phrygian wrong: {hits('c')}"
+
+@test
+def bass_generator_fills_long_patterns(work):
+    h = Harness()
+    h.at(100, "ockm-length 32 ; ockm-bass-notes 4 ; ockm-bass-rhythm 0")
+    g = h.add("#X obj 10 300 r test-get;"); t = h.add("#X obj 10 330 t b b;")
+    a1 = h.add("#X obj 10 360 array get ockm-pat-bass-on 0 32;"); p1 = h.add("#X obj 10 390 print ON;")
+    a2 = h.add("#X obj 150 360 array get ockm-pat-bass-note 0 32;"); p2 = h.add("#X obj 150 390 print NOTE;")
+    h.con(g, t); h.con(t, a1, 1); h.con(a1, p1); h.con(t, a2, 0); h.con(a2, p2)
+    h.at(200, "test-get bang")
+    f = os.path.join(work, "t_gen32.pd"); h.finish(300, f)
+    out = run(work, f)
+    on = [int(float(x)) for x in printed(out, "ON")[0].split()]
+    note = [int(float(x)) for x in printed(out, "NOTE")[0].split()]
+    assert on[16:] == on[:16] and sum(on) == 8, f"rhythm should repeat across 32 steps: {on}"
+    hits = [n for n, o in zip(note, on) if o]
+    assert hits == [33, 35, 36, 40] * 2, f"walk-up notes should carry on through bar 2: {hits}"
 
 @test
 def bass_engines_play_in_tune(work):

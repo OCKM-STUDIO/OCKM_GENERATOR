@@ -1,20 +1,21 @@
 # OCKM_GENERATOR
 
-A drum machine and an easy-to-program bass synth in one box. Built in Pure Data, designed to run on a Raspberry Pi with a 7" touchscreen and a few knobs.
+A drum machine and easy-to-program synths in one box. Built in Pure Data, designed to run on a Raspberry Pi with a 7" touchscreen and a few knobs.
 
-Current version: **v0.8**
+Current version: **v0.9**
 
 ## How to open it
 
 Open `OCKM_GENERATOR.pd` in plugdata. Keep the folder together: the main patch finds everything else in the subfolders.
 
 - Click **start/stop** to play
-- Click squares to switch steps on and off
-- Pick a **pattern** slot (1 to 8). While playing, it switches at the end of the bar
+- Click squares to switch steps on and off. The squares show 16 steps at a time: set **page** to see later steps
+- Set **length** to make the current pattern 1 to 128 steps long. Making it longer repeats what's there to fill the new steps
+- Pick a **pattern** slot (1 to 8). While playing, it switches at the end of the bar and starts from step 1
 - Press **save** to store the grid in the current slot. It's written to disk straight away
 - **Swing %**: 50 is straight. 56 to 62 is the MPC zone
 - **Accent**: how much quieter normal hits are than accented ones. 0 means no difference
-- **pd drum-settings** (bottom left): tune, decay, level, reverb send and delay send for each drum
+- **pd drum-settings** (bottom left): for each of the 6 drum slots, which sound it plays, plus tune, decay, level, reverb send and delay send
 - **Bass**: pick an engine (0 acid, 1 sub, 2 FM, 3 reese, 4 pluck, 5 saw), then drag k1 to k4 and drive while it plays. All knobs run 0 to 1
 - **pd master-fx** (bottom): reverb and delay levels, reverb size and tone, bass sends, DJ filter and drive
 - **pd midi-sync** (bottom): leader (sends MIDI clock) or follower (plays to incoming clock)
@@ -50,16 +51,22 @@ Open `OCKM_GENERATOR.pd` in plugdata. Keep the folder together: the main patch f
 2. ~~Bass rhythm presets, note patterns, keys and scales~~ (v0.2). Still to do: editing single bass steps
 3. ~~Drum accents per step, plus tune, decay and level per drum~~ (v0.3)
 4. ~~More drum voices, up to 8: snare, rim, toms, percussion~~ (v0.3)
-5. Touchscreen interface: Lua grid with a drums page, a bass page and a top bar
+5. Touchscreen interface: Lua grid with a drums page, a synths page and a top bar
 6. Knobs for live bass control: MIDI mapping, plus drive and accent level (waiting on a controller to test with)
 7. ~~Bass engines (acid, sub, FM, Reese, pluck) and master effects (drive, delay, filter)~~ (v0.4)
 8. ~~MIDI clock sync~~ (v0.5)
 9. Move to the Pi and start on boot
+10. ~~6 flexible drum slots and patterns up to 128 steps~~ (v0.9)
+11. Chord and lead synth tracks (v0.10)
+12. One central settings store, so nothing resets when you reopen the patch, plus kits (v0.11)
+13. Your drum samples, chosen per slot
 
 ## Decisions made
 
 - **Raspberry Pi, not Daisy or Arduino.** No hardware skills needed, and it runs full Pd, so nothing has to be rewritten.
-- **8 drum tracks plus 2 synth tracks.** Fits the screen and stays playable.
+- **9 tracks: 6 drum slots plus 3 synths (bass, chord, lead).** More would make the screen too busy without making the music better.
+- **8 pattern slots, each up to 128 steps.** One length per pattern, shown 16 steps at a time.
+- **Drum slots are flexible.** Each of the 6 slots can play any of the 8 drum sounds, and later any of your samples.
 - **7" touchscreen plus a few knobs.** The screen is for editing. The knobs are for playing.
 - **Toggles first, Lua grid later.** Toggles kept everything visible while learning. The touchscreen needs the Lua grid.
 - **Synthesised drums for now.** Samples can be swapped in later, one voice at a time.
@@ -69,7 +76,7 @@ Open `OCKM_GENERATOR.pd` in plugdata. Keep the folder together: the main patch f
 
 - FM drum and bass voices (likely to come back with the bass engines)
 - Probability, ratchets and Euclidean patterns
-- Different lengths per row
+- Different lengths per row (one length per pattern for now)
 - An Arduino-built custom control panel
 - The Daisy route for a fully embedded box
 
@@ -82,9 +89,9 @@ Open `OCKM_GENERATOR.pd` in plugdata. Keep the folder together: the main patch f
 | Path | What it is |
 |---|---|
 | `OCKM_GENERATOR.pd` | Main patch: clock, swing, pattern slots, mixer |
-| `voices/` | One file per sound: 8 drums, the reverb (`ockm-verb`), the bass (`ockm-bass` plus one file per engine and a shared `ockm-bass-core`), and the master effects (`ockm-fx`) |
+| `voices/` | One file per sound: 8 drums plus `ockm-drum` (a slot that plays any of them), the reverb (`ockm-verb`), the bass (`ockm-bass` plus one file per engine and a shared `ockm-bass-core`), and the master effects (`ockm-fx`) |
 | `seq/` | Sequencers: the drum row, the bass pattern and the bass generator (which also holds the bass presets) |
-| `patterns/` | Saved pattern slots, 8 per track. Edited by the patch, not by hand |
+| `patterns/` | Saved pattern slots: 8 slots x 128 steps per track (`d1` to `d6`, `bass-*`), plus `length.txt`. Edited by the patch, not by hand |
 | `sketches/` | Early experiments, kept for reference |
 | `tools/build.py` | Builds every `.pd` file. Structural changes are made here, then the patch files are rebuilt |
 | `tests/run_tests.py` | Plays the patch headless and checks it still works (sounds, accents, patterns, swing, bass, effects, MIDI clock) |
@@ -97,9 +104,9 @@ Open `OCKM_GENERATOR.pd` in plugdata. Keep the folder together: the main patch f
 - *Sound tweaks* (tune, levels, knobs, patterns): use the controls in the patch, as normal.
 - *Structural changes* (new objects, new voices, rewiring): made in `tools/build.py`, then rebuilt with `python3 tools/build.py`. Don't rewire the generated `.pd` files by hand, because the next rebuild would overwrite it. The build never touches `patterns/` unless you add `--reset-patterns`.
 
-**Tests.** `python3 tests/run_tests.py` runs 12 checks in about a minute. It needs vanilla Pure Data's `pd` command, which comes with the Pi's `puredata` package. It works on a temporary copy, so your patterns are safe.
+**Tests.** `python3 tests/run_tests.py` runs 15 checks in about a minute and a half. It needs vanilla Pure Data's `pd` command, which comes with the Pi's `puredata` package. It works on a temporary copy, so your patterns are safe.
 
-**Internal names.** Every shared name starts with `ockm-` so nothing clashes with other patches. Pattern tables are `ockm-pat-<track>`, slot banks are `ockm-bank-<track>`, and the step squares are `ockm-sq-<track>-<step>`.
+**Internal names.** Every shared name starts with `ockm-` so nothing clashes with other patches. Pattern tables are `ockm-pat-<track>`, slot banks are `ockm-bank-<track>`, and the step squares are `ockm-sq-<track>-<square>`. Drum tracks are `d1` to `d6`.
 
 ## Named hooks
 
@@ -110,15 +117,19 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 | `ockm-play` | 1 to start, 0 to stop |
 | `ockm-want` | Pick a pattern slot, 0 to 7 |
 | `ockm-save` | Save the current slot |
-| `ockm-step` | Sends the current step, 0 to 15, as it plays |
+| `ockm-step` | Sends the current step as it plays, counting from 0 |
+| `ockm-length` | Set the current pattern's length, 1 to 128. Lengthening repeats existing steps |
+| `ockm-len` | Sent whenever the active length changes (for example when a pattern loads) |
+| `ockm-page` | Which 16 steps the squares show: 0 is steps 1 to 16, 1 is 17 to 32, up to 7 |
+| `ockm-extend` | Internal: tells every track to repeat its steps to fill a longer pattern |
 | `ockm-master` | The final audio mix |
 | `ockm-bass-rhythm` | Bass rhythm preset, 0 to 7, and rebuild |
 | `ockm-bass-notes` | Note pattern, 0 to 7, and rebuild |
 | `ockm-bass-root` | Key, 0 to 11 (0 = C, 9 = A), and rebuild |
 | `ockm-bass-scale` | Scale, 0 to 5, and rebuild |
 | `ockm-bass-gen` | Rebuild the bassline with the current settings |
-| `ockm-edit` | Set one drum step: track, step (0 to 15), value (0 off, 1 on, 2 accent). For example `kick 4 2` |
-| `ockm-bass-edit` | Set one bass step: step, note (MIDI), on, accent, slide. For example `0 33 1 1 0` |
+| `ockm-edit` | Set one drum step: slot, step (0 to 127), value (0 off, 1 on, 2 accent). For example `d1 4 2` |
+| `ockm-bass-edit` | Set one bass step: step (0 to 127), note (MIDI), on, accent, slide. For example `0 33 1 1 0` |
 | `ockm-accent` | Accent amount, 0 to 1 |
 | `ockm-bass-engine` | Bass engine: 0 acid, 1 sub, 2 FM, 3 reese, 4 pluck, 5 saw |
 | `ockm-bass-k1` to `ockm-bass-k4` | Bass knobs, 0 to 1. What they do depends on the engine (see below) |
@@ -131,8 +142,9 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 | `ockm-verb-mix` | Reverb return level, 0 to 1 |
 | `ockm-verb-size` | Reverb size, 0 (small room, about 0.4s) to 1 (big hall, about 3s) |
 | `ockm-verb-tone` | Reverb tone, 0 dark to 1 bright |
-| `ockm-<drum>-verb` | How much of that drum goes to the reverb, 0 to 1 |
-| `ockm-<drum>-delay` | How much of that drum goes to the delay, 0 to 1 |
+| `ockm-<slot>-sound` | Which sound a drum slot plays: 0 kick, 1 snare, 2 clap, 3 rim, 4 closed hat, 5 open hat, 6 tom, 7 rimshot |
+| `ockm-<slot>-verb` | How much of that slot goes to the reverb, 0 to 1 |
+| `ockm-<slot>-delay` | How much of that slot goes to the delay, 0 to 1 |
 | `ockm-bass-verb`, `ockm-bass-delay` | Bass reverb and delay sends |
 | `ockm-stepms` | Sent by the clock: length of one step in ms |
 | `ockm-sync` | 0 leader (internal clock, sends MIDI clock), 1 follower (plays to incoming MIDI clock) |
@@ -142,15 +154,17 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 | `ockm-tick` | Advance one step (used by the follower) |
 | `ockm-reset` | Next step will be step 1 |
 | `ockm-midi-rt` | Feed in MIDI clock bytes from somewhere other than a MIDI port |
-| `ockm-<drum>-tune` | Tune in semitones, -12 to 12. Drums: kick, snare, clap, rim, chat, ohat, tom, perc |
-| `ockm-<drum>-decay` | Decay in %, 100 is normal |
-| `ockm-<drum>-level` | Level, 0 to 1 |
+| `ockm-<slot>-tune` | Tune in semitones, -12 to 12. Slots: d1 to d6 |
+| `ockm-<slot>-decay` | Decay in %, 100 is normal |
+| `ockm-<slot>-level` | Level, 0 to 1 |
 
 ## Drums
 
-Eight tracks: kick, snare, clap, rim, closed hat, open hat, tom and perc (a 909-style rimshot; the old cowbell is in `sketches/`). Each step can be off, on or accented. Accented steps play at full strength. Normal steps play at full strength minus the accent amount. For now, accents are set with the `ockm-edit` hook. The squares show on or off only, until the touchscreen work.
+Six drum slots, d1 to d6. Each slot can play any of 8 sounds: 0 kick, 1 snare, 2 clap, 3 rim, 4 closed hat, 5 open hat, 6 tom, 7 rimshot (the old cowbell is in `sketches/`). Only the chosen sound runs. The default line-up is kick, snare, clap, closed hat, open hat and rimshot.
 
-Per-drum tune, decay and level aren't saved with patterns yet. Saved drum kits will come later.
+Each step can be off, on or accented. Accented steps play at full strength. Normal steps play at full strength minus the accent amount. For now, accents are set with the `ockm-edit` hook. The squares show on or off only, until the touchscreen work.
+
+Slot sounds and per-drum tune, decay and level aren't saved yet. That comes with the central settings store in v0.11.
 
 ## Bass engines
 
@@ -180,7 +194,7 @@ Pick the MIDI port in plugdata's audio and MIDI settings. On the Pi, the iRig Pr
 
 ## Bass presets
 
-The bassline is built from three choices. Change any one and it rebuilds straight away.
+The bassline is built from four choices: rhythm, notes, key and scale. Change any one and it rebuilds straight away, filling the whole pattern length. The 16-step rhythm repeats, and the note pattern carries on across bars.
 
 **Rhythms** (when it plays): 0 offbeat, 1 rolling, 2 gallop, 3 acid classic, 4 sparse dub, 5 tech bounce, 6 acid 16ths, 7 trip hop
 
@@ -188,4 +202,4 @@ The bassline is built from three choices. Change any one and it rebuilds straigh
 
 **Scales**: 0 minor, 1 major, 2 dorian, 3 phrygian, 4 mixolydian, 5 harmonic minor
 
-To add or change presets, open `seq/ockm-bassgen.pd`, double-click the preset lists, edit and save. Rhythm codes are 0 rest, 1 note, 2 accent, 3 note plus slide, 4 accent plus slide. Notes are scale steps: 0 root, 2 third, 4 fifth, 7 octave, minus numbers go below the root.
+The presets live in `tools/build.py` (in `build_bassgen`), so they survive rebuilds. To add or change one, ask me, or edit the lists there and rebuild. Rhythm codes are 0 rest, 1 note, 2 accent, 3 note plus slide, 4 accent plus slide. Notes are scale steps: 0 root, 2 third, 4 fifth, 7 octave, minus numbers go below the root.

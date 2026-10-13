@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.9 (13 October 2026)
+
+**Added**
+- Patterns up to 128 steps, with one length per pattern, saved per slot
+- Pages: the squares show 16 steps at a time, and the page control moves through the pattern
+- Making a pattern longer repeats its existing steps to fill the new ones (all tracks)
+- The bass generator now fills the whole pattern length
+- Drum slots: each of the 6 drum tracks can play any of the 8 drum sounds
+- 3 new tests: slot sound switching, long patterns and pages, and the generator filling long patterns
+
+**Changed**
+- 6 drum slots instead of 8 fixed drums. Defaults: kick, snare, clap, closed hat, open hat, rimshot
+- Switching patterns, and pressing play, now start from step 1
+- Pattern files are now `d1` to `d6` (8 slots x 128 steps), plus `length.txt`. The old per-drum files were retired; the starter patterns were carried over
+
+**Fixed**
+- Two places where Pd's wiring order wasn't guaranteed are now explicit, so a pattern switch always starts cleanly
+
 ## v0.8 (13 October 2026)
 
 Housekeeping release. Sounds and behaviour are unchanged.
