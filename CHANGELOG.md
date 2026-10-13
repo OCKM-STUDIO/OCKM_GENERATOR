@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.15.1 (13 October 2026)
+
+**Fixed**
+- The synths screen showed "step 1.0" instead of "step 1"
+- The note under the screen no longer names an old version
+- The screen tests now pass numbers the way plugdata does, and fail if a number is drawn as a decimal
+
 ## v0.15 (13 October 2026)
 
 **Added**

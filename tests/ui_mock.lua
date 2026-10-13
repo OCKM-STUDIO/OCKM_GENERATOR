@@ -61,7 +61,10 @@ function pd.send(name, sel, atoms)
   for _, x in ipairs(atoms or {}) do a[#a + 1] = tostring(x) end
   emit("sent " .. name .. " " .. sel .. " " .. table.concat(a, " "))
   engine(name, sel, atoms or {})
-  for _, r in ipairs(receivers[name] or {}) do r.obj[r.method](r.obj, sel, atoms or {}) end
+  -- Pd only has floats: hand numbers on as floats, like plugdata does
+  local fa = {}
+  for k, x in ipairs(atoms or {}) do fa[k] = (type(x) == "number") and (x + 0.0) or x end
+  for _, r in ipairs(receivers[name] or {}) do r.obj[r.method](r.obj, sel, fa) end
 end
 
 -- drawing: record every call

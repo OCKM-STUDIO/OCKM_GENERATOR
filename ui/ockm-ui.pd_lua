@@ -141,11 +141,11 @@ function ui:postinitialize()
     listen("ockm-show-" .. hook:sub(6), set)
   end
   listen("ockm-playing", function(o, sel, a) o.playing = tonumber(a[1]) or 0; o:dirty() end)
-  listen("ockm-load",    function(o, sel, a) o.cur = tonumber(a[1]) or 0; o.want = nil; o:dirty() end)
+  listen("ockm-load",    function(o, sel, a) o.cur = math.floor(tonumber(a[1]) or 0); o.want = nil; o:dirty() end)
   listen("ockm-want",    function(o, sel, a)
     local n = tonumber(a[1]); if n and (o.playing ~= 0) and n ~= o.cur then o.want = n end; o:dirty() end)
-  listen("ockm-page",    function(o, sel, a) o.page = tonumber(a[1]) or 0; o:dirty() end)
-  listen("ockm-step",    function(o, sel, a) o:on_step(tonumber(a[1]) or 0) end)
+  listen("ockm-page",    function(o, sel, a) o.page = math.floor(tonumber(a[1]) or 0); o:dirty() end)
+  listen("ockm-step",    function(o, sel, a) o:on_step(math.floor(tonumber(a[1]) or 0)) end)
   for _, n in ipairs({ "ockm-refresh","ockm-edit","ockm-extend","ockm-bass-edit","ockm-lead-edit","ockm-chord-edit",
                        "ockm-bass-gen","ockm-lead-gen","ockm-chord-gen" }) do
     listen(n, function(o) o:dirty() end)
@@ -488,7 +488,7 @@ end
 
 function ui:step_info()
   local i = self.sel_step
-  local s = "step " .. (self:abs(i) + 1)
+  local s = string.format("step %d", math.floor(self:abs(i) + 1))
   if SYNTHS[self.part] == "chord" then
     if self:chord_get(i, "on") > 0 then s = s .. "   chord " .. (ROMAN[(math.floor(self:chord_get(i, "deg")) % 7) + 1]) end
   elseif self:mono_get(i, "on") > 0 then
@@ -653,7 +653,7 @@ function ui:draw(g, w)
     local playing = (w.n == self.cur)
     self:col(g, playing and "on" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
     if self.want == w.n then self:col(g, "acc"); g:stroke_rounded_rect(w.x + 1, w.y + 1, w.w - 2, w.h - 2, 6, 3) end
-    self:ctext(g, tostring(w.n + 1), w, 22, playing and "bg" or "txt")
+    self:ctext(g, string.format("%d", math.floor(w.n + 1)), w, 22, playing and "bg" or "txt")
   elseif k == "choice" then
     local sel = w.sel
     self:col(g, sel and (w.accent and "acc" or "on") or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)

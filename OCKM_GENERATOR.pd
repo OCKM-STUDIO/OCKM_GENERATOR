@@ -764,4 +764,4 @@
 #X obj 0 0 ockm-panel;
 #X restore 130 624 pd test-panel;
 #X obj 270 624 declare -path voices -path seq -path ui;
-#X text 20 654 OCKM_GENERATOR v0.13. The screen above is the instrument. pd engine is the sound and the sequencer. pd test-panel is the old v0.12 panel \, kept for testing. The screen needs pdlua (built into plugdata).;
+#X text 20 654 OCKM_GENERATOR. The screen above is the instrument (see CHANGELOG.md for the version). pd engine is the sound and the sequencer. pd test-panel is the old v0.12 panel \, kept for testing. The screen needs pdlua (built into plugdata).;

@@ -448,7 +448,7 @@ tp=P(); tp.add("#X obj 0 0 ockm-panel;")
 m.L.append(tp.text(f"#N canvas 80 80 {PANW+40} {PANH+40} test-panel 0;").rstrip("\n"))
 m.add(f"#X restore 130 {by} pd test-panel;")
 m.add(f"#X obj 270 {by} declare {DECL};")
-m.add(f"#X text 20 {by+30} OCKM_GENERATOR v0.13. The screen above is the instrument. pd engine is the sound and the sequencer. pd test-panel is the old v0.12 panel \\, kept for testing. The screen needs pdlua (built into plugdata).;")
+m.add(f"#X text 20 {by+30} OCKM_GENERATOR. The screen above is the instrument (see CHANGELOG.md for the version). pd engine is the sound and the sequencer. pd test-panel is the old v0.12 panel \\, kept for testing. The screen needs pdlua (built into plugdata).;")
 m.save("OCKM_GENERATOR.pd",f"#N canvas 40 40 {UIW} {UIH+80} 12;")
 
 

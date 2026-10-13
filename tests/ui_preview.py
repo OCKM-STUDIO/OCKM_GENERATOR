@@ -104,6 +104,9 @@ def main():
     errs = [l for l in lines if l.startswith("error")]
     if errs:
         raise RuntimeError("\n".join(errs))
+    leaks = [l for l in lines if l.startswith("text ") and re.search(r"\d\.0\b", " ".join(l.split()[4:]))]
+    if leaks:
+        raise RuntimeError("numbers drawn as decimals: " + " | ".join(leaks[:5]))
     for name, _ in SHOTS:
         render(lines, name, os.path.join(out, f"{name}-{theme}.png"))
     print("wrote", out)
