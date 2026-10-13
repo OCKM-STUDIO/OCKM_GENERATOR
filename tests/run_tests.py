@@ -533,7 +533,7 @@ def front_panel_drives_the_engine(work):
 def touchscreen_drives_the_engine(work):
     if not PDLUA:
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
-    h = Harness(); h.show("ockm-edit", "ockm-page", "ockm-len", "ockm-load", "ockm-d1-sound", "ockm-bass-edit", "ockm-want", "ockm-lead-k1", "ockm-filter", "ockm-chord-prog", "ockm-chord-type")
+    h = Harness(); h.show("ockm-edit", "ockm-page", "ockm-len", "ockm-load", "ockm-d1-sound", "ockm-bass-edit", "ockm-want", "ockm-lead-k1", "ockm-filter", "ockm-chord-prog", "ockm-chord-type", "ockm-d1-mute", "ockm-d2-mute", "ockm-bass-level")
     tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
     h.at(100, "ockm-resync bang")
     tap(150, 60, 155)                    # perform: open the kick lane
@@ -553,10 +553,14 @@ def touchscreen_drives_the_engine(work):
     tap(290, 300, 36)                    # perform tab
     tap(300, 300, 100)                   # pattern 3
     tap(310, 752, 558)                   # master filter, middle
-    tap(320, 560, 36); tap(325, 260, 94)  # synths tab, chord part
+    tap(320, 510, 36); tap(325, 260, 94)  # synths tab, chord part
     tap(330, 187, 378)                   # fill view
     tap(335, 430, 446)                   # progression 5 (garage)
     tap(340, 300, 572)                   # spice 3 (ninth)
+    tap(345, 300, 36); tap(348, 128, 155)  # perform tab, mute the kick lane
+    tap(350, 618, 36)                    # mixer tab
+    tap(355, 673, 335)                   # bass fader, halfway
+    tap(360, 130, 512)                   # mute on strip 2
     f = os.path.join(work, "t_touch.pd"); h.finish(600, f)
     out = run(work, f)
     edits = printed(out, "ockm-edit")
@@ -573,6 +577,10 @@ def touchscreen_drives_the_engine(work):
     assert any(0.4 < x < 0.6 for x in lk), f"perform strip: lead knob 1 should be about halfway: {lk}"
     assert any(abs(float(x)) < 0.1 for x in printed(out, "ockm-filter")), "perform strip: filter in the middle should be about 0"
     assert "4" in printed(out, "ockm-chord-prog"), f"fill: progression 5 should send 4: {printed(out, 'ockm-chord-prog')}"
+    assert "1" in printed(out, "ockm-d1-mute"), "perform: M on the kick lane should mute d1"
+    assert "1" in printed(out, "ockm-d2-mute"), "mixer: M on strip 2 should mute d2"
+    bl = [float(x) for x in printed(out, "ockm-bass-level")]
+    assert any(0.4 < x < 0.6 for x in bl), f"mixer: bass fader halfway should be about 0.5: {bl}"
     assert "6" in printed(out, "ockm-chord-type"), f"fill: spice 3 should pick the ninth chord type (6): {printed(out, 'ockm-chord-type')}"
     assert not [l for l in out.splitlines() if "error" in l.lower()], "errors: " + " | ".join(l for l in out.splitlines() if "error" in l.lower())
 
@@ -586,7 +594,28 @@ def touchscreen_screens_draw(work):
         raise Skip("Pillow not installed")
     p = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_preview.py"), os.path.join(work, "preview")], capture_output=True, text=True)
     assert p.returncode == 0, p.stderr[-800:]
-    assert len(os.listdir(os.path.join(work, "preview"))) == 6, "expected six screen pictures"
+    assert len(os.listdir(os.path.join(work, "preview"))) == 8, "expected eight screen pictures"
+
+@test
+def mute_solo_and_levels(work):
+    h = Harness()
+    sig = h.add("#X obj 400 40 sig~ 1;")
+    g = {}
+    for i, (t, lv) in enumerate([("d1", "nolevel"), ("d2", "nolevel"), ("bass", "level")]):
+        g[t] = h.add(f"#X obj {400 + i * 150} 70 ockm-gate {t} {lv};"); h.con(sig, g[t])
+        sn = h.add(f"#X obj {400 + i * 150} 100 snapshot~;"); h.con(g[t], sn)
+        pr = h.add(f"#X obj {400 + i * 150} 130 print G-{t};"); h.con(sn, pr)
+        rb = h.add(f"#X obj {400 + i * 150} 10 r test-snap;"); h.con(rb, sn)
+    h.at(100, "test-snap bang")                                   # all open
+    h.at(120, "ockm-d1-mute 1"); h.at(160, "test-snap bang")      # d1 muted
+    h.at(180, "ockm-d1-mute 0 ; ockm-d2-solo 1"); h.at(220, "test-snap bang")   # d2 soloed: others silent
+    h.at(240, "ockm-d2-solo 0 ; ockm-bass-level 0.5"); h.at(280, "test-snap bang")  # no solo, bass at half
+    f = os.path.join(work, "t_gate.pd"); h.finish(320, f)
+    out = run(work, f)
+    got = {t: [round(float(x), 2) for x in printed(out, f"G-{t}")] for t in g}
+    assert got["d1"] == [1, 0, 0, 1], f"d1: open, muted, not soloed, open: {got['d1']}"
+    assert got["d2"] == [1, 1, 1, 1], f"d2: always open (it's the soloed one): {got['d2']}"
+    assert got["bass"] == [1, 1, 0, 0.5], f"bass: open, open, not soloed, half level: {got['bass']}"
 
 def main():
     if not PD:

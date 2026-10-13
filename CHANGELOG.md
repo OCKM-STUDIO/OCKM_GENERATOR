@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.16 (13 October 2026)
+
+**Added**
+- Mute and solo for every track, on the perform screen (**M** and **S** on each lane) and on the mixer. They fade in and out over 10 ms, so they don't click, and they also silence that track's reverb and delay sends. Silent lanes go dim
+- A **mixer** screen: a strip per track with reverb and delay sends, a level fader, mute and solo, plus a master strip with the reverb and delay returns, master volume and a "clear" for mutes and solos
+- A level for bass, lead and chord (saved with each pattern) and a master volume (saved with the project)
+- 1 new test for mute, solo and level. The touchscreen test now mutes from perform and uses the mixer
+
+**Fixed**
+- The step screens' playhead no longer shows on other screens
+
 ## v0.15.2 (13 October 2026)
 
 **Added**

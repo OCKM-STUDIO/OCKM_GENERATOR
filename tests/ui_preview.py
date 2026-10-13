@@ -90,6 +90,8 @@ SHOTS = [
     ("chord", ["test tap 260 94", "test tap 89 210"]),
     ("chord-fill", ["test tap 187 378"]),
     ("bass-fill", ["test tap 70 94"]),
+    ("perform-mutes", ["test tap 300 36", "test tap 128 155", "test tap 164 352"]),   # mute kick, solo bass
+    ("mixer", ["test tap 618 36"]),
 ]
 
 

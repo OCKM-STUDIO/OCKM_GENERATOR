@@ -2,7 +2,7 @@
 
 A drum machine and easy-to-program synths in one box. Built in Pure Data, designed to run on a Raspberry Pi with a touchscreen and a few knobs.
 
-Current version: **v0.15**
+Current version: **v0.16**
 
 ## How to open it
 
@@ -10,13 +10,14 @@ Open `OCKM_GENERATOR.pd` in plugdata. Keep the folder together: the main patch f
 
 The window is the instrument: three touch screens, drawn in Lua (plugdata has Lua built in). Click with the mouse on the Mac, tap with a finger on the Pi. If clicks do nothing, the patch is in edit mode: press Cmd+E.
 
-**Moving between screens:** the tabs along the top (**perform**, **drums**, **synths**) are on every screen, next to play and tempo. Or tap a track's name on perform to jump straight to it.
+**Moving between screens:** the tabs along the top (**perform**, **drums**, **synths**, **mixer**) are on every screen, next to play and tempo. Or tap a track's name on perform to jump straight to it.
 
 **Perform** (home)
 - **Play** and **tempo** top left. Drag the tempo number up or down
 - **Patterns 1 to 8**: tap to switch. While playing it waits for the end of the bar; the queued one gets an orange outline
 - **Now**: all 11 tracks for the 16 steps that are playing, with the playhead running above them. It's a picture, not an editor
 - Tap a track's **name** to open it
+- **M** mutes a track and **S** solos it (several can be soloed at once). Silent tracks go dim. Mutes and solos are for playing live, so they aren't saved
 - **Sound strip**: pick bass, lead or chord, then play its four main knobs (named for the engine it's using). The **filter** next to length is the master DJ filter
 - **Length**: 16, 32, 64 or 128 steps. Making it longer repeats what's there
 - **Save** and **revert**, top right
@@ -35,6 +36,11 @@ The window is the instrument: three touch screens, drawn in Lua (plugdata has Lu
 - Underneath, two views: **sound** (engine, its four knobs named for the engine, drive, reverb and delay sends) and **fill**
 - **Fill for bass and lead**: pick a rhythm and notes and press **new** to write the whole pattern. Then swipe and tweak single steps
 - **Fill for chords**: pick a **progression** (1 to 10), a **rhythm** (1 to 10) and the **spice** (1 to 4). Picking a progression or rhythm rewrites the chord part straight away. **Smooth** plays each chord in the shape closest to the last one
+
+**Mixer**
+- One strip per track: reverb and delay sends at the top, a level fader, then **M** and **S**. Tap a strip's name to open that track
+- **Master** on the right: the reverb and delay return levels, the master volume, and **clear** to undo every mute and solo
+- Drum levels belong to the kit (the project). Bass, lead and chord levels belong to each pattern, like the rest of their sound
 
 Swing, accent amount, the other master effects and MIDI clock aren't on the screens yet. They're still saved, and they're in **pd test-panel**.
 

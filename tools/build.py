@@ -257,15 +257,15 @@ DLY=[0,0,0,0.25,0,0,0,0.3]                 # default delay send per sound
 MONO=["note","on","acc","slide"]; CHORD=["on","deg"]
 def show(h): return "ockm-show-"+h[5:]
 # Settings registry: (hook, default, hook the store listens to if different)
-PROJECT_KEYS=[("ockm-bpm",124,"ockm-tempo"),("ockm-accent",0.3,None),("ockm-filter",0,None),("ockm-drive",0,None),
+PROJECT_KEYS=[("ockm-bpm",124,"ockm-tempo"),("ockm-volume",1,None),("ockm-accent",0.3,None),("ockm-filter",0,None),("ockm-drive",0,None),
     ("ockm-delay-mix",0.5,None),("ockm-delay-fb",0.4,None),("ockm-delay-steps",3,None),("ockm-verb-mix",0.5,None),
     ("ockm-verb-size",0.6,None),("ockm-verb-tone",0.5,None),("ockm-sync",0,None),("ockm-clock-out",1,None)]
 for nm,snd in SLOTS:
     PROJECT_KEYS+=[(f"ockm-{nm}-sound",snd,None),(f"ockm-{nm}-tune",0,None),(f"ockm-{nm}-decay",100,None),
                    (f"ockm-{nm}-level",1,None),(f"ockm-{nm}-verb",VERB[snd],None),(f"ockm-{nm}-delay",DLY[snd],None)]
-SYNTH_DEFAULTS={"bass":dict(engine=0,k1=0.37,k2=0.9,k3=0.31,k4=0.55,drive=0,verb=0,delay=0,rhythm=3,notes=3),
-                "lead":dict(engine=4,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0.2,delay=0.25,rhythm=6,notes=8),
-                "chord":dict(engine=0,k1=0.45,k2=0.5,k3=0.4,k4=0.3,type=0,smooth=1,verb=0.3,delay=0.35,rhythm=0,prog=0)}
+SYNTH_DEFAULTS={"bass":dict(engine=0,level=1,k1=0.37,k2=0.9,k3=0.31,k4=0.55,drive=0,verb=0,delay=0,rhythm=3,notes=3),
+                "lead":dict(engine=4,level=1,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0.2,delay=0.25,rhythm=6,notes=8),
+                "chord":dict(engine=0,level=1,k1=0.45,k2=0.5,k3=0.4,k4=0.3,type=0,smooth=1,verb=0.3,delay=0.35,rhythm=0,prog=0)}
 PATTERN_KEYS=[("ockm-len",16,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None)]
 for t,d in SYNTH_DEFAULTS.items():
     PATTERN_KEYS+=[(f"ockm-{t}-{k}",v,None) for k,v in d.items()]
@@ -326,15 +326,26 @@ for c in [(rlg,0,clp,0),(clp,0,tl4,0),(tl4,2,pkx,1),(tl4,1,gt,0),(gt,0,sg1,0),(s
 rvb=p.add("#X obj 810 50 bng 25 250 50 0 empty empty empty 17 7 0 10 #fcfcfc #000000 #000000;"); p.add("#X text 842 52 revert;")
 p.con(rvb,0,p.add("#X obj 810 85 s ockm-revert;"),0)
 p.add("#X obj 1100 420 ockm-store;")
+p.add(f"#X obj 1250 450 table ockm-solos {len(SLOTS)+3};")
+_sum=p.add("#X obj 1250 560 array sum ockm-solos;"); _ss=p.add("#X obj 1250 585 s ockm-soloing;")
+p.con(_sum,0,_ss,0)
+for _i,_t in enumerate([n for n,_ in SLOTS]+["bass","lead","chord"]):
+    _r=p.add(f"#X obj {1250+(_i%6)*110} {480+(_i//6)*40} r ockm-{_t}-solo;"); _ne=p.add(f"#X obj {1250+(_i%6)*110} {500+(_i//6)*40} != 0;")
+    _tw=p.add(f"#X obj {1250+(_i%6)*110} {520+(_i//6)*40} tabwrite ockm-solos {_i};"); _tb=p.add(f"#X obj {1300+(_i%6)*110} {520+(_i//6)*40} t b f;")
+    p.con(_r,0,_ne,0); p.con(_ne,0,_tb,0); p.con(_tb,1,_tw,0); p.con(_tb,0,_sum,0)
 p.add(f"#X text 1100 395 settings and patterns: {PROJ_DIR} (project.txt and p1 to p8);")
 # drums
 mix=p.add("#X obj 560 1000 *~ 0.3;"); fx=p.add("#X obj 560 1030 ockm-fx;"); dac=p.add("#X obj 560 1065 dac~;"); smaster=p.add("#X obj 640 1065 s~ ockm-master;")
-p.con(mix,0,fx,0); p.con(fx,0,dac,0); p.con(fx,0,dac,1); p.con(fx,0,smaster,0)
+vol=p.add("#X obj 560 1048 *~;"); rvol=p.add("#X obj 700 1000 r ockm-volume;"); pvol=p.add("#X obj 700 1020 pack f 20;"); lvol=p.add("#X obj 700 1040 line~;")
+p.con(mix,0,fx,0); p.con(fx,0,vol,0); p.con(rvol,0,pvol,0); p.con(pvol,0,lvol,0); p.con(lvol,0,vol,1)
+p.con(vol,0,dac,0); p.con(vol,0,dac,1); p.con(vol,0,smaster,0)
+lbv=p.add("#X obj 820 1000 loadbang;"); onev=p.add("#X msg 820 1020 1;"); p.con(lbv,0,onev,0); p.con(onev,0,pvol,0)
 for r,(nm,snd) in enumerate(SLOTS):
     y=380+r*40
     p.add(f"#X text 20 {y+2} {nm} {SOUND_NAMES[snd].replace(' ','-')};")
     row=p.add(f"#X obj 110 {y} ockm-row {nm};"); v=p.add(f"#X obj 560 {y+2} ockm-drum {nm};")
-    p.con(pipe,0,row,0); p.con(row,0,v,0); p.con(v,0,mix,0)
+    gt=p.add(f"#X obj 660 {y+2} ockm-gate {nm} nolevel;")
+    p.con(pipe,0,row,0); p.con(row,0,v,0); p.con(v,0,gt,0); p.con(gt,0,mix,0); v=gt
     vs=p.add(f"#X obj 760 {y+2} *~ 0;"); vt=p.add(f"#X obj 830 {y+2} throw~ ockm-revbus;"); vr=p.add(f"#X obj 760 {y-18} r ockm-{nm}-verb;")
     p.con(v,0,vs,0); p.con(vs,0,vt,0); p.con(vr,0,vs,1)
     ds=p.add(f"#X obj 990 {y+2} *~ 0;"); dt_=p.add(f"#X obj 1060 {y+2} throw~ ockm-dlybus;"); dr_=p.add(f"#X obj 990 {y-18} r ockm-{nm}-delay;")
@@ -362,11 +373,12 @@ for r,(nm,seqo,voi) in enumerate(SYN):
     y=by+r*40
     p.add(f"#X text 20 {y+2} {nm};")
     sq=p.add(f"#X obj 110 {y} {seqo};"); vo=p.add(f"#X obj 560 {y} {voi};")
-    p.con(pipe,0,sq,0); p.con(sq,0,vo,0); p.con(vo,0,mix,0)
+    gt=p.add(f"#X obj 660 {y} ockm-gate {nm} level;")
+    p.con(pipe,0,sq,0); p.con(sq,0,vo,0); p.con(vo,0,gt,0); p.con(gt,0,mix,0)
     vs=p.add(f"#X obj 760 {y} *~ 0;"); vt=p.add(f"#X obj 830 {y} throw~ ockm-revbus;"); vr=p.add(f"#X obj 760 {y-18} r ockm-{nm}-verb;")
-    p.con(vo,0,vs,0); p.con(vs,0,vt,0); p.con(vr,0,vs,1)
+    p.con(gt,0,vs,0); p.con(vs,0,vt,0); p.con(vr,0,vs,1)
     ds=p.add(f"#X obj 990 {y} *~ 0;"); dt_=p.add(f"#X obj 1060 {y} throw~ ockm-dlybus;"); dr_=p.add(f"#X obj 990 {y-18} r ockm-{nm}-delay;")
-    p.con(vo,0,ds,0); p.con(ds,0,dt_,0); p.con(dr_,0,ds,1)
+    p.con(gt,0,ds,0); p.con(ds,0,dt_,0); p.con(dr_,0,ds,1)
     synth_voice[nm]=vo
 s0b=p.add("#X obj 400 80 sel 0;"); offm=p.add("#X msg 400 105 off;")
 p.con(ttg,1,s0b,0); p.con(s0b,0,offm,0)
@@ -451,6 +463,25 @@ m.add(f"#X obj 270 {by} declare {DECL};")
 m.add(f"#X text 20 {by+30} OCKM_GENERATOR. The screen above is the instrument (see CHANGELOG.md for the version). pd engine is the sound and the sequencer. pd test-panel is the old v0.12 panel \\, kept for testing. The screen needs pdlua (built into plugdata).;")
 m.save("OCKM_GENERATOR.pd",f"#N canvas 40 40 {UIW} {UIH+80} 12;")
 
+
+# ================= track gate: mute, solo and (for synths) level, with a short fade =================
+# args: track, and "level" to listen to ockm-<track>-level (drums apply their level inside the voice, so they pass "nolevel")
+q=P()
+q.add("#X text 20 10 Track gate: mute \\, solo and level. Gain = (not muted) x (soloed \\, or nothing is soloed) x level. Fades over 10 ms so it never clicks.;")
+i_=q.add("#X obj 20 60 inlet~;"); m_=q.add("#X obj 20 300 *~;"); o_=q.add("#X obj 20 340 outlet~;")
+vals=[]
+for j,(hook,d) in enumerate([(f"ockm-{D}1-mute",0),(f"ockm-{D}1-solo",0),("ockm-soloing",0),(f"ockm-{D}1-{D}2",1)]):
+    x=200+j*130
+    r=q.add(f"#X obj {x} 60 r {hook};"); t=q.add(f"#X obj {x} 85 t b f;"); fv=q.add(f"#X obj {x} 160 f {d};")
+    q.con(r,0,t,0); q.con(t,1,fv,1); vals.append((t,fv))
+tb=q.add("#X obj 200 125 t b b b b;")
+ex=q.add(f"#X obj 200 200 expr (1-({D}f1!=0)) * if({D}f3>0 \\, ({D}f2!=0) \\, 1) * {D}f4;")
+pk=q.add("#X obj 200 230 pack f 10;"); ln=q.add("#X obj 200 260 line~;")
+lb=q.add("#X obj 560 125 loadbang;"); q.con(lb,0,tb,0)
+for j,(t,fv) in enumerate(vals):
+    q.con(t,0,tb,0); q.con(tb,j,fv,0); q.con(fv,0,ex,j)   # the hot inlet (mute) fires last
+for c in [(ex,0,pk,0),(pk,0,ln,0),(ln,0,m_,1),(i_,0,m_,0),(m_,0,o_,0)]: q.con(*c)
+q.save("seq/ockm-gate.pd","#N canvas 200 200 760 380 12;")
 
 # ================= bass core: shared note logic for every engine =================
 q=P()
