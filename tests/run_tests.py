@@ -386,14 +386,34 @@ def chord_notes_follow_key_scale_and_type(work):
     h = Harness(dut="ockm-chordseq zz")
     h.add("#X obj 400 120 ockm-presets;")
     pr = h.add("#X obj 400 90 print CHORD;"); h.con(h.dut, pr)
-    h.at(100, "ockm-pat-zz-on 0 1 1 1 2 ; ockm-pat-zz-deg 0 0 5 0 0")
+    h.at(100, "ockm-pat-zz-on 0 1 1 1 2 ; ockm-pat-zz-deg 0 0 5 0 0 ; ockm-zz-smooth 0")
     h.at(120, "test-in 0"); h.at(140, "test-in 1")
     h.at(160, "ockm-zz-type 1"); h.at(170, "test-in 2")
     h.at(190, "ockm-root 0 ; ockm-scale 1 ; ockm-zz-type 0"); h.at(200, "test-in 3")
+    h.at(220, "ockm-root 9 ; ockm-scale 0 ; ockm-zz-smooth 1"); h.at(230, "test-in 1")        # smooth: VI folds down
+    h.at(240, "ockm-zz-type 7"); h.at(250, "test-in 0")                                      # spice 4: eleventh
     f = os.path.join(work, "t_chord.pd"); h.finish(300, f)
     got = [[float(x) for x in v.split()] for v in printed(run(work, f, with_main=False), "CHORD")]
-    want = [[45, 48, 52, 0, 0.75], [53, 57, 60, 0, 0.75], [45, 48, 52, 55, 0.75], [48, 52, 55, 0, 1]]
-    assert got == want, f"chords wrong (A minor i, VI, i7, then C major i accented): {got}"
+    want = [[45, 48, 52, 0, 0.75], [53, 57, 60, 0, 0.75], [45, 48, 52, 55, 0.75], [48, 52, 55, 0, 1],
+            [53, 45, 48, 0, 0.75], [45, 55, 47, 50, 0.75]]
+    assert got == want, f"chords wrong (A minor i, VI, i7, C major i accented, smooth VI, A minor 11): {got}"
+
+@test
+def chord_progressions_fill_and_lengthen(work):
+    h = Harness(); h.show("ockm-len")
+    h.at(100, "ockm-resync bang ; ockm-chord-rhythm 0 ; ockm-chord-prog 4")       # garage: half-bar changes, 2 bars
+    g = h.add("#X obj 10 300 r test-get;"); t = h.add("#X obj 10 330 t b b;")
+    a1 = h.add("#X obj 10 360 array get ockm-pat-chord-deg 0 32;"); p1 = h.add("#X obj 10 390 print DEG;")
+    a2 = h.add("#X obj 200 360 array get ockm-pat-chord-on 0 32;"); p2 = h.add("#X obj 200 390 print ON;")
+    h.con(g, t); h.con(t, a1, 1); h.con(t, a2, 0); h.con(a1, p1); h.con(a2, p2)
+    h.at(200, "test-get bang")
+    f = os.path.join(work, "t_prog.pd"); h.finish(300, f)
+    out = run(work, f)
+    assert "32" in printed(out, "ockm-len"), f"a 2-bar progression should make a 16-step pattern 32 long: {printed(out, 'ockm-len')}"
+    deg = [int(float(x)) for x in printed(out, "DEG")[0].split()]
+    assert deg == [0] * 8 + [5] * 8 + [3] * 8 + [4] * 8, f"garage should change chord every half bar (i VI iv v): {deg}"
+    on = [int(float(x)) for x in printed(out, "ON")[0].split()]
+    assert on[0] == 2 and on[16] == 2 and sum(on) == 4, f"bar-pads rhythm: one accented chord per bar: {on}"
 
 @test
 def chord_engines_sound(work):
@@ -513,7 +533,7 @@ def front_panel_drives_the_engine(work):
 def touchscreen_drives_the_engine(work):
     if not PDLUA:
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
-    h = Harness(); h.show("ockm-edit", "ockm-page", "ockm-len", "ockm-load", "ockm-d1-sound", "ockm-bass-edit", "ockm-want", "ockm-lead-k1", "ockm-filter")
+    h = Harness(); h.show("ockm-edit", "ockm-page", "ockm-len", "ockm-load", "ockm-d1-sound", "ockm-bass-edit", "ockm-want", "ockm-lead-k1", "ockm-filter", "ockm-chord-prog", "ockm-chord-type")
     tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
     h.at(100, "ockm-resync bang")
     tap(150, 60, 155)                    # perform: open the kick lane
@@ -533,6 +553,10 @@ def touchscreen_drives_the_engine(work):
     tap(290, 300, 36)                    # perform tab
     tap(300, 300, 100)                   # pattern 3
     tap(310, 752, 558)                   # master filter, middle
+    tap(320, 560, 36); tap(325, 260, 94)  # synths tab, chord part
+    tap(330, 187, 378)                   # fill view
+    tap(335, 430, 446)                   # progression 5 (garage)
+    tap(340, 300, 572)                   # spice 3 (ninth)
     f = os.path.join(work, "t_touch.pd"); h.finish(600, f)
     out = run(work, f)
     edits = printed(out, "ockm-edit")
@@ -548,6 +572,8 @@ def touchscreen_drives_the_engine(work):
     lk = [float(x) for x in printed(out, "ockm-lead-k1")]
     assert any(0.4 < x < 0.6 for x in lk), f"perform strip: lead knob 1 should be about halfway: {lk}"
     assert any(abs(float(x)) < 0.1 for x in printed(out, "ockm-filter")), "perform strip: filter in the middle should be about 0"
+    assert "4" in printed(out, "ockm-chord-prog"), f"fill: progression 5 should send 4: {printed(out, 'ockm-chord-prog')}"
+    assert "6" in printed(out, "ockm-chord-type"), f"fill: spice 3 should pick the ninth chord type (6): {printed(out, 'ockm-chord-type')}"
     assert not [l for l in out.splitlines() if "error" in l.lower()], "errors: " + " | ".join(l for l in out.splitlines() if "error" in l.lower())
 
 @test
@@ -560,7 +586,7 @@ def touchscreen_screens_draw(work):
         raise Skip("Pillow not installed")
     p = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_preview.py"), os.path.join(work, "preview")], capture_output=True, text=True)
     assert p.returncode == 0, p.stderr[-800:]
-    assert len(os.listdir(os.path.join(work, "preview"))) == 4, "expected four screen pictures"
+    assert len(os.listdir(os.path.join(work, "preview"))) == 6, "expected six screen pictures"
 
 def main():
     if not PD:

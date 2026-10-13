@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.15 (13 October 2026)
+
+**Added**
+- Chord generator, rebuilt: 10 progressions and 10 rhythms, each ordered from simplest to busiest, plus **spice** 1 to 4 (triad, 7th, 9th, 11th)
+- Progressions have their own timing (half-bar to two-bar chords) and length (1 to 8 bars). Picking one makes a shorter pattern long enough to hold it
+- **Smooth** voicing for chords, on by default: each chord is played in the shape closest to the last
+- Synths screen: **sound** and **fill** views underneath the steps. Sound now includes the reverb and delay sends
+- 1 new test: progressions fill and lengthen the pattern. The chord test now covers smooth voicing and the eleventh
+
+**Changed**
+- Chord rhythm and progression numbers now point at the new lists. Saved chord parts are untouched until you pick a new progression or rhythm
+- Preset names are written into the touchscreen by the build, so the screen and the engine always agree
+
 ## v0.14 (13 October 2026)
 
 **Added**

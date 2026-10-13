@@ -88,6 +88,8 @@ SHOTS = [
     ("drums", ["test tap 60 155"]),                    # tap the kick lane name
     ("bass", ["test tap 300 36", "test tap 60 352", "test tap 89 210"]),  # perform tab, open bass, select step 2
     ("chord", ["test tap 260 94", "test tap 89 210"]),
+    ("chord-fill", ["test tap 187 378"]),
+    ("bass-fill", ["test tap 70 94"]),
 ]
 
 

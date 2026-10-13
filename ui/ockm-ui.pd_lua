@@ -51,11 +51,13 @@ local KNOBS = {
   organ = {"drawbars","click","sub","length"},
   pad   = {"brightness","detune","attack","length"},
 }
-local RHYTHMS = { "offbeat","rolling","gallop","acid","dub","bounce","acid 16","trip-hop" }
-local MONO_NOTES = { "root","octaves","fifth","acid riff","walk up","stab","dub","pedal","arp up","arp up-dn","call","descend" }
-local CHORD_RHY = { "offbeat","dub","bar pad","organ","two beat","synco","eighths","sparse" }
-local PROGS = { "i","i-VI-VII","i-iv","i-VII-VI","i-v","i-III-VII","i-VI-iv-v","ii-V-i" }
-local CHORD_TYPES = { "triad","7th","sus2","power" }
+-- BEGIN PRESETS (written by tools/build.py from its preset lists: edit them there, not here)
+local RHYTHMS = { { "offbeat" }, { "rolling" }, { "gallop" }, { "acid classic" }, { "sparse dub" }, { "tech bounce" }, { "acid 16ths" }, { "trip hop" } }
+local MONO_NOTES = { "root", "octaves", "root fifth", "acid riff", "walk up", "minor stab", "dub", "pedal", "arp up", "arp updown", "call", "descend" }
+local CHORD_RHY = { { "bar pads" }, { "two beat" }, { "offbeat" }, { "dub stabs" }, { "house organ" }, { "tresillo" }, { "syncopated" }, { "garage skip" }, { "call answer" }, { "eighths" } }
+local PROGS = { { "one chord", "i" }, { "vamp", "i iv" }, { "dub techno", "i . . VII" }, { "deep house", "i iv VI v" }, { "garage", "i VI iv v" }, { "pop", "i VI III VII" }, { "uplift", "VI VII i" }, { "andalusian", "i VII VI V" }, { "trip hop", "i VII VI v" }, { "soul", "ii V I" } }
+local SPICE = { { 0, "triad" }, { 1, "7th" }, { 6, "9th" }, { 7, "11th" } }
+-- END PRESETS
 local ROMAN = { "i","ii","iii","iv","v","vi","vii" }
 local OCT_OFFSET = { bass = 0, lead = 24 }   -- matches ockm-monogen args
 
@@ -98,6 +100,7 @@ end
 
 function ui:defaults()
   local v = self.v
+  v["ockm-chord-smooth"] = 1
   v["ockm-bpm"] = 124; v["ockm-len"] = 16; v["ockm-filter"] = 0; v["ockm-root"] = 9; v["ockm-scale"] = 0
   for i, nm in ipairs(SLOTS) do
     v["ockm-"..nm.."-sound"] = ({0,1,2,4,5,7,3,6})[i]
@@ -105,7 +108,7 @@ function ui:defaults()
     v["ockm-"..nm.."-verb"] = 0; v["ockm-"..nm.."-delay"] = 0
   end
   for _, t in ipairs(SYNTHS) do
-    for _, k in ipairs({"engine","k1","k2","k3","k4","drive","rhythm","notes","type","prog"}) do v["ockm-"..t.."-"..k] = 0 end
+    for _, k in ipairs({"engine","k1","k2","k3","k4","drive","verb","delay","rhythm","notes","type","prog"}) do v["ockm-"..t.."-"..k] = 0 end
   end
 end
 
@@ -116,9 +119,9 @@ function ui:hooks()
     h[#h+1] = "ockm-"..nm.."-sound"
   end
   for _, t in ipairs({"bass","lead"}) do
-    for _, k in ipairs({"engine","k1","k2","k3","k4","drive","rhythm","notes"}) do h[#h+1] = "ockm-"..t.."-"..k end
+    for _, k in ipairs({"engine","k1","k2","k3","k4","drive","verb","delay","rhythm","notes"}) do h[#h+1] = "ockm-"..t.."-"..k end
   end
-  for _, k in ipairs({"engine","k1","k2","k3","k4","type","rhythm","prog"}) do h[#h+1] = "ockm-chord-"..k end
+  for _, k in ipairs({"engine","k1","k2","k3","k4","type","smooth","verb","delay","rhythm","prog"}) do h[#h+1] = "ockm-chord-"..k end
   return h
 end
 
@@ -363,44 +366,69 @@ function ui:layout_synth(add)
       add{ kind="deg", x=16 + d * bw + 3, y=306, w=bw - 6, h=44, d=d, tap=function() self:chord_set_deg(d) end }
     end
   end
-  -- sound (left) and fill (right)
+  -- underneath: sound or fill, chosen with two small tabs
+  local view = self.synth_view or "sound"
+  add{ kind="tab", x=16, y=360, w=110, h=36, label="sound", sel=(view == "sound"), tap=function() self.synth_view = "sound" end }
+  add{ kind="tab", x=132, y=360, w=110, h=36, label="fill", sel=(view == "fill"), tap=function() self.synth_view = "fill" end }
+  if view == "sound" then self:layout_synth_sound(add, part, mono) else self:layout_synth_fill(add, part, mono) end
+end
+
+function ui:layout_synth_sound(add, part, mono)
   local eng = mono and MONO_ENG or CHORD_ENG
-  local ew = 440 / #eng
-  add{ kind="text", x=16, y=360, w=100, h=16, label="sound", size=11 }
+  local ew = (W - 32) / #eng
   for e = 0, #eng - 1 do
-    add{ kind="choice", x=16 + e * ew, y=378, w=ew - 6, h=40, label=eng[e + 1], sel=(self.v["ockm-"..part.."-engine"] == e),
+    add{ kind="choice", x=16 + e * ew, y=406, w=ew - 6, h=40, label=eng[e + 1], sel=(self.v["ockm-"..part.."-engine"] == e),
          tap=function() self:send("ockm-"..part.."-engine", e) end }
   end
   local kn = KNOBS[eng[(self.v["ockm-"..part.."-engine"] or 0) + 1]] or KNOBS.acid
+  local cw = (W - 32 - 16) / 2
   for k = 1, 4 do
-    add{ kind="slider", x=16, y=426 + (k - 1) * 42, w=434, h=34, hook="ockm-"..part.."-k"..k, lo=0, hi=1, label=kn[k] }
+    local col, row = (k - 1) % 2, math.floor((k - 1) / 2)
+    add{ kind="slider", x=16 + col * (cw + 16), y=456 + row * 42, w=cw, h=34, hook="ockm-"..part.."-k"..k, lo=0, hi=1, label=kn[k] }
   end
-  local rx = 480
+  local third = {}
+  if mono then third[#third + 1] = { "drive", "drive" } end
+  third[#third + 1] = { "verb", "reverb" }; third[#third + 1] = { "delay", "delay" }
+  local tw = (W - 32 - 16 * (#third - 1)) / #third
+  for j, t in ipairs(third) do
+    add{ kind="slider", x=16 + (j - 1) * (tw + 16), y=546, w=tw, h=34, hook="ockm-"..part.."-"..t[1], lo=0, hi=1, label=t[2] }
+  end
+end
+
+-- a row of numbered presets: big number, name underneath
+function ui:preset_row(add, y, h, list, hook, label)
+  add{ kind="text", x=16, y=y - 14, w=200, h=12, label=label, size=10 }
+  local n = #list
+  local bw = (W - 32) / n
+  for i = 0, n - 1 do
+    local item = list[i + 1]
+    add{ kind="preset", x=16 + i * bw, y=y, w=bw - 6, h=h, num=i + 1, label=item[1], sub=item[2],
+         sel=(self.v[hook] == i), tap=function() self:send(hook, i) end }
+  end
+end
+
+function ui:layout_synth_fill(add, part, mono)
   if mono then
-    add{ kind="slider", x=rx, y=378, w=W - rx - 16, h=34, hook="ockm-"..part.."-drive", lo=0, hi=1, label="drive" }
-  else
-    for c = 0, 3 do
-      add{ kind="choice", x=rx + c * 117, y=378, w=111, h=40, label=CHORD_TYPES[c + 1], sel=(self.v["ockm-chord-type"] == c),
-           tap=function() self:send("ockm-chord-type", c) end }
-    end
+    self:preset_row(add, 418, 64, RHYTHMS, "ockm-"..part.."-rhythm", "rhythm")
+    local list = {}
+    for i, nm in ipairs(MONO_NOTES) do list[i] = { nm } end
+    self:preset_row(add, 500, 44, list, "ockm-"..part.."-notes", "notes")
+    add{ kind="btn", x=W - 136, y=552, w=120, h=40, label="new", accent=true,
+         tap=function() pd.send("ockm-"..part.."-gen", "bang", {}); self:dirty() end }
+    return
   end
-  add{ kind="text", x=rx, y=424, w=200, h=16, label="fill", size=11 }
-  local rh = mono and RHYTHMS or CHORD_RHY
-  local cw = (W - rx - 16) / 8
-  for r = 0, 7 do
-    add{ kind="choice", x=rx + r * cw, y=442, w=cw - 4, h=36, label=rh[r + 1], small=true, sel=(self.v["ockm-"..part.."-rhythm"] == r),
-         tap=function() self:send("ockm-"..part.."-rhythm", r) end }
+  -- chords: progression, rhythm, spice. Picking a progression or rhythm rewrites the chord part straight away
+  self:preset_row(add, 418, 56, PROGS, "ockm-chord-prog", "progression")
+  self:preset_row(add, 492, 40, CHORD_RHY, "ockm-chord-rhythm", "rhythm")
+  add{ kind="text", x=16, y=538, w=200, h=12, label="spice", size=10 }
+  for i, sp in ipairs(SPICE) do
+    add{ kind="preset", x=16 + (i - 1) * 118, y=552, w=112, h=40, num=i, label=sp[2], inline=true,
+         sel=(self.v["ockm-chord-type"] == sp[1]), tap=function() self:send("ockm-chord-type", sp[1]) end }
   end
-  local second, key = mono and MONO_NOTES or PROGS, mono and "notes" or "prog"
-  local per = mono and 6 or 4
-  local nw = (W - rx - 16 - 100) / per
-  for n = 0, #second - 1 do
-    local row, col = math.floor(n / per), n % per
-    add{ kind="choice", x=rx + col * nw, y=484 + row * 40, w=nw - 4, h=36, label=second[n + 1], small=true,
-         sel=(self.v["ockm-"..part.."-"..key] == n), tap=function() self:send("ockm-"..part.."-"..key, n) end }
-  end
-  add{ kind="btn", x=W - 112, y=484, w=96, h=76, label="new", accent=true,
-       tap=function() pd.send("ockm-"..part.."-gen", "bang", {}); self:dirty() end }
+  add{ kind="choice", x=500, y=552, w=150, h=40, label="smooth", accent=true, sel=(self.v["ockm-chord-smooth"] or 1) > 0,
+       tap=function() self:send("ockm-chord-smooth", ((self.v["ockm-chord-smooth"] or 1) > 0) and 0 or 1) end }
+  add{ kind="btn", x=W - 136, y=552, w=120, h=40, label="new", accent=true,
+       tap=function() pd.send("ockm-chord-gen", "bang", {}); self:dirty() end }
 end
 
 -- ------------------------------------------------------------------ step edits
@@ -630,6 +658,19 @@ function ui:draw(g, w)
     local sel = w.sel
     self:col(g, sel and (w.accent and "acc" or "on") or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
     self:ctext(g, w.label, w, w.small and 11 or 13, sel and (w.accent and "#ffffff" or "bg") or "txt")
+  elseif k == "preset" then
+    local sel = w.sel
+    self:col(g, sel and "on" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
+    local tc, sc = sel and "bg" or "txt", sel and "bg" or "mute"
+    if w.inline then
+      self:ctext(g, w.num .. "  " .. w.label, w, 13, tc)
+    else
+      local lines = w.sub and 3 or 2
+      local top = w.y + (w.h - (lines == 3 and 46 or 32)) / 2
+      self:ctext(g, tostring(w.num), { x=w.x, y=top, w=w.w, h=16 }, 16, tc)
+      self:ctext(g, w.label, { x=w.x, y=top + 18, w=w.w, h=12 }, 10, tc)
+      if w.sub then self:ctext(g, w.sub, { x=w.x, y=top + 32, w=w.w, h=12 }, 9, sc) end
+    end
   elseif k == "lanename" then
     self:text(g, w.label, w.x, w.y + 4, 13, "txt", w.w)
   elseif k == "lane" then

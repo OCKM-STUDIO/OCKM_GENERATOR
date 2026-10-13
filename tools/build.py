@@ -265,7 +265,7 @@ for nm,snd in SLOTS:
                    (f"ockm-{nm}-level",1,None),(f"ockm-{nm}-verb",VERB[snd],None),(f"ockm-{nm}-delay",DLY[snd],None)]
 SYNTH_DEFAULTS={"bass":dict(engine=0,k1=0.37,k2=0.9,k3=0.31,k4=0.55,drive=0,verb=0,delay=0,rhythm=3,notes=3),
                 "lead":dict(engine=4,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0.2,delay=0.25,rhythm=6,notes=8),
-                "chord":dict(engine=0,k1=0.45,k2=0.5,k3=0.4,k4=0.3,type=0,verb=0.3,delay=0.35,rhythm=0,prog=0)}
+                "chord":dict(engine=0,k1=0.45,k2=0.5,k3=0.4,k4=0.3,type=0,smooth=1,verb=0.3,delay=0.35,rhythm=0,prog=0)}
 PATTERN_KEYS=[("ockm-len",16,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None)]
 for t,d in SYNTH_DEFAULTS.items():
     PATTERN_KEYS+=[(f"ockm-{t}-{k}",v,None) for k,v in d.items()]
@@ -394,11 +394,11 @@ row(140,"bass",[("engine",0,0,5,"ockm-bass-engine",True),("k1",0.37,0,1,"ockm-ba
 row(200,"lead",[("engine",4,0,5,"ockm-lead-engine",True),("k1",0.55,0,1,"ockm-lead-k1",True),("k2",0.3,0,1,"ockm-lead-k2",True),("k3",0.4,0,1,"ockm-lead-k3",True),
                 ("k4",0.45,0,1,"ockm-lead-k4",True),("drive",0,0,1,"ockm-lead-drive",True),("rhythm",6,0,7,"ockm-lead-rhythm",False),("notes",8,0,11,"ockm-lead-notes",False)])
 row(260,"chord",[("engine",0,0,2,"ockm-chord-engine",True),("k1",0.45,0,1,"ockm-chord-k1",True),("k2",0.5,0,1,"ockm-chord-k2",True),("k3",0.4,0,1,"ockm-chord-k3",True),
-                 ("k4",0.3,0,1,"ockm-chord-k4",True),("type",0,0,3,"ockm-chord-type",True),("rhythm",0,0,7,"ockm-chord-rhythm",False),("prog",0,0,7,"ockm-chord-prog",False)])
+                 ("k4",0.3,0,1,"ockm-chord-k4",True),("type",0,0,7,"ockm-chord-type",True),("smooth",1,0,1,"ockm-chord-smooth",True),("rhythm",0,0,9,"ockm-chord-rhythm",False),("prog",0,0,9,"ockm-chord-prog",False)])
 sub.add("#X text 20 300 key root: 0 C ... 9 A ... 11 B. Scale: 0 minor 1 major 2 dorian 3 phrygian 4 mixolydian 5 harmonic minor;")
-sub.add("#X text 20 320 bass and lead engines: 0 acid 1 sub 2 FM 3 reese 4 pluck 5 saw. Chord engines: 0 stab 1 organ 2 pad. Chord type: 0 triad 1 seventh 2 sus2 3 power;")
+sub.add("#X text 20 320 bass and lead engines: 0 acid 1 sub 2 FM 3 reese 4 pluck 5 saw. Chord engines: 0 stab 1 organ 2 pad. Chord type: 0 triad 1 seventh 2 sus2 3 power 4 sus4 5 sixth 6 ninth 7 eleventh;")
 sub.add("#X text 20 340 bass/lead rhythm: 0 offbeat 1 rolling 2 gallop 3 acid 4 dub 5 bounce 6 acid16 7 trip-hop. Notes: 0 root 1 octaves 2 root-fifth 3 acid-riff 4 walk-up 5 stab 6 dub 7 pedal 8 arp-up 9 arp-updown 10 call 11 descend;")
-sub.add("#X text 20 360 chord rhythm: 0 offbeat-stabs 1 dub-stabs 2 bar-pads 3 house-organ 4 two-beat 5 syncopated 6 eighths 7 sparse. Prog: 0 i 1 i-VI-VII 2 i-iv 3 i-VII-VI-VII 4 i-v 5 i-III-VII-iv 6 i-VI-iv-v 7 ii-V-i-i;")
+sub.add("#X text 20 360 chord rhythm 0-9 and progression 0-9: the names are on the synths screen and in tools/build.py (PRE and PROGS). Smooth 1 = chords move by small steps.;")
 p.L.append(sub.text("#N canvas 260 160 1000 400 synth-settings 0;").rstrip("\n"))
 p.add(f"#X restore 30 {gy+40} pd synth-settings;")
 p.add(f"#X text 30 {gy+65} key \\, engines \\, knobs and generator choices for bass \\, lead and chord;")
@@ -707,11 +707,42 @@ PRE={"rhythm":[("offbeat","0 0 2 0 0 0 1 0 0 0 2 0 0 0 1 0"),("rolling","0 2 1 1
               ("dub","0 0 -3 -2"),("pedal","0 0 0 1"),("arp-up","0 2 4 7"),("arp-updown","0 2 4 7 4 2"),("call","4 4 2 0 2 4 5 4"),("descend","7 6 4 2")],
      "scale":[("minor","0 2 3 5 7 8 10"),("major","0 2 4 5 7 9 11"),("dorian","0 2 3 5 7 9 10"),("phrygian","0 1 3 5 7 8 10"),
               ("mixolydian","0 2 4 5 7 9 10"),("harmonic-minor","0 2 3 5 7 8 11")],
-     "chordrhythm":[("offbeat-stabs","0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0"),("dub-stabs","0 0 0 2 0 0 0 0 0 0 1 0 0 0 0 0"),("bar-pads","2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"),
-                    ("house-organ","1 0 0 1 0 0 1 0 0 0 1 0 0 1 0 0"),("two-beat","2 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0"),("syncopated","0 0 1 0 0 1 0 0 0 1 0 0 1 0 0 0"),
-                    ("eighths","1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0"),("sparse","0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0")],
-     "prog":[("i","0"),("i-VI-VII","0 0 5 6"),("i-iv","0 3"),("i-VII-VI-VII","0 6 5 6"),("i-v","0 4"),("i-III-VII-iv","0 2 6 3"),("i-VI-iv-v","0 5 3 4"),("ii-V-i-i","1 4 0 0")],
-     "chordtype":[("triad","0 2 4 -1"),("seventh","0 2 4 6"),("sus2","0 1 4 -1"),("power","0 4 7 -1")]}
+     "chordrhythm":[("bar-pads","2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"),("two-beat","2 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0"),
+                    ("offbeat","0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0"),("dub-stabs","0 0 0 2 0 0 0 0 0 0 1 0 0 0 0 0"),
+                    ("house-organ","1 0 0 1 0 0 1 0 0 0 1 0 0 1 0 0"),("tresillo","2 0 0 1 0 0 1 0 2 0 0 1 0 0 1 0"),
+                    ("syncopated","0 0 1 0 0 1 0 0 0 1 0 0 1 0 0 0"),("garage-skip","1 0 0 1 0 0 0 0 0 1 0 0 1 0 0 0 1 0 0 1 0 0 0 0 0 1 0 0 0 0 1 0"),
+                    ("call-answer","2 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 1 0 0 1 0 0 0"),("eighths","1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0")],
+     "chordtype":[("triad","0 2 4 -1"),("seventh","0 2 4 6"),("sus2","0 1 4 -1"),("power","0 4 7 -1"),
+                  ("sus4","0 3 4 -1"),("sixth","0 2 4 5"),("ninth","0 2 6 8"),("eleventh","0 6 8 10")]}
+# Chord progressions: (name, label shown on screen, [(chord root as scale step, length in bars), ...]).
+# The first 8 are the v0.10 ones (one chord per bar). Each is written out as its natural length in steps,
+# then one chord root per step, so the generator only has to look things up.
+PROGS=[("one-chord","i",[(0,1)]),("vamp","i iv",[(0,1),(3,1)]),("dub-techno","i . . VII",[(0,3),(6,1)]),
+       ("deep-house","i iv VI v",[(0,1),(3,1),(5,1),(4,1)]),("garage","i VI iv v",[(0,.5),(5,.5),(3,.5),(4,.5)]),
+       ("pop","i VI III VII",[(0,1),(5,1),(2,1),(6,1)]),("uplift","VI VII i",[(5,1),(6,1),(0,2)]),
+       ("andalusian","i VII VI V",[(0,1),(6,1),(5,1),(4,1)]),("trip-hop","i VII VI v",[(0,2),(6,2),(5,2),(4,2)]),
+       ("soul","ii V I",[(1,1),(4,1),(0,2)])]
+PRE["progx"]=[]
+for nm,_,chords in PROGS:
+    steps=[]
+    for deg,bars in chords: steps+=[deg]*int(bars*16)
+    assert len(steps) in (16,32,64,128), (nm,len(steps))
+    PRE["progx"].append((nm," ".join(str(v) for v in [len(steps)]+steps)))
+# spice 1 to 4 on screen picks one of these chord types (index into chordtype)
+SPICE=[(0,"triad"),(1,"7th"),(6,"9th"),(7,"11th")]
+# the touchscreen shows the same preset names: write them into the Lua file between its PRESETS markers
+def _lua_list(items): return "{ " + ", ".join("{ " + ", ".join(f'"{x}"' if isinstance(x,str) else str(x) for x in it) + " }" for it in items) + " }"
+_ui_src=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),"ui","ockm-ui.pd_lua")
+if os.path.exists(_ui_src):
+    _t=open(_ui_src).read()
+    _a=_t.index("-- BEGIN PRESETS"); _a=_t.index("\n",_a)+1; _b=_t.index("-- END PRESETS")
+    _block=("local RHYTHMS = "+_lua_list([(n.replace("-"," "),) for n,_ in PRE["rhythm"]])+"\n"
+            "local MONO_NOTES = { "+", ".join(f'"{n.replace("-"," ")}"' for n,_ in PRE["notes"])+" }\n"
+            "local CHORD_RHY = "+_lua_list([(n.replace("-"," "),) for n,_ in PRE["chordrhythm"]])+"\n"
+            "local PROGS = "+_lua_list([(n.replace("-"," "),lab) for n,lab,_ in PROGS])+"\n"
+            "local SPICE = "+_lua_list([(i,lab) for i,lab in SPICE])+"\n")
+    os.makedirs(os.path.join(R,"ui"),exist_ok=True)
+    open(os.path.join(R,"ui","ockm-ui.pd_lua"),"w").write(_t[:_a]+_block+_t[_b:])
 p=P()
 p.add("#X text 20 10 Shared presets for the generators and chords. Rhythm codes: 0 rest 1 note 2 accent 3 note+slide 4 accent+slide. Notes and progressions are scale steps (0 root \\, 2 third \\, 4 fifth \\, 7 octave).;")
 for i,(k,rows) in enumerate(PRE.items()):
@@ -773,6 +804,7 @@ lb=p.add("#X obj 700 40 loadbang;"); lbt=p.add("#X obj 700 65 t b b b;")
 d0a=p.add("#X msg 700 90 0;"); d0b=p.add("#X msg 760 90 0;"); d9=p.add("#X msg 820 90 9;")
 rsc=p.add("#X obj 700 120 r ockm-scale;"); tsc=p.add("#X obj 700 150 text get ockm-presets-scale;"); lsc=p.add("#X obj 700 175 list split 1;"); asc=p.add(f"#X obj 700 200 array set {D}0-sc;")
 rty=p.add(f"#X obj 900 120 r ockm-{D}1-type;"); tty=p.add("#X obj 900 150 text get ockm-presets-chordtype;"); lty=p.add("#X obj 900 175 list split 1;"); aty=p.add(f"#X obj 900 200 array set {D}0-ty;")
+rsm=p.add(f"#X obj 1250 120 r ockm-{D}1-smooth;"); one_sm=p.add("#X msg 1250 90 1;"); p.con(lb,0,one_sm,0)   # smooth voicing on by default
 rro=p.add("#X obj 1100 120 r ockm-root;"); rox=p.add(f"#X obj 1100 150 expr if({D}f1<=7 \\, 48+{D}f1 \\, 36+{D}f1);")
 for c in [(lb,0,lbt,0),(lbt,2,d0a,0),(lbt,1,d0b,0),(lbt,0,d9,0),(d0a,0,tsc,0),(d0b,0,tty,0),(d9,0,rox,0),
           (rsc,0,tsc,0),(tsc,0,lsc,0),(lsc,1,asc,0),(rty,0,tty,0),(tty,0,lty,0),(lty,1,aty,0),(rro,0,rox,0)]: p.con(*c)
@@ -787,7 +819,10 @@ for k in range(4):
     ad=p.add(f"#X obj {x} 360 + 0;"); td=p.add(f"#X obj {x} 390 t f f;")
     sx=p.add(f"#X obj {x+90} 420 expr ((int({D}f1)%7)+7)%7;"); rs=p.add(f"#X obj {x+90} 450 tabread {D}0-sc;")
     nx=p.add(f"#X obj {x} 500 expr if({D}f4<0 \\, 0 \\, {D}f2+12*floor({D}f1/7)+{D}f3);")
-    for c in [(t4,k,mk,0),(mk,0,rt,0),(rt,0,tt,0),(tt,1,nx,3),(tt,0,ad,0),(ad,0,td,0),(td,1,sx,0),(sx,0,rs,0),(rs,0,nx,2),(td,0,nx,0),(rox,0,nx,1),(rdeg,0,ad,1),(nx,0,pk,k)]: p.con(*c)
+    # smooth voicing: fold the note into the octave above the key's root, so chords move by small steps
+    fo=p.add(f"#X obj {x} 560 expr if({D}f1<=0 \\, 0 \\, if({D}f2 \\, {D}f1-12*floor(({D}f1-{D}f3)/12) \\, {D}f1));")
+    for c in [(t4,k,mk,0),(mk,0,rt,0),(rt,0,tt,0),(tt,1,nx,3),(tt,0,ad,0),(ad,0,td,0),(td,1,sx,0),(sx,0,rs,0),(rs,0,nx,2),(td,0,nx,0),(rox,0,nx,1),(rdeg,0,ad,1),
+              (nx,0,fo,0),(rsm,0,fo,1),(one_sm,0,fo,1),(rox,0,fo,2),(fo,0,pk,k)]: p.con(*c)
 # store / load / edit / extend
 re=p.add(f"#X obj 1300 600 r ockm-{D}1-edit;"); tl=p.add("#X obj 1300 630 t l l;"); ls=p.add("#X obj 1480 660 list split 1;"); up=p.add("#X obj 1300 690 unpack f f f;")
 p.con(re,0,tl,0); p.con(tl,1,ls,0); p.con(tl,0,up,0)
@@ -807,9 +842,9 @@ p.save("seq/ockm-chordseq.pd","#N canvas 100 100 1950 800 12;")
 
 # ================= chord generator =================
 p=P()
-p.add("#X text 20 10 Chord generator: a chord rhythm preset plus a progression (one chord per bar). Writes on/accent and chord roots across the whole pattern length.;")
-p.add(f"#X obj 600 60 array define {D}0-r 16;"); p.add(f"#X obj 760 60 array define {D}0-p 8;")
-regen=p.add("#X obj 20 250 t b b b;")
+p.add("#X text 20 10 Chord generator: a chord rhythm preset plus a progression. Progressions are stored as their natural length in steps plus one chord root per step. If the pattern is shorter than the progression \\, it is made longer first. Writes on/accent and chord roots across the whole pattern length.;")
+p.add(f"#X obj 600 60 array define {D}0-r 32;"); p.add(f"#X obj 760 60 array define {D}0-p 128;")
+regen=p.add("#X obj 20 250 t b b b b;")
 gate=p.add("#X obj 20 225 spigot 1;"); rld=p.add("#X obj 120 200 r ockm-loading;"); nl0=p.add("#X obj 120 220 == 0;")
 p.con(gate,0,regen,0); p.con(rld,0,nl0,0); p.con(nl0,0,gate,1)
 store=[]
@@ -818,19 +853,26 @@ for j,(hook,d) in enumerate([(f"ockm-{D}1-rhythm",0),(f"ockm-{D}1-prog",0)]):
     r=p.add(f"#X obj {x} 100 r {hook};"); t=p.add(f"#X obj {x} 130 t b f;"); fs=p.add(f"#X obj {x} 210 f {d};")
     p.con(r,0,t,0); p.con(t,1,fs,1); p.con(t,0,gate,0); store.append(fs)
 rg=p.add(f"#X obj 450 100 r ockm-{D}1-gen;"); p.con(rg,0,regen,0)
-tp=p.add("#X obj 300 300 text get ockm-presets-prog;"); lpp=p.add("#X obj 300 330 list split 1;"); tlp=p.add("#X obj 300 360 t l l;")
-llp=p.add("#X obj 360 390 list length;"); ap=p.add(f"#X obj 300 420 array set {D}0-p;")
-p.con(regen,2,store[1],0); p.con(store[1],0,tp,0); p.con(tp,0,lpp,0); p.con(lpp,1,tlp,0); p.con(tlp,1,llp,0); p.con(tlp,0,ap,0)
-tr=p.add("#X obj 100 300 text get ockm-presets-chordrhythm;"); lr=p.add("#X obj 100 330 list split 1;"); ar=p.add(f"#X obj 100 360 array set {D}0-r;")
-p.con(regen,1,store[0],0); p.con(store[0],0,tr,0); p.con(tr,0,lr,0); p.con(lr,1,ar,0)
+# progression: natural length, then one chord root per step
+tp=p.add("#X obj 500 300 text get ockm-presets-progx;"); lpp=p.add("#X obj 500 330 list split 1;"); lp2=p.add("#X obj 500 360 list split 1;")
+plen=p.add("#X obj 500 420 f 16;"); ap=p.add(f"#X obj 620 390 array set {D}0-p;")
+for c in [(regen,3,store[1],0),(store[1],0,tp,0),(tp,0,lpp,0),(lpp,1,lp2,0),(lp2,0,plen,1),(lp2,1,ap,0)]: p.con(*c)
+# rhythm: 16 or 32 steps
+tr=p.add("#X obj 100 300 text get ockm-presets-chordrhythm;"); lr=p.add("#X obj 100 330 list split 1;"); tlr=p.add("#X obj 100 360 t l l;")
+llr=p.add("#X obj 160 390 list length;"); ar=p.add(f"#X obj 100 420 array set {D}0-r;")
+for c in [(regen,2,store[0],0),(store[0],0,tr,0),(tr,0,lr,0),(lr,1,tlr,0),(tlr,1,llr,0),(tlr,0,ar,0)]: p.con(*c)
+# make the pattern long enough for the progression (never shorter)
+curl=p.add("#X obj 360 470 r ockm-len;"); fit=p.add(f"#X obj 300 500 expr if({D}f1>{D}f2 \\, {D}f1 \\, 0);"); sz=p.add("#X obj 300 530 sel 0;"); sl=p.add("#X obj 340 560 s ockm-length;")
+for c in [(regen,1,plen,0),(plen,0,fit,0),(curl,0,fit,1),(fit,0,sz,0),(sz,1,sl,0)]: p.con(*c)
+# write every step of the pattern
 z1=p.add("#X msg 120 470 0;"); nl=p.add("#X obj 20 470 f 16;"); rlg=p.add("#X obj 80 440 r ockm-len;"); un=p.add("#X obj 20 500 until;")
 fi=p.add("#X obj 20 530 f;"); pi=p.add("#X obj 70 530 + 1;"); ti=p.add("#X obj 20 560 t f f;"); tl2=p.add("#X obj 20 590 t f f;")
 for c in [(regen,0,z1,0),(regen,0,nl,0),(rlg,0,nl,1),(z1,0,fi,1),(nl,0,un,0),(un,0,fi,0),(fi,0,pi,0),(pi,0,fi,1),(fi,0,ti,0),(ti,0,tl2,0)]: p.con(*c)
 two=p.add(f"#X obj 200 700 tabwrite ockm-pat-{D}1-on;"); twd=p.add(f"#X obj 400 700 tabwrite ockm-pat-{D}1-deg;")
-bx=p.add(f"#X obj 300 620 expr int({D}f1/16) % int(max({D}f2\\,1));"); rp=p.add(f"#X obj 300 650 tabread {D}0-p;")
-m16=p.add("#X obj 20 620 mod 16;"); rr=p.add(f"#X obj 20 650 tabread {D}0-r;")
-for c in [(ti,1,two,1),(ti,1,twd,1),(tl2,1,bx,0),(llp,0,bx,1),(bx,0,rp,0),(rp,0,twd,0),(tl2,0,m16,0),(m16,0,rr,0),(rr,0,two,0)]: p.con(*c)
-p.add("#X text 20 760 hooks: ockm-<track>-rhythm 0-7 \\, ockm-<track>-prog 0-7 \\, ockm-<track>-gen (rebuild). Progressions change chord once per 16-step bar \\, so use 32 or 64 steps to hear them move.;")
+bx=p.add(f"#X obj 300 620 expr int({D}f1) % int(max({D}f2\\,1));"); rp=p.add(f"#X obj 300 650 tabread {D}0-p;")
+mr=p.add(f"#X obj 20 620 expr int({D}f1) % int(max({D}f2\\,1));"); rr=p.add(f"#X obj 20 650 tabread {D}0-r;")
+for c in [(ti,1,two,1),(ti,1,twd,1),(tl2,1,bx,0),(plen,0,bx,1),(bx,0,rp,0),(rp,0,twd,0),(tl2,0,mr,0),(llr,0,mr,1),(mr,0,rr,0),(rr,0,two,0)]: p.con(*c)
+p.add("#X text 20 760 hooks: ockm-<track>-rhythm 0-9 \\, ockm-<track>-prog 0-9 \\, ockm-<track>-gen (rebuild). Presets live in tools/build.py (PRE and PROGS).;")
 p.save("seq/ockm-chordgen.pd","#N canvas 120 120 900 800 12;")
 
 # ================= chord sound: 3 engines x 4 voices =================

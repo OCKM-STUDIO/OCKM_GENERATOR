@@ -161,7 +161,7 @@ def build_panel(P, D, save_dir_save, SLOTS, SLOTN, show, theme="dark"):
     labels_under(430, SY + 22, 22, ["min", "maj", "dor", "phr", "mix", "hm"])
     SECT = [("bass", ["acid", "sub", "fm", "reese", "pluck", "saw"], 12, "rhythm", "notes"),
             ("lead", ["acid", "sub", "fm", "reese", "pluck", "saw"], 12, "rhythm", "notes"),
-            ("chord", ["stab", "organ", "pad"], 8, "rhythm", "chords")]
+            ("chord", ["stab", "organ", "pad"], 10, "rhythm", "prog")]
     for si, (t, engs, nsecond, g1, g2) in enumerate(SECT):
         x = 20 + si * 360; y = SY + 50
         card(x, y, 340, 262)
@@ -175,12 +175,13 @@ def build_panel(P, D, save_dir_save, SLOTS, SLOTN, show, theme="dark"):
         if t != "chord":
             hsl(x + 180, y + 62, 130, 0, 1, f"ockm-{t}-drive", show(f"ockm-{t}-drive"), "drive")
         else:
-            hrad(x + 180, y + 56, 20, 4, "ockm-chord-type", show("ockm-chord-type"), "type")
-            labels_under(x + 180, y + 78, 20, ["tri", "7th", "sus", "pow"])
+            hrad(x + 180, y + 56, 17, 8, "ockm-chord-type", show("ockm-chord-type"), "type")
+            labels_under(x + 180, y + 76, 17, ["tri", "7", "s2", "pw", "s4", "6", "9", "11"])
+            tgl(x + 180, y + 96, 14, "ockm-chord-smooth", show("ockm-chord-smooth"), "smooth")
         hsl(x + 180, y + 122, 130, 0, 1, f"ockm-{t}-verb", show(f"ockm-{t}-verb"), "reverb")
         hsl(x + 180, y + 152, 130, 0, 1, f"ockm-{t}-delay", show(f"ockm-{t}-delay"), "delay")
-        hrad(x, y + 192, 16, 8, f"ockm-{t}-{g1}", show(f"ockm-{t}-{g1}"), g1)
-        hrad(x, y + 226, 14 if nsecond > 8 else 16, nsecond, f"ockm-{t}-{g2}", show(f"ockm-{t}-{g2}"), g2)
+        hrad(x, y + 192, 16 if t != "chord" else 14, 8 if t != "chord" else 10, f"ockm-{t}-{g1}", show(f"ockm-{t}-{g1}"), g1)
+        hrad(x, y + 226, 14 if nsecond <= 12 else 13, nsecond, f"ockm-{t}-{g2}", show(f"ockm-{t}-{g2}"), g2)
         bng(x + 240, y + 200, 24, f"ockm-{t}-gen", "new")
 
     # ---------- effects and sync ----------

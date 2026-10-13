@@ -2,7 +2,7 @@
 
 A drum machine and easy-to-program synths in one box. Built in Pure Data, designed to run on a Raspberry Pi with a touchscreen and a few knobs.
 
-Current version: **v0.14**
+Current version: **v0.15**
 
 ## How to open it
 
@@ -31,9 +31,10 @@ The window is the instrument: three touch screens, drawn in Lua (plugdata has Lu
 **Synth** (bass, lead or chord)
 - **Key** and **scale** at the top, shared by all three
 - **Steps**: tap cycles off, on, accent. **Drag a step up or down** to change its note. Or tap a step, then pick its note from the row underneath (the dimmed one is the key's root). **Slide** applies to the selected step
-- Chord steps show the chord on that step of the scale (i, ii, iii...). Chord type is with the sound
-- **Sound**: engine and its four knobs (named for the engine), plus drive, or chord type for the chord
-- **Fill**: pick a rhythm and notes (or a chord rhythm and progression) and press **new** to write the whole pattern. Then swipe and tweak single steps
+- Chord steps show the chord on that step of the scale (i, ii, iii...)
+- Underneath, two views: **sound** (engine, its four knobs named for the engine, drive, reverb and delay sends) and **fill**
+- **Fill for bass and lead**: pick a rhythm and notes and press **new** to write the whole pattern. Then swipe and tweak single steps
+- **Fill for chords**: pick a **progression** (1 to 10), a **rhythm** (1 to 10) and the **spice** (1 to 4). Picking a progression or rhythm rewrites the chord part straight away. **Smooth** plays each chord in the shape closest to the last one
 
 Swing, accent amount, the other master effects and MIDI clock aren't on the screens yet. They're still saved, and they're in **pd test-panel**.
 
@@ -247,7 +248,11 @@ The drive comes after the engine, so it works on all of them. Defaults: bass on 
 
 ## Chord synth
 
-Plays up to four notes at once, worked out as it plays from the step's chord root, the shared key and scale, and the chord type (triad, seventh, sus2 or power). Change the key and the chords follow straight away.
+Plays up to four notes at once, worked out as it plays from the step's chord root, the shared key and scale, and the chord type. Change the key or the spice and the chords follow straight away.
+
+**Spice** picks the chord type: 1 triad, 2 seventh, 3 ninth (root, third, seventh, ninth), 4 eleventh (root, seventh, ninth, eleventh). The old test panel also offers sus2, power, sus4 and sixth.
+
+**Smooth** (on by default) folds every chord into the octave above the key's root, so each chord is played in the shape closest to the last. Off plays every chord from its root upwards.
 
 | Engine | k1 | k2 | k3 | k4 | Character |
 |---|---|---|---|---|---|
@@ -270,15 +275,30 @@ Pick the MIDI port in plugdata's audio and MIDI settings. On the Pi, the iRig Pr
 
 **Bass and lead** are built from a rhythm, a note pattern, and the shared key and scale. Change any one and the track rebuilds straight away, filling the whole pattern length. The 16-step rhythm repeats, and the note pattern carries on across bars. Changing the key rebuilds both bass and lead.
 
-**Chords** are built from a chord rhythm and a progression. The progression moves one chord per 16-step bar, so set the length to 32 or 64 to hear it move.
+**Chords** are built from a progression and a chord rhythm. Each progression has its own length (1, 2, 4 or 8 bars) and its own timing: some change chord every half bar, some hold a chord for two. If the pattern is shorter than the progression, picking it makes the pattern longer. It never makes a pattern shorter.
 
 **Rhythms** (when it plays): 0 offbeat, 1 rolling, 2 gallop, 3 acid classic, 4 sparse dub, 5 tech bounce, 6 acid 16ths, 7 trip hop
 
 **Note patterns** (what it plays, used in turn on each note): 0 root, 1 octaves, 2 root and fifth, 3 acid riff, 4 walk up, 5 minor stab, 6 dub, 7 pedal, 8 arp up, 9 arp up-down, 10 call, 11 descend
 
-**Chord rhythms**: 0 offbeat stabs, 1 dub stabs, 2 bar pads, 3 house organ, 4 two beat, 5 syncopated, 6 eighths, 7 sparse
+**Chord rhythms**, simplest first: 1 bar pads, 2 two beat, 3 offbeat, 4 dub stabs, 5 house organ, 6 tresillo (3-3-2), 7 syncopated, 8 garage skip (2 bars), 9 call and answer (2 bars), 10 eighths
 
-**Progressions**: 0 i, 1 i-VI-VII, 2 i-iv, 3 i-VII-VI-VII, 4 i-v, 5 i-III-VII-iv, 6 i-VI-iv-v, 7 ii-V-i-i
+**Progressions**, simplest first (chords in the minor key, they follow whatever key and scale you pick):
+
+| # | Name | Chords | Bars |
+|---|---|---|---|
+| 1 | one chord | i | 1 |
+| 2 | vamp | i iv | 2 |
+| 3 | dub techno | i i i VII | 4 |
+| 4 | deep house | i iv VI v | 4 |
+| 5 | garage | i VI iv v, half a bar each | 2 |
+| 6 | pop | i VI III VII | 4 |
+| 7 | uplift | VI VII i (held two bars) | 4 |
+| 8 | andalusian | i VII VI V | 4 |
+| 9 | trip hop | i VII VI v, two bars each | 8 |
+| 10 | soul | ii V I (held two bars) | 4 |
+
+The presets live in `tools/build.py` (`PRE` and `PROGS`). The build writes their names into the touchscreen too, so they always match.
 
 **Chord types**: 0 triad, 1 seventh, 2 sus2, 3 power
 
