@@ -25,6 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
+local VERSION = "v0.15.2"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
@@ -240,6 +241,7 @@ function ui:layout_top(add)
     add{ kind="tab", x=250 + (i - 1) * 126, y=12, w=120, h=48, label=t[2], sel=(self.screen == t[1]),
          tap=function() if self.screen ~= t[1] then self:open(t[1]) end end }
   end
+  add{ kind="text", x=W - 272, y=30, w=60, h=12, label=VERSION, size=10 }
   add{ kind="btn", x=W - 208, y=12, w=92, h=48, label="save", quiet=true, tap=function() pd.send("ockm-save", "bang", {}) end }
   add{ kind="btn", x=W - 108, y=12, w=92, h=48, label="revert", quiet=true, tap=function() pd.send("ockm-revert", "bang", {}) end }
 end

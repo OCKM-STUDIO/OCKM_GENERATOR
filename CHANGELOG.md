@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.15.2 (13 October 2026)
+
+**Added**
+- The version number is shown on the screen, top right, so it's obvious which version plugdata has loaded
+
 ## v0.15.1 (13 October 2026)
 
 **Fixed**
