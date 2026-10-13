@@ -1,0 +1,17 @@
+#N canvas 140 140 700 260 12;
+#X text 20 10 Chord synth: three engines \, one plays at a time (ockm-<track>-engine 0 stab \, 1 organ \, 2 pad). Input: up to 4 MIDI notes plus a hit strength \, or off.;
+#X obj 30 50 inlet;
+#X obj 30 100 ockm-chord-stab \$1;
+#X obj 200 100 ockm-chord-organ \$1;
+#X obj 370 100 ockm-chord-pad \$1;
+#X obj 30 160 +~;
+#X obj 30 185 +~;
+#X obj 30 220 outlet~;
+#X connect 1 0 2 0;
+#X connect 1 0 3 0;
+#X connect 1 0 4 0;
+#X connect 2 0 5 0;
+#X connect 3 0 5 1;
+#X connect 5 0 6 0;
+#X connect 4 0 6 1;
+#X connect 6 0 7 0;

@@ -257,7 +257,7 @@ def bass_generator(work):
         h.at(ms, f"test-{label} bang")
     h.at(100, "ockm-bass-notes 0 ; ockm-bass-rhythm 0"); grab(150, "a")
     h.at(200, "ockm-bass-notes 3 ; ockm-bass-rhythm 3"); grab(250, "b")
-    h.at(300, "ockm-bass-root 0 ; ockm-bass-scale 3 ; ockm-bass-notes 6 ; ockm-bass-rhythm 1"); grab(350, "c")
+    h.at(300, "ockm-root 0 ; ockm-scale 3 ; ockm-bass-notes 6 ; ockm-bass-rhythm 1"); grab(350, "c")
     f = os.path.join(work, "t_gen.pd"); h.finish(450, f)
     out = run(work, f)
     got = {v.split()[0]: [int(float(x)) for x in v.split()[1:]] for v in printed(out, "GEN")}
@@ -285,11 +285,52 @@ def bass_generator_fills_long_patterns(work):
     assert hits == [33, 35, 36, 40] * 2, f"walk-up notes should carry on through bar 2: {hits}"
 
 @test
+def lead_plays_two_octaves_up(work):
+    h = Harness()
+    h.at(100, "ockm-lead-notes 1 ; ockm-lead-rhythm 0")
+    g = h.add("#X obj 10 300 r test-get;"); t = h.add("#X obj 10 330 t b b;")
+    a1 = h.add("#X obj 10 360 array get ockm-pat-lead-on 0 16;"); p1 = h.add("#X obj 10 390 print ON;")
+    a2 = h.add("#X obj 150 360 array get ockm-pat-lead-note 0 16;"); p2 = h.add("#X obj 150 390 print NOTE;")
+    h.con(g, t); h.con(t, a1, 1); h.con(a1, p1); h.con(t, a2, 0); h.con(a2, p2)
+    h.at(200, "test-get bang")
+    f = os.path.join(work, "t_lead.pd"); h.finish(300, f)
+    out = run(work, f)
+    on = [int(float(x)) for x in printed(out, "ON")[0].split()]
+    note = [int(float(x)) for x in printed(out, "NOTE")[0].split()]
+    hits = [n for n, o in zip(note, on) if o]
+    assert hits == [57, 69, 57, 69], f"lead octaves pattern in A minor should be A3 A4, got {hits}"
+
+@test
+def chord_notes_follow_key_scale_and_type(work):
+    h = Harness(dut="ockm-chordseq zz")
+    h.add("#X obj 400 120 ockm-presets;")
+    pr = h.add("#X obj 400 90 print CHORD;"); h.con(h.dut, pr)
+    h.at(100, "ockm-pat-zz-on 0 1 1 1 2 ; ockm-pat-zz-deg 0 0 5 0 0")
+    h.at(120, "test-in 0"); h.at(140, "test-in 1")
+    h.at(160, "ockm-zz-type 1"); h.at(170, "test-in 2")
+    h.at(190, "ockm-root 0 ; ockm-scale 1 ; ockm-zz-type 0"); h.at(200, "test-in 3")
+    f = os.path.join(work, "t_chord.pd"); h.finish(300, f)
+    got = [[float(x) for x in v.split()] for v in printed(run(work, f, with_main=False), "CHORD")]
+    want = [[45, 48, 52, 0, 0.75], [53, 57, 60, 0, 0.75], [45, 48, 52, 55, 0.75], [48, 52, 55, 0, 1]]
+    assert got == want, f"chords wrong (A minor i, VI, i7, then C major i accented): {got}"
+
+@test
+def chord_engines_sound(work):
+    for eng, name in enumerate(["stab", "organ", "pad"]):
+        h = Harness(dut="ockm-chord zz")
+        h.record(os.path.join(work, f"c_{name}.wav"), source="dut")
+        h.at(20, f"ockm-zz-engine {eng} ; ockm-zz-k1 0.5 ; ockm-zz-k2 0.5 ; ockm-zz-k3 0.2 ; ockm-zz-k4 0.5")
+        h.at(60, "test-in 45 48 52 0 1")
+        _, (s, sr) = play(work, h, f"t_chord_{name}", with_main=False, ms=900)
+        x = s[int(0.08 * sr):int(0.4 * sr)]
+        assert 0.02 < peak(x) < 1.0, f"{name} chord level {peak(x):.2f}"
+
+@test
 def bass_engines_play_in_tune(work):
     for eng, name in enumerate(["acid", "sub", "fm", "reese", "pluck", "saw"]):
-        h = Harness(dut="ockm-bass")
+        h = Harness(dut="ockm-mono zz")
         h.record(os.path.join(work, f"b_{name}.wav"), source="dut")
-        h.at(20, f"ockm-bass-engine {eng} ; ockm-bass-k1 0.5 ; ockm-bass-k2 0.3 ; ockm-bass-k3 0 ; ockm-bass-k4 0.9 ; ockm-bass-drive 0")
+        h.at(20, f"ockm-zz-engine {eng} ; ockm-zz-k1 0.5 ; ockm-zz-k2 0.3 ; ockm-zz-k3 0 ; ockm-zz-k4 0.9 ; ockm-zz-drive 0")
         h.at(50, "test-in 33 0 0 1")
         _, (s, sr) = play(work, h, f"t_bass_{name}", with_main=False, ms=650)
         x = s[int(0.15 * sr):int(0.5 * sr)]

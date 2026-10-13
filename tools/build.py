@@ -218,7 +218,7 @@ p.save("seq/ockm-row.pd","#N canvas 200 200 1700 600 12;",["#X coords 0 -1 1 1 3
 
 # ---------------- bass sequencer ----------------
 p=P()
-p.add("#X text 20 10 Bass pattern. Each step has a note \\, on/off \\, accent and slide. Up to 128 steps.;")
+p.add("#X text 20 10 Mono synth pattern (bass or lead). Each step has a note \\, on/off \\, accent and slide. Up to 128 steps.;")
 inl=p.add("#X obj 30 60 inlet;"); t5=p.add("#X obj 30 100 t f f f f f;")
 rn=p.add(f"#X obj 30 300 tabread ockm-pat-{D}1-note;"); ra=p.add(f"#X obj 140 260 tabread ockm-pat-{D}1-acc;"); rsl=p.add(f"#X obj 250 220 tabread ockm-pat-{D}1-slide;")
 pz=p.add("#X obj 360 130 sel 0;"); lst=p.add("#X obj 360 160 f 16;"); m1a=p.add("#X obj 360 185 - 1;"); m1b=p.add("#X obj 420 160 - 1;"); rlen=p.add("#X obj 470 100 r ockm-len;")
@@ -233,7 +233,7 @@ for c in [(inl,0,t5,0),(t5,4,ro,0),(t5,3,rsl,0),(t5,2,pz,0),(t5,1,ra,0),(t5,0,rn
 rs=p.add("#X obj 720 120 r ockm-store;"); ts=p.add("#X obj 720 150 t b f;"); ms=p.add(f"#X obj 780 180 * {STEPS};")
 rl=p.add("#X obj 720 320 r ockm-load;"); ml=p.add(f"#X obj 780 380 * {STEPS};")
 p.con(rs,0,ts,0); p.con(ts,1,ms,0); p.con(rl,0,ml,0)
-re=p.add("#X obj 720 560 r ockm-bass-edit;"); tl=p.add("#X obj 720 590 t l l;"); ls=p.add("#X obj 900 620 list split 1;")
+re=p.add(f"#X obj 720 560 r ockm-{D}1-edit;"); tl=p.add("#X obj 720 590 t l l;"); ls=p.add("#X obj 900 620 list split 1;")
 up=p.add("#X obj 720 650 unpack f f f f f;")
 p.con(re,0,tl,0); p.con(tl,1,ls,0); p.con(tl,0,up,0)
 # extend
@@ -255,18 +255,18 @@ for j,nm in enumerate(["note","on","acc","slide"]):
     p.con(t4,3-j,xr,0); p.con(xr,0,xw,0); p.con(tci,1,xw,1)
 p.add("#X text 140 400 only lets the note through if the step is on;")
 p.add("#X text 420 100 glide into this note if the previous step had slide on;")
-p.add("#X text 720 530 edit one step: ockm-bass-edit <step> <note> <on> <accent> <slide>;")
+p.add("#X text 720 530 edit one step: ockm-<track>-edit <step> <note> <on> <accent> <slide>;")
 p.add("#X text 1500 90 extend: repeat steps to fill a longer pattern;")
-p.save("seq/ockm-bassseq.pd","#N canvas 150 150 1800 760 12;")
+p.save("seq/ockm-monoseq.pd","#N canvas 150 150 1800 760 12;")
 
 # ---------------- main patch ----------------
 # six drum slots: (slot, default sound number)
-SLOTS=[("d1",0),("d2",1),("d3",2),("d4",4),("d5",5),("d6",7)]
+SLOTS=[("d1",0),("d2",1),("d3",2),("d4",4),("d5",5),("d6",7),("d7",3),("d8",6)]
 VERB=[0,0.25,0.35,0.2,0.1,0.15,0.2,0.25]   # default reverb send per sound
 DLY=[0,0,0,0.25,0,0,0,0.3]                 # default delay send per sound
 p=P()
 p.raw("#X declare -path voices -path seq;")
-p.add("#X text 30 10 OCKM_GENERATOR v0.9. Click start \\, then click squares to build a beat. Pick a pattern slot \\, press save to keep it.;")
+p.add("#X text 30 10 OCKM_GENERATOR v0.10. Click start \\, then click squares to build a beat. Pick a pattern slot \\, press save to keep it.;")
 lb=p.add("#X obj 30 50 loadbang;"); lbt=p.add("#X obj 30 75 t b b b;")
 dsp=p.add("#X msg 1100 760 \; pd dsp 1;")
 bpmm=p.add("#X msg 30 105 124;"); bpm=p.add("#X floatatom 30 135 5 40 200 0 - - -;"); p.con(p.add("#X obj 120 105 r ockm-bpm;"),0,bpm,0); p.add("#X text 85 135 BPM;")
@@ -323,8 +323,9 @@ rld=p.add("#X obj 1260 140 r ockm-load;"); trl=p.add("#X obj 1260 165 tabread oc
 for c in [(rst2,0,tst2,0),(tst2,1,twl,1),(tst2,0,cl2,0),(cl2,0,twl,0),(rl4,0,cl2,1),(rld,0,trl,0),(trl,0,fixl,0),(fixl,0,sl2,0)]: p.con(*c)
 DR=[s for s,_ in SLOTS]
 names=DR
-banks=["ockm-bank-"+n for n in names]+[f"ockm-bank-bass-{n}" for n in ["note","on","acc","slide"]]+["ockm-bank-len"]
-files=names+[f"bass-{n}" for n in ["note","on","acc","slide"]]+["length"]
+MONO=["note","on","acc","slide"]; CHORD=["on","deg"]
+banks=["ockm-bank-"+n for n in names]+[f"ockm-bank-{t}-{n}" for t in ("bass","lead") for n in MONO]+[f"ockm-bank-chord-{n}" for n in CHORD]+["ockm-bank-len"]
+files=names+[f"{t}-{n}" for t in ("bass","lead") for n in MONO]+[f"chord-{n}" for n in CHORD]+["length"]
 wr=p.add("#X msg 840 85 \; "+" \; ".join(f"{b} write patterns/{fl}.txt" for b,fl in zip(banks,files))+";")
 p.con(tsv,0,wr,0)
 rdm=p.add("#X msg 1100 560 \; "+" \; ".join(f"{b} read patterns/{fl}.txt" for b,fl in zip(banks,files))+" \; ockm-slotset set 0 \; ockm-want 0;")
@@ -332,7 +333,7 @@ p.con(lbt,2,rdm,0)
 for i,b in enumerate(banks): p.add(f"#X obj {1100+(i%2)*190} {420+(i//2)*22} array define {b} {SLOTN if b=='ockm-bank-len' else SLOTN*STEPS};")
 p.add(f"#X text 1100 395 pattern banks ({SLOTN} slots x up to {STEPS} steps) \\, saved in the patterns folder;")
 # drums
-mix=p.add("#X obj 560 900 *~ 0.3;"); fx=p.add("#X obj 560 930 ockm-fx;"); dac=p.add("#X obj 560 965 dac~;"); smaster=p.add("#X obj 640 965 s~ ockm-master;")
+mix=p.add("#X obj 560 1000 *~ 0.3;"); fx=p.add("#X obj 560 1030 ockm-fx;"); dac=p.add("#X obj 560 1065 dac~;"); smaster=p.add("#X obj 640 1065 s~ ockm-master;")
 p.con(mix,0,fx,0); p.con(fx,0,dac,0); p.con(fx,0,dac,1); p.con(fx,0,smaster,0)
 for r,(nm,snd) in enumerate(SLOTS):
     y=380+r*40
@@ -355,37 +356,74 @@ for i,(nm,snd) in enumerate(SLOTS):
         fa=sub.add(f"#X floatatom {115+j*140} {y} 5 {lo} {hi} 0 - - ockm-{nm}-{param};")
         sub.con(slb,0,m,0); sub.con(m,0,fa,0)
 sub.add("#X text 70 60 sound          tune           decay          level          reverb send    delay send;")
-p.L.append(sub.text("#N canvas 300 200 940 300 drum-settings 0;").rstrip("\n"))
-ds=p.add("#X restore 30 830 pd drum-settings;")
-p.add("#X text 30 855 sound \\, tune \\, decay \\, level and sends per drum slot;")
-# bass
+p.L.append(sub.text("#N canvas 300 200 940 360 drum-settings 0;").rstrip("\n"))
+ds=p.add("#X restore 30 960 pd drum-settings;")
+p.add("#X text 30 985 sound \\, tune \\, decay \\, level and sends per drum slot;")
+# synth tracks: bass and lead (mono synth), chord
 by=380+len(SLOTS)*40+10
-p.add(f"#X text 20 {by+2} bass;")
-bs=p.add(f"#X obj 110 {by} ockm-bassseq bass;"); ac=p.add(f"#X obj 560 {by} ockm-bass;")
-p.con(pipe,0,bs,0); p.con(bs,0,ac,0); p.con(ac,0,mix,0)
-bvs=p.add(f"#X obj 760 {by} *~ 0;"); bvt=p.add(f"#X obj 830 {by} throw~ ockm-revbus;"); bvr=p.add(f"#X obj 760 {by-18} r ockm-bass-verb;")
-p.con(ac,0,bvs,0); p.con(bvs,0,bvt,0); p.con(bvr,0,bvs,1)
-bds=p.add(f"#X obj 990 {by} *~ 0;"); bdt=p.add(f"#X obj 1060 {by} throw~ ockm-dlybus;"); bdr=p.add(f"#X obj 990 {by-18} r ockm-bass-delay;")
-p.con(ac,0,bds,0); p.con(bds,0,bdt,0); p.con(bdr,0,bds,1)
-for j,(lab,v,lo,hi,hook) in enumerate([("engine",0,0,5,"ockm-bass-engine"),("k1",0.37,0,1,"ockm-bass-k1"),("k2",0.9,0,1,"ockm-bass-k2"),
-        ("k3",0.31,0,1,"ockm-bass-k3"),("k4",0.55,0,1,"ockm-bass-k4"),("drive",0,0,1,"ockm-bass-drive")]):
-    m=p.add(f"#X msg {110+j*75} {by+40} {v};"); fa=p.add(f"#X floatatom {110+j*75} {by+70} 5 {lo} {hi} 0 - - {hook};")
-    p.con(lbt,0,m,0); p.con(m,0,fa,0)
-p.add(f"#X text 110 {by+95} engine  k1  k2  k3  k4  drive (engines: 0 acid 1 sub 2 fm 3 reese 4 pluck 5 saw);")
+SYN=[("bass","ockm-monoseq bass","ockm-mono bass"),("lead","ockm-monoseq lead","ockm-mono lead"),("chord","ockm-chordseq chord","ockm-chord chord")]
+synth_voice={}
+for r,(nm,seqo,voi) in enumerate(SYN):
+    y=by+r*40
+    p.add(f"#X text 20 {y+2} {nm};")
+    sq=p.add(f"#X obj 110 {y} {seqo};"); vo=p.add(f"#X obj 560 {y} {voi};")
+    p.con(pipe,0,sq,0); p.con(sq,0,vo,0); p.con(vo,0,mix,0)
+    vs=p.add(f"#X obj 760 {y} *~ 0;"); vt=p.add(f"#X obj 830 {y} throw~ ockm-revbus;"); vr=p.add(f"#X obj 760 {y-18} r ockm-{nm}-verb;")
+    p.con(vo,0,vs,0); p.con(vs,0,vt,0); p.con(vr,0,vs,1)
+    ds=p.add(f"#X obj 990 {y} *~ 0;"); dt_=p.add(f"#X obj 1060 {y} throw~ ockm-dlybus;"); dr_=p.add(f"#X obj 990 {y-18} r ockm-{nm}-delay;")
+    p.con(vo,0,ds,0); p.con(ds,0,dt_,0); p.con(dr_,0,ds,1)
+    synth_voice[nm]=vo
 s0b=p.add("#X obj 400 80 sel 0;"); offm=p.add("#X msg 400 105 off;")
-p.con(ttg,1,s0b,0); p.con(s0b,0,offm,0); p.con(offm,0,ac,0)
+p.con(ttg,1,s0b,0); p.con(s0b,0,offm,0)
+for nm in ("bass","lead","chord"): p.con(offm,0,synth_voice[nm],0)
+# generators and shared presets
+gy=by+3*40+20
+p.add(f"#X obj 110 {gy} ockm-presets;")
+p.add(f"#X obj 230 {gy} ockm-monogen bass 0 3 3;")
+p.add(f"#X obj 400 {gy} ockm-monogen lead 24 6 8;")
+p.add(f"#X obj 530 {gy} ockm-chordgen chord;")
+# synth settings subpatch: key, engines, knobs, generator choices
+sub=P()
+sub.add("#X text 20 10 Synth settings. Key and scale are shared by bass \\, lead and chord. Knobs run 0 to 1. Generator choices rebuild that track's pattern.;")
+slb=sub.add("#X obj 20 40 loadbang;")
+def row(y,label,items):
+    sub.add(f"#X text 20 {y} {label};")
+    for j,(lab,dflt,lo,hi,hook,send_at_load) in enumerate(items):
+        x=120+j*95
+        sub.add(f"#X text {x} {y-18} {lab};")
+        fa=sub.add(f"#X floatatom {x} {y} 5 {lo} {hi} 0 - - {hook};")
+        if send_at_load:
+            m=sub.add(f"#X msg {x+45} {y-18} {dflt};"); sub.con(slb,0,m,0); sub.con(m,0,fa,0)
+        else:
+            m=sub.add(f"#X msg {x+45} {y-18} set {dflt};"); sub.con(slb,0,m,0); sub.con(m,0,fa,0)
+row(80,"key",[("root",9,0,11,"ockm-root",False),("scale",0,0,5,"ockm-scale",False)])
+row(140,"bass",[("engine",0,0,5,"ockm-bass-engine",True),("k1",0.37,0,1,"ockm-bass-k1",True),("k2",0.9,0,1,"ockm-bass-k2",True),("k3",0.31,0,1,"ockm-bass-k3",True),
+                ("k4",0.55,0,1,"ockm-bass-k4",True),("drive",0,0,1,"ockm-bass-drive",True),("rhythm",3,0,7,"ockm-bass-rhythm",False),("notes",3,0,11,"ockm-bass-notes",False)])
+row(200,"lead",[("engine",4,0,5,"ockm-lead-engine",True),("k1",0.55,0,1,"ockm-lead-k1",True),("k2",0.3,0,1,"ockm-lead-k2",True),("k3",0.4,0,1,"ockm-lead-k3",True),
+                ("k4",0.45,0,1,"ockm-lead-k4",True),("drive",0,0,1,"ockm-lead-drive",True),("rhythm",6,0,7,"ockm-lead-rhythm",False),("notes",8,0,11,"ockm-lead-notes",False)])
+row(260,"chord",[("engine",0,0,2,"ockm-chord-engine",True),("k1",0.45,0,1,"ockm-chord-k1",True),("k2",0.5,0,1,"ockm-chord-k2",True),("k3",0.4,0,1,"ockm-chord-k3",True),
+                 ("k4",0.3,0,1,"ockm-chord-k4",True),("type",0,0,3,"ockm-chord-type",True),("rhythm",0,0,7,"ockm-chord-rhythm",False),("prog",0,0,7,"ockm-chord-prog",False)])
+sub.add("#X text 20 300 key root: 0 C ... 9 A ... 11 B. Scale: 0 minor 1 major 2 dorian 3 phrygian 4 mixolydian 5 harmonic minor;")
+sub.add("#X text 20 320 bass and lead engines: 0 acid 1 sub 2 FM 3 reese 4 pluck 5 saw. Chord engines: 0 stab 1 organ 2 pad. Chord type: 0 triad 1 seventh 2 sus2 3 power;")
+sub.add("#X text 20 340 bass/lead rhythm: 0 offbeat 1 rolling 2 gallop 3 acid 4 dub 5 bounce 6 acid16 7 trip-hop. Notes: 0 root 1 octaves 2 root-fifth 3 acid-riff 4 walk-up 5 stab 6 dub 7 pedal 8 arp-up 9 arp-updown 10 call 11 descend;")
+sub.add("#X text 20 360 chord rhythm: 0 offbeat-stabs 1 dub-stabs 2 bar-pads 3 house-organ 4 two-beat 5 syncopated 6 eighths 7 sparse. Prog: 0 i 1 i-VI-VII 2 i-iv 3 i-VII-VI-VII 4 i-v 5 i-III-VII-iv 6 i-VI-iv-v 7 ii-V-i-i;")
+p.L.append(sub.text("#N canvas 260 160 1000 400 synth-settings 0;").rstrip("\n"))
+p.add(f"#X restore 30 {gy+40} pd synth-settings;")
+p.add(f"#X text 30 {gy+65} key \\, engines \\, knobs and generator choices for bass \\, lead and chord;")
 # master fx subpatch
 sub=P()
 sub.add("#X text 20 10 Master effects. Filter -1 to 1 (below 0 low-pass \\, above 0 high-pass). Drive 0 to 1. Delay in steps.;")
 slb=sub.add("#X obj 20 40 loadbang;")
 for i,(lab,dflt,lo,hi,hook) in enumerate([("filter",0,-1,1,"ockm-filter"),("drive",0,0,1,"ockm-drive"),("delay level",0.5,0,1,"ockm-delay-mix"),
-        ("delay feedback",0.4,0,0.9,"ockm-delay-fb"),("delay steps",3,1,8,"ockm-delay-steps"),("reverb level",0.5,0,1,"ockm-verb-mix"),("reverb size",0.6,0,1,"ockm-verb-size"),("reverb tone",0.5,0,1,"ockm-verb-tone"),("bass reverb send",0,0,1,"ockm-bass-verb"),("bass delay send",0,0,1,"ockm-bass-delay")]):
+        ("delay feedback",0.4,0,0.9,"ockm-delay-fb"),("delay steps",3,1,8,"ockm-delay-steps"),("reverb level",0.5,0,1,"ockm-verb-mix"),("reverb size",0.6,0,1,"ockm-verb-size"),("reverb tone",0.5,0,1,"ockm-verb-tone"),
+        ("bass reverb send",0,0,1,"ockm-bass-verb"),("bass delay send",0,0,1,"ockm-bass-delay"),("lead reverb send",0.2,0,1,"ockm-lead-verb"),("lead delay send",0.25,0,1,"ockm-lead-delay"),
+        ("chord reverb send",0.3,0,1,"ockm-chord-verb"),("chord delay send",0.35,0,1,"ockm-chord-delay")]):
     y=80+i*30
     sub.add(f"#X text 20 {y} {lab};")
     m=sub.add(f"#X msg 160 {y} {dflt};"); fa=sub.add(f"#X floatatom 220 {y} 5 {lo} {hi} 0 - - {hook};")
     sub.con(slb,0,m,0); sub.con(m,0,fa,0)
-p.L.append(sub.text("#N canvas 320 220 560 420 master-fx 0;").rstrip("\n"))
-p.add("#X restore 250 830 pd master-fx;")
+p.L.append(sub.text("#N canvas 320 220 560 540 master-fx 0;").rstrip("\n"))
+p.add("#X restore 250 960 pd master-fx;")
 sub=P()
 sub.add("#X text 20 10 MIDI clock. Sync 0 = leader (sends clock) \\, 1 = follower (plays to incoming clock). Clock out 1 = send clock when leading.;")
 slb=sub.add("#X obj 20 40 loadbang;")
@@ -395,19 +433,12 @@ for i,(lab,dflt,lo,hi,hook) in enumerate([("sync",0,0,1,"ockm-sync"),("clock out
     m=sub.add(f"#X msg 120 {y} {dflt};"); fa=sub.add(f"#X floatatom 170 {y} 3 {lo} {hi} 0 - - {hook};")
     sub.con(slb,0,m,0); sub.con(m,0,fa,0)
 p.L.append(sub.text("#N canvas 340 240 640 180 midi-sync 0;").rstrip("\n"))
-p.add("#X restore 450 830 pd midi-sync;")
-p.add("#X text 450 855 MIDI clock leader or follower;")
-p.add("#X obj 450 880 ockm-clock;")
-p.add("#X text 250 855 filter \\, drive and delay;")
-gy=by+130
+p.add("#X restore 450 960 pd midi-sync;")
+p.add("#X text 450 985 MIDI clock leader or follower;")
+p.add("#X obj 450 1010 ockm-clock;")
+p.add("#X text 250 985 effects and sends;")
 p.add("#X obj 1100 800 declare -path voices -path seq;")
-p.add(f"#X obj 110 {gy+30} ockm-bassgen bass;")
-p.add(f"#X text 110 {gy} bass generator (temporary controls);")
-for j,(lab,hi,hook) in enumerate([("rhythm",7,"ockm-bass-rhythm"),("notes",7,"ockm-bass-notes"),("key",11,"ockm-bass-root"),("scale",5,"ockm-bass-scale")]):
-    p.add(f"#X floatatom {110+j*110} {gy+60} 3 0 {hi} 0 {lab} - {hook};")
-p.add(f"#X text 110 {gy+85} rhythm 0 offbeat 1 rolling 2 gallop 3 acid 4 dub 5 bounce 6 acid16 7 trip-hop / notes 0 root 1 octaves 2 root-fifth 3 acid-riff 4 walk-up 5 stab 6 dub 7 pedal;")
-p.add(f"#X text 110 {gy+105} key 0 C ... 9 A ... 11 B / scale 0 minor 1 major 2 dorian 3 phrygian 4 mixolydian 5 harmonic minor;")
-p.save("OCKM_GENERATOR.pd","#N canvas 40 40 1420 1000 12;")
+p.save("OCKM_GENERATOR.pd","#N canvas 40 40 1420 1050 12;")
 
 
 # ================= bass core: shared note logic for every engine =================
@@ -437,16 +468,16 @@ for c in [(inl,0,ro,0),(ro,0,offm,0),(offm,0,av,0),(ro,1,up,0),(up,3,eqh,0),(eqh
           (up,1,ap1,0),(ap1,0,es,1),(up,1,lvx,0),(lvx,0,fl,1),(up,0,tn,0),(tn,3,spG,0),(tn,3,spN,0),(spG,0,mG,0),(spN,0,mN,0),(mG,0,pv,0),(mN,0,pv,0),
           (tn,2,fl,0),(fl,0,ma,0),(ma,0,av,0),(tn,1,spR,0),(spR,0,mR,0),(mR,0,av,0),(tn,0,spF,0),(spF,0,fd,0),(fd,0,mF,0),(mF,0,ev,0),(ev,0,es,0),
           (dec,0,fd,1),(pv,0,o0,0),(es,0,o1,0),(av,0,o2,0)]: q.con(*c)
-q.save("voices/ockm-bass-core.pd","#N canvas 150 150 900 520 12;")
+q.save("voices/ockm-mono-core.pd","#N canvas 150 150 900 520 12;")
 
 # ================= engines =================
 def engine(fn,idx,title,build):
     q=P(); q.add(f"#X text 20 10 {title};")
     inl=q.add("#X obj 30 50 inlet;")
     sp=q.add("#X obj 30 80 spigot 1;")
-    core=q.add("#X obj 30 120 ockm-bass-core;")
+    core=q.add("#X obj 30 120 ockm-mono-core;")
     ks=[q.add(f"#X obj {200+i*110} 50 inlet;") for i in range(4)]
-    re=q.add("#X obj 700 50 r ockm-bass-engine;"); eq=q.add(f"#X obj 700 80 == {idx};"); tf=q.add("#X obj 700 110 t f f;")
+    re=q.add(f"#X obj 700 50 r ockm-{D}1-engine;"); eq=q.add(f"#X obj 700 80 == {idx};"); tf=q.add("#X obj 700 110 t f f;")
     sw=q.add("#X obj 700 170 switch~;"); s0=q.add("#X obj 760 140 sel 0;"); om=q.add("#X msg 760 170 off;")
     for c in [(inl,0,sp,0),(sp,0,core,0),(re,0,eq,0),(eq,0,tf,0),(tf,1,sw,0),(tf,0,s0,0),(s0,0,om,0),(om,0,core,0),(tf,0,sp,1)]: q.con(*c)
     dx=q.add(f"#X obj 650 50 expr 20*pow(100\\,{D}f1);"); q.con(ks[3],0,dx,0); q.con(dx,0,core,1)
@@ -517,11 +548,11 @@ def pluck(q,core,ks,out):
               (ks[0],0,k1,0),(k1,0,ad,1),(ks[2],0,k3,0),(k3,0,em,1)]: q.con(*c)
     q.add("#X text 200 110 k1 brightness / k2 saw to square / k3 filter snap. Notes ring out and fade over the decay time (k4) \\, with a sub an octave down.;")
 
-engine("voices/ockm-bass-acid.pd",0,"Acid engine: saw wave into a resonant filter",acid)
-engine("voices/ockm-bass-sub.pd",1,"Sub engine: a driven sine wave with a pitch drop. Deep and clean",sub)
-engine("voices/ockm-bass-fm.pd",2,"FM engine: one sine wave bending another. Punchy and metallic",fm)
-engine("voices/ockm-bass-reese.pd",3,"Reese engine: three detuned saws beating against each other. Dark and wide",reese)
-engine("voices/ockm-bass-pluck.pd",4,"Pluck engine: short and bright. Good for rolling riffs",pluck)
+engine("voices/ockm-mono-acid.pd",0,"Acid engine: saw wave into a resonant filter",acid)
+engine("voices/ockm-mono-sub.pd",1,"Sub engine: a driven sine wave with a pitch drop. Deep and clean",sub)
+engine("voices/ockm-mono-fm.pd",2,"FM engine: one sine wave bending another. Punchy and metallic",fm)
+engine("voices/ockm-mono-reese.pd",3,"Reese engine: three detuned saws beating against each other. Dark and wide",reese)
+engine("voices/ockm-mono-pluck.pd",4,"Pluck engine: short and bright. Good for rolling riffs",pluck)
 
 def sawe(q,core,ks,out):
     # raw sawtooth: optional second detuned saw and sub saw, simple tone control, full-level notes that end hard
@@ -544,25 +575,25 @@ def sawe(q,core,ks,out):
               (ks[2],0,k3,0),(k3,0,g3,1),(k3,0,nm,2)]: q.con(*c)
     q.add("#X text 200 110 k1 tone (1 = fully raw) / k2 second saw detune (0 = single saw) / k3 sub saw an octave down / k4 note length. Notes play at full level then stop hard.;")
 
-engine("voices/ockm-bass-saw.pd",5,"Saw engine: a raw sawtooth. No squelch \\, just a hard buzzy bass",sawe)
+engine("voices/ockm-mono-saw.pd",5,"Saw engine: a raw sawtooth. No squelch \\, just a hard buzzy bass",sawe)
 
 # ================= bass wrapper =================
 q=P()
-q.add("#X text 20 10 Bass: six engines \\, one plays at a time (ockm-bass-engine 0 to 5). Knobs k1-k4 and drive come in on hooks.;")
+q.add("#X text 20 10 Mono synth (bass or lead): six engines \\, one plays at a time (ockm-<track>-engine 0 to 5). Knobs k1-k4 and drive come in on hooks.;")
 inl=q.add("#X obj 30 50 inlet;")
-ks=[q.add(f"#X obj {200+i*130} 50 r ockm-bass-k{i+1};") for i in range(4)]
+ks=[q.add(f"#X obj {200+i*130} 50 r ockm-{D}1-k{i+1};") for i in range(4)]
 names=["acid","sub","fm","reese","pluck","saw"]
-eng=[q.add(f"#X obj {30+i*130} 130 ockm-bass-{n};") for i,n in enumerate(names)]
+eng=[q.add(f"#X obj {30+i*130} 130 ockm-mono-{n} {D}1;") for i,n in enumerate(names)]
 sm=q.add("#X obj 30 200 +~;")
 for i,e in enumerate(eng):
     q.con(inl,0,e,0)
     for j,k in enumerate(ks): q.con(k,0,e,j+1)
     q.con(e,0,sm,0)
-rd=q.add("#X obj 400 200 r ockm-bass-drive;"); dx=q.add(f"#X obj 400 230 expr 1+{D}f1*9;")
+rd=q.add(f"#X obj 400 200 r ockm-{D}1-drive;"); dx=q.add(f"#X obj 400 230 expr 1+{D}f1*9;")
 th=q.add(f"#X obj 30 260 expr~ tanh({D}v1*max({D}f2\\,1))/sqrt(max({D}f2\\,1));"); out=q.add("#X obj 30 300 outlet~;")
 q.add("#X text 400 260 drive: 0 clean \\, 1 heavy;")
 for c in [(rd,0,dx,0),(dx,0,th,1),(sm,0,th,0),(th,0,out,0)]: q.con(*c)
-q.save("voices/ockm-bass.pd","#N canvas 140 140 900 340 12;")
+q.save("voices/ockm-mono.pd","#N canvas 140 140 900 340 12;")
 
 # ================= master effects =================
 q=P()
@@ -657,121 +688,265 @@ for c in [(mri,0,spx,0),(rrt,0,spx,0),(rsy2,0,spx,1),(spx,0,ro,0),(ro,0,tck,0),(
 q.add("#X text 500 540 248 clock \\, 250 start \\, 251 continue \\, 252 stop. ockm-midi-rt lets other things feed clock in too.;")
 q.save("seq/ockm-clock.pd","#N canvas 120 120 1000 580 12;")
 
-def build_bassgen():
-    L=[];C=[];A={}
-    def add(s,after=None):
-        L.append(s); i=sum(1 for x in L if not x.startswith("#A"))-1
-        if after: L.append(after)
-        return i
-    def con(a,b,c,d): C.append((a,b,c,d))
-    add("#X text 20 10 Bass generator. Builds a bassline from a rhythm preset + a note pattern + a key. Writes it into the bass pattern.;")
-    add("#X text 20 40 Rhythm codes: 0 rest \\, 1 note \\, 2 accent \\, 3 note + slide into next \\, 4 accent + slide into next;")
-    add("#X text 20 60 Note patterns are scale degrees \\, used in turn on each note: 0 root \\, 2 third \\, 4 fifth \\, 7 octave \\, -3 fifth below;")
-    RHY=[("offbeat",      "0 0 2 0 0 0 1 0 0 0 2 0 0 0 1 0"),
-       ("rolling",      "0 2 1 1 0 2 1 1 0 2 1 1 0 2 1 1"),
-       ("gallop",       "0 0 2 1 0 1 2 0 0 0 2 1 0 1 2 0"),
-       ("acid-classic", "2 1 0 1 3 4 1 0 2 1 3 1 0 2 1 3"),
-       ("sparse-dub",   "2 0 0 0 0 0 0 1 0 0 1 0 0 0 0 0"),
-       ("tech-bounce",  "0 0 2 0 0 1 0 0 0 0 2 0 0 1 0 1"),
-       ("acid-16ths",   "2 1 3 1 2 1 1 3 2 1 3 1 2 3 1 1"),
-       ("trip-hop",     "2 0 0 0 0 0 3 1 0 0 0 0 0 0 1 0")]
-    N=[("root","0"),("octaves","0 7"),("root-fifth","0 4"),("acid-riff","0 0 7 0 2 0 6 4"),
-       ("walk-up","0 1 2 4"),("minor-stab","0 2 4 2"),("dub","0 0 -3 -2"),("pedal","0 0 0 1")]
-    S=[("minor","0 2 3 5 7 8 10"),("major","0 2 4 5 7 9 11"),("dorian","0 2 3 5 7 9 10"),("phrygian","0 1 3 5 7 8 10"),
-       ("mixolydian","0 2 4 5 7 9 10"),("harmonic-minor","0 2 3 5 7 8 11")]
-    def tdef(x,y,name,rows): return add(f"#X obj {x} {y} text define -k {name};","#A set "+" \; ".join(f"{a} {b}" for a,b in rows)+" \;;")
-    tdef(20,100,"ockm-bass-rhythms",RHY); tdef(250,100,"ockm-bass-notes",N); tdef(480,100,"ockm-bass-scales",S)
-    add("#X text 20 125 double-click these to see or edit the presets;")
-    # work arrays
-    for i,(nm,n) in enumerate([("ockmrtmp",16),("ockmntmp",16),("ockmstmp",7)]):
-        add(f"#X obj {700+i*130} 100 array define {nm} {n};")
-    # hooks and stored settings
-    hooks=[("ockm-bass-rhythm",3),("ockm-bass-notes",3),("ockm-bass-root",9),("ockm-bass-scale",0)]
-    store=[]
-    regen_in=add("#X obj 20 330 t b b b b b;")
-    for j,(h,d) in enumerate(hooks):
-        x=20+j*170
-        r=add(f"#X obj {x} 170 r {h};"); t=add(f"#X obj {x} 200 t b f;"); f=add(f"#X obj {x} 290 f {d};")
-        con(r,0,t,0); con(t,1,f,1); con(t,0,regen_in,0); store.append(f)
-    rg=add("#X obj 720 170 r ockm-bass-gen;"); con(rg,0,regen_in,0)
-    # regen order (right to left): 4 scale, 3 notes, 2 rhythm, 1 root, 0 loop
-    # scale
-    ts=add("#X obj 560 380 text get ockm-bass-scales;"); ls=add("#X obj 560 410 list split 1;"); as_=add("#X obj 560 440 array set ockmstmp;")
-    con(regen_in,4,store[3],0); con(store[3],0,ts,0); con(ts,0,ls,0); con(ls,1,as_,0)
-    # notes
-    tn=add("#X obj 360 380 text get ockm-bass-notes;"); ln=add("#X obj 360 410 list split 1;"); tl=add("#X obj 360 440 t l l;")
-    ll=add("#X obj 420 470 list length;"); an=add("#X obj 360 500 array set ockmntmp;")
-    con(regen_in,3,store[1],0); con(store[1],0,tn,0); con(tn,0,ln,0); con(ln,1,tl,0); con(tl,1,ll,0); con(tl,0,an,0)
-    # rhythm
-    tr=add("#X obj 170 380 text get ockm-bass-rhythms;"); lr=add("#X obj 170 410 list split 1;"); ar=add("#X obj 170 440 array set ockmrtmp;")
-    con(regen_in,2,store[0],0); con(store[0],0,tr,0); con(tr,0,lr,0); con(lr,1,ar,0)
-    # root -> bass register midi note
-    rx=add("#X obj 20 410 expr if(36+$f1>40 \\, 24+$f1 \\, 36+$f1);".replace("$","\\$"))
-    con(regen_in,1,store[2],0); con(store[2],0,rx,0)
-    # loop over 16 steps
-    lp=add("#X obj 20 560 t b b;")
-    con(regen_in,0,lp,0)
-    z1=add("#X msg 120 590 0;"); n16=add("#X obj 20 590 f 16;"); rlg=add("#X obj 80 560 r ockm-len;"); con(rlg,0,n16,1); un=add("#X obj 20 620 until;")
-    fi=add("#X obj 20 650 f;"); pi=add("#X obj 70 650 + 1;"); fh=add("#X obj 400 760 f;"); ph=add("#X obj 450 760 + 1;")
-    con(lp,1,z1,0); con(z1,0,fi,1); con(z1,0,fh,1); con(lp,0,n16,0); con(n16,0,un,0); con(un,0,fi,0); con(fi,0,pi,0); con(pi,0,fi,1)
-    ti=add("#X obj 20 680 t f f;")
-    con(fi,0,ti,0)
-    tws={}
-    for j,nm in enumerate(["note","on","acc","slide"]):
-        tws[nm]=add(f"#X obj {200+j*170} 900 tabwrite ockm-pat-\\$1-{nm};")
-        con(ti,1,tws[nm],1)
-    rd=add("#X obj 20 710 tabread ockmrtmp;")
-    cx=add("#X obj 20 740 expr \\$f1>0 \; \\$f1==2 || \\$f1==4 \; \\$f1>=3;")
-    m16g=add("#X obj 20 700 mod 16;"); con(ti,0,m16g,0); con(m16g,0,rd,0); con(rd,0,cx,0)
-    con(cx,2,tws["slide"],0); con(cx,1,tws["acc"],0)
-    to=add("#X obj 20 780 t f f;"); con(cx,0,to,0); con(to,1,tws["on"],0)
-    s1=add("#X obj 20 810 sel 1;"); con(to,0,s1,0)
-    con(s1,0,fh,0)
-    th=add("#X obj 400 790 t f f;"); con(fh,0,th,0); con(th,1,ph,0); con(ph,0,fh,1)
-    dx=add("#X obj 400 820 expr ockmntmp[\\$f1 % \\$f2];"); con(th,0,dx,0); con(ll,0,dx,1)
-    nx=add("#X obj 400 860 expr \\$f2 + 12*floor(\\$f1/7) + ockmstmp[((int(\\$f1)%7)+7)%7];"); con(dx,0,nx,0); con(rx,0,nx,1)
-    con(nx,0,tws["note"],0)
-    add("#X text 560 820 degree -> MIDI note in the chosen key and scale;")
-    add("#X text 20 960 hooks: ockm-bass-rhythm 0-7 \\, ockm-bass-notes 0-7 \\, ockm-bass-root 0-11 (0 = C \\, 9 = A) \\, ockm-bass-scale 0-5 \\, ockm-bass-gen (rebuild);")
-    out="#N canvas 120 120 1100 1000 12;\n"+"\n".join(L)+"\n"+"".join(f"#X connect {a} {b} {c} {d};\n" for a,b,c,d in C)
-    # fixes applied after the first version (kept here so the output matches)
-    out=out.replace("expr ockmntmp[\\$f1 % \\$f2];","expr ockmntmp[int(\\$f1) % int(\\$f2)];")
-    out=out.replace("ockm-bass-rhythms","ockm-presets-rhythm").replace("text define -k ockm-bass-notes","text define -k ockm-presets-notes")
-    out=out.replace("text get ockm-bass-notes","text get ockm-presets-notes").replace("ockm-bass-scales","ockm-presets-scale")
-    open(os.path.join(R,"seq/ockm-bassgen.pd"),"w").write(out)
+# ================= shared presets =================
+PRE={"rhythm":[("offbeat","0 0 2 0 0 0 1 0 0 0 2 0 0 0 1 0"),("rolling","0 2 1 1 0 2 1 1 0 2 1 1 0 2 1 1"),("gallop","0 0 2 1 0 1 2 0 0 0 2 1 0 1 2 0"),
+               ("acid-classic","2 1 0 1 3 4 1 0 2 1 3 1 0 2 1 3"),("sparse-dub","2 0 0 0 0 0 0 1 0 0 1 0 0 0 0 0"),("tech-bounce","0 0 2 0 0 1 0 0 0 0 2 0 0 1 0 1"),
+               ("acid-16ths","2 1 3 1 2 1 1 3 2 1 3 1 2 3 1 1"),("trip-hop","2 0 0 0 0 0 3 1 0 0 0 0 0 0 1 0")],
+     "notes":[("root","0"),("octaves","0 7"),("root-fifth","0 4"),("acid-riff","0 0 7 0 2 0 6 4"),("walk-up","0 1 2 4"),("minor-stab","0 2 4 2"),
+              ("dub","0 0 -3 -2"),("pedal","0 0 0 1"),("arp-up","0 2 4 7"),("arp-updown","0 2 4 7 4 2"),("call","4 4 2 0 2 4 5 4"),("descend","7 6 4 2")],
+     "scale":[("minor","0 2 3 5 7 8 10"),("major","0 2 4 5 7 9 11"),("dorian","0 2 3 5 7 9 10"),("phrygian","0 1 3 5 7 8 10"),
+              ("mixolydian","0 2 4 5 7 9 10"),("harmonic-minor","0 2 3 5 7 8 11")],
+     "chordrhythm":[("offbeat-stabs","0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0"),("dub-stabs","0 0 0 2 0 0 0 0 0 0 1 0 0 0 0 0"),("bar-pads","2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"),
+                    ("house-organ","1 0 0 1 0 0 1 0 0 0 1 0 0 1 0 0"),("two-beat","2 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0"),("syncopated","0 0 1 0 0 1 0 0 0 1 0 0 1 0 0 0"),
+                    ("eighths","1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0"),("sparse","0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0")],
+     "prog":[("i","0"),("i-VI-VII","0 0 5 6"),("i-iv","0 3"),("i-VII-VI-VII","0 6 5 6"),("i-v","0 4"),("i-III-VII-iv","0 2 6 3"),("i-VI-iv-v","0 5 3 4"),("ii-V-i-i","1 4 0 0")],
+     "chordtype":[("triad","0 2 4 -1"),("seventh","0 2 4 6"),("sus2","0 1 4 -1"),("power","0 4 7 -1")]}
+p=P()
+p.add("#X text 20 10 Shared presets for the generators and chords. Rhythm codes: 0 rest 1 note 2 accent 3 note+slide 4 accent+slide. Notes and progressions are scale steps (0 root \\, 2 third \\, 4 fifth \\, 7 octave).;")
+for i,(k,rows) in enumerate(PRE.items()):
+    p.add(f"#X obj {20+(i%3)*260} {60+(i//3)*40} text define -k ockm-presets-{k};")
+    p.L.append("#A set "+" \; ".join(f"{a} {b}" for a,b in rows)+" \;;")
+p.add("#X text 20 150 Change presets in tools/build.py (PRE) so they survive rebuilds.;")
+p.save("seq/ockm-presets.pd","#N canvas 200 200 820 200 12;")
 
-def build_patterns():
-    """Starter patterns: 8 slots x 128 steps per track, plus a length per slot."""
+# ================= mono generator (bass or lead) =================
+# args: track, octave offset (semitones), default rhythm, default notes
+p=P()
+p.add("#X text 20 10 Mono generator: builds a bass or lead line from a rhythm preset + a note pattern + the shared key. Args: track \\, octave offset \\, default rhythm \\, default notes.;")
+for nm,n in [("r",16),("n",16),("s",7)]: p.add(f"#X obj {700+['r','n','s'].index(nm)*130} 60 array define {D}0-{nm} {n};")
+regen=p.add("#X obj 20 330 t b b b b b;")
+store=[]
+for j,(hook,dflt) in enumerate([(f"ockm-{D}1-rhythm",f"{D}3"),(f"ockm-{D}1-notes",f"{D}4"),("ockm-root","9"),("ockm-scale","0")]):
+    x=20+j*170
+    r=p.add(f"#X obj {x} 170 r {hook};"); t=p.add(f"#X obj {x} 200 t b f;"); fs=p.add(f"#X obj {x} 290 f {dflt};")
+    p.con(r,0,t,0); p.con(t,1,fs,1); p.con(t,0,regen,0); store.append(fs)
+rg=p.add(f"#X obj 720 170 r ockm-{D}1-gen;"); p.con(rg,0,regen,0)
+ts=p.add("#X obj 560 380 text get ockm-presets-scale;"); lsp=p.add("#X obj 560 410 list split 1;"); asx=p.add(f"#X obj 560 440 array set {D}0-s;")
+p.con(regen,4,store[3],0); p.con(store[3],0,ts,0); p.con(ts,0,lsp,0); p.con(lsp,1,asx,0)
+tn=p.add("#X obj 360 380 text get ockm-presets-notes;"); ln=p.add("#X obj 360 410 list split 1;"); tl=p.add("#X obj 360 440 t l l;")
+ll=p.add("#X obj 420 470 list length;"); an=p.add(f"#X obj 360 500 array set {D}0-n;")
+p.con(regen,3,store[1],0); p.con(store[1],0,tn,0); p.con(tn,0,ln,0); p.con(ln,1,tl,0); p.con(tl,1,ll,0); p.con(tl,0,an,0)
+tr=p.add("#X obj 170 380 text get ockm-presets-rhythm;"); lr=p.add("#X obj 170 410 list split 1;"); ar=p.add(f"#X obj 170 440 array set {D}0-r;")
+p.con(regen,2,store[0],0); p.con(store[0],0,tr,0); p.con(tr,0,lr,0); p.con(lr,1,ar,0)
+rx=p.add(f"#X obj 20 410 expr if(36+{D}f1>40 \\, 24+{D}f1 \\, 36+{D}f1);"); ro=p.add(f"#X obj 20 440 + {D}2;")
+p.con(regen,1,store[2],0); p.con(store[2],0,rx,0); p.con(rx,0,ro,0)
+lp=p.add("#X obj 20 560 t b b;"); p.con(regen,0,lp,0)
+z1=p.add("#X msg 120 590 0;"); nl=p.add("#X obj 20 590 f 16;"); rlg=p.add("#X obj 80 560 r ockm-len;"); un=p.add("#X obj 20 620 until;")
+fi=p.add("#X obj 20 650 f;"); pi=p.add("#X obj 70 650 + 1;"); fh=p.add("#X obj 400 760 f;"); ph=p.add("#X obj 450 760 + 1;")
+for c in [(rlg,0,nl,1),(lp,1,z1,0),(z1,0,fi,1),(z1,0,fh,1),(lp,0,nl,0),(nl,0,un,0),(un,0,fi,0),(fi,0,pi,0),(pi,0,fi,1)]: p.con(*c)
+ti=p.add("#X obj 20 680 t f f;"); p.con(fi,0,ti,0)
+tws={}
+for j,nm in enumerate(["note","on","acc","slide"]):
+    tws[nm]=p.add(f"#X obj {200+j*170} 900 tabwrite ockm-pat-{D}1-{nm};"); p.con(ti,1,tws[nm],1)
+m16=p.add("#X obj 20 700 mod 16;"); rd=p.add(f"#X obj 20 720 tabread {D}0-r;")
+cx=p.add(f"#X obj 20 745 expr {D}f1>0 \; {D}f1==2 || {D}f1==4 \; {D}f1>=3;")
+for c in [(ti,0,m16,0),(m16,0,rd,0),(rd,0,cx,0),(cx,2,tws["slide"],0),(cx,1,tws["acc"],0)]: p.con(*c)
+to=p.add("#X obj 20 780 t f f;"); s1=p.add("#X obj 20 810 sel 1;"); th=p.add("#X obj 400 790 t f f;")
+ix=p.add(f"#X obj 400 820 expr int({D}f1) % int({D}f2);"); rn=p.add(f"#X obj 400 845 tabread {D}0-n;"); td=p.add("#X obj 400 870 t f f;")
+sx=p.add(f"#X obj 560 870 expr ((int({D}f1)%7)+7)%7;"); rs=p.add(f"#X obj 560 895 tabread {D}0-s;")
+nx=p.add(f"#X obj 400 930 expr {D}f2 + 12*floor({D}f1/7) + {D}f3;")
+for c in [(cx,0,to,0),(to,1,tws["on"],0),(to,0,s1,0),(s1,0,fh,0),(fh,0,th,0),(th,1,ph,0),(ph,0,fh,1),(th,0,ix,0),(ll,0,ix,1),(ix,0,rn,0),(rn,0,td,0),
+          (td,1,sx,0),(sx,0,rs,0),(rs,0,nx,2),(td,0,nx,0),(ro,0,nx,1),(nx,0,tws["note"],0)]: p.con(*c)
+p.add("#X text 20 980 hooks: ockm-<track>-rhythm 0-7 \\, ockm-<track>-notes 0-11 \\, ockm-<track>-gen (rebuild) \\, and the shared ockm-root 0-11 and ockm-scale 0-5;")
+p.save("seq/ockm-monogen.pd","#N canvas 120 120 1100 1020 12;")
+
+# ================= chord sequencer =================
+p=P()
+p.add("#X text 20 10 Chord pattern. Each step has on/accent and a chord root (scale step). Notes are worked out as it plays \\, so key \\, scale and chord type changes apply straight away.;")
+inl=p.add("#X obj 30 50 inlet;"); out=p.add("#X obj 30 700 outlet;")
+p.add(f"#X obj 30 760 table ockm-pat-{D}1-on {STEPS};"); p.add(f"#X obj 230 760 table ockm-pat-{D}1-deg {STEPS};")
+p.add(f"#X obj 430 760 array define {D}0-sc 7;"); p.add(f"#X obj 600 760 array define {D}0-ty 4;")
+lb=p.add("#X obj 700 40 loadbang;"); lbt=p.add("#X obj 700 65 t b b b;")
+d0a=p.add("#X msg 700 90 0;"); d0b=p.add("#X msg 760 90 0;"); d9=p.add("#X msg 820 90 9;")
+rsc=p.add("#X obj 700 120 r ockm-scale;"); tsc=p.add("#X obj 700 150 text get ockm-presets-scale;"); lsc=p.add("#X obj 700 175 list split 1;"); asc=p.add(f"#X obj 700 200 array set {D}0-sc;")
+rty=p.add(f"#X obj 900 120 r ockm-{D}1-type;"); tty=p.add("#X obj 900 150 text get ockm-presets-chordtype;"); lty=p.add("#X obj 900 175 list split 1;"); aty=p.add(f"#X obj 900 200 array set {D}0-ty;")
+rro=p.add("#X obj 1100 120 r ockm-root;"); rox=p.add(f"#X obj 1100 150 expr if({D}f1<=7 \\, 48+{D}f1 \\, 36+{D}f1);")
+for c in [(lb,0,lbt,0),(lbt,2,d0a,0),(lbt,1,d0b,0),(lbt,0,d9,0),(d0a,0,tsc,0),(d0b,0,tty,0),(d9,0,rox,0),
+          (rsc,0,tsc,0),(tsc,0,lsc,0),(lsc,1,asc,0),(rty,0,tty,0),(tty,0,lty,0),(lty,1,aty,0),(rro,0,rox,0)]: p.con(*c)
+ts=p.add("#X obj 30 80 t f f;"); rdeg=p.add(f"#X obj 200 110 tabread ockm-pat-{D}1-deg;"); ron=p.add(f"#X obj 30 110 tabread ockm-pat-{D}1-on;")
+son=p.add("#X obj 30 140 sel 0;"); vx=p.add(f"#X obj 70 170 expr if({D}f1>1 \\, 1 \\, 0.75);"); tv=p.add("#X obj 70 200 t b f;")
+t4=p.add("#X obj 70 230 t b b b b;")
+pk=p.add("#X obj 30 640 pack 0 0 0 0 0;"); sno=p.add(f"#X obj 200 700 s ockm-{D}1-notes-out;")
+for c in [(inl,0,ts,0),(ts,1,rdeg,0),(ts,0,ron,0),(ron,0,son,0),(son,1,vx,0),(vx,0,tv,0),(tv,1,pk,4),(tv,0,t4,0),(pk,0,out,0),(pk,0,sno,0)]: p.con(*c)
+for k in range(4):
+    x=70+k*260
+    mk=p.add(f"#X msg {x} 270 {k};"); rt=p.add(f"#X obj {x} 300 tabread {D}0-ty;"); tt=p.add(f"#X obj {x} 330 t f f;")
+    ad=p.add(f"#X obj {x} 360 + 0;"); td=p.add(f"#X obj {x} 390 t f f;")
+    sx=p.add(f"#X obj {x+90} 420 expr ((int({D}f1)%7)+7)%7;"); rs=p.add(f"#X obj {x+90} 450 tabread {D}0-sc;")
+    nx=p.add(f"#X obj {x} 500 expr if({D}f4<0 \\, 0 \\, {D}f2+12*floor({D}f1/7)+{D}f3);")
+    for c in [(t4,k,mk,0),(mk,0,rt,0),(rt,0,tt,0),(tt,1,nx,3),(tt,0,ad,0),(ad,0,td,0),(td,1,sx,0),(sx,0,rs,0),(rs,0,nx,2),(td,0,nx,0),(rox,0,nx,1),(rdeg,0,ad,1),(nx,0,pk,k)]: p.con(*c)
+# store / load / edit / extend
+rs_=p.add("#X obj 1300 300 r ockm-store;"); tsb=p.add("#X obj 1300 330 t b f;"); ms=p.add(f"#X obj 1360 360 * {STEPS};")
+rl=p.add("#X obj 1300 450 r ockm-load;"); ml=p.add(f"#X obj 1300 480 * {STEPS};")
+p.con(rs_,0,tsb,0); p.con(tsb,1,ms,0); p.con(rl,0,ml,0)
+re=p.add(f"#X obj 1300 600 r ockm-{D}1-edit;"); tl=p.add("#X obj 1300 630 t l l;"); ls=p.add("#X obj 1480 660 list split 1;"); up=p.add("#X obj 1300 690 unpack f f f;")
+p.con(re,0,tl,0); p.con(tl,1,ls,0); p.con(tl,0,up,0)
+rx=p.add("#X obj 1700 300 r ockm-extend;"); ux=p.add("#X obj 1700 330 unpack f f;")
+cnt=p.add(f"#X obj 1700 390 expr {D}f2-{D}f1;"); txo=p.add("#X obj 1700 360 t f f;"); mo=p.add("#X obj 1700 420 moses 1;"); ux2=p.add("#X obj 1760 450 until;")
+ci=p.add("#X obj 1760 480 f;"); cip=p.add("#X obj 1810 480 + 1;"); tci=p.add("#X obj 1760 510 t f f;")
+md=p.add(f"#X obj 1760 540 expr {D}f1 % {D}f2;"); t2=p.add("#X obj 1760 570 t f f;")
+for c in [(rx,0,ux,0),(ux,1,cnt,1),(ux,0,txo,0),(txo,1,ci,1),(txo,1,md,1),(txo,0,cnt,0),(cnt,0,mo,0),(mo,1,ux2,0),
+          (ux2,0,ci,0),(ci,0,cip,0),(cip,0,ci,1),(ci,0,tci,0),(tci,0,md,0),(md,0,t2,0)]: p.con(*c)
+for j,nm in enumerate(["on","deg"]):
+    x=1300+j*190
+    ag=p.add(f"#X obj {x} 390 array get ockm-pat-{D}1-{nm};"); aset=p.add(f"#X obj {x} 420 array set ockm-bank-{D}1-{nm};")
+    p.con(tsb,0,ag,0); p.con(ag,0,aset,0); p.con(ms,0,aset,1)
+    agb=p.add(f"#X obj {x} 510 array get ockm-bank-{D}1-{nm} 0 {STEPS};"); asp=p.add(f"#X obj {x} 540 array set ockm-pat-{D}1-{nm};")
+    p.con(ml,0,agb,0); p.con(agb,0,asp,0)
+    tw=p.add(f"#X obj {x} 730 tabwrite ockm-pat-{D}1-{nm};"); p.con(ls,0,tw,1); p.con(up,j+1,tw,0)
+    xr=p.add(f"#X obj {1700+j*120} 610 tabread ockm-pat-{D}1-{nm};"); xw=p.add(f"#X obj {1700+j*120} 640 tabwrite ockm-pat-{D}1-{nm};")
+    p.con(t2,1-j,xr,0); p.con(xr,0,xw,0); p.con(tci,1,xw,1)
+p.add("#X text 1300 570 edit one step: ockm-<track>-edit <step> <0 off 1 on 2 accent> <chord root as scale step>;")
+p.save("seq/ockm-chordseq.pd","#N canvas 100 100 1950 800 12;")
+
+# ================= chord generator =================
+p=P()
+p.add("#X text 20 10 Chord generator: a chord rhythm preset plus a progression (one chord per bar). Writes on/accent and chord roots across the whole pattern length.;")
+p.add(f"#X obj 600 60 array define {D}0-r 16;"); p.add(f"#X obj 760 60 array define {D}0-p 8;")
+regen=p.add("#X obj 20 250 t b b b;")
+store=[]
+for j,(hook,d) in enumerate([(f"ockm-{D}1-rhythm",0),(f"ockm-{D}1-prog",0)]):
+    x=20+j*200
+    r=p.add(f"#X obj {x} 100 r {hook};"); t=p.add(f"#X obj {x} 130 t b f;"); fs=p.add(f"#X obj {x} 210 f {d};")
+    p.con(r,0,t,0); p.con(t,1,fs,1); p.con(t,0,regen,0); store.append(fs)
+rg=p.add(f"#X obj 450 100 r ockm-{D}1-gen;"); p.con(rg,0,regen,0)
+tp=p.add("#X obj 300 300 text get ockm-presets-prog;"); lpp=p.add("#X obj 300 330 list split 1;"); tlp=p.add("#X obj 300 360 t l l;")
+llp=p.add("#X obj 360 390 list length;"); ap=p.add(f"#X obj 300 420 array set {D}0-p;")
+p.con(regen,2,store[1],0); p.con(store[1],0,tp,0); p.con(tp,0,lpp,0); p.con(lpp,1,tlp,0); p.con(tlp,1,llp,0); p.con(tlp,0,ap,0)
+tr=p.add("#X obj 100 300 text get ockm-presets-chordrhythm;"); lr=p.add("#X obj 100 330 list split 1;"); ar=p.add(f"#X obj 100 360 array set {D}0-r;")
+p.con(regen,1,store[0],0); p.con(store[0],0,tr,0); p.con(tr,0,lr,0); p.con(lr,1,ar,0)
+z1=p.add("#X msg 120 470 0;"); nl=p.add("#X obj 20 470 f 16;"); rlg=p.add("#X obj 80 440 r ockm-len;"); un=p.add("#X obj 20 500 until;")
+fi=p.add("#X obj 20 530 f;"); pi=p.add("#X obj 70 530 + 1;"); ti=p.add("#X obj 20 560 t f f;"); tl2=p.add("#X obj 20 590 t f f;")
+for c in [(regen,0,z1,0),(regen,0,nl,0),(rlg,0,nl,1),(z1,0,fi,1),(nl,0,un,0),(un,0,fi,0),(fi,0,pi,0),(pi,0,fi,1),(fi,0,ti,0),(ti,0,tl2,0)]: p.con(*c)
+two=p.add(f"#X obj 200 700 tabwrite ockm-pat-{D}1-on;"); twd=p.add(f"#X obj 400 700 tabwrite ockm-pat-{D}1-deg;")
+bx=p.add(f"#X obj 300 620 expr int({D}f1/16) % int(max({D}f2\\,1));"); rp=p.add(f"#X obj 300 650 tabread {D}0-p;")
+m16=p.add("#X obj 20 620 mod 16;"); rr=p.add(f"#X obj 20 650 tabread {D}0-r;")
+for c in [(ti,1,two,1),(ti,1,twd,1),(tl2,1,bx,0),(llp,0,bx,1),(bx,0,rp,0),(rp,0,twd,0),(tl2,0,m16,0),(m16,0,rr,0),(rr,0,two,0)]: p.con(*c)
+p.add("#X text 20 760 hooks: ockm-<track>-rhythm 0-7 \\, ockm-<track>-prog 0-7 \\, ockm-<track>-gen (rebuild). Progressions change chord once per 16-step bar \\, so use 32 or 64 steps to hear them move.;")
+p.save("seq/ockm-chordgen.pd","#N canvas 120 120 900 800 12;")
+
+# ================= chord sound: 3 engines x 4 voices =================
+def chord_voice(sp,kind):
+    """Fill subpatch sp with one chord voice. Inlets: note (left), velocity (right)."""
+    ni=sp.add("#X obj 20 20 inlet;"); vi=sp.add("#X obj 400 20 inlet;"); out=sp.add("#X obj 20 420 outlet~;")
+    fv=sp.add("#X obj 400 50 f;"); sp.con(vi,0,fv,1)
+    mo=sp.add("#X obj 20 50 moses 1;"); tb=sp.add("#X obj 20 80 t b f;"); mt=sp.add("#X obj 80 110 mtof;")
+    roff=sp.add(f"#X obj 600 20 r {D}0-off;"); moff=sp.add("#X msg 600 50 0 30;")
+    k=[sp.add(f"#X obj {600+i*90} 100 r ockm-{D}1-k{i+1};") for i in range(4)]
+    am=sp.add("#X obj 20 330 *~;"); av=sp.add("#X obj 200 300 vline~;")
+    for c in [(ni,0,mo,0),(mo,1,tb,0),(tb,1,mt,0),(roff,0,moff,0),(moff,0,av,0),(av,0,am,1),(am,0,out,0)]: sp.con(*c)
+    if kind=="stab":
+        tf=sp.add("#X obj 80 140 t f f;"); dt=sp.add("#X obj 160 170 * 1.007;"); p1=sp.add("#X obj 80 200 phasor~;"); p2=sp.add("#X obj 160 200 phasor~;")
+        sm=sp.add("#X obj 80 230 +~;"); ce=sp.add("#X obj 80 255 -~ 1;")
+        fe=sp.add("#X obj 400 200 vline~;"); fa=sp.add("#X obj 400 225 *~ 3000;"); fb=sp.add("#X obj 400 250 +~ 600;"); fc=sp.add("#X obj 400 275 clip~ 40 15000;")
+        l1=sp.add("#X obj 80 290 lop~;"); l2=sp.add("#X obj 80 310 lop~;")
+        dk=sp.add("#X obj 300 130 f 280;"); tbb=sp.add("#X obj 20 140 t b b;")
+        pa=sp.add("#X obj 200 200 pack f 280;"); ma=sp.add(f"#X msg 200 230 {D}1 2 \\, 0 {D}2 2;"); mf=sp.add(f"#X msg 400 170 1 \\, 0 {D}1;")
+        x1=sp.add(f"#X obj 600 140 expr 150*pow(2\\,6*{D}f1);"); x2=sp.add(f"#X obj 690 140 expr 1+0.02*{D}f1;"); x3=sp.add("#X obj 780 140 * 8000;"); x4=sp.add(f"#X obj 870 140 expr 40+{D}f1*800;")
+        for c in [(mt,0,tf,0),(tf,1,dt,0),(dt,0,p2,0),(tf,0,p1,0),(p1,0,sm,0),(p2,0,sm,1),(sm,0,ce,0),(ce,0,l1,0),(l1,0,l2,0),(l2,0,am,0),
+                  (fe,0,fa,0),(fa,0,fb,0),(fb,0,fc,0),(fc,0,l1,1),(fc,0,l2,1),
+                  (tb,0,tbb,0),(tbb,1,fv,0),(fv,0,pa,0),(pa,0,ma,0),(ma,0,av,0),(tbb,0,dk,0),(dk,0,mf,0),(mf,0,fe,0),
+                  (k[0],0,x1,0),(x1,0,fb,1),(k[1],0,x2,0),(x2,0,dt,1),(k[2],0,x3,0),(x3,0,fa,1),(k[3],0,x4,0),(x4,0,dk,1),(x4,0,pa,1)]: sp.con(*c)
+    elif kind=="organ":
+        tf=sp.add("#X obj 80 140 t f f f f;")
+        o1=sp.add("#X obj 80 200 osc~;"); h2=sp.add("#X obj 150 170 * 2;"); o2=sp.add("#X obj 150 200 osc~;"); h3=sp.add("#X obj 220 170 * 3;"); o3=sp.add("#X obj 220 200 osc~;")
+        hs=sp.add("#X obj 290 170 * 0.5;"); o4=sp.add("#X obj 290 200 osc~;")
+        g2=sp.add("#X obj 150 230 *~ 0.3;"); g3=sp.add("#X obj 220 230 *~ 0.2;"); g4=sp.add("#X obj 290 230 *~ 0.3;")
+        pe=sp.add("#X obj 400 200 vline~;"); pg=sp.add("#X obj 400 230 *~ 0;"); p3=sp.add("#X obj 220 260 *~;")
+        s1=sp.add("#X obj 80 270 +~;"); s2=sp.add("#X obj 80 290 +~;"); s3=sp.add("#X obj 80 310 +~;")
+        pp=sp.add("#X msg 400 170 1 \\, 0 150;"); tbb=sp.add("#X obj 20 140 t b b;")
+        pa=sp.add("#X obj 200 140 pack f 400;"); ma=sp.add(f"#X msg 200 170 {D}1 5 \\, 0 40 {D}2;")
+        x1=sp.add(f"#X obj 600 140 expr 0.1+0.6*{D}f1 \; 0.05+0.4*{D}f1;"); x2=sp.add("#X obj 690 170 * 0.6;"); x3=sp.add("#X obj 780 140 * 0.7;"); x4=sp.add(f"#X obj 870 140 expr 60+{D}f1*1200;")
+        for c in [(mt,0,tf,0),(tf,3,o1,0),(tf,2,h2,0),(h2,0,o2,0),(tf,1,h3,0),(h3,0,o3,0),(tf,0,hs,0),(hs,0,o4,0),(o2,0,g2,0),(o3,0,g3,0),(o4,0,g4,0),
+                  (o3,0,p3,0),(pe,0,pg,0),(pg,0,p3,1),(o1,0,s1,0),(g2,0,s1,1),(s1,0,s2,0),(g3,0,s2,1),(s2,0,s3,0),(g4,0,s3,1),(s3,0,am,0),(p3,0,am,0),
+                  (tb,0,tbb,0),(tbb,1,fv,0),(fv,0,pa,0),(pa,0,ma,0),(ma,0,av,0),(tbb,0,pp,0),(pp,0,pe,0),
+                  (k[0],0,x1,0),(x1,0,g2,1),(x1,1,g3,1),(k[1],0,x2,0),(x2,0,pg,1),(k[2],0,x3,0),(x3,0,g4,1),(k[3],0,x4,0),(x4,0,pa,1)]: sp.con(*c)
+    else:  # pad
+        tf=sp.add("#X obj 80 140 t f f f;"); du=sp.add("#X obj 160 170 * 1.01;"); dd=sp.add("#X obj 240 170 * 0.99;")
+        p1=sp.add("#X obj 80 200 phasor~;"); p2=sp.add("#X obj 160 200 phasor~;"); p3=sp.add("#X obj 240 200 phasor~;")
+        s1=sp.add("#X obj 80 230 +~;"); s2=sp.add("#X obj 80 250 +~;"); ce=sp.add("#X obj 80 270 -~ 1.5;")
+        l1=sp.add("#X obj 80 290 lop~ 1500;"); l2=sp.add("#X obj 80 310 lop~ 1500;")
+        pa=sp.add("#X obj 200 140 pack f 300 1000;"); ma=sp.add(f"#X msg 200 170 {D}1 {D}2 \\, 0 400 {D}3;")
+        x1=sp.add(f"#X obj 600 140 expr 200*pow(2\\,5*{D}f1);"); x2=sp.add(f"#X obj 690 140 expr 1+0.025*{D}f1 \; 1-0.025*{D}f1;")
+        x3=sp.add(f"#X obj 780 140 expr 5+{D}f1*1500;"); x4=sp.add(f"#X obj 870 140 expr 100+{D}f1*2000;"); ad=sp.add(f"#X obj 870 200 expr {D}f1+{D}f2;")
+        fa3=sp.add("#X obj 780 200 t f f;")
+        for c in [(mt,0,tf,0),(tf,2,p1,0),(tf,1,du,0),(du,0,p2,0),(tf,0,dd,0),(dd,0,p3,0),(p1,0,s1,0),(p2,0,s1,1),(s1,0,s2,0),(p3,0,s2,1),(s2,0,ce,0),
+                  (ce,0,l1,0),(l1,0,l2,0),(l2,0,am,0),(tb,0,fv,0),(fv,0,pa,0),(pa,0,ma,0),(ma,0,av,0),
+                  (k[0],0,x1,0),(x1,0,l1,1),(x1,0,l2,1),(k[1],0,x2,0),(x2,0,du,1),(x2,1,dd,1),
+                  (k[2],0,x3,0),(x3,0,fa3,0),(fa3,1,ad,1),(fa3,0,pa,1),(k[3],0,x4,0),(x4,0,ad,0),(ad,0,pa,2)]: sp.con(*c)
+
+CHORD_ENGINES=[("stab","Stab: two detuned saws through a filter that snaps shut. Dub techno with the delay"),
+               ("organ","Organ: sine drawbars plus a percussive click. House organ stabs"),
+               ("pad","Pad: three detuned saws with a slow attack. Long chords")]
+for idx,(kind,title) in enumerate(CHORD_ENGINES):
+    q=P(); q.add(f"#X text 20 10 Chord engine {idx}. {title}. k1-k4 0 to 1.;")
+    inl=q.add("#X obj 30 50 inlet;"); sp_=q.add("#X obj 30 80 spigot 1;"); ro=q.add("#X obj 30 110 route off;")
+    so=q.add(f"#X obj 30 140 s {D}0-off;"); up=q.add("#X obj 120 140 unpack f f f f f;")
+    re=q.add(f"#X obj 700 50 r ockm-{D}1-engine;"); eq=q.add(f"#X obj 700 80 == {idx};"); tf=q.add("#X obj 700 110 t f f;")
+    sw=q.add("#X obj 700 170 switch~;"); s0=q.add("#X obj 760 140 sel 0;"); bo=q.add(f"#X obj 760 170 s {D}0-off;")
+    for c in [(inl,0,sp_,0),(sp_,0,ro,0),(ro,0,so,0),(ro,1,up,0),(re,0,eq,0),(eq,0,tf,0),(tf,1,sw,0),(tf,0,s0,0),(s0,0,bo,0),(tf,0,sp_,1)]: q.con(*c)
+    vs=[]
+    for v in range(4):
+        sp=P(); chord_voice(sp,kind)
+        q.L.append(sp.text(f"#N canvas 0 0 980 460 v{v} 0;").rstrip("\n"))
+        o=q.add(f"#X restore {120+v*90} 200 pd v{v};"); vs.append(o)
+        q.con(up,v,o,0); q.con(up,4,o,1)
+    s1=q.add("#X obj 120 260 +~;"); s2=q.add("#X obj 120 280 +~;"); s3=q.add("#X obj 120 300 +~;"); g=q.add("#X obj 120 330 *~ 0.18;"); out=q.add("#X obj 120 370 outlet~;")
+    for c in [(vs[0],0,s1,0),(vs[1],0,s1,1),(s1,0,s2,0),(vs[2],0,s2,1),(s2,0,s3,0),(vs[3],0,s3,1),(s3,0,g,0),(g,0,out,0)]: q.con(*c)
+    q.save(f"voices/ockm-chord-{kind}.pd","#N canvas 160 160 900 420 12;")
+q=P()
+q.add("#X text 20 10 Chord synth: three engines \\, one plays at a time (ockm-<track>-engine 0 stab \\, 1 organ \\, 2 pad). Input: up to 4 MIDI notes plus a hit strength \\, or off.;")
+inl=q.add("#X obj 30 50 inlet;")
+eng=[q.add(f"#X obj {30+i*170} 100 ockm-chord-{k} {D}1;") for i,(k,_) in enumerate(CHORD_ENGINES)]
+s1=q.add("#X obj 30 160 +~;"); s2=q.add("#X obj 30 185 +~;"); out=q.add("#X obj 30 220 outlet~;")
+for e in eng: q.con(inl,0,e,0)
+for c in [(eng[0],0,s1,0),(eng[1],0,s1,1),(s1,0,s2,0),(eng[2],0,s2,1),(s2,0,out,0)]: q.con(*c)
+q.save("voices/ockm-chord.pd","#N canvas 140 140 700 260 12;")
+
+def build_patterns(reset=False):
+    """Starter patterns: 8 slots x 128 steps per track, plus a length per slot.
+    Without reset, only files that don't exist yet are written, so saved patterns are kept."""
+    def write(name, values):
+        path=f"{R}/patterns/{name}.txt"
+        if reset or not os.path.exists(path):
+            open(path,"w").write("\n".join(str(v) for v in values)+"\n")
     def st(on,acc=()): return [2 if i in acc else (1 if i in on else 0) for i in range(16)]
+    def steps(on): return [1 if i in on else 0 for i in range(16)]
     E=[0]*16
     four={0,4,8,12}; offb={2,6,10,14}; eighths=set(range(0,16,2))
-    # slots 1-4: house, tech house, broken beat, hip hop. d1 kick, d2 snare, d3 clap, d4 closed hat, d5 open hat, d6 rimshot
-    drums={"d1":[st(four),st(four),st({0,6,10}),st({0,7,10})],
-           "d2":[E,E,st({4,12,15}),st({4,12})],
-           "d3":[st({4,12}),st({4,12}),E,E],
-           "d4":[st(offb,{6,14}),st({3,7,11,15},{7,15}),st(eighths,offb),st(eighths,{4,12})],
-           "d5":[E,st(offb),st({14}),E],
-           "d6":[E,st({3,11}),E,st({14})]}
     def slots(per_slot16):
         out=[]
         for k in range(SLOTN):
             s16=per_slot16[k] if k<len(per_slot16) else [0]*16
             out+=s16+[0]*(STEPS-16)
         return out
-    for nm,ps in drums.items():
-        open(f"{R}/patterns/{nm}.txt","w").write("\n".join(str(v) for v in slots(ps))+"\n")
-    def steps(on): return [1 if i in on else 0 for i in range(16)]
+    # slots 1-4: house, tech house, broken beat, hip hop
+    drums={"d1":[st(four),st(four),st({0,6,10}),st({0,7,10})],          # kick
+           "d2":[E,E,st({4,12,15}),st({4,12})],                           # snare
+           "d3":[st({4,12}),st({4,12}),E,E],                              # clap
+           "d4":[st(offb,{6,14}),st({3,7,11,15},{7,15}),st(eighths,offb),st(eighths,{4,12})],  # closed hat
+           "d5":[E,st(offb),st({14}),E],                                  # open hat
+           "d6":[E,st({3,11}),E,E],                                       # rimshot
+           "d7":[E,st({5,13}),E,st({14})],                                # rim
+           "d8":[E,E,st({11,13}),E]}                                      # tom
+    for nm,ps in drums.items(): write(nm, slots(ps))
     b1=dict(note=[33,45,33,33,36,43,45,45,33,33,45,40,40,43,36,38],on=[1,1,0,1,1,1,1,0,1,1,1,1,0,1,1,1],
             acc=[1,0,0,0,0,1,0,0,1,0,0,0,0,1,0,0],slide=[0,0,0,0,1,1,0,0,0,0,1,0,0,0,0,1])
     b2=dict(note=[33]*14+[36,33],on=steps(offb),acc=steps({6,14}),slide=E)
     b3=dict(note=[33,33,45,33,36,33,45,43,33,33,45,33,40,38,36,45],on=[1,1,1,0,1,1,1,1,1,1,1,0,1,1,1,1],acc=steps({0,4,8,12}),slide=steps({6,14}))
     b4=dict(note=[33,33,33,33,33,33,33,33,31,31,31,31,36,36,36,36],on=steps({0,3,8,11}),acc=steps({0}),slide=E)
     for k in ["note","on","acc","slide"]:
-        per=[b1[k],b2[k],b3[k],b4[k]]+[b1[k]]*4
-        open(f"{R}/patterns/bass-{k}.txt","w").write("\n".join(str(v) for v in slots(per))+"\n")
-    open(f"{R}/patterns/length.txt","w").write("\n".join(["16"]*SLOTN)+"\n")
+        write(f"bass-{k}", slots([b1[k],b2[k],b3[k],b4[k]]+[b1[k]]*4))
+    # lead: quiet in slots 1-2, an arp in slot 3, a sparse phrase in slot 4
+    l3=dict(note=[57,60,64,69,64,60,57,55]*2,on=steps(eighths),acc=steps({0,8}),slide=E)
+    l4=dict(note=[69]*4+[67]*4+[64]*4+[62]*4,on=steps({0,3,6,10}),acc=steps({0}),slide=steps({6}))
+    for k in ["note","on","acc","slide"]:
+        write(f"lead-{k}", slots([E,E,l3[k],l4[k]]))
+    # chord: offbeat stabs, dub stabs, a pad, two hits
+    write("chord-on", slots([st(offb),st({3,10},{3}),st({0},{0}),st({0,8})]))
+    write("chord-deg", slots([E,E,E,E]))
+    write("length", ["16"]*SLOTN)
 
-build_bassgen()
-if args.reset_patterns:
-    build_patterns()
+
+build_patterns(reset=args.reset_patterns)
 print("built", R)

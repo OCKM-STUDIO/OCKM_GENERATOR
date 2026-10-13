@@ -1,5 +1,5 @@
 #N canvas 150 150 1800 760 12;
-#X text 20 10 Bass pattern. Each step has a note \, on/off \, accent and slide. Up to 128 steps.;
+#X text 20 10 Mono synth pattern (bass or lead). Each step has a note \, on/off \, accent and slide. Up to 128 steps.;
 #X obj 30 60 inlet;
 #X obj 30 100 t f f f f f;
 #X obj 30 300 tabread ockm-pat-\$1-note;
@@ -30,7 +30,7 @@
 #X obj 780 180 * 128;
 #X obj 720 320 r ockm-load;
 #X obj 780 380 * 128;
-#X obj 720 560 r ockm-bass-edit;
+#X obj 720 560 r ockm-\$1-edit;
 #X obj 720 590 t l l;
 #X obj 900 620 list split 1;
 #X obj 720 650 unpack f f f f f;
@@ -75,7 +75,7 @@
 #X obj 1860 460 tabwrite ockm-pat-\$1-slide;
 #X text 140 400 only lets the note through if the step is on;
 #X text 420 100 glide into this note if the previous step had slide on;
-#X text 720 530 edit one step: ockm-bass-edit <step> <note> <on> <accent> <slide>;
+#X text 720 530 edit one step: ockm-<track>-edit <step> <note> <on> <accent> <slide>;
 #X text 1500 90 extend: repeat steps to fill a longer pattern;
 #X connect 1 0 2 0;
 #X connect 2 4 16 0;

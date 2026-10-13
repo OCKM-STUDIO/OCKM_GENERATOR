@@ -2,12 +2,12 @@
 #X text 20 10 Acid engine: saw wave into a resonant filter;
 #X obj 30 50 inlet;
 #X obj 30 80 spigot 1;
-#X obj 30 120 ockm-bass-core;
+#X obj 30 120 ockm-mono-core;
 #X obj 200 50 inlet;
 #X obj 310 50 inlet;
 #X obj 420 50 inlet;
 #X obj 530 50 inlet;
-#X obj 700 50 r ockm-bass-engine;
+#X obj 700 50 r ockm-\$1-engine;
 #X obj 700 80 == 0;
 #X obj 700 110 t f f;
 #X obj 700 170 switch~;

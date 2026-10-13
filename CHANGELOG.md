@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.10 (13 October 2026)
+
+**Added**
+- 8 drum slots (was 6). The new slots default to rim and tom
+- Lead synth: the same six engines as the bass, two octaves up, with its own pattern and generator
+- Chord synth with three engines (stab, organ, pad), four chord types and eight progressions. Chords are worked out as they play, so key changes apply instantly
+- Shared key and scale for bass, lead and chord (`ockm-root`, `ockm-scale`)
+- Four lead-friendly note patterns: arp up, arp up-down, call, descend
+- A synth-settings panel for all synth controls; reverb and delay sends for lead and chord
+- Starter lead and chord parts in the starter patterns
+- 3 new tests: lead octave, chord voicing (key, scale, type, accent) and chord engines
+
+**Changed**
+- The bass voice became a general mono synth (`ockm-mono`), used for both bass and lead
+- `ockm-bass-root` and `ockm-bass-scale` replaced by the shared `ockm-root` and `ockm-scale`
+- Presets moved into one shared object (`ockm-presets`)
+- Building no longer overwrites saved patterns: it only creates pattern files that are missing
+
 ## v0.9 (13 October 2026)
 
 **Added**
