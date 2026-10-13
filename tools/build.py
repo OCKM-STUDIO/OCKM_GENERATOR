@@ -8,6 +8,7 @@ Sound tweaks are made with the controls in the patch, not here.
 Usage:
   python3 tools/build.py                 rebuild every .pd file in the project
   python3 tools/build.py --out DIR       write to another folder (used by the tests)
+  python3 tools/build.py --theme light    build the front panel in the light theme (default dark)
   python3 tools/build.py --reset-patterns  rewrite projects/default with the starter project
                                           (this DELETES any patterns and settings you have saved)
 
@@ -17,6 +18,7 @@ import os, sys, argparse
 ap=argparse.ArgumentParser()
 ap.add_argument("--out",default=os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 ap.add_argument("--reset-patterns",action="store_true")
+ap.add_argument("--theme",choices=["dark","light"],default="dark",help="front panel colours (default dark)")
 args=ap.parse_args()
 R=args.out
 for d in ("voices","seq"): os.makedirs(os.path.join(R,d),exist_ok=True)
@@ -269,7 +271,7 @@ TABLES=[f"ockm-pat-{n}" for n,_ in SLOTS]+[f"ockm-pat-{t}-{f}" for t in ("bass",
 PROJ_DIR="projects/default"
 p=P()
 p.raw("#X declare -path voices -path seq;")
-p.add("#X text 30 10 OCKM_GENERATOR v0.11. Click start \\, then click squares to build a beat. Pick a pattern slot \\, press save to keep it.;")
+p.add("#X text 30 10 OCKM_GENERATOR v0.12. The front panel is above. Everything below is the engine \\, and the panel only talks to it through the named ockm- hooks.;")
 lb=p.add("#X obj 30 50 loadbang;"); lbt=p.add("#X obj 30 75 t b b b;")
 dsp=p.add("#X msg 1100 760 \; pd dsp 1;")
 bpmm=p.add("#X obj 30 160 s ockm-tempo;"); bpm=p.add("#X floatatom 30 135 5 40 200 0 - - -;"); p.con(p.add("#X obj 120 105 r ockm-bpm;"),0,bpm,0); p.add("#X text 85 135 BPM;")
@@ -426,7 +428,18 @@ p.add("#X text 450 985 MIDI clock leader or follower;")
 p.add("#X obj 450 1010 ockm-clock;")
 p.add("#X text 250 985 effects and sends;")
 p.add("#X obj 1100 800 declare -path voices -path seq;")
-p.save("OCKM_GENERATOR.pd","#N canvas 40 40 1420 1050 12;")
+# front panel at the top, the engine below it
+sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)))
+from panel import build_panel
+PANW,PANH=build_panel(P,D,lambda q,fn,h: q.save(fn,h),SLOTS,SLOTN,show,args.theme)
+OFF_Y=PANH+60
+def _shift(line):
+    t=line.split(" ")
+    if "\n" in line or len(t)<4 or t[1] not in ("obj","msg","text","floatatom","restore"): return line
+    t[3]=str(int(t[3])+OFF_Y); return " ".join(t)
+p.L=[_shift(l) for l in p.L]
+p.add("#X obj 0 0 ockm-panel;")
+p.save("OCKM_GENERATOR.pd",f"#N canvas 40 40 {PANW+40} {PANH+60} 12;")
 
 
 # ================= bass core: shared note logic for every engine =================

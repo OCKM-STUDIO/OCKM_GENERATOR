@@ -459,6 +459,33 @@ def full_mix_does_not_clip(work):
 
 
 # ---------------------------------------------------------------- runner
+@test
+def front_panel_drives_the_engine(work):
+    h = Harness(); h.show("ockm-load", "ockm-len", "ockm-ui-d2-5", "ockm-ui-ph-2")
+    h.at(100, "ockm-ui-d2-5 1")                          # click slot 2, step 6
+    h.at(150, "ockm-ui-accmode 1 ; ockm-ui-d3-1 1 ; ockm-ui-accmode 0")   # accented click
+    h.at(200, "ockm-ui-len 1")                            # length button 2 = 32 steps
+    h.at(250, "ockm-page 1 ; ockm-ui-d1-1 1")             # page 2, step 18
+    g = h.add("#X obj 10 300 r test-get;"); t = h.add("#X obj 10 330 t b b b;")
+    for i, nm in enumerate(["d1", "d2", "d3"]):
+        a = h.add(f"#X obj {10+i*150} 360 array get ockm-pat-{nm} 0 32;"); p = h.add(f"#X obj {10+i*150} 390 print PAT-{nm};")
+        h.con(t, a, 2 - i); h.con(a, p)
+    h.con(g, t)
+    h.at(300, "test-get bang")
+    h.at(350, "ockm-page 0 ; ockm-ui-slot 2")             # pattern button 3
+    h.at(500, "ockm-play 1"); h.at(500 + 3 * 15000 / 124 + 20, "ockm-play 0")
+    f = os.path.join(work, "t_panel.pd"); h.finish(1200, f)
+    out = run(work, f)
+    pat = {nm: [int(float(x)) for x in printed(out, f"PAT-{nm}")[0].split()] for nm in ("d1", "d2", "d3")}
+    assert pat["d2"][5] == 1, f"clicking slot 2 step 6 didn't set it: {pat['d2'][:16]}"
+    assert pat["d3"][1] == 2, f"accent-mode click should set an accent: {pat['d3'][:16]}"
+    assert "32" in printed(out, "ockm-len"), "length button didn't set 32 steps"
+    assert pat["d1"][17] == 1, f"page 2 click should set step 18: {pat['d1'][16:32]}"
+    assert "2" in printed(out, "ockm-load"), "pattern button didn't load pattern 3"
+    ui = printed(out, "ockm-ui-d2-5")
+    assert any(x.startswith("set 1") for x in ui) and any(x.startswith(("color #ededed", "color #1a1a1a")) for x in ui), f"square wasn't redrawn as a hit: {ui}"
+    assert any(x.startswith(("color #ff5a24", "color #ff4f1a")) for x in printed(out, "ockm-ui-ph-2")), "playhead didn't light step 3"
+
 def main():
     if not PD:
         sys.exit("Can't find Pure Data. Install it, or set PD=/path/to/pd")

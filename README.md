@@ -1,26 +1,40 @@
 # OCKM_GENERATOR
 
-A drum machine and easy-to-program synths in one box. Built in Pure Data, designed to run on a Raspberry Pi with a 7" touchscreen and a few knobs.
+A drum machine and easy-to-program synths in one box. Built in Pure Data, designed to run on a Raspberry Pi with a touchscreen and a few knobs.
 
-Current version: **v0.11**
+Current version: **v0.12**
 
 ## How to open it
 
 Open `OCKM_GENERATOR.pd` in plugdata. Keep the folder together: the main patch finds everything else in the subfolders.
 
-- Click **start/stop** to play
-- Click squares to switch steps on and off. The squares show 16 steps at a time: set **page** to see later steps
-- Set **length** to make the current pattern 1 to 128 steps long. Making it longer repeats what's there to fill the new steps
-- Pick a **pattern** slot (1 to 8). While playing, it switches at the end of the bar and starts from step 1
-- Press **save** to write the current pattern and the project to disk. Press **revert** to throw away unsaved changes
-- Everything is remembered: drum kit, synth sounds, effects, tempo, swing, key and the steps. Switching patterns keeps unsaved edits in memory
-- **Swing %**: 50 is straight. 56 to 62 is the MPC zone
-- **Accent**: how much quieter normal hits are than accented ones. 0 means no difference
-- **pd drum-settings** (bottom left): for each of the 8 drum slots, which sound it plays, plus tune, decay, level, reverb send and delay send
-- **pd synth-settings**: the key and scale (shared by all three synths), plus engine, knobs k1 to k4 and generator choices for the bass, lead and chord. All knobs run 0 to 1
-- **pd master-fx** (bottom): reverb and delay levels, reverb size and tone, bass sends, DJ filter and drive
-- **pd midi-sync** (bottom): leader (sends MIDI clock) or follower (plays to incoming clock)
-- **Generators** (in synth-settings): pick a rhythm and notes for the bass or lead, or a chord rhythm and progression for the chord, and it builds that track's pattern. Press save to keep it in the current slot
+The **front panel** fills the top of the window. Everything below it is the engine, which you can ignore unless you're curious.
+
+**Top bar**
+- **Play** (big square, top left) and **tempo** (drag the number up and down)
+- **Swing**: left is straight, a quarter to half way is the MPC zone (56 to 62%). **Accent amount**: how much quieter normal hits are than accented ones
+- **Pattern 1 to 8**: while playing, it switches at the end of the bar and starts from step 1
+- **Save** writes the current pattern and the project to disk. **Revert** throws away unsaved changes
+- **Length**: 16, 32, 64 or 128 steps. Making it longer repeats what's there. **Page**: which 16 steps the grid shows
+
+**Drums**
+- Click a square to switch a step on or off. Grey is empty, solid is a hit, orange is an accented hit
+- Tick **tap adds accent** and clicks put in accented hits instead
+- The thin bars above the grid show the playhead
+- Left of each row: which of the 8 sounds the slot plays. Right of each row: level, tune, decay, reverb and delay sends
+
+**Synths**
+- **Key** and **scale** are shared by bass, lead and chord
+- Each synth has its engine, knobs k1 to k4, drive (or chord type for the chord), reverb and delay sends
+- Pick a **rhythm** and **notes** (or **chords**) and press **new** to build that track's pattern. Press save to keep it
+
+**Effects** along the bottom: DJ filter, drive, delay level and feedback, reverb level, size and tone, delay time in steps, and MIDI clock (follow incoming clock, send clock out).
+
+Everything is remembered: drum kit, synth sounds, effects, tempo, swing, key and the steps. Switching patterns keeps unsaved edits in memory.
+
+The old number boxes and settings windows (`pd drum-settings`, `pd synth-settings`, `pd master-fx`, `pd midi-sync`) are still there below the panel and stay in step with it.
+
+**Light or dark.** The panel is dark by default. For the light version, rebuild with `python3 tools/build.py --theme light`.
 
 ## The idea
 
@@ -41,7 +55,7 @@ Open `OCKM_GENERATOR.pd` in plugdata. Keep the folder together: the main patch f
 | Part | Choice | Status |
 |---|---|---|
 | Computer | Raspberry Pi 5, 2GB or 4GB, with Active Cooler and official power supply | Not bought |
-| Screen | Official Raspberry Pi 7" touchscreen | Not bought |
+| Screen | Official Raspberry Pi Touch Display 2, 10" (1920 x 1200, Pi 5 only) is the favourite; the 7" is the compact option | Not bought |
 | Audio | iRig Pro Duo (already owned, check it's recognised) | Owned |
 | Knobs | Small USB MIDI knob controller | To choose |
 | Storage | microSD card | Not bought |
@@ -52,7 +66,7 @@ Open `OCKM_GENERATOR.pd` in plugdata. Keep the folder together: the main patch f
 2. ~~Bass rhythm presets, note patterns, keys and scales~~ (v0.2). Still to do: editing single bass steps
 3. ~~Drum accents per step, plus tune, decay and level per drum~~ (v0.3)
 4. ~~More drum voices, up to 8: snare, rim, toms, percussion~~ (v0.3)
-5. Touchscreen interface: Lua grid with a drums page, a synths page and a top bar
+5. Touchscreen interface: Lua grid with a drums page, a synths page and a top bar. ~~Front panel for testing on the Mac~~ (v0.12)
 6. Knobs for live bass control: MIDI mapping, plus drive and accent level (waiting on a controller to test with)
 7. ~~Bass engines (acid, sub, FM, Reese, pluck) and master effects (drive, delay, filter)~~ (v0.4)
 8. ~~MIDI clock sync~~ (v0.5)
@@ -69,7 +83,9 @@ Open `OCKM_GENERATOR.pd` in plugdata. Keep the folder together: the main patch f
 - **8 pattern slots, each up to 128 steps.** One length per pattern, shown 16 steps at a time.
 - **Drum slots are flexible.** Each of the 8 slots can play any of the 8 drum sounds, and later any of your samples.
 - **One key for all synths.** Bass, lead and chord share the key and scale, so they always agree.
-- **7" touchscreen plus a few knobs.** The screen is for editing. The knobs are for playing.
+- **Touchscreen plus a few knobs.** The screen is for editing. The knobs are for playing. Leaning towards the official 10" screen for bigger steps.
+- **Minimal modern look.** Flat, one accent colour (orange), lots of space, light and dark themes. Dark is the default.
+- **Build and test on the Mac first.** Everything runs in plugdata; the Pi only adds audio setup, screen rotation and start-up.
 - **Toggles first, Lua grid later.** Toggles kept everything visible while learning. The touchscreen needs the Lua grid.
 - **Synthesised drums for now.** Samples can be swapped in later, one voice at a time.
 - **Projects and patterns saved as readable text files** in `projects/`, so saving works on the Pi without a keyboard.
@@ -93,10 +109,10 @@ Open `OCKM_GENERATOR.pd` in plugdata. Keep the folder together: the main patch f
 |---|---|
 | `OCKM_GENERATOR.pd` | Main patch: clock, swing, pattern slots, mixer |
 | `voices/` | One file per sound: 8 drums plus `ockm-drum` (a slot that plays any of them); the mono synth used for bass and lead (`ockm-mono`, one file per engine, shared `ockm-mono-core`); the chord synth (`ockm-chord`, one file per engine); the reverb (`ockm-verb`); and the master effects (`ockm-fx`) |
-| `seq/` | Sequencers and generators: drum row, mono pattern and generator (bass and lead), chord pattern and generator, the shared presets (`ockm-presets`) and MIDI clock |
+| `seq/` | The front panel (`ockm-panel`), plus sequencers and generators: drum row, mono pattern and generator (bass and lead), chord pattern and generator, the shared presets (`ockm-presets`) and MIDI clock |
 | `projects/default/` | The project: `project.txt` (tempo, effects, MIDI, accent, drum kit) and `p1.txt` to `p8.txt` (one per pattern). Written by the patch when you save |
 | `sketches/` | Early experiments, kept for reference |
-| `tools/build.py` | Builds every `.pd` file. Structural changes are made here, then the patch files are rebuilt |
+| `tools/build.py` | Builds every `.pd` file (the panel's layout and colours are in `tools/panel.py`). Structural changes are made here, then the patch files are rebuilt |
 | `tests/run_tests.py` | Plays the patch headless and checks it still works (sounds, accents, patterns, swing, bass, effects, MIDI clock) |
 
 ## Working on the project
@@ -107,7 +123,7 @@ Open `OCKM_GENERATOR.pd` in plugdata. Keep the folder together: the main patch f
 - *Sound tweaks* (tune, levels, knobs, patterns): use the controls in the patch, as normal.
 - *Structural changes* (new objects, new voices, rewiring): made in `tools/build.py`, then rebuilt with `python3 tools/build.py`. Don't rewire the generated `.pd` files by hand, because the next rebuild would overwrite it. The build only creates project files that are missing, so your saved work is never overwritten. `--reset-patterns` rewrites the starter project, which deletes your saved patterns.
 
-**Tests.** `python3 tests/run_tests.py` runs 21 checks in about two and a half minutes. It needs vanilla Pure Data's `pd` command, which comes with the Pi's `puredata` package. It works on a temporary copy, so your patterns are safe.
+**Tests.** `python3 tests/run_tests.py` runs 22 checks in about two and a half minutes. It needs vanilla Pure Data's `pd` command, which comes with the Pi's `puredata` package. It works on a temporary copy, so your patterns are safe.
 
 **Internal names.** Every shared name starts with `ockm-` so nothing clashes with other patches. Pattern tables are `ockm-pat-<track>`, slot banks are `ockm-bank-<track>`, and the step squares are `ockm-sq-<track>-<square>`. Drum tracks are `d1` to `d8`, synth tracks are `bass`, `lead` and `chord`.
 

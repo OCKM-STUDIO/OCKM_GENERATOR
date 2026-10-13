@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.12 (13 October 2026)
+
+**Added**
+- Front panel at the top of the main patch, in a minimal modern style: flat, one orange accent, dark by default
+- Top bar: play, tempo, swing, accent amount, pattern 1 to 8, save, revert, length (16, 32, 64, 128) and page
+- Drum grid: 8 rows of 16 steps, coloured by state (empty, hit, accented hit), with a playhead and an accent-tap switch
+- Per slot: sound choice, level, tune, decay, reverb and delay sends
+- Synths: shared key and scale, plus engine, knobs, drive or chord type, sends, generator choices and a "new" button for each of bass, lead and chord
+- Effects row with MIDI clock switches
+- Light theme: `python3 tools/build.py --theme light`
+- 1 new test: the panel drives the engine (step clicks, accents, length, page, pattern buttons, redraw and playhead)
+
+**Changed**
+- The engine now sits below the panel in the main patch. Nothing in it changed, and the old controls still work
+
 ## v0.11 (13 October 2026)
 
 **Added**
