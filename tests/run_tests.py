@@ -188,8 +188,66 @@ def pattern_save_and_reload(work):
     out = run(work, f)
     want = "1 0 1 1 0 0 0 0 0 0 1 0 0 0 0 1"
     assert printed(out, "RELOADED") == [want], f"reload gave {printed(out, 'RELOADED')}"
-    disk = open(os.path.join(work, "patterns", "d1.txt")).read().split()[7 * 128:7 * 128 + 16]
-    assert " ".join(disk) == want, "slot 8 not written to disk"
+    line = [l for l in open(os.path.join(work, "projects", "default", "p8.txt")).read().split(";") if "ockm-pat-d1 " in l][0]
+    assert " ".join(line.split()[2:18]) == want, "pattern 8 not written to disk"
+
+def show_values(h, names, label):
+    """Print the on-screen value of each setting (via its ockm-show-... hook) as label-name: value."""
+    for n in names:
+        r = h.add(f"#X obj 700 300 r ockm-show-{n};"); pr = h.add(f"#X obj 700 330 print {label}-{n};"); h.con(r, pr)
+
+def last(out, name):
+    v = printed(out, name)
+    return v[-1].replace("set ", "") if v else None
+
+@test
+def kit_stays_synths_follow_pattern(work):
+    h = Harness()
+    keys = ["bass-engine", "d1-tune", "lead-engine"]
+    show_values(h, keys, "V")
+    r = h.add("#X obj 900 300 r ockm-snap;"); pr = h.add("#X obj 900 330 print SNAP;"); h.con(r, pr)
+    tb = h.add("#X obj 900 360 t b;"); a = h.add("#X obj 900 390 array get ockm-pat-d1 0 16;"); pa = h.add("#X obj 900 420 print D1;")
+    h.con(r, tb); h.con(tb, a); h.con(a, pa)
+    h.at(200, "ockm-bass-engine 2 ; ockm-d1-tune 3")
+    h.at(300, "ockm-want 1"); h.at(350, "ockm-snap a")                       # pattern 2: own synth sounds, same kit
+    h.at(400, "ockm-want 0"); h.at(450, "ockm-snap b")                       # back to pattern 1: edits kept
+    h.at(500, "ockm-lead-engine 1 ; ockm-want 5"); h.at(550, "ockm-snap c")  # empty pattern 6 inherits synth sounds
+    f = os.path.join(work, "t_kit.pd"); h.finish(650, f)
+    lines = run(work, f).splitlines()
+    def at_snap(lab, key):
+        i = next(i for i, l in enumerate(lines) if l.startswith(f"SNAP: {lab}"))
+        vals = [l for l in lines[:i] if l.startswith(f"V-{key}:")]
+        return vals[-1].split("set ")[-1].strip() if vals else None
+    assert at_snap("a", "bass-engine") == "0" and at_snap("a", "d1-tune") == "3", f"pattern 2 should have its own bass sound but the same kit ({at_snap('a','bass-engine')}, {at_snap('a','d1-tune')})"
+    assert at_snap("b", "bass-engine") == "2", "pattern 1's bass sound should be kept after switching away and back"
+    assert at_snap("c", "lead-engine") == "1" and at_snap("c", "bass-engine") == "2", "a new empty pattern should keep the current synth sounds"
+    d1 = [l for l in lines if l.startswith("D1:")]
+    assert d1[-1].split(":", 1)[1].split() == ["0"] * 16, "a new empty pattern should start with blank steps"
+
+@test
+def save_quit_and_reopen(work):
+    h = Harness()
+    h.at(200, "ockm-bpm 131 ; ockm-d2-decay 150 ; ockm-bass-engine 5 ; ockm-swing 60 ; ockm-length 32")
+    h.at(300, "ockm-save bang")
+    f = os.path.join(work, "t_save1.pd"); h.finish(400, f); run(work, f)
+    h = Harness(); show_values(h, ["bpm", "d2-decay", "bass-engine", "swing", "len"], "V")
+    h.at(200, "ockm-resync bang")
+    f = os.path.join(work, "t_save2.pd"); h.finish(400, f)
+    out = run(work, f)
+    got = {k: last(out, f"V-{k}") for k in ["bpm", "d2-decay", "bass-engine", "swing", "len"]}
+    assert got == {"bpm": "131", "d2-decay": "150", "bass-engine": "5", "swing": "60", "len": "32"}, f"settings not restored after reopening: {got}"
+
+@test
+def revert_goes_back_to_saved(work):
+    h = Harness(); show_values(h, ["d1-tune", "lead-k1"], "V")
+    h.at(200, "ockm-d1-tune 7 ; ockm-lead-k1 0.9 ; ockm-pat-d1 0 1 1 1 1")
+    h.at(300, "ockm-revert bang")
+    g = h.add("#X obj 10 300 r test-get;"); a = h.add("#X obj 10 330 array get ockm-pat-d1 0 4;"); pa = h.add("#X obj 10 360 print D1;"); h.con(g, a); h.con(a, pa)
+    h.at(400, "test-get bang")
+    f = os.path.join(work, "t_revert.pd"); h.finish(500, f)
+    out = run(work, f)
+    assert last(out, "V-d1-tune") == "0" and last(out, "V-lead-k1") == "0.55", "revert should restore the saved settings"
+    assert printed(out, "D1")[-1].split() == ["1", "0", "0", "0"], "revert should restore the saved steps"
 
 @test
 def drum_slot_switches_sound(work):
@@ -409,7 +467,7 @@ def main():
     passed = 0
     for t in chosen:
         work = tempfile.mkdtemp(prefix="ockm-test-")
-        for item in ["OCKM_GENERATOR.pd", "voices", "seq", "patterns"]:
+        for item in ["OCKM_GENERATOR.pd", "voices", "seq", "projects"]:
             src = os.path.join(ROOT, item)
             (shutil.copytree if os.path.isdir(src) else shutil.copy)(src, os.path.join(work, item))
         try:

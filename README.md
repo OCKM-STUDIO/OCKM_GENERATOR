@@ -2,7 +2,7 @@
 
 A drum machine and easy-to-program synths in one box. Built in Pure Data, designed to run on a Raspberry Pi with a 7" touchscreen and a few knobs.
 
-Current version: **v0.10**
+Current version: **v0.11**
 
 ## How to open it
 
@@ -12,7 +12,8 @@ Open `OCKM_GENERATOR.pd` in plugdata. Keep the folder together: the main patch f
 - Click squares to switch steps on and off. The squares show 16 steps at a time: set **page** to see later steps
 - Set **length** to make the current pattern 1 to 128 steps long. Making it longer repeats what's there to fill the new steps
 - Pick a **pattern** slot (1 to 8). While playing, it switches at the end of the bar and starts from step 1
-- Press **save** to store the grid in the current slot. It's written to disk straight away
+- Press **save** to write the current pattern and the project to disk. Press **revert** to throw away unsaved changes
+- Everything is remembered: drum kit, synth sounds, effects, tempo, swing, key and the steps. Switching patterns keeps unsaved edits in memory
 - **Swing %**: 50 is straight. 56 to 62 is the MPC zone
 - **Accent**: how much quieter normal hits are than accented ones. 0 means no difference
 - **pd drum-settings** (bottom left): for each of the 8 drum slots, which sound it plays, plus tune, decay, level, reverb send and delay send
@@ -58,7 +59,7 @@ Open `OCKM_GENERATOR.pd` in plugdata. Keep the folder together: the main patch f
 9. Move to the Pi and start on boot
 10. ~~6 flexible drum slots and patterns up to 128 steps~~ (v0.9)
 11. ~~8 drum slots, chord and lead synth tracks~~ (v0.10)
-12. One central settings store, so nothing resets when you reopen the patch, plus kits (v0.11)
+12. ~~One central settings store: projects, patterns and the drum kit, saved and restored~~ (v0.11)
 13. Your drum samples, chosen per slot
 
 ## Decisions made
@@ -71,7 +72,8 @@ Open `OCKM_GENERATOR.pd` in plugdata. Keep the folder together: the main patch f
 - **7" touchscreen plus a few knobs.** The screen is for editing. The knobs are for playing.
 - **Toggles first, Lua grid later.** Toggles kept everything visible while learning. The touchscreen needs the Lua grid.
 - **Synthesised drums for now.** Samples can be swapped in later, one voice at a time.
-- **Patterns saved as text files** in `patterns/`, so saving works on the Pi without a keyboard.
+- **Projects and patterns saved as readable text files** in `projects/`, so saving works on the Pi without a keyboard.
+- **The drum kit belongs to the project; synth sounds belong to each pattern.** See "How it's organised".
 
 ## Parked ideas
 
@@ -92,7 +94,7 @@ Open `OCKM_GENERATOR.pd` in plugdata. Keep the folder together: the main patch f
 | `OCKM_GENERATOR.pd` | Main patch: clock, swing, pattern slots, mixer |
 | `voices/` | One file per sound: 8 drums plus `ockm-drum` (a slot that plays any of them); the mono synth used for bass and lead (`ockm-mono`, one file per engine, shared `ockm-mono-core`); the chord synth (`ockm-chord`, one file per engine); the reverb (`ockm-verb`); and the master effects (`ockm-fx`) |
 | `seq/` | Sequencers and generators: drum row, mono pattern and generator (bass and lead), chord pattern and generator, the shared presets (`ockm-presets`) and MIDI clock |
-| `patterns/` | Saved pattern slots: 8 slots x 128 steps per track (`d1` to `d8`, `bass-*`, `lead-*`, `chord-*`), plus `length.txt`. Edited by the patch, not by hand |
+| `projects/default/` | The project: `project.txt` (tempo, effects, MIDI, accent, drum kit) and `p1.txt` to `p8.txt` (one per pattern). Written by the patch when you save |
 | `sketches/` | Early experiments, kept for reference |
 | `tools/build.py` | Builds every `.pd` file. Structural changes are made here, then the patch files are rebuilt |
 | `tests/run_tests.py` | Plays the patch headless and checks it still works (sounds, accents, patterns, swing, bass, effects, MIDI clock) |
@@ -103,11 +105,35 @@ Open `OCKM_GENERATOR.pd` in plugdata. Keep the folder together: the main patch f
 
 **Two kinds of change.**
 - *Sound tweaks* (tune, levels, knobs, patterns): use the controls in the patch, as normal.
-- *Structural changes* (new objects, new voices, rewiring): made in `tools/build.py`, then rebuilt with `python3 tools/build.py`. Don't rewire the generated `.pd` files by hand, because the next rebuild would overwrite it. The build never touches `patterns/` unless you add `--reset-patterns`.
+- *Structural changes* (new objects, new voices, rewiring): made in `tools/build.py`, then rebuilt with `python3 tools/build.py`. Don't rewire the generated `.pd` files by hand, because the next rebuild would overwrite it. The build only creates project files that are missing, so your saved work is never overwritten. `--reset-patterns` rewrites the starter project, which deletes your saved patterns.
 
-**Tests.** `python3 tests/run_tests.py` runs 18 checks in about two minutes. It needs vanilla Pure Data's `pd` command, which comes with the Pi's `puredata` package. It works on a temporary copy, so your patterns are safe.
+**Tests.** `python3 tests/run_tests.py` runs 21 checks in about two and a half minutes. It needs vanilla Pure Data's `pd` command, which comes with the Pi's `puredata` package. It works on a temporary copy, so your patterns are safe.
 
 **Internal names.** Every shared name starts with `ockm-` so nothing clashes with other patches. Pattern tables are `ockm-pat-<track>`, slot banks are `ockm-bank-<track>`, and the step squares are `ockm-sq-<track>-<square>`. Drum tracks are `d1` to `d8`, synth tracks are `bass`, `lead` and `chord`.
+
+## How it's organised
+
+The data model, smallest first:
+
+1. **Step:** one slot in time on one track. Drums: off, on or accent. Bass and lead: note, on, accent and slide. Chord: on or accent plus a chord root.
+2. **Track:** one lane. 8 drum slots, plus bass, lead and chord.
+3. **Sound:** what a track plays. A drum slot: its sound, tune, decay, level and sends. A synth: engine, k1 to k4, drive (bass and lead), chord type (chord) and sends.
+4. **Kit:** the 8 drum sounds together.
+5. **Pattern:** a loop. The steps for all 11 tracks, plus length (1 to 128), swing, key and scale, generator choices and **the three synth sounds**.
+6. **Project:** a whole set. 8 patterns, **the drum kit**, tempo, master effects, MIDI settings and accent amount.
+
+| Setting | Lives in |
+|---|---|
+| Drum kit (all 8 drum slots) | Project, shared by every pattern |
+| Tempo, master effects, MIDI sync, accent | Project |
+| Steps, length, swing, key and scale | Pattern |
+| Synth sounds (bass, lead, chord) | Pattern |
+| Generator choices | Pattern |
+
+**Rules**
+- A new, empty pattern starts with blank steps but keeps the synth sounds, key and swing of the pattern you came from.
+- Switching patterns keeps unsaved edits in memory, so you can go back and forth. **Save** writes the current pattern and the project to disk. **Revert** reloads them from disk. Closing without saving loses unsaved changes.
+- Files are plain text, one setting or one track per line, so they're easy to read, copy and back up.
 
 ## Named hooks
 
@@ -117,7 +143,13 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 |---|---|
 | `ockm-play` | 1 to start, 0 to stop |
 | `ockm-want` | Pick a pattern slot, 0 to 7 |
-| `ockm-save` | Save the current slot |
+| `ockm-save` | Save the current pattern and the project to disk |
+| `ockm-revert` | Throw away unsaved changes: reload the current pattern and the project from disk |
+| `ockm-resync` | Ask the store to send every current value to the on-screen boxes (`ockm-show-<name>`) |
+| `ockm-tempo` | Sent when the tempo box changes (the store listens to this) |
+| `ockm-swing` | Set the swing. `ockm-swing-now` is sent when it changes |
+| `ockm-loading` | 1 while a pattern is loading, 0 after. Generators don't rebuild while it's 1 |
+| `ockm-refresh` | Sent after a pattern loads, so the squares update |
 | `ockm-step` | Sends the current step as it plays, counting from 0 |
 | `ockm-length` | Set the current pattern's length, 1 to 128. Lengthening repeats existing steps |
 | `ockm-len` | Sent whenever the active length changes (for example when a pattern loads) |
@@ -169,7 +201,7 @@ Eight drum slots, d1 to d8. Each slot can play any of 8 sounds: 0 kick, 1 snare,
 
 Each step can be off, on or accented. Accented steps play at full strength. Normal steps play at full strength minus the accent amount. For now, accents are set with the `ockm-edit` hook. The squares show on or off only, until the touchscreen work.
 
-Slot sounds and per-drum tune, decay and level aren't saved yet. That comes with the central settings store in v0.11.
+Slot sounds, tune, decay, level and sends are part of the drum kit, which is saved with the project and shared by every pattern.
 
 ## Bass and lead engines
 

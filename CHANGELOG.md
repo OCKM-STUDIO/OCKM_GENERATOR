@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.11 (13 October 2026)
+
+**Added**
+- Central settings store: every setting and every pattern is saved and restored. Nothing resets when you reopen the patch
+- Projects: `projects/default/project.txt` holds tempo, master effects, MIDI, accent and the drum kit; `p1.txt` to `p8.txt` hold one pattern each
+- Synth sounds belong to each pattern; the drum kit belongs to the project
+- New, empty patterns keep the current synth sounds, key and swing
+- Switching patterns keeps unsaved edits in memory; **revert** reloads from disk
+- On-screen settings boxes show the stored values (via `ockm-show-...` hooks)
+- 3 new tests: kit versus pattern sounds and inheritance, save, quit and reopen, and revert
+
+**Changed**
+- The old per-track `patterns/` files were replaced by the project files. The starter patterns carried over
+- Generators no longer rebuild while a pattern is loading
+
 ## v0.10 (13 October 2026)
 
 **Added**
