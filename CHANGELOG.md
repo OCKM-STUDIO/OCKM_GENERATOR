@@ -1,5 +1,25 @@
 # Changelog
 
+## v0.13 (13 October 2026)
+
+**Added**
+- Touchscreen UI in Lua (`ui/ockm-ui.pd_lua`), following `docs/architecture-and-ui-brief.md`. Three screens:
+  - **Perform**: play, tempo, patterns 1 to 8 (queued pattern outlined), a picture of all 11 tracks for the 16 steps playing now, length, save and revert. Tap a track name to open it
+  - **Drum**: one slot at a time, 8 sound pads, 16 big steps (tap cycles off, hit, accent), the slot's level, tune, decay and sends
+  - **Synth**: bass, lead or chord; key and scale; 16 steps with note names (drag up or down to change a note, or pick from the note row); slide; engine and named knobs; drive or chord type; fill and new
+- Swipe the step row sideways to move between blocks of 16. Only as many blocks as the length allows. Perform follows the playhead; the edit screens stay where you put them
+- Light and dark themes, and a Pi size: `--theme light`, `--ui-scale 2`
+- `tests/ui_preview.py` draws the screens to PNG without Pd
+- 2 new tests: tapping and swiping through the screens reaches the engine, and every screen draws without errors
+
+**Changed**
+- The main window is now just the screen. The engine moved into `pd engine`, and the v0.12 panel into `pd test-panel`
+- The v0.12 panel no longer prints an error when a drum step is edited
+
+**Checked**
+- `bob~` comes with plain Pure Data (it's in the Pi's standard `puredata` install), so the acid, reese and pluck engines don't need replacing
+- Saving writes to `projects/default` whichever folder Pd was started from
+
 ## v0.12 (13 October 2026)
 
 **Added**

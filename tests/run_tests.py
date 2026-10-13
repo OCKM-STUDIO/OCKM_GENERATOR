@@ -18,6 +18,25 @@ import os, sys, shutil, subprocess, tempfile, wave, struct, math, re
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PD = os.environ.get("PD") or shutil.which("pd") or shutil.which("puredata")
 
+
+def find_pdlua():
+    """The folder holding pdlua (the Lua loader the touchscreen needs). plugdata has it built in;
+    plain Pd needs it installed (deken: pdlua, or apt: pd-lua 0.12 or newer). Set PDLUA=/path to override."""
+    cands = [os.environ.get("PDLUA", ""), os.path.expanduser("~/Documents/Pd/externals/pdlua"),
+             os.path.expanduser("~/.local/lib/pd/extra/pdlua"), "/usr/lib/pd/extra/pdlua", "/usr/local/lib/pd-externals/pdlua"]
+    for c in cands:
+        if c and os.path.isdir(c) and any(n.startswith("pdlua.") and not n.endswith(".pd") for n in os.listdir(c)):
+            return c
+    return None
+
+
+PDLUA = find_pdlua()
+LUA = shutil.which("lua5.4") or shutil.which("lua5.3") or shutil.which("lua")
+
+
+class Skip(Exception):
+    pass
+
 # ---------------------------------------------------------------- helpers
 class Harness:
     """Builds a small test patch: timed messages, printed receives, optional recording."""
@@ -75,6 +94,8 @@ class Harness:
 
 def run(work, harness_file, with_main=True, timeout=60):
     cmd = [PD, "-nogui", "-nosound", "-nomidi", "-stderr"]
+    if PDLUA:
+        cmd += ["-path", PDLUA, "-lib", "pdlua"]
     if with_main:
         cmd += ["-open", "OCKM_GENERATOR.pd"]
     cmd += ["-open", harness_file]
@@ -137,6 +158,8 @@ def loads_clean(work):
     f = os.path.join(work, "t_load.pd"); h.finish(300, f)
     out = run(work, f)
     bad = [l for l in out.splitlines() if re.search(r"error|couldn't create|connection failed", l, re.I)]
+    if not PDLUA:   # without pdlua the screen can't load; the engine still must
+        bad = [l for l in bad if "ockm-ui" not in l]
     assert not bad, "problems while loading: " + " | ".join(bad[:5])
 
 @test
@@ -486,26 +509,76 @@ def front_panel_drives_the_engine(work):
     assert any(x.startswith("set 1") for x in ui) and any(x.startswith(("color #ededed", "color #1a1a1a")) for x in ui), f"square wasn't redrawn as a hit: {ui}"
     assert any(x.startswith(("color #ff5a24", "color #ff4f1a")) for x in printed(out, "ockm-ui-ph-2")), "playhead didn't light step 3"
 
+@test
+def touchscreen_drives_the_engine(work):
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness(); h.show("ockm-edit", "ockm-page", "ockm-len", "ockm-load", "ockm-d1-sound", "ockm-bass-edit", "ockm-want")
+    tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
+    h.at(100, "ockm-resync bang")
+    tap(150, 60, 165)                    # perform: open the kick lane
+    tap(160, 300, 170)                   # drums: sound pad 3 (clap)
+    tap(170, 160, 260); tap(180, 160, 260)   # step 3: on, then accent
+    tap(190, 60, 36)                     # back to perform
+    tap(200, 130, 560)                   # length 32
+    tap(210, 60, 165)                    # open the kick lane again
+    h.at(220, "ockm-ui-test drag 600 260 200 260")   # swipe left: steps 17-32
+    tap(230, 45, 260)                    # step 17
+    h.at(240, "ockm-ui-test drag 200 260 600 260")   # swipe right: back to 1-16
+    tap(250, 60, 36)                     # back
+    tap(260, 60, 405)                    # open bass
+    tap(270, 45, 210)                    # bass step 1
+    tap(280, 600, 328)                   # note picker: third note of the scale
+    tap(290, 16 + 30, 36)                # back
+    tap(300, 300, 100)                   # pattern 3
+    f = os.path.join(work, "t_touch.pd"); h.finish(600, f)
+    out = run(work, f)
+    edits = printed(out, "ockm-edit")
+    assert edits[:2] == ["d1 2 1", "d1 2 2"], f"tapping step 3 should go on, then accent: {edits}"
+    assert "2" in printed(out, "ockm-d1-sound"), "sound pad didn't change the slot's sound"
+    assert "32" in printed(out, "ockm-len"), "length button didn't set 32"
+    pages = printed(out, "ockm-page")
+    assert "1" in pages and pages[-1] == "0", f"swipes should go to block 2 then back: {pages}"
+    assert any(e.startswith("d1 16 ") for e in edits), f"tap after the swipe should edit step 17: {edits}"
+    be = printed(out, "ockm-bass-edit")
+    assert len(be) >= 2 and be[-1].split()[:2] == ["0", "36"], f"bass step 1 should become C (A minor, third step): {be}"
+    assert "2" in printed(out, "ockm-load"), "pattern 3 button didn't load pattern 3"
+    assert not [l for l in out.splitlines() if "error" in l.lower()], "errors: " + " | ".join(l for l in out.splitlines() if "error" in l.lower())
+
+@test
+def touchscreen_screens_draw(work):
+    if not LUA:
+        raise Skip("lua not found")
+    try:
+        import PIL  # noqa: F401
+    except ImportError:
+        raise Skip("Pillow not installed")
+    p = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_preview.py"), os.path.join(work, "preview")], capture_output=True, text=True)
+    assert p.returncode == 0, p.stderr[-800:]
+    assert len(os.listdir(os.path.join(work, "preview"))) == 4, "expected four screen pictures"
+
 def main():
     if not PD:
         sys.exit("Can't find Pure Data. Install it, or set PD=/path/to/pd")
     picks = sys.argv[1:]
     chosen = [t for t in TESTS if not picks or any(p in t.__name__ for p in picks)]
-    passed = 0
+    passed = skipped = 0
     for t in chosen:
         work = tempfile.mkdtemp(prefix="ockm-test-")
-        for item in ["OCKM_GENERATOR.pd", "voices", "seq", "projects"]:
+        for item in ["OCKM_GENERATOR.pd", "voices", "seq", "ui", "projects"]:
             src = os.path.join(ROOT, item)
             (shutil.copytree if os.path.isdir(src) else shutil.copy)(src, os.path.join(work, item))
         try:
             t(work)
             print(f"PASS  {t.__name__}"); passed += 1
+        except Skip as e:
+            print(f"SKIP  {t.__name__}: {e}"); skipped += 1
         except Exception as e:
             print(f"FAIL  {t.__name__}: {e}")
         finally:
             shutil.rmtree(work, ignore_errors=True)
-    print(f"\n{passed}/{len(chosen)} passed")
-    sys.exit(0 if passed == len(chosen) else 1)
+    print(f"\n{passed}/{len(chosen)} passed" + (f", {skipped} skipped" if skipped else ""))
+    sys.exit(0 if passed + skipped == len(chosen) else 1)
 
 if __name__ == "__main__":
     main()

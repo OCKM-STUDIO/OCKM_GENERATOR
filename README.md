@@ -2,39 +2,43 @@
 
 A drum machine and easy-to-program synths in one box. Built in Pure Data, designed to run on a Raspberry Pi with a touchscreen and a few knobs.
 
-Current version: **v0.12**
+Current version: **v0.13**
 
 ## How to open it
 
 Open `OCKM_GENERATOR.pd` in plugdata. Keep the folder together: the main patch finds everything else in the subfolders.
 
-The **front panel** fills the top of the window. Everything below it is the engine, which you can ignore unless you're curious.
+The window is the instrument: three touch screens, drawn in Lua (plugdata has Lua built in). Click with the mouse on the Mac, tap with a finger on the Pi. If clicks do nothing, the patch is in edit mode: press Cmd+E.
 
-**Top bar**
-- **Play** (big square, top left) and **tempo** (drag the number up and down)
-- **Swing**: left is straight, a quarter to half way is the MPC zone (56 to 62%). **Accent amount**: how much quieter normal hits are than accented ones
-- **Pattern 1 to 8**: while playing, it switches at the end of the bar and starts from step 1
-- **Save** writes the current pattern and the project to disk. **Revert** throws away unsaved changes
-- **Length**: 16, 32, 64 or 128 steps. Making it longer repeats what's there. **Page**: which 16 steps the grid shows
+**Perform** (home)
+- **Play** and **tempo** top left. Drag the tempo number up or down
+- **Patterns 1 to 8**: tap to switch. While playing it waits for the end of the bar; the queued one gets an orange outline
+- **Now**: all 11 tracks for the 16 steps that are playing, with the playhead running above them. It's a picture, not an editor
+- Tap a track's **name** to open it
+- **Length**: 16, 32, 64 or 128 steps. Making it longer repeats what's there
+- **Save** and **revert**, top right
 
-**Drums**
-- Click a square to switch a step on or off. Grey is empty, solid is a hit, orange is an accented hit
-- Tick **tap adds accent** and clicks put in accented hits instead
-- The thin bars above the grid show the playhead
-- Left of each row: which of the 8 sounds the slot plays. Right of each row: level, tune, decay, reverb and delay sends
+**Drum** (one slot at a time)
+- The 8 slots along the top, named by the sound they play
+- **Sound**: 8 pads, one per drum sound
+- **Steps**: tap cycles empty, hit (white), accent (orange)
+- **Swipe** the step row sideways to move between blocks of 16. The dots underneath show which block you're on; an orange mark shows where the playhead is if it's somewhere else
+- **Level, tune, decay, reverb, delay** for this slot. These belong to the kit, so they stay when you change pattern
 
-**Synths**
-- **Key** and **scale** are shared by bass, lead and chord
-- Each synth has its engine, knobs k1 to k4, drive (or chord type for the chord), reverb and delay sends
-- Pick a **rhythm** and **notes** (or **chords**) and press **new** to build that track's pattern. Press save to keep it
+**Synth** (bass, lead or chord)
+- **Key** and **scale** at the top, shared by all three
+- **Steps**: tap cycles off, on, accent. **Drag a step up or down** to change its note. Or tap a step, then pick its note from the row underneath (the dimmed one is the key's root). **Slide** applies to the selected step
+- Chord steps show the chord on that step of the scale (i, ii, iii...). Chord type is with the sound
+- **Sound**: engine and its four knobs (named for the engine), plus drive, or chord type for the chord
+- **Fill**: pick a rhythm and notes (or a chord rhythm and progression) and press **new** to write the whole pattern. Then swipe and tweak single steps
 
-**Effects** along the bottom: DJ filter, drive, delay level and feedback, reverb level, size and tone, delay time in steps, and MIDI clock (follow incoming clock, send clock out).
+Swing, accent amount, master effects and MIDI clock aren't on the screens yet. They're still saved, and they're in **pd test-panel**.
+
+**Under the screen:** `pd engine` is the sound and sequencer (open it only if you're curious). `pd test-panel` is the old v0.12 panel with every control on one sheet, kept for testing.
 
 Everything is remembered: drum kit, synth sounds, effects, tempo, swing, key and the steps. Switching patterns keeps unsaved edits in memory.
 
-The old number boxes and settings windows (`pd drum-settings`, `pd synth-settings`, `pd master-fx`, `pd midi-sync`) are still there below the panel and stay in step with it.
-
-**Light or dark.** The panel is dark by default. For the light version, rebuild with `python3 tools/build.py --theme light`.
+**Light or dark, Mac or Pi.** Rebuild with `python3 tools/build.py --theme light` for the light version. `--ui-scale 2` sizes the screens for the 10" Pi display (1920 x 1200). The defaults are dark and Mac size (960 x 600).
 
 ## The idea
 
@@ -66,7 +70,7 @@ The old number boxes and settings windows (`pd drum-settings`, `pd synth-setting
 2. ~~Bass rhythm presets, note patterns, keys and scales~~ (v0.2). Still to do: editing single bass steps
 3. ~~Drum accents per step, plus tune, decay and level per drum~~ (v0.3)
 4. ~~More drum voices, up to 8: snare, rim, toms, percussion~~ (v0.3)
-5. Touchscreen interface: Lua grid with a drums page, a synths page and a top bar. ~~Front panel for testing on the Mac~~ (v0.12)
+5. ~~Front panel for testing on the Mac~~ (v0.12). ~~Touchscreen interface in Lua: perform, drum and synth screens, swipe between blocks~~ (v0.13). Still to come: a settings strip for swing, accent, effects and MIDI
 6. Knobs for live bass control: MIDI mapping, plus drive and accent level (waiting on a controller to test with)
 7. ~~Bass engines (acid, sub, FM, Reese, pluck) and master effects (drive, delay, filter)~~ (v0.4)
 8. ~~MIDI clock sync~~ (v0.5)
@@ -86,7 +90,8 @@ The old number boxes and settings windows (`pd drum-settings`, `pd synth-setting
 - **Touchscreen plus a few knobs.** The screen is for editing. The knobs are for playing. Leaning towards the official 10" screen for bigger steps.
 - **Minimal modern look.** Flat, one accent colour (orange), lots of space, light and dark themes. Dark is the default.
 - **Build and test on the Mac first.** Everything runs in plugdata; the Pi only adds audio setup, screen rotation and start-up.
-- **Toggles first, Lua grid later.** Toggles kept everything visible while learning. The touchscreen needs the Lua grid.
+- **Lua for the screens.** Plain Pd controls can't tell a tap from a swipe, or show one screen at a time. The screens are one Lua object (`ui/ockm-ui.pd_lua`) that only sends and listens to the `ockm-*` hooks. The sound engine stays plain Pd.
+- **Three screens, one level deep.** Perform is home. Drum and synth screens go deep on one part at a time. See `docs/architecture-and-ui-brief.md`.
 - **Synthesised drums for now.** Samples can be swapped in later, one voice at a time.
 - **Projects and patterns saved as readable text files** in `projects/`, so saving works on the Pi without a keyboard.
 - **The drum kit belongs to the project; synth sounds belong to each pattern.** See "How it's organised".
@@ -109,11 +114,14 @@ The old number boxes and settings windows (`pd drum-settings`, `pd synth-setting
 |---|---|
 | `OCKM_GENERATOR.pd` | Main patch: clock, swing, pattern slots, mixer |
 | `voices/` | One file per sound: 8 drums plus `ockm-drum` (a slot that plays any of them); the mono synth used for bass and lead (`ockm-mono`, one file per engine, shared `ockm-mono-core`); the chord synth (`ockm-chord`, one file per engine); the reverb (`ockm-verb`); and the master effects (`ockm-fx`) |
-| `seq/` | The front panel (`ockm-panel`), plus sequencers and generators: drum row, mono pattern and generator (bass and lead), chord pattern and generator, the shared presets (`ockm-presets`) and MIDI clock |
+| `ui/` | The touchscreen: `ockm-ui.pd_lua` (all three screens) |
+| `docs/` | The architecture review and the brief for the screens |
+| `seq/` | The old test panel (`ockm-panel`), plus sequencers and generators: drum row, mono pattern and generator (bass and lead), chord pattern and generator, the shared presets (`ockm-presets`) and MIDI clock |
 | `projects/default/` | The project: `project.txt` (tempo, effects, MIDI, accent, drum kit) and `p1.txt` to `p8.txt` (one per pattern). Written by the patch when you save |
 | `sketches/` | Early experiments, kept for reference |
 | `tools/build.py` | Builds every `.pd` file (the panel's layout and colours are in `tools/panel.py`). Structural changes are made here, then the patch files are rebuilt |
-| `tests/run_tests.py` | Plays the patch headless and checks it still works (sounds, accents, patterns, swing, bass, effects, MIDI clock) |
+| `tests/run_tests.py` | Plays the patch headless and checks it still works (sounds, accents, patterns, swing, bass, effects, MIDI clock, both panels) |
+| `tests/ui_preview.py` | Draws the touch screens to PNG files without Pd (needs `lua` and Pillow) |
 
 ## Working on the project
 
@@ -123,7 +131,7 @@ The old number boxes and settings windows (`pd drum-settings`, `pd synth-setting
 - *Sound tweaks* (tune, levels, knobs, patterns): use the controls in the patch, as normal.
 - *Structural changes* (new objects, new voices, rewiring): made in `tools/build.py`, then rebuilt with `python3 tools/build.py`. Don't rewire the generated `.pd` files by hand, because the next rebuild would overwrite it. The build only creates project files that are missing, so your saved work is never overwritten. `--reset-patterns` rewrites the starter project, which deletes your saved patterns.
 
-**Tests.** `python3 tests/run_tests.py` runs 22 checks in about two and a half minutes. It needs vanilla Pure Data's `pd` command, which comes with the Pi's `puredata` package. It works on a temporary copy, so your patterns are safe.
+**Tests.** `python3 tests/run_tests.py` runs 24 checks in about two and a half minutes. It needs vanilla Pure Data's `pd` command, which comes with the Pi's `puredata` package. The touchscreen test also needs pdlua (set `PDLUA=/folder/with/pdlua`); without it, that test is skipped. It works on a temporary copy, so your patterns are safe.
 
 **Internal names.** Every shared name starts with `ockm-` so nothing clashes with other patches. Pattern tables are `ockm-pat-<track>`, slot banks are `ockm-bank-<track>`, and the step squares are `ockm-sq-<track>-<square>`. Drum tracks are `d1` to `d8`, synth tracks are `bass`, `lead` and `chord`.
 

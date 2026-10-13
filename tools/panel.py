@@ -112,7 +112,9 @@ def build_panel(P, D, save_dir_save, SLOTS, SLOTN, show, theme="dark"):
     # redraw every square on load, page change, edits and extends
     rr = [q.add(f"#X obj {1200+i*130} {PH+20} r {n};") for i, n in enumerate(["ockm-refresh", "ockm-page", "ockm-edit", "ockm-extend"])]
     dl = q.add(f"#X obj 1200 {PH+50} delay 0;")
-    for r in rr: q.con(r, 0, dl, 0)
+    tb_ = q.add(f"#X obj 1200 {PH+35} t b;")   # edits arrive as 'd1 4 2': turn anything into a bang
+    for r in rr: q.con(r, 0, tb_, 0)
+    q.con(tb_, 0, dl, 0)
     for ri, (nm, _) in enumerate(SLOTS):
         y = GY + ri * (SQ + 4)
         lab(20, y + 9, str(ri + 1), TXT, 12)

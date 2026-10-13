@@ -8,7 +8,8 @@ Sound tweaks are made with the controls in the patch, not here.
 Usage:
   python3 tools/build.py                 rebuild every .pd file in the project
   python3 tools/build.py --out DIR       write to another folder (used by the tests)
-  python3 tools/build.py --theme light    build the front panel in the light theme (default dark)
+  python3 tools/build.py --theme light    build the screens in the light theme (default dark)
+  python3 tools/build.py --ui-scale 2     size the screen for the 10" Pi display (1920x1200)
   python3 tools/build.py --reset-patterns  rewrite projects/default with the starter project
                                           (this DELETES any patterns and settings you have saved)
 
@@ -18,7 +19,8 @@ import os, sys, argparse
 ap=argparse.ArgumentParser()
 ap.add_argument("--out",default=os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 ap.add_argument("--reset-patterns",action="store_true")
-ap.add_argument("--theme",choices=["dark","light"],default="dark",help="front panel colours (default dark)")
+ap.add_argument("--theme",choices=["dark","light"],default="dark",help="screen colours (default dark)")
+ap.add_argument("--ui-scale",type=int,choices=[1,2],default=1,help="1 = 960x600 for the Mac, 2 = 1920x1200 for the 10-inch Pi screen")
 args=ap.parse_args()
 R=args.out
 for d in ("voices","seq"): os.makedirs(os.path.join(R,d),exist_ok=True)
@@ -271,7 +273,7 @@ TABLES=[f"ockm-pat-{n}" for n,_ in SLOTS]+[f"ockm-pat-{t}-{f}" for t in ("bass",
 PROJ_DIR="projects/default"
 p=P()
 p.raw("#X declare -path voices -path seq;")
-p.add("#X text 30 10 OCKM_GENERATOR v0.12. The front panel is above. Everything below is the engine \\, and the panel only talks to it through the named ockm- hooks.;")
+p.add("#X text 30 10 OCKM_GENERATOR engine: clock \\, swing \\, pattern switching \\, voices and mixer. The screens only talk to it through the named ockm- hooks.;")
 lb=p.add("#X obj 30 50 loadbang;"); lbt=p.add("#X obj 30 75 t b b b;")
 dsp=p.add("#X msg 1100 760 \; pd dsp 1;")
 bpmm=p.add("#X obj 30 160 s ockm-tempo;"); bpm=p.add("#X floatatom 30 135 5 40 200 0 - - -;"); p.con(p.add("#X obj 120 105 r ockm-bpm;"),0,bpm,0); p.add("#X text 85 135 BPM;")
@@ -428,18 +430,26 @@ p.add("#X text 450 985 MIDI clock leader or follower;")
 p.add("#X obj 450 1010 ockm-clock;")
 p.add("#X text 250 985 effects and sends;")
 p.add("#X obj 1100 800 declare -path voices -path seq;")
-# front panel at the top, the engine below it
+# ---- the main window: the touchscreen UI on top; the engine and the old test panel in closed subpatches ----
 sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)))
 from panel import build_panel
 PANW,PANH=build_panel(P,D,lambda q,fn,h: q.save(fn,h),SLOTS,SLOTN,show,args.theme)
-OFF_Y=PANH+60
-def _shift(line):
-    t=line.split(" ")
-    if "\n" in line or len(t)<4 or t[1] not in ("obj","msg","text","floatatom","restore"): return line
-    t[3]=str(int(t[3])+OFF_Y); return " ".join(t)
-p.L=[_shift(l) for l in p.L]
-p.add("#X obj 0 0 ockm-panel;")
-p.save("OCKM_GENERATOR.pd",f"#N canvas 40 40 {PANW+40} {PANH+60} 12;")
+DECL="-path voices -path seq -path ui"
+assert p.L[0].startswith("#X declare"); p.L.pop(0)          # the declare belongs to the top level
+p.L=[l.replace("#X obj 1100 800 declare -path voices -path seq;","#X text 1100 800 (the declare is in the main window);") for l in p.L]
+UIW,UIH=960*args.ui_scale,600*args.ui_scale
+by=UIH+24
+m=P()
+m.raw(f"#X declare {DECL};")
+m.add(f"#X obj 0 0 ockm-ui {args.ui_scale} {args.theme};")
+m.L.append(p.text("#N canvas 60 60 1420 1100 engine 0;").rstrip("\n"))
+m.add(f"#X restore 20 {by} pd engine;")
+tp=P(); tp.add("#X obj 0 0 ockm-panel;")
+m.L.append(tp.text(f"#N canvas 80 80 {PANW+40} {PANH+40} test-panel 0;").rstrip("\n"))
+m.add(f"#X restore 130 {by} pd test-panel;")
+m.add(f"#X obj 270 {by} declare {DECL};")
+m.add(f"#X text 20 {by+30} OCKM_GENERATOR v0.13. The screen above is the instrument. pd engine is the sound and the sequencer. pd test-panel is the old v0.12 panel \\, kept for testing. The screen needs pdlua (built into plugdata).;")
+m.save("OCKM_GENERATOR.pd",f"#N canvas 40 40 {UIW} {UIH+80} 12;")
 
 
 # ================= bass core: shared note logic for every engine =================
