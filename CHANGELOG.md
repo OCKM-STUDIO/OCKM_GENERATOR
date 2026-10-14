@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.34 (14 October 2026)
+
+**Changed**
+- New patterns and projects are **4 bars** long by default
+- Length is shown in bars: 1, 2, 4, 8
+- **Shorter keeps the start, and nothing is lost:** go longer again and the bars you'd hidden come back, instead of being overwritten with copies. The pattern remembers its longest length when saved
+- **Longer** repeats what you've written; parts on auto (following parts, and preset-driven ones) are rebuilt to fill the new length, so a 4-bar progression plays in full instead of repeating its first chord
+- Changing the length no longer stretches the pattern back out to the progression's length
+
 ## v0.33 (14 October 2026)
 
 **Added**

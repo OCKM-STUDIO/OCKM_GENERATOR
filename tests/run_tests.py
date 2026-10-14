@@ -540,7 +540,7 @@ def touchscreen_drives_the_engine(work):
     tap(160, 300, 312)                   # drums: sound pad 3 (clap)
     tap(170, 160, 212); tap(180, 160, 212)   # step 3: on, then accent
     tap(190, 281, 36)                    # perform tab
-    tap(200, 836, 88)                    # length 32 (navigation strip)
+    tap(200, 807, 88)                    # length 2 bars (navigation strip)
     tap(210, 414, 36)                    # drums tab (back to the kick slot)
     h.at(220, "ockm-ui-test drag 600 212 200 212")   # swipe left: steps 17-32
     tap(230, 45, 212)                    # step 17
@@ -895,6 +895,26 @@ def drum_fill_on_the_fourth_bar(work):
     assert seg(0.05, 3 * bar - 0.05) < 0.01, f"bars 1-3 should have no snare: {seg(0.05, 3 * bar - 0.05):.3f}"
     assert seg(3.5 * bar, 4 * bar) > 0.05, f"the second half of bar 4 should have the snare roll: {seg(3.5 * bar, 4 * bar):.3f}"
     assert seg(4 * bar + 0.15, 5 * bar - 0.05) < 0.01, "bar 5 should be back to normal (no snare)"
+
+@test
+def length_keeps_bars_and_rebuilds_followers(work):
+    """Shorten a 4-bar drum part to 1 bar and back: the original bars return (not copies). Lengthen a 1-bar pattern with a 4-bar progression: the chords fill out the whole progression."""
+    h = Harness()
+    g = h.add("#X obj 10 300 r test-get;"); t = h.add("#X obj 10 325 t b b;")
+    a1 = h.add("#X obj 10 350 array get ockm-pat-d2 0 64;"); p1 = h.add("#X obj 10 375 print D2;")
+    a2 = h.add("#X obj 300 350 array get ockm-pat-chord-deg 0 64;"); p2 = h.add("#X obj 300 375 print DEG;")
+    h.con(g, t); h.con(t, a2, 0); h.con(t, a1, 1); h.con(a1, p1); h.con(a2, p2)
+    h.at(100, "ockm-length 64 ; ockm-edit d2 4 1 ; ockm-edit d2 36 2 ; ockm-edit d2 52 1")    # snare in bars 1, 3 and 4
+    h.at(150, "ockm-length 16"); h.at(200, "ockm-length 64"); h.at(250, "test-get bang")      # 0: shrink and grow back
+    h.at(300, "ockm-chord-mode 0 ; ockm-length 16 ; ockm-chord-prog 0"); h.at(320, "ockm-length 16")
+    h.at(350, "ockm-chord-prog 3"); h.at(400, "ockm-length 16"); h.at(450, "ockm-length 64"); h.at(500, "test-get bang")   # 1: grow with a 4-bar progression
+    f = os.path.join(work, "t_len.pd"); h.finish(600, f)
+    out = run(work, f)
+    d2 = [[int(float(x)) for x in v.split()] for v in printed(out, "D2")]
+    deg = [[int(float(x)) for x in v.split()] for v in printed(out, "DEG")]
+    assert d2[0][4] == 1 and d2[0][36] == 2 and d2[0][52] == 1 and d2[0][20] == 0, f"bars 2-4 should come back as they were, not as copies of bar 1: {d2[0][16:64]}"
+    bars = [deg[1][b * 16] for b in range(4)]
+    assert bars == [0, 3, 5, 4], f"growing to 4 bars should play the whole progression (i iv VI v), not repeat bar 1: {bars}"
 
 @test
 def blank_project_synths_start_and_sound(work):

@@ -12,7 +12,7 @@ The window is the instrument: three touch screens, drawn in Lua (plugdata has Lu
 
 **How every screen is laid out**, top to bottom:
 1. **Top bar:** play, tempo, then the screens as tabs: **perform, compose, drums, bass, lead, chord, mixer, song**. Save and **project** on the right. The version number sits next to the tempo
-2. **Navigation strip:** on the left, right above the steps, the **steps** navigator: back and forward arrows either side of the steps you're looking at (for example "17-32"). The dots show every block of 16: white is the one on screen, orange is the one playing. You can also swipe the step row sideways. In the middle, **pattern**: just the patterns you've made, then **+** for a new one. On the right, **length** (16, 32, 64, 128)
+2. **Navigation strip:** on the left, right above the steps, the **steps** navigator: back and forward arrows either side of the steps you're looking at (for example "17-32"). The dots show every block of 16: white is the one on screen, orange is the one playing. You can also swipe the step row sideways. In the middle, **pattern**: just the patterns you've made, then **+** for a new one. On the right, **length** in bars (1, 2, 4, 8). New patterns are 4 bars. **Shorter** keeps the start; nothing is deleted, so going longer again brings your bars back. **Longer** repeats what you've written to fill the new bars, and following parts are rebuilt to fit (a 4-bar progression fills out properly instead of repeating its first chord)
 3. **What you're editing:** the steps (and, on the drums screen, which of the 8 drum slots)
 4. **Sound shaping** at the bottom
 

@@ -92,7 +92,7 @@ SHOTS = [
     ("compose", ["test tap 345 36"]),
     ("perform-mutes", ["test tap 281 36", "test tap 126 137", "test tap 166 369"]),   # mute kick, solo bass
     ("mixer", ["test tap 690 36"]),
-    ("drums-long", ["test tap 414 36", "test tap 880 88", "test tap 194 88"]),        # 64 steps, forward to the second block
+    ("drums-long", ["test tap 414 36", "test tap 861 88", "test tap 194 88"]),        # 64 steps, forward to the second block
     ("compose-melody", ["test tap 345 36", "test tap 186 154", "test tap 400 540"]),   # melody leads, ask for chords, then mutate the bass
     ("drums-groove", ["test tap 414 36", "test tap 660 445"]),                         # drums tab, tap a groove
     ("project", ["test tap 910 36", "test tap 600 261"]),                              # project screen, pick an older project

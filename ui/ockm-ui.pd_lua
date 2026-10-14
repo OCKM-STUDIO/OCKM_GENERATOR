@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.33"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.34"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
@@ -124,7 +124,7 @@ function ui:defaults()
   v["ockm-bass-sync"] = 1; v["ockm-lead-sync"] = 1; v["ockm-leader"] = 0; v["ockm-drum-groove"] = -1
   v["ockm-fill-every"] = 0; v["ockm-fill-style"] = 0; v["ockm-swing"] = 56; v["ockm-accent"] = 0.3; v["ockm-sync"] = 0; v["ockm-song-mode"] = 0; v["ockm-song-loop"] = 1; v["ockm-volume"] = 1
   for _, p in ipairs({ "bass", "lead" }) do v["ockm-"..p.."-lock"] = 0; v["ockm-"..p.."-density"] = 1; v["ockm-"..p.."-seed"] = 0 end
-  v["ockm-bpm"] = 124; v["ockm-len"] = 16; v["ockm-filter"] = 0; v["ockm-root"] = 9; v["ockm-scale"] = 0
+  v["ockm-bpm"] = 124; v["ockm-len"] = 64; v["ockm-filter"] = 0; v["ockm-root"] = 9; v["ockm-scale"] = 0
   for i, nm in ipairs(SLOTS) do
     v["ockm-"..nm.."-sound"] = ({0,1,2,4,5,7,3,6})[i]
     v["ockm-"..nm.."-level"] = 1; v["ockm-"..nm.."-tune"] = 0; v["ockm-"..nm.."-decay"] = 100
@@ -365,10 +365,17 @@ function ui:layout_nav(add)
   end
   if self:free_slot() then add{ kind="btn", x=px, y=y, w=30, h=h, label="+", accent=true, tap=function() self.sheet = "newpat" end } end
   -- right: length
-  add{ kind="text", x=W - 16 - 172 - 50, y=y + 12, w=50, h=12, label="length", size=10 }
+  -- right: length in bars. Shorter keeps the start (the rest comes back if you go longer again); longer repeats what's there
+  add{ kind="text", x=W - 16 - 216 - 46, y=y + 12, w=46, h=12, label="length", size=10 }
   for i, len in ipairs({ 16, 32, 64, 128 }) do
-    add{ kind="choice", x=W - 16 - 172 + (i - 1) * 44, y=y, w=40, h=h, label=tostring(len), small=true,
-         sel=(self.v["ockm-len"] == len), tap=function() psend("ockm-length", "float", { len }) end }
+    local bars = len // 16
+    add{ kind="choice", x=W - 16 - 216 + (i - 1) * 54, y=y, w=50, h=h, label=bars .. ((bars == 1) and " bar" or " bars"), small=true,
+         sel=(self.v["ockm-len"] == len), tap=function()
+           local old = math.floor(self.v["ockm-len"] or 64)
+           psend("ockm-length", "float", { len })
+           if len < old then self:say("now " .. bars .. (bars == 1 and " bar" or " bars") .. ": the start is kept. Go longer again and the rest comes back")
+           elseif len > old then self:say("now " .. bars .. " bars: your parts repeat to fill it, following parts are rebuilt to fit") end
+         end }
   end
 end
 
