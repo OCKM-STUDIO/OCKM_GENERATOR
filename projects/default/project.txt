@@ -1,4 +1,5 @@
 ockm-bpm 124;
+ockm-volume 1;
 ockm-accent 0.3;
 ockm-filter 0;
 ockm-drive 0;

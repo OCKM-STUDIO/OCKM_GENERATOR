@@ -54,6 +54,17 @@ local function engine(name, sel, atoms)
   end
   if name == "ockm-length" then pd.send("ockm-len", "float", { atoms[1] }) end
   if name == "ockm-play" then pd.send("ockm-playing", "float", { atoms[1] }) end
+  -- projects: a pretend projects folder
+  if name == "ockm-project-list" then
+    projects = projects or { "default", "2026-10-02-amber-heron", "2026-10-09-neon-otter", "2026-10-12-dusty-lantern" }
+    pd.send("ockm-project-list-start", "bang", {})
+    for _, p in ipairs(projects) do pd.send("ockm-project-item", "symbol", { p }) end
+    pd.send("ockm-project-list-end", "bang", {})
+  end
+  if name == "ockm-project-new" or name == "ockm-project-saveas" then
+    projects = projects or { "default" }; projects[#projects + 1] = atoms[1]; pd.send("ockm-project-name", "symbol", { atoms[1] })
+  end
+  if name == "ockm-project-open" then pd.send("ockm-project-name", "symbol", { atoms[1] }) end
 end
 
 function pd.send(name, sel, atoms)

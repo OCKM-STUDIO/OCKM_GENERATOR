@@ -11,7 +11,7 @@ Open `OCKM_GENERATOR.pd` in plugdata. Keep the folder together: the main patch f
 The window is the instrument: three touch screens, drawn in Lua (plugdata has Lua built in). Click with the mouse on the Mac, tap with a finger on the Pi. If clicks do nothing, the patch is in edit mode: press Cmd+E.
 
 **How every screen is laid out**, top to bottom:
-1. **Top bar:** play, tempo, then the screens as tabs: **perform, drums, bass, lead, chord, mixer**. Save and revert on the right. The version number sits next to the tempo
+1. **Top bar:** play, tempo, then the screens as tabs: **perform, drums, bass, lead, chord, mixer**. Save and **project** on the right. The version number sits next to the tempo
 2. **Navigation strip:** **pattern** 1 to 8 (small), **length** (16, 32, 64, 128), and **steps**: back and forward arrows either side of the steps you're looking at (for example "17-32"). The dots underneath show every block of 16: white is the one on screen, orange is the one playing. You can also swipe the step row sideways
 3. **What you're editing:** the steps (and, on the drums screen, which of the 8 drum slots)
 4. **Sound shaping** at the bottom
@@ -28,7 +28,7 @@ Tap a track's name on perform or the mixer to jump straight to it.
 - **Bottom right, master FX:** filter (centre is off: left is low-pass, right is high-pass), drive, delay level, feedback and time (in steps), reverb level, size and tone
 - These are bars: drag along them. The orange line shows the value
 - **Length** is in the navigation strip. Making a pattern longer repeats what's there
-- **Save** and **revert**, top right
+- **Save** and **project**, top right
 
 **Drum** (one slot at a time)
 - The 8 slots along the top, named by the sound they play
@@ -36,7 +36,7 @@ Tap a track's name on perform or the mixer to jump straight to it.
 - **Steps**: tap cycles empty, hit (white), accent (orange)
 - Move between blocks of 16 with the **steps** arrows in the navigation strip, or swipe the step row sideways
 - **Level, tune, decay, reverb, delay** for this slot. These belong to the kit, so they stay when you change pattern
-- **Grooves** (right of the sliders): tap one to fill all 8 drums at once. Each slot gets the part for the sound it plays, so a groove's hats land on whichever slot is your hat. It fills the whole pattern length and sets a swing to suit. Twelve to pick from: four floor, house, deep house, tech house, minimal, techno, dub techno, garage, breakbeat, boom bap, trip hop, electro. **Clear** empties the drums. A groove replaces your drum steps, so **revert** is your undo
+- **Grooves** (right of the sliders): tap one to fill all 8 drums at once. Each slot gets the part for the sound it plays, so a groove's hats land on whichever slot is your hat. It fills the whole pattern length and sets a swing to suit. Twelve to pick from: four floor, house, deep house, tech house, minimal, techno, dub techno, garage, breakbeat, boom bap, trip hop, electro. **Clear** empties the drums. A groove replaces your drum steps, so **back to last save** (on the project screen) is your undo
 
 **Compose** (a tab between drums and the synths): how the pattern is put together.
 - **Who leads the harmony:**
@@ -76,7 +76,13 @@ Swing, accent amount and MIDI clock aren't on the screens yet. They're still sav
 
 **Under the screen:** `pd engine` is the sound and sequencer (open it only if you're curious). `pd test-panel` is the old v0.12 panel with every control on one sheet, kept for testing.
 
-Everything is remembered: drum kit, synth sounds, effects, tempo, swing, key and the steps. Switching patterns keeps unsaved edits in memory.
+**Projects** (the **project** button, top right). A project is 8 patterns plus the drum kit, tempo and effects. It opens on the one you used last.
+- **Save** writes all 8 patterns and the project. **Back to last save** throws away everything since
+- **New blank project** starts from nothing: every pattern empty, the default kit and sounds. It's named for you with two random words and the date, like "velvet heron · 14 Oct"
+- **Save as a copy** keeps the project you were in as it was last saved, and carries on in a copy
+- **Your projects**, newest first. Tap one, then **save mine, then open**, **open without saving**, or **delete** (tap twice). Deleting moves the files to a `trash` folder next to `projects/`, so nothing is lost by accident
+
+Everything is remembered: drum kit, synth sounds, effects, tempo, swing, key and the steps. Switching patterns keeps unsaved edits in memory until you save.
 
 **Light or dark, Mac or Pi.** Rebuild with `python3 tools/build.py --theme light` for the light version. `--ui-scale 2` sizes the screens for the 10" Pi display (1920 x 1200). The defaults are dark and Mac size (960 x 600).
 
@@ -160,7 +166,8 @@ Everything is remembered: drum kit, synth sounds, effects, tempo, swing, key and
 | `ui/` | The touchscreen: `ockm-ui.pd_lua` (all three screens) |
 | `docs/` | The architecture review and the brief for the screens |
 | `seq/` | The old test panel (`ockm-panel`), plus sequencers and generators: drum row, mono pattern and generator (bass and lead), chord pattern and generator, the shared presets (`ockm-presets`) and MIDI clock |
-| `projects/default/` | The project: `project.txt` (tempo, effects, MIDI, accent, drum kit) and `p1.txt` to `p8.txt` (one per pattern). Written by the patch when you save |
+| `projects/` | One folder per project, named like `2026-10-14-velvet-heron`, each holding `project.txt` (tempo, effects, MIDI, accent, drum kit) and `p1.txt` to `p8.txt`. `current.txt` names the one that opens at start-up. `default` is the blank starter |
+| `trash/` | Deleted projects. Empty it by hand when you're sure |
 | `sketches/` | Early experiments, kept for reference |
 | `tools/build.py` | Builds every `.pd` file (the panel's layout and colours are in `tools/panel.py`). Structural changes are made here, then the patch files are rebuilt |
 | `tests/run_tests.py` | Plays the patch headless and checks it still works (sounds, accents, patterns, swing, bass, effects, MIDI clock, both panels) |
@@ -199,7 +206,7 @@ The data model, smallest first:
 
 **Rules**
 - A new, empty pattern starts with blank steps but keeps the synth sounds, key and swing of the pattern you came from.
-- Switching patterns keeps unsaved edits in memory, so you can go back and forth. **Save** writes the current pattern and the project to disk. **Revert** reloads them from disk. Closing without saving loses unsaved changes.
+- Switching patterns keeps unsaved edits in memory, so you can go back and forth. **Save** writes all 8 patterns and the project to disk. **Revert** reloads the whole project from disk. Closing without saving loses unsaved changes.
 - Files are plain text, one setting or one track per line, so they're easy to read, copy and back up.
 
 ## Named hooks
@@ -210,8 +217,14 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 |---|---|
 | `ockm-play` | 1 to start, 0 to stop |
 | `ockm-want` | Pick a pattern slot, 0 to 7 |
-| `ockm-save` | Save the current pattern and the project to disk |
-| `ockm-revert` | Throw away unsaved changes: reload the current pattern and the project from disk |
+| `ockm-save` | Save all 8 patterns and the project to disk |
+| `ockm-revert` | Throw away unsaved changes: reload the whole project from disk |
+| `ockm-project-new <name>` | Make a blank project in `projects/<name>` and open it |
+| `ockm-project-open <name>` | Open a project (unsaved changes in the current one are dropped) |
+| `ockm-project-saveas <name>` | Save the current project into `projects/<name>` and carry on there |
+| `ockm-project-delete <name>` | Move a project's files to `trash/<name>` |
+| `ockm-project-list` | Reply with `ockm-project-list-start`, one `ockm-project-item <name>` per project, then `ockm-project-list-end` |
+| `ockm-project-name` | Sent by the engine: the open project's name |
 | `ockm-resync` | Ask the store to send every current value to the on-screen boxes (`ockm-show-<name>`) |
 | `ockm-tempo` | Sent when the tempo box changes (the store listens to this) |
 | `ockm-swing` | Set the swing. `ockm-swing-now` is sent when it changes |

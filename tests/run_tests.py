@@ -600,7 +600,7 @@ def touchscreen_screens_draw(work):
         raise Skip("Pillow not installed")
     p = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_preview.py"), os.path.join(work, "preview")], capture_output=True, text=True)
     assert p.returncode == 0, p.stderr[-800:]
-    assert len(os.listdir(os.path.join(work, "preview"))) == 11, "expected eleven screen pictures"
+    assert len(os.listdir(os.path.join(work, "preview"))) == 12, "expected twelve screen pictures"
 
 @test
 def mute_solo_and_levels(work):
@@ -671,6 +671,58 @@ def bass_lock_density_and_mutate(work):
     assert 0 < sum(on[3]) < 16, f"density 0.3 should thin the line out: {on[3]}"
     assert notes[4] != notes[0], "mutate should change the line"
     assert notes[5] == notes[0] and on[5] == on[0], "seed 0 should bring back the original"
+
+@test
+def projects_new_open_saveas_list_delete(work):
+    """Projects are folders: save as copies, new starts blank, open brings one back, delete moves it to the trash."""
+    h = Harness()
+    g = h.add("#X obj 10 300 r test-get;"); tg = h.add("#X obj 10 325 t b b;")
+    a = h.add("#X obj 10 350 array get ockm-pat-d1 0 4;"); pa = h.add("#X obj 10 375 print D1;")
+    bp = h.add("#X obj 200 350 r ockm-bpm;"); pb = h.add("#X obj 200 375 print BPM;")
+    it = h.add("#X obj 400 350 r ockm-project-item;"); pi = h.add("#X obj 400 375 print ITEM;")
+    nm = h.add("#X obj 600 350 r ockm-project-name;"); pn = h.add("#X obj 600 375 print NAME;")
+    h.con(g, tg); h.con(tg, a, 0); h.con(a, pa); h.con(bp, pb); h.con(it, pi); h.con(nm, pn)
+    h.at(200, "ockm-bpm 131 ; ockm-edit d1 0 2 ; ockm-save bang")
+    h.at(300, "ockm-project-saveas symbol 2026-10-14-copy-one")
+    h.at(400, "ockm-project-new symbol 2026-10-14-fresh-two")
+    h.at(500, "test-get bang")                                     # 0: the new project is blank
+    h.at(600, "ockm-project-open symbol 2026-10-14-copy-one")
+    h.at(700, "test-get bang")                                     # 1: the copy has the kick accent back
+    h.at(800, "ockm-project-list bang")
+    h.at(900, "ockm-project-delete symbol 2026-10-14-fresh-two")
+    f = os.path.join(work, "t_proj.pd"); h.finish(1000, f)
+    out = run(work, f)
+    d1 = [[int(float(x)) for x in v.split()] for v in printed(out, "D1")]
+    assert d1[0] == [0, 0, 0, 0], f"a new project should start blank: {d1[0]}"
+    assert d1[1][0] == 2, f"opening the copy should bring back its steps: {d1[1]}"
+    bpms = [v.split()[-1] for v in printed(out, "BPM")]
+    assert "124" in bpms and bpms[-1] == "131", f"new should reset the tempo, open should restore it: {bpms}"
+    items = [v.split()[-1] for v in printed(out, "ITEM")]
+    for want in ("default", "2026-10-14-copy-one", "2026-10-14-fresh-two"):
+        assert want in items, f"{want} missing from the project list: {items}"
+    P = os.path.join(work, "projects")
+    assert os.path.exists(os.path.join(P, "2026-10-14-copy-one", "p8.txt")), "save as should write all 8 patterns"
+    assert not os.path.exists(os.path.join(P, "2026-10-14-fresh-two")), "delete should move the project out of projects/"
+    assert os.path.exists(os.path.join(work, "trash", "2026-10-14-fresh-two", "project.txt")), "deleted projects go to the trash folder"
+    assert open(os.path.join(P, "current.txt")).read().strip() == "2026-10-14-copy-one;", "the open project should be remembered"
+    assert printed(out, "NAME")[-1].split()[-1] == "2026-10-14-copy-one"
+
+@test
+def touchscreen_makes_and_opens_projects(work):
+    """On the project screen, new blank project makes a folder named by the date and two random words, and opens it."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness(); h.show("ockm-project-name", "ockm-project-new", "ockm-project-open")
+    tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
+    tap(150, 910, 36)                    # project screen
+    tap(200, 831, 178)                   # new blank project
+    f = os.path.join(work, "t_touchproj.pd"); h.finish(400, f)
+    out = run(work, f)
+    errs = [l for l in out.splitlines() if "error" in l.lower() and "current.txt" not in l]
+    made = [d for d in os.listdir(os.path.join(work, "projects")) if re.match(r"\d{4}-\d\d-\d\d-[a-z]+-[a-z]+$", d)]
+    assert made, f"no new project folder: {os.listdir(os.path.join(work, 'projects'))} {errs[:3]}"
+    assert os.path.exists(os.path.join(work, "projects", made[0], "p8.txt")), "the new project should be written straight away"
+    assert open(os.path.join(work, "projects", "current.txt")).read().strip() == made[0] + ";"
 
 @test
 def drum_grooves_fill_every_slot(work):
@@ -745,6 +797,9 @@ def main():
         for item in ["OCKM_GENERATOR.pd", "voices", "seq", "ui", "projects"]:
             src = os.path.join(ROOT, item)
             (shutil.copytree if os.path.isdir(src) else shutil.copy)(src, os.path.join(work, item))
+        # the tests play the demo grooves, not your saved project or the blank starter
+        subprocess.run([sys.executable, os.path.join(ROOT, "tools", "build.py"), "--out", work, "--reset-patterns", "--demo"],
+                       check=True, capture_output=True)
         try:
             t(work)
             print(f"PASS  {t.__name__}"); passed += 1

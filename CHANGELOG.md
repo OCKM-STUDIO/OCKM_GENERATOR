@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.24 (14 October 2026)
+
+**Added**
+- Projects. The **project** button opens a screen to save, go back to the last save, save as a copy, start a new blank project, and open or delete any project
+- New projects are named with two random words and the date, like "velvet heron · 14 Oct"
+- The project you used last opens at start-up
+- Deleting moves the files to a `trash` folder, so nothing is lost by accident
+
+**Changed**
+- The starter project is completely blank. The old demo grooves are still there with `python3 tools/build.py --reset-patterns --demo`
+- **Save** now writes all 8 patterns, not just the one you're on. Before, edits to patterns you'd switched away from were never saved
+- **Revert** (now "back to last save") reloads the whole project
+- The top-right **revert** button is replaced by **project**
+
 ## v0.23 (14 October 2026)
 
 **Added**

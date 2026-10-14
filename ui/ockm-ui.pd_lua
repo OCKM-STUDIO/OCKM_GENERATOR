@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.23"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.24"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
@@ -144,6 +144,8 @@ function ui:hooks()
 end
 
 function ui:postinitialize()
+  math.randomseed(os.time())
+  self.project = "default"
   self.recv = {}
   local function listen(name, fn)
     local m = "r_" .. #self.recv
@@ -159,6 +161,17 @@ function ui:postinitialize()
     listen("ockm-show-" .. hook:sub(6), set)
   end
   listen("ockm-playing", function(o, sel, a) o.playing = tonumber(a[1]) or 0; o:dirty() end)
+  listen("ockm-project-name", function(o, sel, a) o.project = tostring(a[1] or "default"); o:dirty() end)
+  listen("ockm-project-list-start", function(o) o.incoming = {} end)
+  listen("ockm-project-item", function(o, sel, a) if o.incoming then o.incoming[#o.incoming + 1] = tostring(a[1]) end end)
+  listen("ockm-project-list-end", function(o)
+    local l = o.incoming or {}
+    -- names start with the date, so newest first; anything without a date (like 'default') goes last
+    local function dated(n) return n:match("^%d%d%d%d%-") ~= nil end
+    table.sort(l, function(x, y) if dated(x) ~= dated(y) then return dated(x) end return x > y end)
+    o.projects, o.incoming = l, nil
+    o:dirty()
+  end)
   listen("ockm-load",    function(o, sel, a) o.cur = math.floor(tonumber(a[1]) or 0); o.want = nil; o:dirty() end)
   listen("ockm-want",    function(o, sel, a)
     local n = tonumber(a[1]); if n and (o.playing ~= 0) and n ~= o.cur then o.want = n end; o:dirty() end)
@@ -257,6 +270,7 @@ function ui:layout()
   elseif self.screen == "drums" then self:layout_drums(add)
   elseif self.screen == "mixer" then self:layout_mixer(add)
   elseif self.screen == "compose" then self:layout_compose(add)
+  elseif self.screen == "project" then self:layout_project(add)
   else self:layout_synth(add) end
   return L
 end
@@ -280,9 +294,11 @@ function ui:layout_top(add)
       if self.screen ~= t[1] then self:open(t[1]) end
     end }
   end
-  add{ kind="btn", x=W - 144, y=12, w=62, h=48, label="save", quiet=true, tap=function() pd.send("ockm-save", "bang", {}) end }
-  add{ kind="btn", x=W - 78, y=12, w=62, h=48, label="revert", quiet=true, tap=function() pd.send("ockm-revert", "bang", {}) end }
-  self:layout_nav(add)
+  add{ kind="btn", x=W - 154, y=12, w=64, h=48, label="save", quiet=true, tap=function() pd.send("ockm-save", "bang", {}); self:say("saved " .. ockm_pretty(self.project)) end }
+  add{ kind="tab", x=W - 84, y=12, w=68, h=48, label="project", sel=(self.screen == "project"), tap=function()
+    if self.screen ~= "project" then self:open("project") end
+  end }
+  if self.screen ~= "project" then self:layout_nav(add) end
 end
 
 -- the navigation strip: pattern 1-8, length, and the blocks of 16 steps (only as many as the length allows)
@@ -367,6 +383,8 @@ end
 function ui:open(screen)
   self.msg = nil
   self.screen = screen
+  self.pick, self.confirm = nil, nil
+  if screen == "project" then pd.send("ockm-project-list", "bang", {}) end
   self.sel_step = 0
   self:set_page(self:play_block())
 end
@@ -684,6 +702,92 @@ function ui:layout_compose(add)
       add{ kind="text", x=ix, y=cy + 314, w=iw, h=14, size=11,
            label=(leads and "leads the harmony" or (follows and "follows the chords" or "follows the key")) .. ((seed > 0) and ("  ·  variation " .. seed) or "") }
     end
+  end
+end
+
+-- ------------------------------------------------------------------ projects
+-- A project is a folder: 8 patterns plus the kit, tempo and effects. New ones get two random words and the date.
+local WORDS_A = { "amber", "velvet", "copper", "hollow", "silver", "midnight", "dusty", "neon", "quiet", "golden", "lazy", "electric",
+                  "crimson", "misty", "wild", "paper", "rusty", "cosmic", "frozen", "lucky", "deep", "salt", "sunny", "smoky",
+                  "brass", "wooden", "liquid", "broken", "gentle", "secret", "orange", "indigo" }
+local WORDS_B = { "heron", "fox", "harbour", "orchard", "comet", "lantern", "meadow", "engine", "badger", "river", "signal", "garden",
+                  "falcon", "tunnel", "mirror", "kettle", "bridge", "otter", "planet", "violin", "marble", "pylon", "lighthouse", "magpie",
+                  "cassette", "ferry", "thistle", "rocket", "lagoon", "beacon", "pebble", "wren" }
+local MONTHS = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" }
+-- '2026-10-14-velvet-heron' -> 'velvet heron · 14 Oct'
+function ockm_pretty(name)
+  name = tostring(name or "default")
+  local y, m, d, rest = name:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)%-(.+)$")
+  if not y then return (name:gsub("%-", " ")) end
+  return rest:gsub("%-", " ") .. " · " .. tonumber(d) .. " " .. (MONTHS[tonumber(m)] or "")
+end
+function ui:new_name()
+  local taken = {}
+  for _, p in ipairs(self.projects or {}) do taken[p] = true end
+  local date = os.date("%Y-%m-%d")
+  for _ = 1, 50 do
+    local n = date .. "-" .. WORDS_A[math.random(#WORDS_A)] .. "-" .. WORDS_B[math.random(#WORDS_B)]
+    if not taken[n] then return n end
+  end
+  return date .. "-" .. os.date("%H%M%S")
+end
+
+function ui:layout_project(add)
+  local cur = self.project or "default"
+  add{ kind="text", x=16, y=80, w=300, h=12, label="open now", size=10 }
+  add{ kind="text", x=16, y=96, w=W - 32, h=24, label=ockm_pretty(cur), size=22, col="txt" }
+  add{ kind="text", x=16, y=130, w=W - 32, h=14, label=self.msg or "8 patterns, plus the drum kit, tempo and effects", size=11, col=self.msg and "acc" or nil }
+  local bw = (W - 32 - 3 * 8) / 4
+  local acts = {
+    { "save", function() pd.send("ockm-save", "bang", {}); self:say("saved " .. ockm_pretty(cur)) end },
+    { "back to last save", function() pd.send("ockm-revert", "bang", {}); self:say("back to the last save of " .. ockm_pretty(cur)) end },
+    { "save as a copy", function()
+        local n = self:new_name(); pd.send("ockm-project-saveas", "symbol", { n }); pd.send("ockm-project-list", "bang", {})
+        self:say("saved a copy as " .. ockm_pretty(n) .. ". You're now working in the copy") end },
+    { "new blank project", function()
+        local n = self:new_name(); pd.send("ockm-project-new", "symbol", { n }); pd.send("ockm-project-list", "bang", {})
+        self.pick = nil; self:say("new project: " .. ockm_pretty(n) .. ". The last one stays as you last saved it") end },
+  }
+  for i, a in ipairs(acts) do
+    add{ kind="btn", x=16 + (i - 1) * (bw + 8), y=152, w=bw, h=52, label=a[1], accent=(i == 4), tap=a[2] }
+  end
+  -- every project, newest first
+  local list = self.projects or {}
+  add{ kind="text", x=16, y=222, w=300, h=12, label="your projects (" .. #list .. ")", size=10 }
+  local cols, rows = 4, 4
+  local per = cols * rows
+  local pages = math.max(1, math.ceil(#list / per))
+  self.ppage = clamp(self.ppage or 0, 0, pages - 1)
+  local cw = (W - 32 - (cols - 1) * 8) / cols
+  for k = 1, per do
+    local name = list[self.ppage * per + k]
+    if not name then break end
+    local col, row = (k - 1) % cols, math.floor((k - 1) / cols)
+    local is_cur = (name == cur)
+    add{ kind="choice", x=16 + col * (cw + 8), y=238 + row * 52, w=cw, h=46, small=true,
+         label=ockm_pretty(name) .. (is_cur and "  (open)" or ""), sel=(self.pick == name) or (self.pick == nil and is_cur),
+         tap=function() self.confirm = nil; self.pick = (not is_cur) and name or nil end }
+  end
+  if pages > 1 then
+    add{ kind="arrow", x=W - 112, y=216, w=44, h=20, dir=-1, on=self.ppage > 0, tap=function() self.ppage = self.ppage - 1 end }
+    add{ kind="arrow", x=W - 60, y=216, w=44, h=20, dir=1, on=self.ppage < pages - 1, tap=function() self.ppage = self.ppage + 1 end }
+  end
+  -- what to do with the one you picked
+  local p = self.pick
+  if p then
+    local y = H - 64
+    add{ kind="text", x=16, y=y - 18, w=W - 32, h=12, label=ockm_pretty(p) .. ": open it, or delete it. Opening swaps out " .. ockm_pretty(cur), size=10 }
+    local w3 = (W - 32 - 16) / 3
+    add{ kind="btn", x=16, y=y, w=w3, h=52, label="save " .. ockm_pretty(cur):match("^[^·]+"):gsub("%s+$", "") .. ", then open", accent=true, tap=function()
+      pd.send("ockm-save", "bang", {}); pd.send("ockm-project-open", "symbol", { p }); self.pick = nil; self:say("opened " .. ockm_pretty(p)) end }
+    add{ kind="btn", x=16 + w3 + 8, y=y, w=w3, h=52, label="open without saving", tap=function()
+      pd.send("ockm-project-open", "symbol", { p }); self.pick = nil; self:say("opened " .. ockm_pretty(p)) end }
+    add{ kind="btn", x=16 + 2 * (w3 + 8), y=y, w=w3, h=52, label=(self.confirm == p) and "tap again to delete" or "delete", quiet=(self.confirm ~= p), tap=function()
+      if self.confirm == p then
+        pd.send("ockm-project-delete", "symbol", { p }); self.pick, self.confirm = nil, nil
+        self:say(ockm_pretty(p) .. " moved to the trash folder")
+      else self.confirm = p end
+    end }
   end
 end
 

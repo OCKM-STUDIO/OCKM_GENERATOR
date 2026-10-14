@@ -94,6 +94,7 @@ SHOTS = [
     ("drums-long", ["test tap 361 36", "test tap 506 88", "test tap 922 88"]),        # 64 steps, forward to the second block
     ("compose-melody", ["test tap 441 36", "test tap 186 154", "test tap 400 540"]),   # melody leads, ask for chords, then mutate the bass
     ("drums-groove", ["test tap 361 36", "test tap 660 445"]),                         # drums tab, tap a groove
+    ("project", ["test tap 910 36", "test tap 600 261"]),                              # project screen, pick an older project
     ("bass-manual", ["test tap 521 36", "test tap 900 283", "test tap 89 158"]),      # switch to manual, then edit step 2
 ]
 

@@ -10,8 +10,9 @@ Usage:
   python3 tools/build.py --out DIR       write to another folder (used by the tests)
   python3 tools/build.py --theme light    build the screens in the light theme (default dark)
   python3 tools/build.py --ui-scale 2     size the screen for the 10" Pi display (1920x1200)
-  python3 tools/build.py --reset-patterns  rewrite projects/default with the starter project
+  python3 tools/build.py --reset-patterns  rewrite projects/default as a blank project: all 8 patterns empty
                                           (this DELETES any patterns and settings you have saved)
+  python3 tools/build.py --reset-patterns --demo   the same, but with the old demo grooves in patterns 1 to 4
 
 It only creates project files that are missing, and never touches sketches/, README or CHANGELOG.
 """
@@ -19,6 +20,7 @@ import os, sys, argparse
 ap=argparse.ArgumentParser()
 ap.add_argument("--out",default=os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 ap.add_argument("--reset-patterns",action="store_true")
+ap.add_argument("--demo",action="store_true",help="with --reset-patterns: fill patterns 1-4 with the demo grooves instead of starting blank")
 ap.add_argument("--theme",choices=["dark","light"],default="dark",help="screen colours (default dark)")
 ap.add_argument("--ui-scale",type=int,choices=[1,2],default=1,help="1 = 960x600 for the Mac, 2 = 1920x1200 for the 10-inch Pi screen")
 args=ap.parse_args()
@@ -1161,33 +1163,163 @@ syn=q.add(f"#X obj 820 1330 s {D}0-sync;"); one=q.add("#X msg 880 1330 1;")
 for c in [(rl,0,tfb,0),(tfb,1,started,0),(started,0,scap,0),(tfb,0,tl,0),
           (tl,5,cur,1),(tl,5,lpp,1),(tl,5,fcur,1),(tl,4,l1,0),(l1,0,sl1,0),(tl,3,fcur,0),(fcur,0,play,0),(play,0,sq,0),
           (tl,2,l0,0),(l0,0,sl0,0),(tl,1,rf,0),(tl,0,syn,0),(tl,0,one,0),(one,0,started,1)]: q.con(*c)
-# --- save: capture, then write the pattern and the project ---
-rsv=q.add("#X obj 20 1450 r ockm-do-save;"); tsv=q.add("#X obj 20 1475 t b b b b;")
-fc2=q.add("#X obj 200 1505 f;"); p1=q.add("#X obj 200 1530 + 1;"); mkf=q.add(f"#X obj 200 1555 makefilename {QDIR}/p%d.txt;"); lpw=q.add("#X obj 200 1580 list prepend write;"); ltw=q.add("#X obj 200 1605 list trim;")
-cj=q.add("#X msg 20 1505 clear;"); scj=q.add(f"#X obj 80 1530 s {D}0-cap-j;")
-wj=q.add(f"#X msg 20 1560 write {QDIR}/project.txt;")
-tj=q.add("#X obj 20 1530 t b b b;")
-sdone=q.add("#X msg 400 1505 \; ockm-saved bang;")
-for c in [(rsv,0,tsv,0),(tsv,3,scap,0),(tsv,2,fc2,0),(tl,5,fc2,1),(fc2,0,p1,0),(p1,0,mkf,0),(mkf,0,lpw,0),(lpw,0,ltw,0),(ltw,0,sap,0),
-          (tsv,1,tj,0),(tj,2,cj,0),(cj,0,saj,0),(tj,1,scj,0),(tj,0,wj,0),(wj,0,saj,0),(tsv,0,sdone,0)]: q.con(*c)
-# --- revert: reload the project and the current pattern from disk ---
-rrv=q.add("#X obj 20 1650 r ockm-revert;"); trv=q.add("#X obj 20 1675 t b b b b;")
-rj2=q.add(f"#X msg 300 1705 read {QDIR}/project.txt \\, rewind \\, bang;")
-fc3=q.add("#X obj 200 1705 f;"); p2=q.add("#X obj 200 1730 + 1;"); mkr=q.add(f"#X obj 200 1755 makefilename {QDIR}/p%d.txt;"); lpr=q.add("#X obj 200 1780 list prepend read;"); ltr2=q.add("#X obj 200 1805 list trim;")
-z=q.add("#X msg 120 1705 0;"); fc4=q.add("#X obj 20 1735 f;"); sld=q.add("#X obj 20 1760 s ockm-load;")
-for c in [(rrv,0,trv,0),(trv,3,rj2,0),(rj2,0,saj,0),(trv,2,fc3,0),(tl,5,fc3,1),(fc3,0,p2,0),(p2,0,mkr,0),(mkr,0,lpr,0),(lpr,0,ltr2,0),(ltr2,0,sap,0),
-          (trv,1,z,0),(z,0,started,1),(trv,0,fc4,0),(tl,5,fc4,1),(fc4,0,sld,0)]: q.con(*c)
-# --- start-up: read the project and every pattern, then load pattern 1 ---
-lb=q.add("#X obj 20 1850 loadbang;"); tlb=q.add("#X obj 20 1875 t b b b;")
-ini_j=q.add(f"#X msg 300 1905 read {QDIR}/project.txt \\, rewind \\, bang;")
-ini_p=q.add("#X msg 160 1905 "+" \\, ".join(f"{n} read {QDIR}/p{n+1}.txt" for n in range(SLOTN))+";")
-go=q.add("#X msg 20 1905 \; ockm-slotset set 0 \; ockm-want 0;")
-for c in [(lb,0,tlb,0),(tlb,2,ini_j,0),(ini_j,0,saj,0),(tlb,1,ini_p,0),(ini_p,0,sq,0),(tlb,0,go,0)]: q.con(*c)
+def _fmtv(v): return str(int(v)) if float(v)==int(v) else str(v)
+# --- projects: each project is a folder in projects/ holding project.txt and p1.txt to p8.txt ---
+# Paths are built from this patch's own folder (Pd's [file] objects need full paths).
+def holder(key,x,y):
+    """a [symbol] that always holds the latest value sent to $0-<key>"""
+    h=q.add(f"#X obj {x} {y} symbol;"); r=q.add(f"#X obj {x+80} {y-25} r {D}0-{key};"); q.con(r,0,h,1); return h
+def joined(src,outlet,tail,x,y):
+    """src's symbol (a folder) -> folder/tail"""
+    la=q.add(f"#X obj {x} {y} list append {tail};"); fj=q.add(f"#X obj {x} {y+25} file join;")
+    q.con(src,outlet,la,0); q.con(la,0,fj,0); return fj
+def cmd(src,outlet,word,x,y,target):
+    """src's symbol -> '<word> <symbol>' message into target"""
+    a=q.add(f"#X obj {x} {y} list prepend {word};"); b=q.add(f"#X obj {x} {y+25} list trim;")
+    q.con(src,outlet,a,0); q.con(a,0,b,0); q.con(b,0,target,0)
+def sender(key,x,y): return q.add(f"#X obj {x} {y} s {D}0-{key};")
+Y0=1450
+# read every file of the open project into the buffers, then play the project settings
+rra=q.add(f"#X obj 20 {Y0} r {D}0-readall;"); dr=holder("dir",20,Y0+50); q.con(rra,0,dr,0)
+tr9=q.add(f"#X obj 20 {Y0+75} t "+" ".join(["s"]*(SLOTN+1))+";"); q.con(dr,0,tr9,0)
+pj=joined(tr9,SLOTN,"project.txt",20,Y0+100); tpj=q.add(f"#X obj 20 {Y0+150} t b s;")
+cmd(tpj,1,"read",80,Y0+175,saj); rwb=q.add(f"#X msg 20 {Y0+225} rewind \\, bang;"); q.con(pj,0,tpj,0); q.con(tpj,0,rwb,0); q.con(rwb,0,saj,0)
+for n in range(SLOTN):
+    x=240+n*140; pf=joined(tr9,SLOTN-1-n,f"p{n+1}.txt",x,Y0+100)
+    a=q.add(f"#X obj {x} {Y0+150} list prepend read;"); b=q.add(f"#X obj {x} {Y0+175} list prepend {n};")
+    q.con(pf,0,a,0); q.con(a,0,b,0); q.con(b,0,sq,0)
+# write every buffer into the open project folder (save captures the live pattern first)
+Y1=Y0+300
+rwa=q.add(f"#X obj 20 {Y1} r {D}0-writeall;"); dw=holder("dir",20,Y1+50); q.con(rwa,0,dw,0)
+tw9=q.add(f"#X obj 20 {Y1+75} t b "+" ".join(["s"]*(SLOTN+1))+";"); q.con(dw,0,tw9,0)
+for n in range(SLOTN):
+    x=240+n*140; pf=joined(tw9,SLOTN+1-1-n,f"p{n+1}.txt",x,Y1+100)
+    a=q.add(f"#X obj {x} {Y1+150} list prepend write;"); b=q.add(f"#X obj {x} {Y1+175} list prepend {n};")
+    q.con(pf,0,a,0); q.con(a,0,b,0); q.con(b,0,sq,0)
+pw=joined(tw9,SLOTN+1,"project.txt",20,Y1+100); tjw=q.add(f"#X obj 20 {Y1+150} t s b b;")
+cj=q.add(f"#X msg 160 {Y1+175} clear;"); scj=sender("cap-j",100,Y1+200)
+q.con(pw,0,tjw,0); q.con(tjw,2,cj,0); q.con(cj,0,saj,0); q.con(tjw,1,scj,0); cmd(tjw,0,"write",20,Y1+225,saj)
+q.con(tw9,0,q.add(f"#X msg 20 {Y1+275} \; ockm-saved bang;"),0)
+# remember the open project in projects/current.txt, and tell the screens its name
+Y2=Y1+350
+tcur=q.add(f"#X obj 700 {Y2+50} text define {D}0-cur;"); rcc=q.add(f"#X obj 700 {Y2+25} r {D}0-curcmd;"); q.con(rcc,0,tcur,0)
+rrm=q.add(f"#X obj 20 {Y2} r {D}0-remember;"); trm=q.add(f"#X obj 20 {Y2+25} t b b b;")
+clc=q.add(f"#X msg 300 {Y2+50} clear;"); q.con(trm,2,clc,0); q.con(clc,0,sender("curcmd",300,Y2+75),0)
+nmh=holder("name",160,Y2+75); lst=q.add(f"#X obj 160 {Y2+100} list;"); ins=q.add(f"#X obj 160 {Y2+125} text insert {D}0-cur 1e+06;")
+ann=q.add(f"#X obj 260 {Y2+125} s ockm-project-name;")
+bh=holder("base",20,Y2+75); cp=joined(bh,0,"current.txt",20,Y2+100)
+for c in [(rrm,0,trm,0),(trm,1,nmh,0),(nmh,0,lst,0),(lst,0,ins,0),(nmh,0,ann,0),(trm,0,bh,0)]: q.con(*c)
+cmd(cp,0,"write",20,Y2+150,sender("curcmd",20,Y2+200))
+# set the name: $0-name, and $0-dir = base/name
+Y3=Y2+300
+rsn=q.add(f"#X obj 20 {Y3} r {D}0-setname;"); tsn=q.add(f"#X obj 20 {Y3+25} t s s;")
+lpb=q.add(f"#X obj 20 {Y3+75} list prepend;"); rb=q.add(f"#X obj 120 {Y3+50} r {D}0-base;"); fjn=q.add(f"#X obj 20 {Y3+100} file join;")
+for c in [(rsn,0,tsn,0),(tsn,1,sender("name",120,Y3+50+30),0),(tsn,0,lpb,0),(rb,0,lpb,1),(lpb,0,fjn,0),(fjn,0,sender("dir",20,Y3+125),0)]: q.con(*c)
+# load a pattern without capturing the one we're leaving (its buffer belongs to the old project)
+rlf=q.add(f"#X obj 400 {Y3} r {D}0-loadpat;"); tlf=q.add(f"#X obj 400 {Y3+25} t f b;"); zz=q.add(f"#X msg 460 {Y3+50} 0;")
+slo=q.add(f"#X msg 400 {Y3+75} \; ockm-slotset set {D}1 \; ockm-load {D}1;")
+for c in [(rlf,0,tlf,0),(tlf,1,zz,0),(zz,0,started,1),(tlf,0,slo,0)]: q.con(*c)
+# make a folder in projects/
+def mkdir_of(src,outlet,x,y):
+    bh2=holder("base",x+200,y); lp=q.add(f"#X obj {x} {y+25} list prepend;"); fj=q.add(f"#X obj {x} {y+50} file join;"); md=q.add(f"#X obj {x} {y+75} file mkdir;")
+    t=q.add(f"#X obj {x} {y} t s b;"); q.con(src,outlet,t,0); q.con(t,1,bh2,0); q.con(bh2,0,lp,1); q.con(t,0,lp,0); q.con(lp,0,fj,0); q.con(fj,0,md,0)
+Y4=Y3+200
+# ockm-project-open <name>: read it all, play pattern 1
+ro=q.add(f"#X obj 20 {Y4} r ockm-project-open;"); to=q.add(f"#X obj 20 {Y4+25} t b b b s;")
+for c in [(ro,0,to,0),(to,3,sender("setname",200,Y4+50),0),(to,2,sender("readall",150,Y4+75),0)]: q.con(*c)
+z0=q.add(f"#X msg 100 {Y4+100} 0;"); q.con(to,1,z0,0); q.con(z0,0,sender("loadpat",100,Y4+125),0); q.con(to,0,sender("remember",20,Y4+150),0)
+# ockm-revert: read the open project again, stay on this pattern
+rrv=q.add(f"#X obj 400 {Y4} r ockm-revert;"); trv=q.add(f"#X obj 400 {Y4+25} t b b;"); fc4=q.add(f"#X obj 400 {Y4+50} f;")
+for c in [(rrv,0,trv,0),(trv,1,sender("readall",500,Y4+50),0),(trv,0,fc4,0),(tl,5,fc4,1),(fc4,0,sender("loadpat",400,Y4+75),0)]: q.con(*c)
+# ockm-do-save: capture the live pattern, write everything
+rsv=q.add(f"#X obj 700 {Y4} r ockm-do-save;"); tsv=q.add(f"#X obj 700 {Y4+25} t b b;")
+for c in [(rsv,0,tsv,0),(tsv,1,scap,0),(tsv,0,sender("writeall",700,Y4+50),0)]: q.con(*c)
+# ockm-project-new <name>: a blank project (every pattern empty, default kit, tempo and sounds)
+Y5=Y4+250
+rn=q.add(f"#X obj 20 {Y5} r ockm-project-new;"); tn=q.add(f"#X obj 20 {Y5+25} t b b b b b s s;")
+mkdir_of(tn,6,700,Y5)
+blankp=q.add(f"#X msg 300 {Y5+75} "+" \\, ".join(["0 clear"]+[f"0 add {h} {_fmtv(d)}" for h,d,_ in PATTERN_KEYS]+["0 add ockm-empty 1"]
+                                               +[x for n in range(1,SLOTN) for x in (f"{n} clear",f"{n} add ockm-empty 1")])+";")
+blankj=q.add(f"#X msg 250 {Y5+100} "+" \\, ".join(["clear"]+[f"add {h} {_fmtv(d)}" for h,d,_ in PROJECT_KEYS])+" \\, rewind \\, bang;")
+for c in [(rn,0,tn,0),(tn,5,sender("setname",400,Y5+50),0),(tn,4,blankp,0),(blankp,0,sq,0),(tn,3,blankj,0),(blankj,0,saj,0),
+          (tn,2,sender("writeall",200,Y5+125),0)]: q.con(*c)
+z1=q.add(f"#X msg 100 {Y5+150} 0;"); q.con(tn,1,z1,0); q.con(z1,0,sender("loadpat",100,Y5+175),0); q.con(tn,0,sender("remember",20,Y5+200),0)
+# ockm-project-saveas <name>: this project, saved into a new folder, which becomes the open one
+Y6=Y5+250
+rsa=q.add(f"#X obj 20 {Y6} r ockm-project-saveas;"); tsa=q.add(f"#X obj 20 {Y6+25} t b b b s s;")
+mkdir_of(tsa,4,700,Y6)
+for c in [(rsa,0,tsa,0),(tsa,3,sender("setname",300,Y6+50),0),(tsa,2,scap,0),(tsa,1,sender("writeall",200,Y6+75),0),(tsa,0,sender("remember",20,Y6+100),0)]: q.con(*c)
+# ockm-project-delete <name>: its files move to trash/<name> (next to projects/), then the empty folder goes
+Y7=Y6+150
+DEL_FILES=["project.txt"]+[f"p{n+1}.txt" for n in range(SLOTN)]+[".DS_Store"]
+rdl=q.add(f"#X obj 20 {Y7} r ockm-project-delete;"); tdl=q.add(f"#X obj 20 {Y7+25} t b s;"); q.con(rdl,0,tdl,0)
+nmd=q.add(f"#X obj 100 {Y7+50} symbol;"); q.con(tdl,1,nmd,1)
+nf=len(DEL_FILES)
+steps=q.add(f"#X obj 20 {Y7+75} t "+" ".join(["b"]*(nf+3))+";"); q.con(tdl,0,steps,0)
+
+# setup (fires first): src = base/name, dst = base/../trash/name, make the trash folders
+bdl=holder("base",900,Y7+100); q.con(steps,nf+2,bdl,0)
+tsu=q.add(f"#X obj 900 {Y7+125} t s s s;"); q.con(bdl,0,tsu,0)
+t1=joined(tsu,2,"../trash",1100,Y7+150); md1=q.add(f"#X obj 1100 {Y7+200} file mkdir;"); q.con(t1,0,md1,0)
+lps=q.add(f"#X obj 900 {Y7+225} list prepend;"); q.con(tsu,1,lps,1); fjs=q.add(f"#X obj 900 {Y7+250} file join;"); q.con(lps,0,fjs,0); 
+lad=q.add(f"#X obj 1000 {Y7+150} list append ../trash;"); q.con(tsu,0,lad,0)
+lpd=q.add(f"#X obj 1000 {Y7+225} list prepend;"); q.con(lad,0,lpd,1); fjd=q.add(f"#X obj 1000 {Y7+250} file join;"); q.con(lpd,0,fjd,0)
+tdd=q.add(f"#X obj 1000 {Y7+275} t s s;"); q.con(fjd,0,tdd,0); q.con(tdd,1,q.add(f"#X obj 1100 {Y7+300} file mkdir;"),0); 
+nm2=q.add(f"#X obj 800 {Y7+175} t s s;"); q.con(nmd,0,nm2,0); q.con(nm2,1,lpd,0); q.con(nm2,0,lps,0)
+q.con(steps,nf+1,nmd,0)
+# one move per file (missing files are skipped quietly)
+for k,fn in enumerate(DEL_FILES):
+    x=100+k*110; tb=q.add(f"#X obj {x} {Y7+350} t b b;"); q.con(steps,nf-k,tb,0)
+    # dst first into the pair's right inlet, then src triggers the move
+    d_a=q.add(f"#X obj {x+50} {Y7+400} list append {fn};"); d_j=q.add(f"#X obj {x+50} {Y7+425} file join;")
+    s_a=q.add(f"#X obj {x} {Y7+450} list append {fn};"); s_j=q.add(f"#X obj {x} {Y7+475} file join;")
+    pk=q.add(f"#X obj {x} {Y7+500} list append;"); mv=q.add(f"#X obj {x} {Y7+525} file move;")
+    hd=q.add(f"#X obj {x+50} {Y7+375} symbol;"); hs=q.add(f"#X obj {x} {Y7+425} symbol;")
+    q.con(tdd,0,hd,1); q.con(fjs,0,hs,1)
+    for c in [(tb,1,hd,0),(hd,0,d_a,0),(d_a,0,d_j,0),(d_j,0,pk,1),(tb,0,hs,0),(hs,0,s_a,0),(s_a,0,s_j,0),(s_j,0,pk,0),(pk,0,mv,0)]: q.con(*c)
+# then the empty folder, then a fresh list for the screens
+hrm=q.add(f"#X obj 20 {Y7+575} symbol;"); q.con(fjs,0,hrm,1); q.con(steps,1,hrm,0); q.con(hrm,0,q.add(f"#X obj 20 {Y7+600} file delete;"),0)
+q.con(steps,0,q.add(f"#X msg 20 {Y7+650} \\; ockm-project-list bang;"),0)
+Y7=Y7+400
+# ockm-project-list: one ockm-project-item <name> per project folder, between -start and -end
+Y8=Y7+350
+rls=q.add(f"#X obj 20 {Y8} r ockm-project-list;"); bls=holder("base",20,Y8+50); q.con(rls,0,bls,0)
+tls=q.add(f"#X obj 20 {Y8+75} t b s b;"); q.con(bls,0,tls,0)
+q.con(tls,2,q.add(f"#X msg 300 {Y8+100} \; ockm-project-list-start bang;"),0)
+gl=joined(tls,1,"*",100,Y8+100); fg=q.add(f"#X obj 100 {Y8+150} file glob;"); q.con(gl,0,fg,0)
+ug=q.add(f"#X obj 100 {Y8+175} unpack s f;"); sp=q.add(f"#X obj 100 {Y8+225} spigot;"); sn=q.add(f"#X obj 100 {Y8+250} file splitname;")
+ls2=q.add(f"#X obj 100 {Y8+275} list split 1;"); sit=q.add(f"#X obj 100 {Y8+325} s ockm-project-item;"); syi=q.add(f"#X obj 100 {Y8+300} symbol;")
+for c in [(fg,0,ug,0),(ug,1,sp,1),(ug,0,sp,0),(sp,0,sn,0),(sn,0,ls2,0),(ls2,1,syi,0),(syi,0,sit,0)]: q.con(*c)
+q.con(tls,0,q.add(f"#X msg 20 {Y8+350} \; ockm-project-list-end bang;"),0)
+# start-up: find projects/, open the project used last time (or 'default')
+Y9=Y8+400
+lb=q.add(f"#X obj 20 {Y9} loadbang;"); tlb=q.add(f"#X obj 20 {Y9+25} t b b;")
+dm=q.add(f"#X msg 200 {Y9+50} dir;"); pdc=q.add(f"#X obj 200 {Y9+75} pdcontrol;"); bj=joined(pdc,0,"../projects",200,Y9+100)
+q.con(lb,0,tlb,0); q.con(tlb,1,dm,0); q.con(dm,0,pdc,0); q.con(bj,0,sender("base",200,Y9+150),0)
+q.con(tlb,0,q.add(f"#X msg 20 {Y9+50} \; ockm-slotset set 0;"),0)
+bst=holder("base",20,Y9+100); q.con(tlb,0,bst,0)
+tst=q.add(f"#X obj 20 {Y9+125} t b s;"); q.con(bst,0,tst,0)
+tcr=q.add(f"#X obj 100 {Y9+130} t s b;"); q.con(tst,1,tcr,0)
+clr2=q.add(f"#X msg 300 {Y9+150} clear;"); q.con(tcr,1,clr2,0); q.con(clr2,0,sender("curcmd",300,Y9+175),0)
+cpr=joined(tcr,0,"current.txt",100,Y9+150)
+tif=q.add(f"#X obj 100 {Y9+200} t s s;"); isf=q.add(f"#X obj 250 {Y9+225} file isfile;"); spf=q.add(f"#X obj 100 {Y9+250} spigot;")
+q.con(cpr,0,tif,0); q.con(tif,1,isf,0); q.con(isf,0,spf,1); q.con(tif,0,spf,0); z9=q.add(f"#X msg 330 {Y9+250} 0;"); q.con(isf,1,z9,0); q.con(z9,0,spf,1)
+cmd(spf,0,"read",100,Y9+275,sender("curcmd",100,Y9+325))
+sz=q.add(f"#X obj 20 {Y9+275} text size {D}0-cur;"); q.con(tst,0,sz,0)
+sel0=q.add(f"#X obj 20 {Y9+300} sel 0;"); q.con(sz,0,sel0,0)
+dflt=q.add(f"#X msg 20 {Y9+450} symbol default;"); q.con(sel0,0,dflt,0)
+g0=q.add(f"#X msg 100 {Y9+325} 0;"); tg=q.add(f"#X obj 100 {Y9+350} text get {D}0-cur;"); q.con(sel0,1,g0,0); q.con(g0,0,tg,0)
+tchk=q.add(f"#X obj 100 {Y9+375} t b s;"); nhold=q.add(f"#X obj 100 {Y9+450} symbol;"); q.con(tg,0,tchk,0); q.con(tchk,1,nhold,1)
+bch=holder("base",250,Y9+400); lpc=q.add(f"#X obj 250 {Y9+425} list append;"); fjc=q.add(f"#X obj 250 {Y9+450} file join;"); isd=q.add(f"#X obj 250 {Y9+475} file isdirectory;")
+q.con(tchk,1,lpc,1); q.con(tchk,0,bch,0); q.con(bch,0,lpc,0); q.con(lpc,0,fjc,0); q.con(fjc,0,isd,0)
+s01=q.add(f"#X obj 250 {Y9+500} sel 0;"); tb1=q.add(f"#X obj 330 {Y9+525} t b;"); q.con(isd,0,s01,0); q.con(isd,1,dflt,0); q.con(s01,0,dflt,0); q.con(s01,1,tb1,0); q.con(tb1,0,nhold,0)
+sop=q.add(f"#X obj 20 {Y9+525} s ockm-project-open;"); q.con(dflt,0,sop,0); q.con(nhold,0,sop,0)
 q.save("seq/ockm-store.pd","#N canvas 60 60 2200 1960 12;")
 
 # ================= project files =================
-def build_project(reset=False):
+def build_project(reset=False, demo=False):
     """Write the starter project: project.txt (tempo, effects, MIDI, accent, drum kit) and p1-p8.
+    The starter is blank: every pattern empty, every part silent. demo=True puts the old demo grooves in 1-4.
     Without reset, only missing files are written, so saved work is kept."""
     os.makedirs(os.path.join(R,PROJ_DIR),exist_ok=True)
     def write(name, lines):
@@ -1219,7 +1351,7 @@ def build_project(reset=False):
     chord_on=[st(offb),st({3,10},{3}),st({0},{0}),st({0,8})]
     pad=lambda v:" ".join(str(x) for x in v+[0]*(STEPS-16))
     for k in range(SLOTN):
-        if k>=4:
+        if k>=4 or not demo:   # empty: no steps, and it takes on the sounds you're already using
             write(f"p{k+1}.txt",["ockm-empty 1"]); continue
         lines=[f"{h} {fmt(d)}" for h,d,_ in PATTERN_KEYS]
         lines+=[f"ockm-pat-{nm} 0 {pad(drums[nm][k])}" for nm,_ in SLOTS]
@@ -1229,5 +1361,5 @@ def build_project(reset=False):
         write(f"p{k+1}.txt",lines)
 
 
-build_project(reset=args.reset_patterns)
+build_project(reset=args.reset_patterns, demo=args.demo)
 print("built", R)
