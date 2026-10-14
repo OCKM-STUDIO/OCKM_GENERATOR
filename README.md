@@ -74,6 +74,7 @@ Everything is remembered: drum kit, synth sounds, effects, tempo, swing, key and
 | Screen power | Small USB power adapter for the screen, because the DAC Pro covers the GPIO pins the screen would normally take power from | Not bought |
 | Controller | Endless knobs with light rings. Front runners: Novation Launch Control 3 (16 knobs, screen) or Behringer X-Touch Mini (8 knobs, 16 buttons). Maybe a Launchpad Mini later for a hands-on step grid | To choose |
 | Storage | microSD card, 32GB | Not bought |
+| MIDI | USB only for now: the controller plugs straight into the Pi. If syncing with gear that only has 5-pin MIDI sockets is ever needed, add a Roland UM-ONE mk2 (avoid cheap unbranded cables) | Decided |
 
 ## Roadmap
 
@@ -98,6 +99,7 @@ Everything is remembered: drum kit, synth sounds, effects, tempo, swing, key and
 - **8 pattern slots, each up to 128 steps.** One length per pattern, shown 16 steps at a time.
 - **Drum slots are flexible.** Each of the 8 slots can play any of the 8 drum sounds, and later any of your samples.
 - **One key for all synths.** Bass, lead and chord share the key and scale, so they always agree.
+- **A self-contained box.** Pi, 10" screen and DAC Pro in one unit, a USB MIDI controller alongside, audio out on RCA to the mixer. No iRig, no MIDI interface for now.
 - **Touchscreen plus a hardware controller.** The screen is for editing and overview. The knobs are for playing. The screen is the official 10" (decided October 2026): the 7" would make mute, solo and step buttons too small for a finger.
 - **Minimal modern look.** Flat, one accent colour (orange), lots of space, light and dark themes. Dark is the default.
 - **Build and test on the Mac first.** Everything runs in plugdata; the Pi only adds audio setup, screen rotation and start-up.
