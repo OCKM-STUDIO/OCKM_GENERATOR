@@ -145,7 +145,7 @@ Everything is remembered: drum kit, synth sounds, effects, tempo, swing, key and
 10. ~~6 flexible drum slots and patterns up to 128 steps~~ (v0.9)
 11. ~~8 drum slots, chord and lead synth tracks~~ (v0.10)
 12. ~~One central settings store: projects, patterns and the drum kit, saved and restored~~ (v0.11)
-13. Your drum samples, chosen per slot
+13. ~~Your drum samples, chosen per slot~~ (v0.36). Later: load sample folders from a USB stick or SD card on the Pi
 14. ~~Song mode, MPC style~~ (v0.26). Next: a song generator that writes a starting chain (intro, build, drop, break, outro) for you to tweak
 15. ~~A usability pass~~ (v0.26). Keep going after each round of playing
 16. ~~A setup screen for tempo, swing, accents, volume and MIDI clock~~ (v0.26)
@@ -308,6 +308,9 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 | `ockm-verb-size` | Reverb size, 0 (small room, about 0.4s) to 1 (big hall, about 3s) |
 | `ockm-verb-tone` | Reverb tone, 0 dark to 1 bright |
 | `ockm-<slot>-sound` | Which sound a drum slot plays: 0 kick, 1 snare, 2 clap, 3 perc 1, 4 closed hat, 5 open hat, 6 tom, 7 perc 2 |
+| `ockm-<slot>-sample` | 0 = the synth sound, n = the nth file in that sound's sample folder. Saved with the project |
+| `ockm-<slot>-audition` | Play the slot once (the screen uses it when you pick a sound or sample) |
+| `ockm-samples-scan` | Count the files in each sample folder again. Answer: `ockm-sample-counts` with 7 numbers, in the order kick snare clap perc hat open-hat tom |
 | `ockm-<slot>-verb` | How much of that slot goes to the reverb, 0 to 1 |
 | `ockm-<slot>-delay` | How much of that slot goes to the delay, 0 to 1 |
 | `ockm-<synth>-verb`, `ockm-<synth>-delay` | Reverb and delay sends for bass, lead and chord |
@@ -325,11 +328,20 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 
 ## Drums
 
-Eight drum slots, d1 to d8. Each slot can play any of 8 sounds: 0 kick, 1 snare, 2 clap, 3 perc 1, 4 closed hat, 5 open hat, 6 tom, 7 perc 2 (until sample playback lands, perc 1 is a short rim and perc 2 a 909-style rimshot; the old cowbell is in `sketches/`). Only the chosen sound runs. The default line-up is kick, snare, clap, closed hat, open hat, rimshot, rim and tom.
+Eight drum slots, d1 to d8. Each slot can play any of 8 sounds: 0 kick, 1 snare, 2 clap, 3 perc 1, 4 closed hat, 5 open hat, 6 tom, 7 perc 2. Perc 1's synth sound is a short rim and perc 2's a 909-style rimshot (the old cowbell is in `sketches/`). Only the chosen sound runs. The default line-up is kick, snare, clap, closed hat, open hat, perc 2, perc 1 and tom.
 
 Each step can be off, on or accented. Accented steps play at full strength. Normal steps play at full strength minus the accent amount. For now, accents are set with the `ockm-edit` hook. The squares show on or off only, until the touchscreen work.
 
-Slot sounds, tune, decay, level and sends are part of the drum kit, which is saved with the project and shared by every pattern.
+Slot sounds, samples, tune, decay, level and sends are part of the drum kit, which is saved with the project and shared by every pattern.
+
+### Samples
+
+Each slot plays either its built-in synth sound or a sample from that sound's folder in `samples/` (perc 1 and perc 2 share `perc`). On the drums tab, the sample box under the steps picks it: the arrows step through the folder (the first step back is "synth"), each change plays the new sound, and tapping the box plays it again. **New kit** picks a random sample for every slot that has some.
+
+- Samples are numbered in file-name order, so `01.wav` is sample 1. WAV and AIFF, mono or stereo (only the left channel plays), any sample rate
+- Tune changes the playback speed, like an MPC: +12 is an octave up and twice as short. Decay below 100 fades the tail early; at 100 or more the whole sample plays
+- Files added while it's running show up next time you open the drums tab
+- `tools/pick_samples.py` fills the folders from a big sample library: 20 per sound, grouped by source, with `samples/sources.csv` (kept out of git) saying where each came from
 
 ## Bass and lead engines
 

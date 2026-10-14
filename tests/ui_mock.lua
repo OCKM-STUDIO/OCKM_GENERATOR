@@ -65,6 +65,7 @@ local function engine(name, sel, atoms)
     projects = projects or { "default" }; projects[#projects + 1] = atoms[1]; pd.send("ockm-project-name", "symbol", { atoms[1] })
   end
   if name == "ockm-song-list" then pd.send("ockm-song-show", sel == "bang" and "bang" or "list", atoms) end
+  if name == "ockm-samples-scan" then pd.send("ockm-sample-counts", "list", { 20, 20, 21, 19, 20, 20, 17 }) end
   if name == "ockm-project-open" then pd.send("ockm-project-name", "symbol", { atoms[1] }) end
 end
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.36 (14 October 2026)
+
+- **Drum samples.** Each slot can play a sample from its sound's folder instead of the synth sound. Pick it on the drums tab: arrows step through the folder, each change plays it, tap the box to hear it again
+- **New kit** button: a random sample for every slot that has some
+- The kit, samples included, belongs to the project
+- Tune works like an MPC (playback speed), decay trims the tail, level and sends work as before
+- The slot buttons show the sample number, e.g. "kick 03"
+- Opening a project now resets project settings to their defaults first, so a setting missing from an older project file doesn't carry over from the last one
+
 ## v0.35 (14 October 2026)
 
 - Rim and rimshot are now **perc 1** and **perc 2**. Both pick from one shared `samples/perc` folder, so you can mix and match

@@ -4,7 +4,8 @@ One folder per drum sound: kick, snare, clap, perc, hat, open-hat, tom. Perc 1 a
 
 - WAV or AIFF, 16 or 24 bit, 44.1 or 48 kHz. Mono is best for drums
 - Short one-shots, trimmed so the hit starts right at the beginning of the file
-- Names show on the screen, so keep them short and clear: `909-tight.wav`, not `KICK_FINAL_v2 (1).wav`
+- The screen shows samples by number, in file-name order: `01.wav` is sample 1. Numbering your files keeps it predictable
+- Mono or stereo (only the left channel plays), any sample rate
 - Up to about 64 per folder keeps browsing quick on the 10-inch screen
 
 Audio files in here aren't saved to git (they're big). Back the folder up yourself.

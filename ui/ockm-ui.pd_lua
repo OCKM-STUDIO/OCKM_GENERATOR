@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.35"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.36"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
@@ -36,6 +36,9 @@ local SLOTS   = { "d1","d2","d3","d4","d5","d6","d7","d8" }
 local SOUNDS  = { "kick","snare","clap","perc 1","closed hat","open hat","tom","perc 2" }
 local START = { bass = "start the bass line", lead = "start a melody", chord = "start the chords" }
 local SHORT   = { "kick","snare","clap","perc 1","hat","open hat","tom","perc 2" }
+-- sample folders (same order as ockm-sample-counts), and which folder each sound plays from
+local FOLDERS   = { "kick","snare","clap","perc","hat","open hat","tom" }
+local SOUND_DIR = { 1, 2, 3, 4, 5, 6, 7, 4 }   -- perc 1 and perc 2 share the perc folder
 local SYNTHS  = { "bass","lead","chord" }
 local TRACKS  = { "d1","d2","d3","d4","d5","d6","d7","d8","bass","lead","chord" }
 local NOTES   = { "C","C#","D","D#","E","F","F#","G","G#","A","A#","B" }
@@ -82,7 +85,8 @@ local NOT_CHANGES = { ["ockm-play"]=1, ["ockm-want"]=1, ["ockm-page"]=1, ["ockm-
   ["ockm-project-list"]=1, ["ockm-project-open"]=1, ["ockm-project-new"]=1, ["ockm-project-saveas"]=1, ["ockm-project-delete"]=1,
   ["ockm-resync"]=1, ["ockm-filter"]=1, ["ockm-filter-glide"]=1, ["ockm-delay-throw"]=1 }
 local function psend(name, sel, atoms)
-  if UI_NOW and not NOT_CHANGES[name] and not name:match("%-mute$") and not name:match("%-solo$") then UI_NOW.unsaved = true end
+  if UI_NOW and not NOT_CHANGES[name] and not name:match("%-mute$") and not name:match("%-solo$") and not name:match("%-audition$")
+     and name ~= "ockm-samples-scan" then UI_NOW.unsaved = true end
   pd["send"](name, sel, atoms)
 end
 local function clamp(v, lo, hi) if v < lo then return lo elseif v > hi then return hi end return v end
@@ -128,7 +132,7 @@ function ui:defaults()
   for i, nm in ipairs(SLOTS) do
     v["ockm-"..nm.."-sound"] = ({0,1,2,4,5,7,3,6})[i]
     v["ockm-"..nm.."-level"] = 1; v["ockm-"..nm.."-tune"] = 0; v["ockm-"..nm.."-decay"] = 100
-    v["ockm-"..nm.."-verb"] = 0; v["ockm-"..nm.."-delay"] = 0
+    v["ockm-"..nm.."-verb"] = 0; v["ockm-"..nm.."-delay"] = 0; v["ockm-"..nm.."-sample"] = 0
   end
   for _, t in ipairs(SYNTHS) do
     for _, k in ipairs({"engine","k1","k2","k3","k4","drive","verb","delay","rhythm","notes","type","prog"}) do v["ockm-"..t.."-"..k] = 0 end
@@ -139,7 +143,7 @@ function ui:hooks()
   local h = { "ockm-bpm","ockm-len","ockm-root","ockm-scale","ockm-filter" }
   for _, nm in ipairs(SLOTS) do
     for _, p in ipairs(DRUM_PARAMS) do h[#h+1] = "ockm-"..nm.."-"..p[1] end
-    h[#h+1] = "ockm-"..nm.."-sound"
+    h[#h+1] = "ockm-"..nm.."-sound"; h[#h+1] = "ockm-"..nm.."-sample"
   end
   for _, t in ipairs({"bass","lead"}) do
     for _, k in ipairs({"engine","k1","k2","k3","k4","drive","verb","delay","rhythm","notes"}) do h[#h+1] = "ockm-"..t.."-"..k end
@@ -184,7 +188,12 @@ function ui:postinitialize()
   end)
   self.roleclock = pd.Clock:new():register(self, "check_roles")
   listen("ockm-refresh", function(o) if o.roleclock then o.roleclock:delay(0) end end)
-  listen("ockm-patterns-exist", function(o, sel, a) o.exists = math.floor(tonumber(a[1]) or 1); o:dirty() end)
+  listen("ockm-sample-counts", function(o, sel, a)
+    o.scount = {}
+    for k = 1, #FOLDERS do o.scount[k] = math.floor(tonumber(a[k]) or 0) end
+    o:dirty()
+  end)
+  listen("ockm-patterns-exist",function(o, sel, a) o.exists = math.floor(tonumber(a[1]) or 1); o:dirty() end)
   for _, n in ipairs({ "ockm-saved", "ockm-revert", "ockm-project-name" }) do listen(n, function(o) o.unsaved = false; o:dirty() end) end
   listen("ockm-song-show", function(o, sel, a)
     local l = {}
@@ -220,12 +229,39 @@ function ui:postinitialize()
   listen("ockm-ui-test", function(o, sel, a) o:test(sel, a) end)
   self.clock = pd.Clock:new():register(self, "redraw")
   self.msgclock = pd.Clock:new():register(self, "clear_msg")
+  self.audclock = pd.Clock:new():register(self, "audition")
+end
+
+-- play a drum slot once. After a sample change it waits a moment, so the new file is loaded first
+function ui:audition(slot)
+  local s = slot or self.aud_slot
+  if s then psend("ockm-"..SLOTS[s].."-audition", "float", { 1 }) end
+end
+function ui:audition_soon(slot) self.aud_slot = slot; if self.audclock then self.audclock:delay(30) end end
+function ui:sample_count(slot)
+  local snd = math.floor(self.v["ockm-"..SLOTS[slot].."-sound"] or 0)
+  return (self.scount or {})[SOUND_DIR[snd + 1]] or 0
+end
+function ui:set_sample(slot, n)
+  self:send("ockm-"..SLOTS[slot].."-sample", n)
+  self:audition_soon(slot)
+end
+-- a fresh kit: a random sample for every slot whose folder has any
+function ui:random_kit()
+  local n = 0
+  for i = 1, 8 do
+    local c = self:sample_count(i)
+    if c > 0 then self:send("ockm-"..SLOTS[i].."-sample", math.random(1, c)); n = n + 1 end
+  end
+  if n == 0 then self:say("no samples yet: add some to the samples folder")
+  else self:say("new kit: " .. n .. " samples picked (back to last save undoes it)") end
 end
 
 function ui:finalize()
   for _, r in ipairs(self.recv or {}) do r:destruct() end
   if self.clock then self.clock:destruct() end
   if self.msgclock then self.msgclock:destruct() end
+  if self.audclock then self.audclock:destruct() end
   for _, t in pairs(self.tables) do if t.destruct then t:destruct() end end
 end
 
@@ -454,6 +490,7 @@ function ui:open(screen)
   self.screen = screen
   self.pick, self.confirm, self.sheet = nil, nil, nil
   if screen == "project" then psend("ockm-project-list", "bang", {}) end
+  if screen == "drums" then psend("ockm-samples-scan", "bang", {}) end   -- pick up files added since
   self.sel_step = 0
   self:set_page(self:play_block())
 end
@@ -474,8 +511,10 @@ function ui:layout_drums(add)
   local tw = (W - 32 - 7 * 8) / 8
   -- which drum: the 8 slots, named by their sound
   for i = 1, 8 do
+    local smp = math.floor(self.v["ockm-"..SLOTS[i].."-sample"] or 0)
     add{ kind="choice", x=16 + (i - 1) * (tw + 8), y=114, w=tw, h=40,
-         label=SHORT[(self.v["ockm-"..SLOTS[i].."-sound"] or 0) + 1], sel=(i == self.slot), tap=function() self.slot = i end }
+         label=SHORT[(self.v["ockm-"..SLOTS[i].."-sound"] or 0) + 1] .. (smp > 0 and string.format(" %02d", smp) or ""),
+         sel=(i == self.slot), tap=function() self.slot = i end }
   end
   self:step_row(add, D_STEP_Y, D_STEP_H, "dstep")
   add{ kind="key", x=W - 16 - 300, y=276, w=300, h=12 }
@@ -483,12 +522,30 @@ function ui:layout_drums(add)
   add{ kind="text", x=16, y=276, w=200, h=12, label="sound", size=10 }
   for s = 0, 7 do
     add{ kind="choice", x=16 + s * (tw + 8), y=290, w=tw, h=44, label=SOUNDS[s + 1], accent=true,
-         sel=(self.v["ockm-"..nm.."-sound"] == s), tap=function() self:send("ockm-"..nm.."-sound", s) end }
+         sel=(self.v["ockm-"..nm.."-sound"] == s), tap=function()
+           self:send("ockm-"..nm.."-sound", s)
+           -- same sample number in the new folder, unless that folder has fewer
+           local smp, c = math.floor(self.v["ockm-"..nm.."-sample"] or 0), self:sample_count(self.slot)
+           if smp > c then self:send("ockm-"..nm.."-sample", c) end
+           self:audition_soon(self.slot)
+         end }
   end
   -- this slot's sound on the left, grooves for the whole kit on the right
   local half = (W - 48) / 2
+  -- sample: 0 is the built-in synth sound, then the files in this sound's folder. Tap the box to hear it
+  local slot, smp, cnt = self.slot, math.floor(self.v["ockm-"..nm.."-sample"] or 0), self:sample_count(self.slot)
+  local folder = FOLDERS[SOUND_DIR[math.floor(self.v["ockm-"..nm.."-sound"] or 0) + 1]]
+  add{ kind="text", x=16, y=346, w=half, h=12, size=10,
+       label=(cnt == 0) and ("no samples in the " .. folder .. " folder yet: playing the synth sound") or "sample: tap to hear it, arrows to change" }
+  local bw = half - 44 * 2 - 12 - 84
+  add{ kind="arrow", x=16, y=362, w=44, h=36, dir=-1, on=(smp > 0), tap=function() if smp > 0 then self:set_sample(slot, smp - 1) end end }
+  add{ kind="preset", x=66, y=362, w=bw, h=36, inline=true, sel=(smp > 0),
+       num=(smp > 0) and string.format("%02d", smp) or "synth", label=(smp > 0) and ("of " .. cnt .. "  " .. folder) or "built-in sound",
+       tap=function() self:audition(slot) end }
+  add{ kind="arrow", x=66 + bw + 6, y=362, w=44, h=36, dir=1, on=(smp < cnt), tap=function() if smp < cnt then self:set_sample(slot, smp + 1) end end }
+  add{ kind="btn", x=16 + half - 84, y=362, w=84, h=36, label="new kit", small=true, tap=function() self:random_kit() end }
   for j, p in ipairs(DRUM_PARAMS) do
-    add{ kind="slider", x=16, y=350 + (j - 1) * 46, w=half, h=36, hook="ockm-"..nm.."-"..p[1], lo=p[2], hi=p[3], label=p[4] or p[1] }
+    add{ kind="slider", x=16, y=406 + (j - 1) * 36, w=half, h=30, hook="ockm-"..nm.."-"..p[1], lo=p[2], hi=p[3], label=p[4] or p[1] }
   end
   local gx = 16 + half + 16
   add{ kind="text", x=gx, y=346, w=half, h=12, label=self.msg or "grooves: tap one to fill all 8 drums", size=self.msg and 11 or 10, col=self.msg and "acc" or nil }

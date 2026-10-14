@@ -145,28 +145,112 @@ tonal_voice("voices/ockm-snare.pd","Snare: two tuned tones for the body plus fil
 tonal_voice("voices/ockm-rim.pd","Rim: two high tones \\, very short.",[500,1720],30,0.6,filt="hip~ 400")
 tonal_voice("voices/ockm-perc.pd","Perc: a 909-style rimshot. Two woody tones plus a sharp noise snap.",[330,820],60,0.4,filt="hip~ 200",noise=("hip~",3000,15,0.35))
 
+# ---------------- samples ----------------
+# One folder per drum sound. Perc 1 and perc 2 share the perc folder. Files are numbered in name order (01, 02...).
+SAMPLE_DIRS=["kick","snare","clap","perc","hat","open-hat","tom"]
+SOUND_DIR=["kick","snare","clap","perc","hat","open-hat","tom","perc"]   # by sound number
+AUDIO_EXT=["wav","WAV","aif","aiff","AIF","AIFF","Wav","Aif"]
+
+def audio_glob(p,x,y):
+    """[file glob] that only passes audio files. Returns (in, out): in takes a glob pattern, out gives each path (sorted)."""
+    g=p.add(f"#X obj {x} {y} file glob;"); u=p.add(f"#X obj {x} {y+25} unpack s f;"); t=p.add(f"#X obj {x} {y+50} t s s;")
+    hp=p.add(f"#X obj {x+150} {y+175} symbol;")
+    se=p.add(f"#X obj {x} {y+75} file splitext;"); ls=p.add(f"#X obj {x} {y+100} list split 1;"); lt=p.add(f"#X obj {x+60} {y+125} list trim;")
+    ro=p.add(f"#X obj {x+60} {y+150} route "+" ".join(AUDIO_EXT)+";"); tb=p.add(f"#X obj {x+60} {y+175} t b;")
+    for c in [(g,0,u,0),(u,0,t,0),(t,1,hp,1),(t,0,se,0),(se,0,ls,0),(ls,1,lt,0),(lt,0,ro,0),(tb,0,hp,0)]: p.con(*c)
+    for k in range(len(AUDIO_EXT)): p.con(ro,k,tb,0)
+    return g,hp
+
+def samples_base(p,x,y,trig,outlet):
+    """trig's bang -> this abstraction's folder/../samples, as a symbol out of the returned object"""
+    m=p.add(f"#X msg {x} {y} dir;"); pc=p.add(f"#X obj {x} {y+25} pdcontrol;")
+    la=p.add(f"#X obj {x} {y+50} list append ../samples;"); fj=p.add(f"#X obj {x} {y+75} file join;")
+    p.con(trig,outlet,m,0); p.con(m,0,pc,0); p.con(pc,0,la,0); p.con(la,0,fj,0)
+    return fj
+
+# sample player for one drum slot: ockm-<slot>-sample 0 = the synth sound, n = the nth file in that sound's folder
+p=P(); header_text(p,"Sample player for one drum slot. ockm-<slot>-sample n loads the nth file from samples/<sound folder>. Tune = playback speed \\, decay cuts the tail \\, level scales.")
+inl=p.add("#X obj 30 50 inlet;")
+lb=p.add("#X obj 600 50 loadbang;"); tlb=p.add("#X obj 600 75 t b b;"); p.con(lb,0,tlb,0)
+base=samples_base(p,700,100,tlb,1)
+lp=p.add("#X obj 600 300 list prepend;"); bl=p.add("#X obj 700 200 list;"); p.con(base,0,bl,0); p.con(bl,0,lp,1)
+rs=p.add(f"#X obj 600 150 r ockm-{D}1-sound;"); fs=p.add("#X obj 600 200 f;"); ts=p.add("#X obj 600 175 t b f;")
+rn=p.add(f"#X obj 800 150 r ockm-{D}1-sample;"); tn=p.add("#X obj 800 175 t b f f;"); fn=p.add("#X obj 900 230 f;")
+dl=p.add("#X obj 900 200 delay 2;"); tl=p.add("#X obj 900 225 t b b;"); z0=p.add("#X msg 1000 250 0;")
+mo=p.add("#X obj 900 255 moses 1;"); tsf=p.add("#X obj 960 280 t b;")
+sel=p.add("#X obj 600 230 sel "+" ".join(str(i) for i in range(8))+";")
+for c in [(rs,0,ts,0),(ts,1,fs,1),(ts,0,dl,0),(rn,0,tn,0),(tn,2,fn,1),(tn,0,dl,0),(tlb,0,dl,0),(dl,0,tl,0),(tl,1,z0,0),(tl,0,fn,0),(fn,0,mo,0),(mo,1,tsf,0),(tsf,0,fs,0),(fs,0,sel,0)]: p.con(*c)
+la=p.add("#X obj 600 330 file join;")
+for i,d in enumerate(SOUND_DIR):
+    m=p.add(f"#X msg {600+i*60} 265 list {d} *;"); p.con(sel,i,m,0); p.con(m,0,lp,0)
+p.con(lp,0,la,0)
+tp=p.add("#X obj 600 355 t s b;"); cnt=p.add("#X obj 700 500 f;"); inc=p.add("#X obj 750 500 + 1;"); tc=p.add("#X obj 700 525 t f f;")
+z1=p.add("#X msg 760 380 0;"); eq=p.add("#X obj 700 550 ==;"); s1=p.add("#X obj 700 575 sel 1;")
+gi,go=audio_glob(p,600,380)
+tbs=p.add("#X obj 600 600 t b s;"); hp2=p.add("#X obj 600 650 symbol;")
+for c in [(la,0,tp,0),(tp,1,z1,0),(z1,0,cnt,1),(tp,0,gi,0),(go,0,tbs,0),(tbs,1,hp2,1),(tbs,0,cnt,0),(cnt,0,inc,0),(inc,0,tc,0),(tc,1,cnt,1),(tc,0,eq,0),(tn,1,eq,1),(s1,0,hp2,0),(eq,0,s1,0)]: p.con(*c)
+lat=p.add(f"#X obj 600 680 list append {D}0-smp;"); lpr=p.add("#X obj 600 705 list prepend read -resize;"); ltr=p.add("#X obj 600 730 list trim;")
+sf=p.add("#X obj 600 755 soundfiler;"); ui_=p.add("#X obj 700 780 unpack f;"); p.add(f"#X obj 900 700 table {D}0-smp;")
+for c in [(hp2,0,lat,0),(lat,0,lpr,0),(lpr,0,ltr,0),(ltr,0,sf,0)]: p.con(*c)
+# hit: vel -> (length ms at this speed, amplitude, when to fade, sample count)
+ex=p.add(f"#X obj 30 120 expr {D}f2/max({D}f3\\,1)*1000/pow(2\\,{D}f4/12) \\; {D}f1*{D}f6*0.8 \\; {D}f2/max({D}f3\\,1)*1000/pow(2\\,{D}f4/12)*min({D}f5\\,100)/100 \\; {D}f2;")
+init=p.add("#X msg 200 75 44100;"); p.con(tlb,1,init,0); p.con(init,0,ex,2)
+il=p.add("#X msg 260 75 1;"); p.con(tlb,1,il,0); p.con(il,0,ex,5)
+idc=p.add("#X msg 300 75 100;"); p.con(tlb,1,idc,0); p.con(idc,0,ex,4)
+p.con(z0,0,ex,1); p.con(sf,0,ex,1); p.con(sf,1,ui_,0); p.con(ui_,0,ex,2)
+t_,d_,l_=hooks(p,200,20); p.con(t_,0,ex,3); p.con(d_,0,ex,4); p.con(l_,0,ex,5)
+p.con(inl,0,ex,0)
+pk=p.add("#X obj 30 160 pack f f f f;")
+for k in range(4): p.con(ex,k,pk,k)
+tll=p.add("#X obj 30 185 t l l;"); mph=p.add(f"#X msg 150 210 1 \\, {D}4 {D}1;"); mam=p.add(f"#X msg 30 210 {D}2 \\, 0 4 {D}3;")
+vph=p.add("#X obj 150 240 vline~;"); trd=p.add(f"#X obj 150 270 tabread4~ {D}0-smp;"); vam=p.add("#X obj 30 240 vline~;")
+mul=p.add("#X obj 30 300 *~;"); out=p.add("#X obj 30 340 outlet~;")
+for c in [(pk,0,tll,0),(tll,1,mph,0),(tll,0,mam,0),(mph,0,vph,0),(vph,0,trd,0),(mam,0,vam,0),(trd,0,mul,0),(vam,0,mul,1),(mul,0,out,0)]: p.con(*c)
+p.save("voices/ockm-sampler.pd","#N canvas 150 150 1300 820 12;")
+
+# the sample library: counts the files in each folder for the screen (ockm-sample-counts, in SAMPLE_DIRS order)
+p=P(); header_text(p,"Sample library: counts the audio files in each samples folder. ockm-samples-scan to count again. Answers ockm-sample-counts "+" ".join(SAMPLE_DIRS)+".")
+lb=p.add("#X obj 30 50 loadbang;"); tlb=p.add("#X obj 30 75 t b b;"); rsc=p.add("#X obj 130 50 r ockm-samples-scan;"); p.con(lb,0,tlb,0)
+base=samples_base(p,400,50,tlb,1)
+nd=len(SAMPLE_DIRS)
+tall=p.add("#X obj 30 150 t "+" ".join(["b"]*nd)+";"); p.con(tlb,0,tall,0); p.con(rsc,0,tall,0)
+pkc=p.add("#X obj 30 800 pack "+" ".join(["0"]*nd)+";"); p.con(pkc,0,p.add("#X obj 30 830 s ockm-sample-counts;"),0)
+for i,d in enumerate(SAMPLE_DIRS):
+    x=30+i*260
+    hb=p.add(f"#X obj {x} 200 symbol;"); p.con(base,0,hb,1); p.con(tall,i,hb,0)   # outlet 0 fires last, so kick (the hot inlet) goes last
+    la=p.add(f"#X obj {x} 225 list append {d} *;"); fj=p.add(f"#X obj {x} 250 file join;"); t3=p.add(f"#X obj {x} 275 t b s b;")
+    z=p.add(f"#X msg {x+150} 300 0;"); gi,go=audio_glob(p,x,320)
+    tb=p.add(f"#X obj {x} 560 t b;"); cnt=p.add(f"#X obj {x} 585 f;"); inc=p.add(f"#X obj {x+50} 585 + 1;"); rd=p.add(f"#X obj {x} 700 f;")
+    for c in [(hb,0,la,0),(la,0,fj,0),(fj,0,t3,0),(t3,2,z,0),(z,0,cnt,1),(z,0,rd,1),(t3,1,gi,0),(go,0,tb,0),(tb,0,cnt,0),(cnt,0,inc,0),(inc,0,cnt,1),(inc,0,rd,1),(t3,0,rd,0),(rd,0,pkc,i)]: p.con(*c)
+p.save("seq/ockm-samplelib.pd","#N canvas 150 150 1900 880 12;")
+
 # ---------------- drum slot: any of the 8 drum sounds ----------------
 SOUNDS=["ockm-kick","ockm-snare","ockm-clap","ockm-rim","ockm-hat","ockm-ohat","ockm-tom","ockm-perc"]
 SOUND_NAMES=["kick","snare","clap","perc 1","closed hat","open hat","tom","perc 2"]
 p=P()
-p.add("#X text 20 10 Drum slot: plays one of the 8 drum sounds (ockm-<slot>-sound 0-7). Only the chosen sound runs.;")
+p.add("#X text 20 10 Drum slot: plays one of the 8 drum sounds (ockm-<slot>-sound 0-7) \, or a sample when ockm-<slot>-sample is 1 or more. Only the one in use runs. ockm-<slot>-audition plays it once.;")
 inl=p.add("#X obj 30 50 inlet;")
+aud=p.add(f"#X obj 130 50 r ockm-{D}1-audition;")
+# which one runs: 8 = the sample player, otherwise the sound number
+ars=p.add(f"#X obj 500 20 r ockm-{D}1-sound;"); arn=p.add(f"#X obj 650 20 r ockm-{D}1-sample;"); atn=p.add("#X obj 650 45 t b f;")
+aex=p.add(f"#X obj 500 70 expr if({D}f2>0 \, 8 \, {D}f1);"); p.con(aex,0,p.add(f"#X obj 500 95 s {D}0-act;"),0)
+for c in [(ars,0,aex,0),(arn,0,atn,0),(atn,1,aex,1),(atn,0,aex,0)]: p.con(*c)
 summ=None
 outs=[]
-for k,v in enumerate(SOUNDS):
+for k,v in enumerate(SOUNDS+["ockm-sampler"]):
     sp=P()
     si=sp.add("#X obj 20 20 inlet;"); sg=sp.add("#X obj 20 50 spigot;"); vo=sp.add(f"#X obj 20 80 {v} {D}1;"); so=sp.add("#X obj 20 110 outlet~;")
-    rs=sp.add(f"#X obj 200 20 r ockm-{D}1-sound;"); eq=sp.add(f"#X obj 200 50 == {k};"); tf=sp.add("#X obj 200 80 t f f;"); sw=sp.add("#X obj 200 110 switch~;")
+    rs=sp.add(f"#X obj 200 20 r {D}0-act;"); eq=sp.add(f"#X obj 200 50 == {k};"); tf=sp.add("#X obj 200 80 t f f;"); sw=sp.add("#X obj 200 110 switch~;")
     for c in [(si,0,sg,0),(sg,0,vo,0),(vo,0,so,0),(rs,0,eq,0),(eq,0,tf,0),(tf,1,sw,0),(tf,0,sg,1)]: sp.con(*c)
     p.L.append(sp.text(f"#N canvas 0 0 420 160 s{k} 0;").rstrip("\n"))
     o=p.add(f"#X restore {30+k*90} 100 pd s{k};")
-    p.con(inl,0,o,0); outs.append(o)
-    p.add(f"#X text {30+k*90} 125 {k} {SOUND_NAMES[k].split()[0]};")
+    p.con(inl,0,o,0); p.con(aud,0,o,0); outs.append(o)
+    p.add(f"#X text {30+k*90} 125 {k} {(SOUND_NAMES+['sample'])[k].split()[0]};")
 prev=outs[0]
 for o in outs[1:]:
     a=p.add("#X obj 30 200 +~;"); p.con(prev,0,a,0); p.con(o,0,a,1); prev=a
 out=p.add("#X obj 30 260 outlet~;"); p.con(prev,0,out,0)
-p.save("voices/ockm-drum.pd","#N canvas 180 180 800 300 12;")
+p.save("voices/ockm-drum.pd","#N canvas 180 180 900 300 12;")
 
 # ---------------- drum row (up to 128 steps, shown 16 at a time) ----------------
 p=P()
@@ -267,7 +351,7 @@ PROJECT_KEYS=[("ockm-bpm",124,"ockm-tempo"),("ockm-volume",1,None),("ockm-accent
     ("ockm-verb-size",0.6,None),("ockm-verb-tone",0.5,None),("ockm-sync",0,None),("ockm-clock-out",1,None),
     ("ockm-song-mode",0,None),("ockm-song-loop",1,None)]
 for nm,snd in SLOTS:
-    PROJECT_KEYS+=[(f"ockm-{nm}-sound",snd,None),(f"ockm-{nm}-tune",0,None),(f"ockm-{nm}-decay",100,None),
+    PROJECT_KEYS+=[(f"ockm-{nm}-sound",snd,None),(f"ockm-{nm}-sample",0,None),(f"ockm-{nm}-tune",0,None),(f"ockm-{nm}-decay",100,None),
                    (f"ockm-{nm}-level",1,None),(f"ockm-{nm}-verb",VERB[snd],None),(f"ockm-{nm}-delay",DLY[snd],None)]
 SYNTH_DEFAULTS={"bass":dict(engine=0,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.37,k2=0.9,k3=0.31,k4=0.55,drive=0,verb=0,delay=0,rhythm=3,notes=3),
                 "lead":dict(engine=4,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0.2,delay=0.25,rhythm=8,notes=12),
@@ -359,6 +443,7 @@ for r,(nm,snd) in enumerate(SLOTS):
     y=380+r*40
     p.add(f"#X text 20 {y+2} {nm} {SOUND_NAMES[snd].replace(' ','-')};")
     row=p.add(f"#X obj 110 {y} ockm-row {nm};"); v=p.add(f"#X obj 560 {y+2} ockm-drum {nm};")
+    if r==0: p.add(f"#X obj 1200 {y} ockm-samplelib;")
     gt=p.add(f"#X obj 660 {y+2} ockm-gate {nm} nolevel;")
     p.con(pipe,0,row,0); p.con(row,0,v,0); p.con(v,0,gt,0); p.con(gt,0,mix,0); v=gt
     vs=p.add(f"#X obj 760 {y+2} *~ 0;"); vt=p.add(f"#X obj 830 {y+2} throw~ ockm-revbus;"); vr=p.add(f"#X obj 760 {y-18} r ockm-{nm}-verb;")
@@ -1344,7 +1429,9 @@ Y0=1450
 # read every file of the open project into the buffers, then play the project settings
 rra=q.add(f"#X obj 20 {Y0} r {D}0-readall;"); dr=holder("dir",20,Y0+50); q.con(rra,0,dr,0)
 tr9=q.add(f"#X obj 20 {Y0+75} t "+" ".join(["s"]*(SLOTN+1))+";"); q.con(dr,0,tr9,0)
-pj=joined(tr9,SLOTN,"project.txt",20,Y0+100); tpj=q.add(f"#X obj 20 {Y0+150} t b s;")
+pj=joined(tr9,SLOTN,"project.txt",20,Y0+100); tpj=q.add(f"#X obj 20 {Y0+150} t b s b;")
+# defaults first, so a setting missing from an older project.txt doesn't keep the last project's value
+dfj=q.add(f"#X msg 400 {Y0+175} "+" \\, ".join(["clear"]+[f"add {h} {_fmtv(d)}" for h,d,_ in PROJECT_KEYS])+" \\, rewind \\, bang;"); q.con(tpj,2,dfj,0); q.con(dfj,0,saj,0)
 cmd(tpj,1,"read",80,Y0+175,saj); rwb=q.add(f"#X msg 20 {Y0+225} rewind \\, bang;"); q.con(pj,0,tpj,0); q.con(tpj,0,rwb,0); q.con(rwb,0,saj,0)
 for n in range(SLOTN):
     x=240+n*140; pf=joined(tr9,SLOTN-1-n,f"p{n+1}.txt",x,Y0+100)
@@ -1581,8 +1668,7 @@ def build_project(reset=False, demo=False):
 build_project(reset=args.reset_patterns, demo=args.demo)
 
 # ================= sample folders =================
-# One folder per drum sound. Drop WAV or AIFF files in; the drums will pick them up once sample playback is built.
-SAMPLE_DIRS=["kick","snare","clap","perc","hat","open-hat","tom"]
+# One folder per drum sound (SAMPLE_DIRS, near the voices). Drop WAV or AIFF files in and pick them on the drums tab.
 def build_samples():
     base=os.path.join(R,"samples")
     for d in SAMPLE_DIRS: os.makedirs(os.path.join(base,d),exist_ok=True)
@@ -1594,7 +1680,8 @@ One folder per drum sound: """+", ".join(SAMPLE_DIRS)+""". Perc 1 and perc 2 bot
 
 - WAV or AIFF, 16 or 24 bit, 44.1 or 48 kHz. Mono is best for drums
 - Short one-shots, trimmed so the hit starts right at the beginning of the file
-- Names show on the screen, so keep them short and clear: `909-tight.wav`, not `KICK_FINAL_v2 (1).wav`
+- The screen shows samples by number, in file-name order: `01.wav` is sample 1. Numbering your files keeps it predictable
+- Mono or stereo (only the left channel plays), any sample rate
 - Up to about 64 per folder keeps browsing quick on the 10-inch screen
 
 Audio files in here aren't saved to git (they're big). Back the folder up yourself.

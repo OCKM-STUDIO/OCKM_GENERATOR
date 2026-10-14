@@ -602,7 +602,7 @@ def touchscreen_screens_draw(work):
         raise Skip("Pillow not installed")
     p = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_preview.py"), os.path.join(work, "preview")], capture_output=True, text=True)
     assert p.returncode == 0, p.stderr[-800:]
-    assert len(os.listdir(os.path.join(work, "preview"))) == 15, "expected fifteen screen pictures"
+    assert len(os.listdir(os.path.join(work, "preview"))) == 16, "expected sixteen screen pictures"
 
 @test
 def mute_solo_and_levels(work):
@@ -1040,6 +1040,77 @@ def ui_preview_shapes():
             depth -= 1
             if depth == 0: progs.append([(int(d), int(b)) for d, b in re.findall(r"\{ (\d+), (\d+) \}", cur)]); cur = ""
     return progs
+
+def write_tone(path, hz, secs, sr=44100, channels=1):
+    w = wave.open(path, "w"); w.setnchannels(channels); w.setsampwidth(2); w.setframerate(sr)
+    n = int(secs * sr)
+    fr = [int(20000 * math.sin(2 * math.pi * hz * i / sr) * (1 - i / n)) for i in range(n)]
+    w.writeframes(b"".join(struct.pack("<" + "h" * channels, *([v] * channels)) for v in fr)); w.close()
+
+def raw_hz(x, sr):
+    """pitch of a clean tone: upward zero crossings, no smoothing"""
+    z = sum(1 for i in range(1, len(x)) if x[i - 1] < 0 <= x[i])
+    return z / (len(x) / sr)
+
+@test
+def samples_load_and_play_on_drum_slots(work):
+    kd = os.path.join(work, "samples", "kick"); pd_ = os.path.join(work, "samples", "perc")
+    write_tone(os.path.join(kd, "01.wav"), 440, 0.4, sr=48000, channels=2)   # stereo, 48k: still plays at the right pitch
+    write_tone(os.path.join(kd, "02.wav"), 880, 0.4)
+    open(os.path.join(kd, "02.wav.asd"), "w").write("not audio")              # Ableton leaves these about
+    write_tone(os.path.join(pd_, "01.wav"), 660, 0.3)
+    h = Harness(); h.show("ockm-sample-counts")
+    h.at(200, "ockm-samples-scan bang")
+    h.record(os.path.join(work, "smp.wav"))
+    h.at(300, "ockm-d1-sound 0 ; ockm-d1-sample 1 ; ockm-d1-verb 0 ; ockm-d1-delay 0")
+    h.at(400, "ockm-d1-audition 1")            # 440
+    h.at(1000, "ockm-d1-sample 2")
+    h.at(1100, "ockm-d1-audition 1")           # 880
+    h.at(1700, "ockm-d1-sample 1 ; ockm-d1-tune 12")
+    h.at(1800, "ockm-d1-audition 1")           # 440 an octave up
+    h.at(2400, "ockm-d1-tune 0 ; ockm-d1-decay 25")
+    h.at(2500, "ockm-d1-audition 1")           # cut short
+    h.at(3100, "ockm-d1-decay 100 ; ockm-d1-sample 0")
+    h.at(3200, "ockm-d1-audition 1")           # back to the synth kick
+    h.at(3800, "ockm-d1-sample 3")             # no third kick: silent, not the old sample
+    h.at(3900, "ockm-d1-audition 1")
+    out, (x, sr) = play(work, h, "t_samples", ms=4500)
+    counts = printed(out, "ockm-sample-counts")
+    assert counts and counts[-1].split()[:4] == ["2", "0", "0", "1"], f"sample counts wrong: {counts}"
+    t0 = 0.2   # recording starts at 200 ms
+    def seg(a, b): return x[int((a - t0) * sr):int((b - t0) * sr)]
+    f1 = raw_hz(seg(0.42, 0.6), sr); f2 = raw_hz(seg(1.12, 1.3), sr); f3 = raw_hz(seg(1.82, 1.9), sr)
+    assert 400 < f1 < 480, f"sample 1 should play at 440 Hz ({f1:.0f})"
+    assert 820 < f2 < 940, f"sample 2 should play at 880 Hz ({f2:.0f})"
+    assert 820 < f3 < 940, f"tune +12 should double the pitch ({f3:.0f})"
+    full, cut = peak(seg(0.65, 0.75)), peak(seg(2.65, 2.75))
+    assert full > 0.05 and cut < full * 0.2, f"decay 25 should cut the tail ({full:.2f} vs {cut:.2f})"
+    k = seg(3.22, 3.4); assert peak(k) > 0.05 and cycles_per_second(k, sr) < 200, "sample 0 should give the synth kick back"
+    assert peak(seg(3.92, 4.3)) < 0.01, "a missing sample should be silent"
+
+@test
+def touchscreen_picks_samples_and_kits(work):
+    """Drums tab: arrows step through the folder (and stop at the end), the box plays it, a new sound folder with
+    fewer files pulls the number back, and 'new kit' picks for every slot that has samples."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    kd = os.path.join(work, "samples", "kick")
+    write_tone(os.path.join(kd, "01.wav"), 110, 0.2); write_tone(os.path.join(kd, "02.wav"), 220, 0.2)
+    write_tone(os.path.join(work, "samples", "perc", "01.wav"), 330, 0.2)
+    h = Harness(); h.show("ockm-d1-sample", "ockm-d1-audition", "ockm-d6-sample", "ockm-d7-sample", "ockm-d1-sound")
+    h.at(100, "ockm-ui-test tap 414 36")      # drums tab: counts the folders
+    h.at(300, "ockm-ui-test tap 366 380")     # next sample: 1
+    h.at(500, "ockm-ui-test tap 366 380")     # 2
+    h.at(700, "ockm-ui-test tap 366 380")     # only 2 kicks: stays put
+    h.at(900, "ockm-ui-test tap 200 380")     # tap the box: hear it
+    h.at(1100, "ockm-ui-test tap 187 312")    # sound: snare. No snare samples, so back to the synth
+    h.at(1300, "ockm-ui-test tap 430 380")    # new kit: perc 1 and perc 2 get the perc sample
+    f = os.path.join(work, "t_samples_ui.pd"); h.finish(1500, f)
+    out = run(work, f)
+    d1 = [int(float(v)) for v in printed(out, "ockm-d1-sample")]
+    assert d1 == [1, 2, 0], f"sample steps wrong: {d1}"
+    assert len(printed(out, "ockm-d1-audition")) >= 3, f"should play on each change and on tapping the box: {printed(out, 'ockm-d1-audition')}"
+    assert printed(out, "ockm-d6-sample") == ["1"] and printed(out, "ockm-d7-sample") == ["1"], "new kit should give both perc slots a sample"
 
 def main():
     if not PD:
