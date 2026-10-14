@@ -131,6 +131,7 @@ Everything is remembered: drum kit, synth sounds, effects, tempo, swing, key and
 13. Your drum samples, chosen per slot
 14. Song mode, MPC style: a chain of patterns, each with a repeat count, played in order. Then a song generator that writes a starting chain (intro, build, drop, break, outro) for you to tweak
 15. Tighten up the logic and usability after a round of playing
+16. A settings screen for swing, accent amount and MIDI clock, so nothing needs the old test panel
 
 ## Decisions made
 
@@ -148,6 +149,7 @@ Everything is remembered: drum kit, synth sounds, effects, tempo, swing, key and
 - **Synthesised drums for now.** Samples can be swapped in later, one voice at a time.
 - **Projects and patterns saved as readable text files** in `projects/`, so saving works on the Pi without a keyboard.
 - **The drum kit belongs to the project; synth sounds belong to each pattern.** See "How it's organised".
+- **V1 is touchscreen only** (decided October 2026). The Pi box works like a dedicated iPad app: everything is reachable on the screen, landscape only. A hardware controller and MIDI mapping come in V2. An iPad app is a likely phase two: same Pd engine (via libpd), screens rebuilt natively.
 - **Song mode works like the MPC: one song per project** (decided October 2026). A song is a chain of steps, each a pattern plus how many times it repeats. A song/pattern switch sits by play.
 
 ## Parked ideas
