@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.28"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.29"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
@@ -79,7 +79,7 @@ end
 local UI_NOW
 local NOT_CHANGES = { ["ockm-play"]=1, ["ockm-want"]=1, ["ockm-page"]=1, ["ockm-save"]=1, ["ockm-revert"]=1, ["ockm-song-start"]=1,
   ["ockm-project-list"]=1, ["ockm-project-open"]=1, ["ockm-project-new"]=1, ["ockm-project-saveas"]=1, ["ockm-project-delete"]=1,
-  ["ockm-resync"]=1 }
+  ["ockm-resync"]=1, ["ockm-filter"]=1, ["ockm-filter-glide"]=1, ["ockm-delay-throw"]=1 }
 local function psend(name, sel, atoms)
   if UI_NOW and not NOT_CHANGES[name] and not name:match("%-mute$") and not name:match("%-solo$") then UI_NOW.unsaved = true end
   pd["send"](name, sel, atoms)
@@ -176,6 +176,11 @@ function ui:postinitialize()
   listen("ockm-playing", function(o, sel, a) o.playing = tonumber(a[1]) or 0; o:dirty() end)
   listen("ockm-project-name", function(o, sel, a) o.project = tostring(a[1] or "default"); o:dirty() end)
   listen("ockm-project-list-start", function(o) o.incoming = {} end)
+  listen("ockm-filter-now", function(o, sel, a)
+    local t = o.touch
+    if t and t.w and t.w.hook == "ockm-filter" then return end
+    o.v["ockm-filter"] = tonumber(a[1]) or 0; o:dirty()
+  end)
   listen("ockm-patterns-exist", function(o, sel, a) o.exists = math.floor(tonumber(a[1]) or 1); o:dirty() end)
   for _, n in ipairs({ "ockm-saved", "ockm-revert", "ockm-project-name" }) do listen(n, function(o) o.unsaved = false; o:dirty() end) end
   listen("ockm-song-show", function(o, sel, a)
@@ -403,12 +408,19 @@ function ui:layout_perform(add)
   local half = (W - 32 - 16) / 2
   local lx, rx = 16, 16 + half + 16
   add{ kind="text", x=rx, y=441, w=200, h=10, label="master fx", size=9 }
-  local MFX = { { "ockm-filter", -1, 1, "filter" }, { "ockm-drive", 0, 1, "drive" }, { "ockm-delay-mix", 0, 1, "delay" }, { "ockm-delay-fb", 0, 0.9, "feedback" },
-                { "ockm-delay-steps", 1, 8, "time" }, { "ockm-verb-mix", 0, 1, "reverb" }, { "ockm-verb-size", 0, 1, "size" }, { "ockm-verb-tone", 0, 1, "tone" } }
   local mw = (half - 3 * 6) / 4
-  for i, m in ipairs(MFX) do
-    local col, row = (i - 1) % 4, math.floor((i - 1) / 4)
-    add{ kind="hbar", x=rx + col * (mw + 6), y=456 + row * 68, w=mw, h=60, hook=m[1], lo=m[2], hi=m[3], label=m[4], bold=true }
+  -- top row: the filter (wide, springs back to off when you let go unless held), the dub throw, drive
+  local hold = self.filter_hold
+  add{ kind="hbar", x=rx, y=456, w=2 * mw + 6, h=60, hook="ockm-filter", lo=-1, hi=1, label=hold and "filter (held)" or "filter", bold=true, spring=not hold }
+  add{ kind="choice", x=rx + 2 * mw + 6 - 50, y=460, w=46, h=22, label="hold", small=true, sel=hold, tap=function()
+    self.filter_hold = not hold
+    if hold then psend("ockm-filter-glide", "list", { 0, 180 }) end
+  end }
+  add{ kind="pad", x=rx + 2 * (mw + 6), y=456, w=mw, h=60, hook="ockm-delay-throw", label="throw", sub="hold" }
+  add{ kind="hbar", x=rx + 3 * (mw + 6), y=456, w=mw, h=60, hook="ockm-drive", lo=0, hi=1, label="drive", bold=true }
+  local ROW2 = { { "ockm-delay-fb", 0, 0.9, "feedback" }, { "ockm-delay-steps", 1, 8, "time" }, { "ockm-verb-mix", 0, 1, "reverb" }, { "ockm-verb-size", 0, 1, "size" } }
+  for i, m in ipairs(ROW2) do
+    add{ kind="hbar", x=rx + (i - 1) * (mw + 6), y=524, w=mw, h=60, hook=m[1], lo=m[2], hi=m[3], label=m[4], bold=true }
   end
   local part = SYNTHS[self.perf_part or 1]
   local tw = (half - 2 * 6) / 3
@@ -974,8 +986,9 @@ function ui:layout_setup(add)
   local sync = math.floor(self.v["ockm-sync"] or 0)
   add{ kind="choice", x=16, y=420, w=half, h=52, label="lead: use my tempo, send clock out", sel=(sync == 0), tap=function() self:send("ockm-sync", 0) end }
   add{ kind="choice", x=24 + half, y=420, w=half, h=52, label="follow: play to incoming MIDI clock", sel=(sync == 1), tap=function() self:send("ockm-sync", 1) end }
-  add{ kind="text", x=16, y=496, w=W - 32, h=12, label="tempo, accents, volume and MIDI clock belong to the project. Save to keep them", size=10 }
-  add{ kind="text", x=16, y=516, w=W - 32, h=12, label="OCKM_GENERATOR " .. VERSION .. "  ·  project: " .. ockm_pretty(self.project), size=10 }
+  add{ kind="slider", x=16, y=484, w=W - 32, h=36, hook="ockm-verb-tone", lo=0, hi=1, label="reverb tone" }
+  add{ kind="text", x=16, y=532, w=W - 32, h=12, label="tempo, accents, volume, reverb tone and MIDI clock belong to the project. Save to keep them", size=10 }
+  add{ kind="text", x=16, y=552, w=W - 32, h=12, label="OCKM_GENERATOR " .. VERSION .. "  ·  project: " .. ockm_pretty(self.project), size=10 }
 end
 
 -- ------------------------------------------------------------------ projects
@@ -1185,7 +1198,7 @@ function ui:hit(x, y)
   for k = #L, 1, -1 do
     local w = L[k]
     if inside(w, x, y) and (w.tap or w.swipe or w.kind == "slider" or w.kind == "bpm" or w.kind == "vfader" or w.kind == "hbar" or w.kind == "ms"
-       or w.kind == "dstep" or w.kind == "mstep" or w.kind == "cstep") then return w end
+       or w.kind == "dstep" or w.kind == "mstep" or w.kind == "cstep" or w.kind == "pad") then return w end
   end
   return nil
 end
@@ -1194,7 +1207,8 @@ function ui:press(x, y)
   local w = self:hit(x, y)
   self.touch = { w = w, x0 = x, y0 = y, mode = nil }
   if not w then return end
-  if w.kind == "slider" or w.kind == "vfader" or w.kind == "hbar" then self.touch.mode = "slider"; self:slide(w, x, y)
+  if w.kind == "pad" then self.touch.mode = "pad"; self.pad_on = w.hook; psend(w.hook, "float", { 1 })
+  elseif w.kind == "slider" or w.kind == "vfader" or w.kind == "hbar" then self.touch.mode = "slider"; self:slide(w, x, y)
   elseif w.kind == "bpm" then self.touch.v0 = self.v["ockm-bpm"] or 124
   elseif w.kind == "mstep" or w.kind == "cstep" then
     self.touch.v0 = (w.kind == "mstep") and self:midi_to_deg(SYNTHS[self.part], self:mono_note_or_default(w.i))
@@ -1249,7 +1263,11 @@ function ui:release(x, y)
   self.touch = nil
   if not t or not t.w then return end
   local w = t.w
-  if t.mode == "swipe" then
+  if t.mode == "pad" then
+    self.pad_on = nil; psend(w.hook, "float", { 0 })
+  elseif t.mode == "slider" and w.spring then
+    psend("ockm-filter-glide", "list", { 0, 180 })     -- let go: glide back to off
+  elseif t.mode == "swipe" then
     local dx = x - t.x0
     self:set_page(self.page + ((dx < 0) and 1 or -1))
   elseif t.mode == nil and inside(w, x, y) then
@@ -1318,7 +1336,12 @@ end
 function ui:draw(g, w)
   local k = w.kind
   local th = self.theme
-  if k == "key" then
+  if k == "pad" then
+    local on = (self.pad_on == w.hook)
+    self:col(g, on and "acc" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
+    self:ctext(g, w.label, { x=w.x, y=w.y + 8, w=w.w, h=20 }, 14, on and "#ffffff" or "txt")
+    self:ctext(g, w.sub or "", { x=w.x, y=w.y + 32, w=w.w, h=16 }, 10, on and "#ffffff" or "mute")
+  elseif k == "key" then
     -- what the step colours mean
     local x = w.x + w.w - 290
     self:col(g, "on"); g:fill_rounded_rect(x, w.y, 12, 12, 3); self:text(g, "hit", x + 18, w.y - 1, 11, "mute", 40)

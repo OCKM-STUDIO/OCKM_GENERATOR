@@ -1,4 +1,4 @@
-ockm-len 64;
+ockm-len 16;
 ockm-swing 56;
 ockm-root 9;
 ockm-scale 0;

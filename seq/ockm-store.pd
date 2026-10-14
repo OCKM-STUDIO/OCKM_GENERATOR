@@ -49,7 +49,7 @@
 #X msg 260 144 add ockm-accent \$1;
 #X msg 480 144 set \$1;
 #X obj 560 144 s ockm-show-accent;
-#X obj 20 166 r ockm-filter;
+#X obj 20 166 r ockm-filter-now;
 #X obj 200 166 f 0;
 #X obj 420 166 f 0;
 #X msg 260 166 add ockm-filter \$1;

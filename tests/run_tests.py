@@ -556,7 +556,7 @@ def touchscreen_drives_the_engine(work):
     tap(280, 600, 236)                   # note picker: third note of the scale
     tap(290, 281, 36)                    # perform tab
     tap(300, 373, 88)                    # pattern 3 (navigation strip)
-    tap(310, 543, 486)                   # master fx: filter, middle
+    tap(310, 600, 486)                   # master fx: filter, middle
     tap(320, 441, 36)                    # compose tab
     tap(335, 283, 349)                   # chord column: next progression
     tap(340, 200, 486)                   # spice 3 (ninth)
@@ -761,6 +761,46 @@ def song_saved_with_the_project_and_patterns_copy(work):
     assert printed(out, "ockm-song-show") and printed(out, "ockm-song-show")[-1].split()[-4:] == ["2", "4", "0", "8"], f"the song should come back on reopening: {printed(out, 'ockm-song-show')} {open(os.path.join(work, 'projects', 'default', 'song.txt')).read()}"
     d1 = [[int(float(x)) for x in v.split()] for v in printed(out, "D1")]
     assert sum(d1[0]) > 0 and sum(d1[1]) == 0, f"copied pattern should play; clearing the playing pattern should empty it: {d1}"
+
+@test
+def dub_throw_rings_out_and_filter_springs_back(work):
+    """Hold the throw, let go and mute everything: the echoes keep ringing. Without a throw it goes quiet. The filter glides back to 0."""
+    def tail(throw):
+        h = Harness(); h.record(os.path.join(work, f"throw{throw}.wav"))
+        mutes = " ; ".join(f"ockm-{t}-mute 1" for t in ["d1","d2","d3","d4","d5","d6","d7","d8","bass","lead","chord"])
+        h.at(100, "ockm-delay-mix 0 ; ockm-delay-fb 0.6 ; ockm-verb-mix 0 ; ockm-play 1")
+        if throw: h.at(1000, "ockm-delay-throw 1")
+        h.at(1500, f"ockm-delay-throw 0 ; {mutes}")
+        h.at(2600, "ockm-play 0")
+        _, (snd, sr) = play(work, h, f"t_throw{throw}", ms=2600)
+        a, b = int(1.7 * sr), int(2.5 * sr)          # 0.2 to 1 s after letting go
+        return peak(snd[a:b])
+    rings, quiet = tail(1), tail(0)
+    assert rings > 0.02 and rings > 5 * max(quiet, 1e-4), f"the throw's echoes should ring out after letting go: {rings:.4f} vs {quiet:.4f}"
+    h = Harness(); h.show("ockm-filter-now")
+    h.at(100, "ockm-filter -0.8"); h.at(300, "ockm-filter-glide 0 180")
+    f = os.path.join(work, "t_spring.pd"); h.finish(700, f); out = run(work, f)
+    vals = [float(v.split()[-1]) for v in printed(out, "ockm-filter-now")]
+    assert min(vals) < -0.75 and abs(vals[-1]) < 1e-6, f"filter should reach -0.8 then glide back to 0: {vals[:3]} ... {vals[-3:]}"
+    mid = [v for v in vals if -0.7 < v < -0.1]
+    assert len(mid) >= 5, "the way back should be a glide, not a jump"
+
+@test
+def touchscreen_filter_springs_and_throw(work):
+    """On perform: sweep the filter and let go, it glides back to 0. With hold on it stays. The throw pad sends 1 then 0."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness(); h.show("ockm-filter-glide", "ockm-delay-throw", "ockm-filter-now")
+    h.at(100, "ockm-ui-test drag 600 486 520 486")          # sweep the filter left, let go
+    h.at(500, "ockm-ui-test tap 690 470")                   # hold on
+    h.at(550, "ockm-ui-test drag 600 486 520 486")          # sweep again, let go: it stays
+    h.at(900, "ockm-ui-test tap 773 486")                   # throw
+    f = os.path.join(work, "t_spring_ui.pd"); h.finish(1000, f)
+    out = run(work, f)
+    assert len(printed(out, "ockm-filter-glide")) == 1, f"only the first sweep should spring back: {printed(out, 'ockm-filter-glide')}"
+    now = [float(v.split()[-1]) for v in printed(out, "ockm-filter-now")]
+    assert min(now) < -0.3 and abs(now[-1]) > 0.3, f"held filter should stay where it was left: last {now[-3:]}"
+    assert [int(float(v.split()[-1])) for v in printed(out, "ockm-delay-throw")] == [1, 0], printed(out, "ockm-delay-throw")
 
 @test
 def blank_project_synths_start_and_sound(work):

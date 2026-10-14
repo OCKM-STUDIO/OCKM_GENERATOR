@@ -13,7 +13,6 @@ ockm-sync 0;
 ockm-clock-out 1;
 ockm-song-mode 0;
 ockm-song-loop 1;
-ockm-used 1;
 ockm-d1-sound 0;
 ockm-d1-tune 0;
 ockm-d1-decay 100;

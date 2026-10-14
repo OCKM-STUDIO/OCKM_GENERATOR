@@ -259,7 +259,7 @@ DLY=[0,0,0,0.25,0,0,0,0.3]                 # default delay send per sound
 MONO=["note","on","acc","slide"]; CHORD=["on","deg"]
 def show(h): return "ockm-show-"+h[5:]
 # Settings registry: (hook, default, hook the store listens to if different)
-PROJECT_KEYS=[("ockm-bpm",124,"ockm-tempo"),("ockm-volume",1,None),("ockm-accent",0.3,None),("ockm-filter",0,None),("ockm-drive",0,None),
+PROJECT_KEYS=[("ockm-bpm",124,"ockm-tempo"),("ockm-volume",1,None),("ockm-accent",0.3,None),("ockm-filter",0,"ockm-filter-now"),("ockm-drive",0,None),
     ("ockm-delay-mix",0.5,None),("ockm-delay-fb",0.4,None),("ockm-delay-steps",3,None),("ockm-verb-mix",0.5,None),
     ("ockm-verb-size",0.6,None),("ockm-verb-tone",0.5,None),("ockm-sync",0,None),("ockm-clock-out",1,None),
     ("ockm-song-mode",0,None),("ockm-song-loop",1,None)]
@@ -682,8 +682,11 @@ inl0=q.add("#X obj 30 30 inlet~;"); ctch=q.add("#X obj 150 30 catch~ ockm-revbus
 rvm=q.add("#X obj 300 30 r ockm-verb-mix;"); pre=q.add("#X obj 30 70 +~;"); inl=q.add("#X obj 30 90 +~;")
 dcat=q.add("#X obj 200 300 catch~ ockm-dlybus;")
 for c in [(inl0,0,pre,0),(ctch,0,verb,0),(verb,0,vm,0),(vm,0,pre,1),(rvm,0,vm,1),(pre,0,inl,0)]: q.con(*c)
+inl2=q.add("#X obj 30 100 +~;")   # plus the dub throw's echoes
 h1=q.add("#X obj 30 90 hip~ 10;"); h2=q.add("#X obj 30 115 hip~ 10;"); l1=q.add("#X obj 30 140 lop~ 20000;"); l2=q.add("#X obj 30 165 lop~ 20000;")
-rf=q.add("#X obj 300 50 r ockm-filter;")
+rf0=q.add("#X obj 300 20 r ockm-filter;"); pkf=q.add("#X obj 300 40 pack f 25;"); rgl=q.add("#X obj 400 20 r ockm-filter-glide;")
+rf=q.add("#X obj 300 60 line 0 5;"); tfn=q.add("#X obj 300 70 t f f;"); sfn=q.add("#X obj 420 70 s ockm-filter-now;")
+q.con(rf0,0,pkf,0); q.con(pkf,0,rf,0); q.con(rgl,0,rf,0); q.con(rf,0,tfn,0); q.con(tfn,1,sfn,0)
 fx=q.add(f"#X obj 300 80 expr if({D}f1>0 \\, 20*pow(2\\,{D}f1*9.6) \\, 10) \; if({D}f1<0 \\, 20000*pow(2\\,{D}f1*9.6) \\, 20000);")
 rdv=q.add("#X obj 300 200 r ockm-drive;"); dvx=q.add(f"#X obj 300 230 expr 1+{D}f1*9;")
 th=q.add(f"#X obj 30 230 expr~ if({D}f2>1.001 \\, tanh({D}v1*{D}f2)/sqrt({D}f2) \\, {D}v1);")   # drive 0 is clean
@@ -693,11 +696,17 @@ rst=q.add("#X obj 500 250 r ockm-stepms;"); rsteps=q.add("#X obj 620 250 r ockm-
 rfb=q.add("#X obj 500 330 r ockm-delay-fb;"); rmx=q.add("#X obj 500 380 r ockm-delay-mix;")
 tff=q.add("#X obj 620 280 t b f;"); fs=q.add("#X obj 500 220 f 121;")
 sm=q.add("#X obj 30 440 +~;"); lim=q.add(f"#X obj 30 470 expr~ if(abs({D}v1)<0.8 \\, {D}v1 \\, (0.8+0.2*tanh((abs({D}v1)-0.8)/0.2))*({D}v1/abs({D}v1)));"); out=q.add("#X obj 30 510 outlet~;")   # limiter: clean below 0.8
-for c in [(inl,0,h1,0),(h1,0,h2,0),(h2,0,l1,0),(l1,0,l2,0),(rf,0,fx,0),(fx,0,h1,1),(fx,0,h2,1),(fx,1,l1,1),(fx,1,l2,1),
+for c in [(inl,0,inl2,0),(inl2,0,h1,0),(h1,0,h2,0),(h2,0,l1,0),(l1,0,l2,0),(tfn,0,fx,0),(fx,0,h1,1),(fx,0,h2,1),(fx,1,l1,1),(fx,1,l2,1),
           (rdv,0,dvx,0),(dvx,0,th,1),(l2,0,th,0),(dcat,0,dw,0),(dr,0,fb,0),(fb,0,dw,0),(dr,0,mx,0),(mx,0,inl,1),
           (rst,0,fs,0),(fs,0,dtm,0),(rsteps,0,tff,0),(tff,1,dtm,1),(tff,0,fs,0),(dtm,0,dr,0),(rfb,0,fb,1),(rmx,0,mx,1),
           (th,0,lim,0),(lim,0,out,0)]: q.con(*c)
 q.add("#X text 500 410 delay time = step length x delay steps (3 = dotted 8th);")
+# dub throw: while held, the whole mix goes into its own echo line; let go and the echoes ring out
+rth=q.add("#X obj 700 450 r ockm-delay-throw;"); thm=q.add(f"#X msg 700 475 {D}1 15;"); thl=q.add("#X obj 700 500 line~;")
+ths=q.add("#X obj 600 525 *~;"); tdw=q.add(f"#X obj 600 600 delwrite~ {D}0-thr 4000;"); tdr=q.add(f"#X obj 600 550 delread~ {D}0-thr 363;")
+tfb=q.add("#X obj 700 575 *~ 0.4;"); tad=q.add("#X obj 600 575 +~;"); tgo=q.add("#X obj 600 640 *~ 0.8;")
+for c in [(rth,0,thm,0),(thm,0,thl,0),(pre,0,ths,0),(thl,0,ths,1),(ths,0,tad,0),(tdr,0,tfb,0),(tfb,0,tad,1),(tad,0,tdw,0),
+          (dtm,0,tdr,0),(rfb,0,tfb,1),(tdr,0,tgo,0),(tgo,0,inl2,1)]: q.con(*c)
 q.save("voices/ockm-fx.pd","#N canvas 140 140 900 560 12;")
 
 # ================= reverb =================

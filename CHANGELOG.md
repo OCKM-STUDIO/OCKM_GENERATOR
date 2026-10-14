@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.29 (14 October 2026)
+
+**Added**
+- The master filter springs back: let go and it glides back to off in about a fifth of a second, like the SP-404. **Hold** keeps it where you leave it
+- **Throw** pad: hold it to send the whole mix into its own echo line; let go and the echoes ring out at your delay time and feedback
+- The filter is smoothed in the engine, so sweeps and the spring back don't click
+
+**Changed**
+- Perform's master FX: a double-width filter with hold, throw, drive; then feedback, time, reverb, size
+- Reverb tone moved to setup. The ordinary delay level is on the mixer's master strip
+- Filter sweeps and throws don't count as unsaved changes
+
 ## v0.28 (14 October 2026)
 
 **Changed**

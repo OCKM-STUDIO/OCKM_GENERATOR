@@ -27,7 +27,10 @@ Tap a track's name on perform or the mixer to jump straight to it.
 - Tap a track's **name** to open it
 - **M** mutes a track and **S** solos it (several can be soloed at once). Silent tracks go dim. Mutes and solos are for playing live, so they aren't saved
 - **Bottom left, synth:** pick bass, lead or chord, then play its four main knobs (named for the engine it's using)
-- **Bottom right, master FX:** filter (centre is off: left is low-pass, right is high-pass), drive, delay level, feedback and time (in steps), reverb level, size and tone
+- **Bottom right, master FX**, played like an SP-404:
+  - **Filter** (double width): drag left for low-pass, right for high-pass. Let go and it glides back to off in a fifth of a second. Tap **hold** to make it stay where you leave it; tap hold again and it glides home
+  - **Throw** (hold the pad): sends the whole mix into its own echo line. Let go and the echoes ring out and fade, at the delay time and feedback you've set. The dub throw
+  - **Drive**, then delay **feedback** and **time** (in steps), reverb level and **size**. Reverb tone is in setup, and the normal delay level is on the mixer's master strip
 - These are bars: drag along them. The orange line shows the value
 - **Length** is in the navigation strip. Making a pattern longer repeats what's there
 - **Save** and **project**, top right
@@ -286,7 +289,10 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 | `ockm-<synth>-engine` | bass and lead: 0 acid, 1 sub, 2 FM, 3 reese, 4 pluck, 5 saw, 6 house. chord: 0 stab, 1 organ, 2 pad |
 | `ockm-<synth>-k1` to `-k4` | Synth knobs, 0 to 1. What they do depends on the engine (see below) |
 | `ockm-bass-drive`, `ockm-lead-drive` | Distortion, 0 to 1 |
-| `ockm-filter` | Master DJ filter, -1 to 1. Below 0 cuts the top, above 0 cuts the bottom, 0 is off |
+| `ockm-filter` | Master DJ filter, -1 to 1. Below 0 cuts the top, above 0 cuts the bottom, 0 is off. Smoothed, so moves don't click |
+| `ockm-filter-glide <to> <ms>` | Glide the filter to a value, for example `0 180` to spring back to off |
+| `ockm-filter-now` | Sent by the engine: where the filter actually is (what gets saved) |
+| `ockm-delay-throw` | 1 sends the whole mix into the throw echo line, 0 stops sending (the echoes ring out) |
 | `ockm-drive` | Master drive, 0 to 1 |
 | `ockm-delay-mix` | Delay return level, 0 to 1 |
 | `ockm-delay-fb` | Delay feedback, 0 to 0.9 |
