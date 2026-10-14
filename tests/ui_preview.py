@@ -85,13 +85,14 @@ def render(lines, label, path):
 
 SHOTS = [
     ("perform", ["send ockm-play float 1", "send ockm-step float 4"]),
-    ("drums", ["test tap 60 155"]),                    # tap the kick lane name
-    ("bass", ["test tap 300 36", "test tap 60 352", "test tap 89 210"]),  # perform tab, open bass, select step 2
-    ("chord", ["test tap 260 94", "test tap 89 210"]),
-    ("chord-fill", ["test tap 187 378"]),
-    ("bass-fill", ["test tap 70 94"]),
-    ("perform-mutes", ["test tap 300 36", "test tap 128 155", "test tap 164 352"]),   # mute kick, solo bass
-    ("mixer", ["test tap 618 36"]),
+    ("drums", ["test tap 50 137"]),                    # tap the kick lane name
+    ("bass", ["test tap 471 36", "test tap 89 158"]),  # bass tab, select step 2
+    ("chord", ["test tap 655 36", "test tap 89 158"]),
+    ("chord-fill", ["test tap 187 328"]),
+    ("bass-fill", ["test tap 471 36"]),
+    ("perform-mutes", ["test tap 287 36", "test tap 126 137", "test tap 166 369"]),   # mute kick, solo bass
+    ("mixer", ["test tap 747 36"]),
+    ("drums-long", ["test tap 379 36", "test tap 462 88", "test tap 860 88"]),          # 32 steps, second block
 ]
 
 

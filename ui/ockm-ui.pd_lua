@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.16"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.17"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
@@ -174,7 +174,7 @@ function ui:redraw() self:repaint() end
 function ui:on_step(n)
   local old = math.floor(self.step / 16)
   self.step = n
-  if self.screen == "perform" and math.floor(n / 16) ~= old then self:repaint() else self:repaint(2) end
+  if math.floor(n / 16) ~= old then self:repaint() else self:repaint(2) end
 end
 
 -- ------------------------------------------------------------------ data
@@ -239,67 +239,85 @@ function ui:layout()
   return L
 end
 
--- top bar, the same on every screen: play, tempo, the three screens as tabs, save and revert
-local TABS = { { "perform", "perform" }, { "drums", "drums" }, { "synth", "synths" }, { "mixer", "mixer" } }
+-- Screen hierarchy, top to bottom:
+--   1. top bar: play, tempo, the six screens as tabs, save and revert
+--   2. navigation strip: pattern, length, which block of 16 steps
+--   3. what you're editing (drum slot tabs on the drums screen), then the steps
+--   4. sound shaping at the bottom
+local TABS = { { "perform", "perform" }, { "drums", "drums" }, { "synth", "bass", 1 }, { "synth", "lead", 2 }, { "synth", "chord", 3 }, { "mixer", "mixer" } }
+local NAV_Y, NAV_H = 70, 36
 function ui:layout_top(add)
   add{ kind="play", x=16, y=12, w=64, h=48, tap=function() self:send("ockm-play", self.playing ~= 0 and 0 or 1) end }
   add{ kind="bpm", x=92, y=12, w=140, h=48 }
   for i, t in ipairs(TABS) do
-    add{ kind="tab", x=248 + (i - 1) * 106, y=12, w=100, h=48, label=t[2], sel=(self.screen == t[1]),
-         tap=function() if self.screen ~= t[1] then self:open(t[1]) end end }
+    local sel = (self.screen == t[1]) and (t[3] == nil or t[3] == self.part)
+    add{ kind="tab", x=244 + (i - 1) * 92, y=12, w=86, h=48, label=t[2], sel=sel, tap=function()
+      if t[3] then
+        if self.part ~= t[3] then self.part = t[3]; self.sel_step = 0 end
+      end
+      if self.screen ~= t[1] then self:open(t[1]) end
+    end }
   end
-  add{ kind="text", x=W - 272, y=30, w=60, h=12, label=VERSION, size=10 }
-  add{ kind="btn", x=W - 208, y=12, w=92, h=48, label="save", quiet=true, tap=function() pd.send("ockm-save", "bang", {}) end }
-  add{ kind="btn", x=W - 108, y=12, w=92, h=48, label="revert", quiet=true, tap=function() pd.send("ockm-revert", "bang", {}) end }
+  add{ kind="btn", x=W - 144, y=12, w=62, h=48, label="save", quiet=true, tap=function() pd.send("ockm-save", "bang", {}) end }
+  add{ kind="btn", x=W - 78, y=12, w=62, h=48, label="revert", quiet=true, tap=function() pd.send("ockm-revert", "bang", {}) end }
+  self:layout_nav(add)
 end
 
-local LANE_Y, LANE_H, LANE_P, LANE_X = 144, 22, 24, 188
-function ui:lane_y(i) return LANE_Y + (i - 1) * LANE_P + ((i > 8) and 6 or 0) end
-
-function ui:layout_perform(add)
-  -- patterns 1 to 8
-  local pw = (W - 32 - 7 * 8) / 8
+-- the navigation strip: pattern 1-8, length, and the blocks of 16 steps (only as many as the length allows)
+function ui:layout_nav(add)
+  local y, h = NAV_Y, NAV_H
+  add{ kind="text", x=16, y=y + 12, w=60, h=12, label="pattern", size=10 }
   for i = 0, 7 do
-    add{ kind="pattern", x=16 + i * (pw + 8), y=72, w=pw, h=56, n=i, tap=function()
+    add{ kind="pattern", x=66 + i * 34, y=y, w=30, h=h, n=i, tap=function()
       pd.send("ockm-want", "float", { i })
       if self.playing ~= 0 and i ~= self.cur then self.want = i end
     end }
   end
+  add{ kind="text", x=354, y=y + 12, w=50, h=12, label="length", size=10 }
+  for i, n in ipairs({ 16, 32, 64, 128 }) do
+    add{ kind="choice", x=398 + (i - 1) * 44, y=y, w=40, h=h, label=tostring(n), small=true,
+         sel=(self.v["ockm-len"] == n), tap=function() pd.send("ockm-length", "float", { n }) end }
+  end
+  add{ kind="text", x=584, y=y + 12, w=50, h=12, label="steps", size=10 }
+  local n = self:blocks()
+  local bx, bw = 622, (W - 16 - 622) / n
+  for b = 0, n - 1 do
+    local label = (n <= 4) and string.format("%d-%d", b * 16 + 1, b * 16 + 16) or tostring(b + 1)
+    add{ kind="block", x=bx + b * bw, y=y, w=bw - 4, h=h, b=b, label=label, tap=function() self:set_page(b) end }
+  end
+end
+
+local LANE_Y, LANE_H, LANE_P, LANE_X = 124, 26, 28, 192
+function ui:lane_y(i) return LANE_Y + (i - 1) * LANE_P + ((i > 8) and 8 or 0) end
+
+function ui:layout_perform(add)
   -- now: 8 drum lanes and 3 synth lanes, a picture of the block that is playing. Tap a name to open it
   for i = 1, 11 do
     local isdrum = i <= 8
     local y = self:lane_y(i)
     local name = isdrum and SHORT[(self.v["ockm-"..SLOTS[i].."-sound"] or 0) + 1] or SYNTHS[i - 8]
     local tr = TRACKS[i]
-    add{ kind="ms", x=112, y=y, w=32, h=LANE_H, label="M", hook="ockm-"..tr.."-mute" }
-    add{ kind="ms", x=148, y=y, w=32, h=LANE_H, label="S", hook="ockm-"..tr.."-solo" }
-    add{ kind="lanename", x=16, y=y, w=92, h=LANE_H, label=name, tap=function()
+    add{ kind="ms", x=108, y=y, w=36, h=LANE_H, label="M", hook="ockm-"..tr.."-mute" }
+    add{ kind="ms", x=148, y=y, w=36, h=LANE_H, label="S", hook="ockm-"..tr.."-solo" }
+    add{ kind="lanename", x=16, y=y, w=88, h=LANE_H, label=name, tap=function()
       if isdrum then self.slot = i; self:open("drums") else self.part = i - 8; self:open("synth") end
     end }
     add{ kind="lane", x=LANE_X, y=y, w=W - LANE_X - 16, h=LANE_H, track=i }
   end
-  -- live sound strip: pick a synth, play its four main knobs
+  -- live sound strip: pick a synth, play its four main knobs, plus the master filter
   local part = SYNTHS[self.perf_part or 1]
   for i, t in ipairs(SYNTHS) do
-    add{ kind="choice", x=16 + (i - 1) * 68, y=430, w=62, h=76, label=t, sel=((self.perf_part or 1) == i),
+    add{ kind="choice", x=16 + (i - 1) * 68, y=452, w=62, h=132, label=t, sel=((self.perf_part or 1) == i),
          tap=function() self.perf_part = i end }
   end
   local eng = (part == "chord") and CHORD_ENG or MONO_ENG
   local kn = KNOBS[eng[(self.v["ockm-"..part.."-engine"] or 0) + 1]] or KNOBS.acid
-  local cw = (W - 236 - 16 - 12) / 2
+  local cw = (W - 232 - 16 - 12) / 2
   for k = 1, 4 do
     local col, row = (k - 1) % 2, math.floor((k - 1) / 2)
-    add{ kind="slider", x=236 + col * (cw + 12), y=430 + row * 42, w=cw, h=34, hook="ockm-"..part.."-k"..k, lo=0, hi=1, label=kn[k] }
+    add{ kind="slider", x=232 + col * (cw + 12), y=452 + row * 46, w=cw, h=36, hook="ockm-"..part.."-k"..k, lo=0, hi=1, label=kn[k] }
   end
-  -- length, where we are, and the master filter
-  local lens = { 16, 32, 64, 128 }
-  add{ kind="text", x=16, y=516, w=100, h=12, label="length", size=10 }
-  for i, n in ipairs(lens) do
-    add{ kind="choice", x=16 + (i - 1) * 70, y=532, w=64, h=52, label=tostring(n),
-         sel=(self.v["ockm-len"] == n), tap=function() pd.send("ockm-length", "float", { n }) end }
-  end
-  add{ kind="blockinfo", x=306, y=532, w=210, h=52, follow=true }
-  add{ kind="slider", x=520, y=541, w=W - 536, h=34, hook="ockm-filter", lo=-1, hi=1, label="filter" }
+  add{ kind="slider", x=232, y=548, w=W - 248, h=36, hook="ockm-filter", lo=-1, hi=1, label="filter" }
 end
 
 function ui:open(screen)
@@ -308,14 +326,8 @@ function ui:open(screen)
   self:set_page(self:play_block())
 end
 
--- the block bar: dots you can tap, plus which steps you're looking at
-function ui:block_bar(add, y)
-  local n = self:blocks()
-  for b = 0, n - 1 do
-    add{ kind="dot", x=16 + b * 44, y=y, w=40, h=32, b=b, tap=function() self:set_page(b) end }
-  end
-  add{ kind="blockinfo", x=16 + n * 44 + 12, y=y, w=400, h=32 }
-end
+local D_STEP_Y, D_STEP_H = 166, 92      -- drums screen step pads
+local S_STEP_Y, S_STEP_H = 116, 84      -- synth screens step pads
 
 function ui:step_row(add, y, h, kind)
   local pitch = (W - 32) / 16
@@ -328,60 +340,57 @@ end
 function ui:layout_drums(add)
   local nm = SLOTS[self.slot]
   local tw = (W - 32 - 7 * 8) / 8
+  -- which drum: the 8 slots, named by their sound
   for i = 1, 8 do
-    add{ kind="choice", x=16 + (i - 1) * (tw + 8), y=72, w=tw, h=48,
+    add{ kind="choice", x=16 + (i - 1) * (tw + 8), y=114, w=tw, h=40,
          label=SHORT[(self.v["ockm-"..SLOTS[i].."-sound"] or 0) + 1], sel=(i == self.slot), tap=function() self.slot = i end }
   end
-  add{ kind="text", x=16, y=130, w=200, h=16, label="sound", size=11 }
+  self:step_row(add, D_STEP_Y, D_STEP_H, "dstep")
+  -- sound shaping
+  add{ kind="text", x=16, y=276, w=200, h=12, label="sound", size=10 }
   for s = 0, 7 do
-    add{ kind="choice", x=16 + s * (tw + 8), y=148, w=tw, h=48, label=SOUNDS[s + 1], accent=true,
+    add{ kind="choice", x=16 + s * (tw + 8), y=290, w=tw, h=44, label=SOUNDS[s + 1], accent=true,
          sel=(self.v["ockm-"..nm.."-sound"] == s), tap=function() self:send("ockm-"..nm.."-sound", s) end }
   end
-  self:step_row(add, 220, 96, "dstep")
-  self:block_bar(add, 330)
   for j, p in ipairs(DRUM_PARAMS) do
-    add{ kind="slider", x=16, y=380 + (j - 1) * 42, w=W - 32, h=34, hook="ockm-"..nm.."-"..p[1], lo=p[2], hi=p[3], label=p[4] or p[1] }
+    add{ kind="slider", x=16, y=350 + (j - 1) * 46, w=W - 32, h=36, hook="ockm-"..nm.."-"..p[1], lo=p[2], hi=p[3], label=p[4] or p[1] }
   end
 end
 
 function ui:layout_synth(add)
   local part = SYNTHS[self.part]
   local mono = part ~= "chord"
-  for i, t in ipairs(SYNTHS) do
-    add{ kind="choice", x=16 + (i - 1) * 118, y=72, w=110, h=44, label=t, sel=(i == self.part),
-         tap=function() self.part = i; self.sel_step = 0 end }
-  end
-  for k = 0, 11 do
-    add{ kind="choice", x=376 + k * 47, y=72, w=43, h=44, label=NOTES[k + 1], sel=(self.v["ockm-root"] == k),
-         tap=function() self:send("ockm-root", k) end }
-  end
-  for s = 0, 5 do
-    add{ kind="choice", x=16 + s * 80, y=124, w=74, h=40, label=SCALE_NAMES[s + 1], sel=(self.v["ockm-scale"] == s),
-         tap=function() self:send("ockm-scale", s) end }
-  end
-  if mono then
-    add{ kind="choice", x=W - 136, y=124, w=120, h=40, label="slide", accent=true, sel=self:mono_get(self.sel_step, "slide") > 0,
-         tap=function() self:mono_toggle_slide() end }
-  end
-  add{ kind="text", x=500, y=136, w=300, h=20, label=self:step_info(), size=12 }
-  self:step_row(add, 176, 84, mono and "mstep" or "cstep")
-  self:block_bar(add, 268)
-  -- note picker for the selected step
+  self:step_row(add, S_STEP_Y, S_STEP_H, mono and "mstep" or "cstep")
+  -- note (or chord) for the selected step
   if mono then
     local bw = (W - 32) / 15
     for d = -7, 7 do
-      add{ kind="deg", x=16 + (d + 7) * bw + 2, y=306, w=bw - 4, h=44, d=d, tap=function() self:mono_set_deg(d) end }
+      add{ kind="deg", x=16 + (d + 7) * bw + 2, y=216, w=bw - 4, h=40, d=d, tap=function() self:mono_set_deg(d) end }
     end
   else
     local bw = (W - 32) / 7
     for d = 0, 6 do
-      add{ kind="deg", x=16 + d * bw + 3, y=306, w=bw - 6, h=44, d=d, tap=function() self:chord_set_deg(d) end }
+      add{ kind="deg", x=16 + d * bw + 3, y=216, w=bw - 6, h=40, d=d, tap=function() self:chord_set_deg(d) end }
     end
   end
-  -- underneath: sound or fill, chosen with two small tabs
+  -- key and scale (shared by all three synths), slide for the selected step
+  for k = 0, 11 do
+    add{ kind="choice", x=16 + k * 36, y=266, w=33, h=34, label=NOTES[k + 1], small=true, sel=(self.v["ockm-root"] == k),
+         tap=function() self:send("ockm-root", k) end }
+  end
+  for sc = 0, 5 do
+    add{ kind="choice", x=456 + sc * 64, y=266, w=60, h=34, label=SCALE_NAMES[sc + 1], small=true, sel=(self.v["ockm-scale"] == sc),
+         tap=function() self:send("ockm-scale", sc) end }
+  end
+  if mono then
+    add{ kind="choice", x=W - 102, y=266, w=86, h=34, label="slide", accent=true, small=true, sel=self:mono_get(self.sel_step, "slide") > 0,
+         tap=function() self:mono_toggle_slide() end }
+  end
+  -- sound shaping underneath: sound or fill
   local view = self.synth_view or "sound"
-  add{ kind="tab", x=16, y=360, w=110, h=36, label="sound", sel=(view == "sound"), tap=function() self.synth_view = "sound" end }
-  add{ kind="tab", x=132, y=360, w=110, h=36, label="fill", sel=(view == "fill"), tap=function() self.synth_view = "fill" end }
+  add{ kind="tab", x=16, y=312, w=110, h=32, label="sound", sel=(view == "sound"), tap=function() self.synth_view = "sound" end }
+  add{ kind="tab", x=132, y=312, w=110, h=32, label="fill", sel=(view == "fill"), tap=function() self.synth_view = "fill" end }
+  add{ kind="text", x=260, y=322, w=500, h=12, label=self:step_info(), size=11 }
   if view == "sound" then self:layout_synth_sound(add, part, mono) else self:layout_synth_fill(add, part, mono) end
 end
 
@@ -389,22 +398,23 @@ function ui:layout_synth_sound(add, part, mono)
   local eng = mono and MONO_ENG or CHORD_ENG
   local ew = (W - 32) / #eng
   for e = 0, #eng - 1 do
-    add{ kind="choice", x=16 + e * ew, y=406, w=ew - 6, h=40, label=eng[e + 1], sel=(self.v["ockm-"..part.."-engine"] == e),
+    add{ kind="choice", x=16 + e * ew, y=356, w=ew - 6, h=40, label=eng[e + 1], sel=(self.v["ockm-"..part.."-engine"] == e),
          tap=function() self:send("ockm-"..part.."-engine", e) end }
   end
   local kn = KNOBS[eng[(self.v["ockm-"..part.."-engine"] or 0) + 1]] or KNOBS.acid
   local cw = (W - 32 - 16) / 2
   for k = 1, 4 do
     local col, row = (k - 1) % 2, math.floor((k - 1) / 2)
-    add{ kind="slider", x=16 + col * (cw + 16), y=456 + row * 42, w=cw, h=34, hook="ockm-"..part.."-k"..k, lo=0, hi=1, label=kn[k] }
+    add{ kind="slider", x=16 + col * (cw + 16), y=410 + row * 46, w=cw, h=36, hook="ockm-"..part.."-k"..k, lo=0, hi=1, label=kn[k] }
   end
   local third = {}
   if mono then third[#third + 1] = { "drive", "drive" } end
   third[#third + 1] = { "verb", "reverb" }; third[#third + 1] = { "delay", "delay" }
   local tw = (W - 32 - 16 * (#third - 1)) / #third
   for j, t in ipairs(third) do
-    add{ kind="slider", x=16 + (j - 1) * (tw + 16), y=546, w=tw, h=34, hook="ockm-"..part.."-"..t[1], lo=0, hi=1, label=t[2] }
+    add{ kind="slider", x=16 + (j - 1) * (tw + 16), y=510, w=tw, h=36, hook="ockm-"..part.."-"..t[1], lo=0, hi=1, label=t[2] }
   end
+  add{ kind="slider", x=16, y=556, w=cw, h=36, hook="ockm-"..part.."-level", lo=0, hi=1, label="level" }
 end
 
 -- a row of numbered presets: big number, name underneath
@@ -421,25 +431,25 @@ end
 
 function ui:layout_synth_fill(add, part, mono)
   if mono then
-    self:preset_row(add, 418, 64, RHYTHMS, "ockm-"..part.."-rhythm", "rhythm")
+    self:preset_row(add, 370, 60, RHYTHMS, "ockm-"..part.."-rhythm", "rhythm")
     local list = {}
     for i, nm in ipairs(MONO_NOTES) do list[i] = { nm } end
-    self:preset_row(add, 500, 44, list, "ockm-"..part.."-notes", "notes")
-    add{ kind="btn", x=W - 136, y=552, w=120, h=40, label="new", accent=true,
+    self:preset_row(add, 456, 48, list, "ockm-"..part.."-notes", "notes")
+    add{ kind="btn", x=W - 136, y=530, w=120, h=56, label="new", accent=true,
          tap=function() pd.send("ockm-"..part.."-gen", "bang", {}); self:dirty() end }
     return
   end
   -- chords: progression, rhythm, spice. Picking a progression or rhythm rewrites the chord part straight away
-  self:preset_row(add, 418, 56, PROGS, "ockm-chord-prog", "progression")
-  self:preset_row(add, 492, 40, CHORD_RHY, "ockm-chord-rhythm", "rhythm")
-  add{ kind="text", x=16, y=538, w=200, h=12, label="spice", size=10 }
+  self:preset_row(add, 370, 58, PROGS, "ockm-chord-prog", "progression")
+  self:preset_row(add, 456, 44, CHORD_RHY, "ockm-chord-rhythm", "rhythm")
+  add{ kind="text", x=16, y=528, w=200, h=12, label="spice", size=10 }
   for i, sp in ipairs(SPICE) do
-    add{ kind="preset", x=16 + (i - 1) * 118, y=552, w=112, h=40, num=i, label=sp[2], inline=true,
+    add{ kind="preset", x=16 + (i - 1) * 118, y=542, w=112, h=44, num=i, label=sp[2], inline=true,
          sel=(self.v["ockm-chord-type"] == sp[1]), tap=function() self:send("ockm-chord-type", sp[1]) end }
   end
-  add{ kind="choice", x=500, y=552, w=150, h=40, label="smooth", accent=true, sel=(self.v["ockm-chord-smooth"] or 1) > 0,
+  add{ kind="choice", x=500, y=542, w=150, h=44, label="smooth", accent=true, sel=(self.v["ockm-chord-smooth"] or 1) > 0,
        tap=function() self:send("ockm-chord-smooth", ((self.v["ockm-chord-smooth"] or 1) > 0) and 0 or 1) end }
-  add{ kind="btn", x=W - 136, y=552, w=120, h=40, label="new", accent=true,
+  add{ kind="btn", x=W - 136, y=542, w=120, h=44, label="new", accent=true,
        tap=function() pd.send("ockm-chord-gen", "bang", {}); self:dirty() end }
 end
 
@@ -461,25 +471,26 @@ end
 function ui:layout_mixer(add)
   local n = #TRACKS + 1
   local sw = (W - 32) / n
+  local top = 116
   for i = 1, n do
     local x = 16 + (i - 1) * sw
     local cx, cw = x + 3, sw - 6
     if i <= #TRACKS then
       local t = TRACKS[i]
-      add{ kind="strip", x=x, y=72, w=sw - 2, h=520, label=self:track_name(i), silent=self:silent(t) }
-      add{ kind="stripname", x=x, y=72, w=sw - 2, h=32,     -- tap the name to open that track
+      add{ kind="strip", x=x, y=top, w=sw - 2, h=H - top - 8, label=self:track_name(i), silent=self:silent(t) }
+      add{ kind="stripname", x=x, y=top, w=sw - 2, h=32,     -- tap the name to open that track
            tap=function() if i <= 8 then self.slot = i; self:open("drums") else self.part = i - 8; self:open("synth") end end }
-      add{ kind="hbar", x=cx, y=110, w=cw, h=26, hook="ockm-"..t.."-verb", lo=0, hi=1, label="rev" }
-      add{ kind="hbar", x=cx, y=150, w=cw, h=26, hook="ockm-"..t.."-delay", lo=0, hi=1, label="dly" }
-      add{ kind="vfader", x=cx, y=190, w=cw, h=290, hook="ockm-"..t.."-level", lo=0, hi=1 }
-      add{ kind="ms", x=cx, y=490, w=cw, h=44, label="M", hook="ockm-"..t.."-mute" }
-      add{ kind="ms", x=cx, y=540, w=cw, h=44, label="S", hook="ockm-"..t.."-solo" }
+      add{ kind="hbar", x=cx, y=top + 34, w=cw, h=26, hook="ockm-"..t.."-verb", lo=0, hi=1, label="rev" }
+      add{ kind="hbar", x=cx, y=top + 66, w=cw, h=26, hook="ockm-"..t.."-delay", lo=0, hi=1, label="dly" }
+      add{ kind="vfader", x=cx, y=top + 100, w=cw, h=250, hook="ockm-"..t.."-level", lo=0, hi=1 }
+      add{ kind="ms", x=cx, y=top + 364, w=cw, h=50, label="M", hook="ockm-"..t.."-mute" }
+      add{ kind="ms", x=cx, y=top + 420, w=cw, h=50, label="S", hook="ockm-"..t.."-solo" }
     else
-      add{ kind="strip", x=x, y=72, w=sw - 2, h=520, label="master", master=true }
-      add{ kind="hbar", x=cx, y=110, w=cw, h=26, hook="ockm-verb-mix", lo=0, hi=1, label="rev" }
-      add{ kind="hbar", x=cx, y=150, w=cw, h=26, hook="ockm-delay-mix", lo=0, hi=1, label="dly" }
-      add{ kind="vfader", x=cx, y=190, w=cw, h=290, hook="ockm-volume", lo=0, hi=1, master=true }
-      add{ kind="btn", x=cx, y=490, w=cw, h=94, label="clear", quiet=true, tap=function()
+      add{ kind="strip", x=x, y=top, w=sw - 2, h=H - top - 8, label="master", master=true }
+      add{ kind="hbar", x=cx, y=top + 34, w=cw, h=26, hook="ockm-verb-mix", lo=0, hi=1, label="rev" }
+      add{ kind="hbar", x=cx, y=top + 66, w=cw, h=26, hook="ockm-delay-mix", lo=0, hi=1, label="dly" }
+      add{ kind="vfader", x=cx, y=top + 100, w=cw, h=250, hook="ockm-volume", lo=0, hi=1, master=true }
+      add{ kind="btn", x=cx, y=top + 364, w=cw, h=106, label="clear", quiet=true, tap=function()
         for _, t in ipairs(TRACKS) do
           if (self.v["ockm-"..t.."-mute"] or 0) > 0 then self:send("ockm-"..t.."-mute", 0) end
           if (self.v["ockm-"..t.."-solo"] or 0) > 0 then self:send("ockm-"..t.."-solo", 0) end
@@ -681,10 +692,10 @@ function ui:paint_layer_2(g)
   local pitch = (W - 32) / 16
   if self.screen == "perform" then
     local lw = (W - LANE_X - 16) / 16
-    self:col(g, "acc"); g:fill_rect(LANE_X + i * lw + 2, LANE_Y - 7, lw - 4, 3)
+    self:col(g, "acc"); g:fill_rect(LANE_X + i * lw + 2, LANE_Y - 6, lw - 4, 3)
   elseif (self.screen == "drums" or self.screen == "synth") and self:play_block() == self.page then
     -- under the step pads, over the beat marks
-    local y = (self.screen == "drums") and (220 + 96 + 3) or (176 + 84 + 3)
+    local y = (self.screen == "drums") and (D_STEP_Y + D_STEP_H + 3) or (S_STEP_Y + S_STEP_H + 3)
     self:col(g, "acc"); g:fill_rect(16 + i * pitch + 3, y, pitch - 6, 4)
   end
 end
@@ -709,13 +720,14 @@ function ui:draw(g, w)
     local s = fmt(self.v["ockm-bpm"] or 124)
     self:text(g, s, w.x + 4, w.y + 4, 32, "txt")
     self:text(g, "bpm", w.x + 8 + #s * 19, w.y + 26, 12, "mute")
+    self:text(g, VERSION, w.x + 8 + #s * 19, w.y + 8, 9, "mute")
   elseif k == "text" then
     self:text(g, w.label, w.x, w.y, w.size or 12, w.col or "mute", w.w)
   elseif k == "pattern" then
     local playing = (w.n == self.cur)
     self:col(g, playing and "on" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
-    if self.want == w.n then self:col(g, "acc"); g:stroke_rounded_rect(w.x + 1, w.y + 1, w.w - 2, w.h - 2, 6, 3) end
-    self:ctext(g, string.format("%d", math.floor(w.n + 1)), w, 22, playing and "bg" or "txt")
+    if self.want == w.n then self:col(g, "acc"); g:stroke_rounded_rect(w.x + 1, w.y + 1, w.w - 2, w.h - 2, 6, 2) end
+    self:ctext(g, string.format("%d", math.floor(w.n + 1)), w, (w.h > 44) and 22 or 13, playing and "bg" or "txt")
   elseif k == "choice" then
     local sel = w.sel
     self:col(g, sel and (w.accent and "acc" or "on") or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
@@ -773,6 +785,15 @@ function ui:draw(g, w)
     self:col(g, cur and "on" or "off"); g:fill_rounded_rect(w.x + 4, w.y + 8, w.w - 8, w.h - 16, 4)
     if self.playing ~= 0 and w.b == self:play_block() and not cur then
       self:col(g, "acc"); g:fill_rect(w.x + 4, w.y + w.h - 5, w.w - 8, 3)
+    end
+  elseif k == "block" then
+    -- the block you're looking at is filled; an orange bar marks the one that's playing
+    local shown = (self.screen == "perform" and self.playing ~= 0) and self:play_block() or self.page
+    local cur = (w.b == shown)
+    self:col(g, cur and "on" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
+    self:ctext(g, w.label, w, 11, cur and "bg" or "txt")
+    if self.playing ~= 0 and w.b == self:play_block() then
+      self:col(g, "acc"); g:fill_rect(w.x + 4, w.y + w.h - 4, w.w - 8, 3)
     end
   elseif k == "steprow" or k == "stripname" then
     -- nothing to draw: it only catches swipes between the pads

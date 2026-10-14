@@ -536,31 +536,33 @@ def touchscreen_drives_the_engine(work):
     h = Harness(); h.show("ockm-edit", "ockm-page", "ockm-len", "ockm-load", "ockm-d1-sound", "ockm-bass-edit", "ockm-want", "ockm-lead-k1", "ockm-filter", "ockm-chord-prog", "ockm-chord-type", "ockm-d1-mute", "ockm-d2-mute", "ockm-bass-level")
     tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
     h.at(100, "ockm-resync bang")
-    tap(150, 60, 155)                    # perform: open the kick lane
-    tap(160, 300, 170)                   # drums: sound pad 3 (clap)
-    tap(170, 160, 260); tap(180, 160, 260)   # step 3: on, then accent
-    tap(190, 300, 36)                    # perform tab
-    tap(200, 118, 556)                   # length 32
-    tap(210, 430, 36)                    # drums tab (back to the kick slot)
-    h.at(220, "ockm-ui-test drag 600 260 200 260")   # swipe left: steps 17-32
-    tap(230, 45, 260)                    # step 17
-    h.at(240, "ockm-ui-test drag 200 260 600 260")   # swipe right: back to 1-16
-    tap(250, 300, 36)                    # perform tab
-    tap(255, 116, 468); tap(258, 430, 449)   # sound strip: lead, then its first knob
-    tap(260, 60, 352)                    # open bass
-    tap(270, 45, 210)                    # bass step 1
-    tap(280, 600, 328)                   # note picker: third note of the scale
-    tap(290, 300, 36)                    # perform tab
-    tap(300, 300, 100)                   # pattern 3
-    tap(310, 752, 558)                   # master filter, middle
-    tap(320, 510, 36); tap(325, 260, 94)  # synths tab, chord part
-    tap(330, 187, 378)                   # fill view
-    tap(335, 430, 446)                   # progression 5 (garage)
-    tap(340, 300, 572)                   # spice 3 (ninth)
-    tap(345, 300, 36); tap(348, 128, 155)  # perform tab, mute the kick lane
-    tap(350, 618, 36)                    # mixer tab
-    tap(355, 673, 335)                   # bass fader, halfway
-    tap(360, 130, 512)                   # mute on strip 2
+    tap(150, 50, 137)                    # perform: open the kick lane
+    tap(160, 300, 312)                   # drums: sound pad 3 (clap)
+    tap(170, 160, 212); tap(180, 160, 212)   # step 3: on, then accent
+    tap(190, 287, 36)                    # perform tab
+    tap(200, 462, 88)                    # length 32 (navigation strip)
+    tap(210, 379, 36)                    # drums tab (back to the kick slot)
+    h.at(220, "ockm-ui-test drag 600 212 200 212")   # swipe left: steps 17-32
+    tap(230, 45, 212)                    # step 17
+    h.at(240, "ockm-ui-test drag 200 212 600 212")   # swipe right: back to 1-16
+    tap(245, 860, 88)                    # block button 2 (steps 17-32)
+    tap(248, 622 + 40, 88)               # block button 1 (steps 1-16)
+    tap(250, 287, 36)                    # perform tab
+    tap(255, 116, 518); tap(258, 427, 470)   # sound strip: lead, then its first knob
+    tap(260, 50, 369)                    # open bass from its lane
+    tap(270, 45, 158)                    # bass step 1
+    tap(280, 600, 236)                   # note picker: third note of the scale
+    tap(290, 287, 36)                    # perform tab
+    tap(300, 149, 88)                    # pattern 3 (navigation strip)
+    tap(310, 608, 566)                   # master filter, middle
+    tap(320, 655, 36)                    # chord tab
+    tap(330, 187, 328)                   # fill view
+    tap(335, 430, 399)                   # progression 5 (garage)
+    tap(340, 300, 564)                   # spice 3 (ninth)
+    tap(345, 287, 36); tap(348, 126, 137)  # perform tab, mute the kick lane
+    tap(350, 747, 36)                    # mixer tab
+    tap(355, 673, 341)                   # bass fader, halfway
+    tap(360, 130, 505)                   # mute on strip 2
     f = os.path.join(work, "t_touch.pd"); h.finish(600, f)
     out = run(work, f)
     edits = printed(out, "ockm-edit")
@@ -568,7 +570,7 @@ def touchscreen_drives_the_engine(work):
     assert "2" in printed(out, "ockm-d1-sound"), "sound pad didn't change the slot's sound"
     assert "32" in printed(out, "ockm-len"), "length button didn't set 32"
     pages = printed(out, "ockm-page")
-    assert "1" in pages and pages[-1] == "0", f"swipes should go to block 2 then back: {pages}"
+    assert pages.count("1") >= 2 and "0" in pages[pages.index("1") + 1:], f"swipes and block buttons should go to block 2 and back: {pages}"
     assert any(e.startswith("d1 16 ") for e in edits), f"tap after the swipe should edit step 17: {edits}"
     be = printed(out, "ockm-bass-edit")
     assert len(be) >= 2 and be[-1].split()[:2] == ["0", "36"], f"bass step 1 should become C (A minor, third step): {be}"
@@ -594,7 +596,7 @@ def touchscreen_screens_draw(work):
         raise Skip("Pillow not installed")
     p = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_preview.py"), os.path.join(work, "preview")], capture_output=True, text=True)
     assert p.returncode == 0, p.stderr[-800:]
-    assert len(os.listdir(os.path.join(work, "preview"))) == 8, "expected eight screen pictures"
+    assert len(os.listdir(os.path.join(work, "preview"))) == 9, "expected nine screen pictures"
 
 @test
 def mute_solo_and_levels(work):

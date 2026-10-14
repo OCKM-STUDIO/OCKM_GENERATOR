@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.17 (14 October 2026)
+
+**Changed**
+- Clearer layout on every screen: navigation at the top, sound shaping at the bottom
+- Bass, lead and chord each have their own tab and screen (tabs: perform, drums, bass, lead, chord, mixer), so it's obvious what you're editing
+- A navigation strip under the tabs on every screen: small pattern buttons, length, and one button per block of 16 steps (only as many as the length allows), with an orange bar for the block that's playing
+- Pattern buttons are much smaller on perform, leaving taller track lanes and bigger mute and solo buttons
+- Synth screens: key and scale moved into one slim row; a level slider joins the sound view
+
 ## v0.16 (13 October 2026)
 
 **Added**

@@ -2,7 +2,7 @@
 
 A drum machine and easy-to-program synths in one box. Built in Pure Data, designed to run on a Raspberry Pi with a touchscreen and a few knobs.
 
-Current version: **v0.16**
+Current version: **v0.17**
 
 ## How to open it
 
@@ -10,26 +10,32 @@ Open `OCKM_GENERATOR.pd` in plugdata. Keep the folder together: the main patch f
 
 The window is the instrument: three touch screens, drawn in Lua (plugdata has Lua built in). Click with the mouse on the Mac, tap with a finger on the Pi. If clicks do nothing, the patch is in edit mode: press Cmd+E.
 
-**Moving between screens:** the tabs along the top (**perform**, **drums**, **synths**, **mixer**) are on every screen, next to play and tempo. Or tap a track's name on perform to jump straight to it.
+**How every screen is laid out**, top to bottom:
+1. **Top bar:** play, tempo, then the screens as tabs: **perform, drums, bass, lead, chord, mixer**. Save and revert on the right. The version number sits next to the tempo
+2. **Navigation strip:** **pattern** 1 to 8 (small), **length** (16, 32, 64, 128), and **steps**: one button per block of 16 steps, only as many as the length allows. The filled one is the block you're looking at; an orange bar marks the block that's playing. You can also swipe the step row sideways
+3. **What you're editing:** the steps (and, on the drums screen, which of the 8 drum slots)
+4. **Sound shaping** at the bottom
+
+Tap a track's name on perform or the mixer to jump straight to it.
 
 **Perform** (home)
 - **Play** and **tempo** top left. Drag the tempo number up or down
-- **Patterns 1 to 8**: tap to switch. While playing it waits for the end of the bar; the queued one gets an orange outline
+- Patterns are in the navigation strip: tap to switch. While playing it waits for the end of the bar; the queued one gets an orange outline
 - **Now**: all 11 tracks for the 16 steps that are playing, with the playhead running above them. It's a picture, not an editor
 - Tap a track's **name** to open it
 - **M** mutes a track and **S** solos it (several can be soloed at once). Silent tracks go dim. Mutes and solos are for playing live, so they aren't saved
 - **Sound strip**: pick bass, lead or chord, then play its four main knobs (named for the engine it's using). The **filter** next to length is the master DJ filter
-- **Length**: 16, 32, 64 or 128 steps. Making it longer repeats what's there
+- **Length** is in the navigation strip. Making a pattern longer repeats what's there
 - **Save** and **revert**, top right
 
 **Drum** (one slot at a time)
 - The 8 slots along the top, named by the sound they play
 - **Sound**: 8 pads, one per drum sound
 - **Steps**: tap cycles empty, hit (white), accent (orange)
-- **Swipe** the step row sideways to move between blocks of 16. The dots underneath show which block you're on; an orange mark shows where the playhead is if it's somewhere else
+- Move between blocks of 16 with the **steps** buttons in the navigation strip, or swipe the step row sideways
 - **Level, tune, decay, reverb, delay** for this slot. These belong to the kit, so they stay when you change pattern
 
-**Synth** (bass, lead or chord)
+**Bass, lead and chord** (a tab each)
 - **Key** and **scale** at the top, shared by all three
 - **Steps**: tap cycles off, on, accent. **Drag a step up or down** to change its note. Or tap a step, then pick its note from the row underneath (the dimmed one is the key's root). **Slide** applies to the selected step
 - Chord steps show the chord on that step of the scale (i, ii, iii...)
