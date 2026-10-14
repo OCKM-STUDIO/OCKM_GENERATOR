@@ -264,9 +264,9 @@ for nm,snd in SLOTS:
     PROJECT_KEYS+=[(f"ockm-{nm}-sound",snd,None),(f"ockm-{nm}-tune",0,None),(f"ockm-{nm}-decay",100,None),
                    (f"ockm-{nm}-level",1,None),(f"ockm-{nm}-verb",VERB[snd],None),(f"ockm-{nm}-delay",DLY[snd],None)]
 SYNTH_DEFAULTS={"bass":dict(engine=0,mode=0,sync=1,level=1,k1=0.37,k2=0.9,k3=0.31,k4=0.55,drive=0,verb=0,delay=0,rhythm=3,notes=3),
-                "lead":dict(engine=4,mode=1,sync=0,level=1,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0.2,delay=0.25,rhythm=6,notes=8),
+                "lead":dict(engine=4,mode=1,sync=1,level=1,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0.2,delay=0.25,rhythm=6,notes=8),
                 "chord":dict(engine=0,mode=0,level=1,k1=0.45,k2=0.5,k3=0.4,k4=0.3,type=0,smooth=1,verb=0.3,delay=0.35,rhythm=0,prog=0)}
-PATTERN_KEYS=[("ockm-len",16,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None)]
+PATTERN_KEYS=[("ockm-len",16,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None),("ockm-leader",0,None)]
 for t,d in SYNTH_DEFAULTS.items():
     PATTERN_KEYS+=[(f"ockm-{t}-{k}",v,None) for k,v in d.items()]
 TABLES=[f"ockm-pat-{n}" for n,_ in SLOTS]+[f"ockm-pat-{t}-{f}" for t in ("bass","lead") for f in MONO]+[f"ockm-pat-chord-{f}" for f in CHORD]
@@ -387,7 +387,7 @@ for nm in ("bass","lead","chord"): p.con(offm,0,synth_voice[nm],0)
 gy=by+3*40+20
 p.add(f"#X obj 110 {gy} ockm-presets;")
 p.add(f"#X obj 230 {gy} ockm-monogen bass 0 3 3 0 1;")
-p.add(f"#X obj 400 {gy} ockm-monogen lead 24 6 8 1 0;")
+p.add(f"#X obj 400 {gy} ockm-monogen lead 24 6 8 1 1;")
 p.add(f"#X obj 530 {gy} ockm-chordgen chord 0;")
 # synth settings subpatch: key, engines, knobs, generator choices
 sub=P()

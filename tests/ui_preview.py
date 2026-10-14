@@ -85,14 +85,14 @@ def render(lines, label, path):
 
 SHOTS = [
     ("perform", ["send ockm-play float 1", "send ockm-step float 4"]),
-    ("drums", ["test tap 50 137"]),                    # tap the kick lane name
-    ("bass", ["test tap 471 36", "test tap 89 158"]),  # bass tab, edit step 2 (switches the bass to manual)
-    ("chord", ["test tap 655 36", "test tap 89 158"]),
-    ("chord-fill", ["test tap 187 328"]),
-    ("bass-fill", ["test tap 471 36"]),
-    ("perform-mutes", ["test tap 287 36", "test tap 126 137", "test tap 166 369"]),   # mute kick, solo bass
-    ("mixer", ["test tap 747 36"]),
-    ("drums-long", ["test tap 379 36", "test tap 506 88", "test tap 922 88"]),          # 64 steps, forward to the second block
+    ("drums", ["test tap 50 137"]),                                   # tap the kick lane name
+    ("bass", ["test tap 521 36", "test tap 89 158"]),                 # bass tab; tapping a step on auto just explains the lock
+    ("chord", ["test tap 681 36"]),
+    ("compose", ["test tap 441 36"]),
+    ("perform-mutes", ["test tap 281 36", "test tap 126 137", "test tap 166 369"]),   # mute kick, solo bass
+    ("mixer", ["test tap 761 36"]),
+    ("drums-long", ["test tap 361 36", "test tap 506 88", "test tap 922 88"]),        # 64 steps, forward to the second block
+    ("bass-manual", ["test tap 521 36", "test tap 900 283", "test tap 89 158"]),      # switch to manual, then edit step 2
 ]
 
 

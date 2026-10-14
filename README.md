@@ -2,7 +2,7 @@
 
 A drum machine and easy-to-program synths in one box. Built in Pure Data, designed to run on a Raspberry Pi with a touchscreen and a few knobs.
 
-Current version: **v0.20**
+Current version: **v0.21**
 
 ## How to open it
 
@@ -37,21 +37,25 @@ Tap a track's name on perform or the mixer to jump straight to it.
 - Move between blocks of 16 with the **steps** arrows in the navigation strip, or swipe the step row sideways
 - **Level, tune, decay, reverb, delay** for this slot. These belong to the kit, so they stay when you change pattern
 
-**Auto and manual, like a camera.** Every synth part is either:
-- **Auto:** generated from its presets, and it follows everything else live: the chords, the key, the scale and the length. Bass and chord start in auto
-- **Manual:** your notes, exactly as you left them. Nothing regenerates them. The lead starts in manual, because it's the melody
+**Compose** (a tab between drums and the synths): how the pattern is put together.
+- **Who leads the harmony:** chords (the chord progression leads; bass and lead follow it) or key only (no connections: every part just uses the key). Melody-led and bass-led are coming
+- **Key and scale**, shared by every part
+- **The chain:** which part leads, which follow, and which are on manual
+- **A column each for chord, bass and lead** with their generator settings: progression, rhythm, spice and smooth voicing for the chord; notes and rhythm for bass and lead. Use the arrows to step through the presets. A change rewrites the part straight away
 
-The switch is on each synth screen, next to sound and fill. Editing a step in auto flips that part to manual (a short message says so). Tap **auto** to hand it back to the generator. Picking a preset in fill, or pressing new, always generates and goes back to auto.
-
-**Follow chords** (in fill, for bass and lead): the part sits on each chord of the chord part instead of the key's root. V, VI and VII go below the root, as a bass player would. On by default for the bass, off for the lead.
+**The rule: compose decides the notes, the synth tabs decide the sound.** Every synth part is on **auto** or **manual**, like a camera:
+- **Auto:** the notes come from compose and follow the chain. On the synth tab its steps are drawn as outlines and locked; tapping one just reminds you it's on auto
+- **Manual:** your notes. Switch to manual on the synth tab (or on compose) and edit the steps. Compose greys the part out and never changes it. **Back to auto** hands it back to the generator and replaces your notes
+- Sound controls (engine, knobs, drive, sends, level) always work, in either mode
+- Bass and chord start on auto; the lead starts on manual, because it's the melody
 
 **Bass, lead and chord** (a tab each)
 - **Key** and **scale** at the top, shared by all three
 - **Steps**: tap cycles off, on, accent. **Drag a step up or down** to change its note. Or tap a step, then pick its note from the row underneath (the dimmed one is the key's root). **Slide** applies to the selected step
 - Chord steps show the chord on that step of the scale (i, ii, iii...)
-- Underneath, two views: **sound** (engine, its four knobs named for the engine, drive, reverb and delay sends) and **fill**
-- **Fill for bass and lead**: pick a rhythm and notes and press **new** to write the whole pattern. Then swipe and tweak single steps
-- **Fill for chords**: pick a **progression** (1 to 10), a **rhythm** (1 to 10) and the **spice** (1 to 4). Picking a progression or rhythm rewrites the chord part straight away. **Smooth** plays each chord in the shape closest to the last one
+- The **auto | manual** switch, and a line saying where the notes come from
+- **Sound**: engine, its four knobs (named for the engine), drive, reverb and delay sends, level
+- On manual: the note (or chord) picker for the selected step, and slide
 
 **Mixer**
 - One strip per track: reverb and delay sends at the top, a level fader, then **M** and **S**. Tap a strip's name to open that track

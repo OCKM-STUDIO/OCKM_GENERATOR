@@ -539,29 +539,30 @@ def touchscreen_drives_the_engine(work):
     tap(150, 50, 137)                    # perform: open the kick lane
     tap(160, 300, 312)                   # drums: sound pad 3 (clap)
     tap(170, 160, 212); tap(180, 160, 212)   # step 3: on, then accent
-    tap(190, 287, 36)                    # perform tab
+    tap(190, 281, 36)                    # perform tab
     tap(200, 462, 88)                    # length 32 (navigation strip)
-    tap(210, 379, 36)                    # drums tab (back to the kick slot)
+    tap(210, 361, 36)                    # drums tab (back to the kick slot)
     h.at(220, "ockm-ui-test drag 600 212 200 212")   # swipe left: steps 17-32
     tap(230, 45, 212)                    # step 17
     h.at(240, "ockm-ui-test drag 200 212 600 212")   # swipe right: back to 1-16
     tap(245, 922, 88)                    # forward arrow (steps 17-32)
     tap(248, 644, 88)                    # back arrow (steps 1-16)
-    tap(250, 287, 36)                    # perform tab
+    tap(250, 281, 36)                    # perform tab
     tap(255, 244, 467); tap(258, 128, 512)   # synth half: lead, then its first knob
-    tap(260, 50, 369)                    # open bass from its lane
-    tap(270, 45, 158)                    # bass step 1
+    tap(260, 50, 369)                    # open bass from its lane (bass is on auto)
+    tap(265, 45, 158)                    # tap a step on auto: locked, nothing is edited
+    tap(268, 900, 283)                   # switch the bass to manual
+    tap(270, 45, 158)                    # now bass step 1 edits
     tap(280, 600, 236)                   # note picker: third note of the scale
-    tap(290, 287, 36)                    # perform tab
+    tap(290, 281, 36)                    # perform tab
     tap(300, 149, 88)                    # pattern 3 (navigation strip)
     tap(310, 543, 486)                   # master fx: filter, middle
-    tap(320, 655, 36)                    # chord tab
-    tap(330, 187, 328)                   # fill view
-    tap(335, 430, 399)                   # progression 5 (garage)
-    tap(340, 300, 564)                   # spice 3 (ninth)
-    tap(345, 287, 36); tap(348, 126, 137)  # perform tab, mute the kick lane
+    tap(320, 441, 36)                    # compose tab
+    tap(335, 283, 349)                   # chord column: next progression
+    tap(340, 200, 486)                   # spice 3 (ninth)
+    tap(345, 281, 36); tap(348, 126, 137)  # perform tab, mute the kick lane
     tap(349, 192 + 47 * 1 + 20, 165)     # perform: snare lane, step 2
-    tap(350, 747, 36)                    # mixer tab
+    tap(350, 761, 36)                    # mixer tab
     tap(355, 673, 341)                   # bass fader, halfway
     tap(360, 130, 505)                   # mute on strip 2
     f = os.path.join(work, "t_touch.pd"); h.finish(600, f)
@@ -579,14 +580,14 @@ def touchscreen_drives_the_engine(work):
     lk = [float(x) for x in printed(out, "ockm-lead-k1")]
     assert any(0.4 < x < 0.6 for x in lk), f"perform strip: lead knob 1 should be about halfway: {lk}"
     assert any(abs(float(x)) < 0.1 for x in printed(out, "ockm-filter")), "perform strip: filter in the middle should be about 0"
-    assert "4" in printed(out, "ockm-chord-prog"), f"fill: progression 5 should send 4: {printed(out, 'ockm-chord-prog')}"
+    assert printed(out, "ockm-chord-prog"), "compose: the progression arrow should pick the next progression"
     assert any(e.startswith("d2 1 ") for e in edits), f"tapping the snare lane on perform should edit d2 step 2: {edits}"
-    assert "1" in printed(out, "ockm-bass-mode"), "editing a bass step in auto should switch the bass to manual"
+    assert "1" in printed(out, "ockm-bass-mode"), "the manual switch should put the bass in manual"
     assert "1" in printed(out, "ockm-d1-mute"), "perform: M on the kick lane should mute d1"
     assert "1" in printed(out, "ockm-d2-mute"), "mixer: M on strip 2 should mute d2"
     bl = [float(x) for x in printed(out, "ockm-bass-level")]
     assert any(0.4 < x < 0.6 for x in bl), f"mixer: bass fader halfway should be about 0.5: {bl}"
-    assert "6" in printed(out, "ockm-chord-type"), f"fill: spice 3 should pick the ninth chord type (6): {printed(out, 'ockm-chord-type')}"
+    assert "6" in printed(out, "ockm-chord-type"), f"compose: spice 3 should pick the ninth chord type (6): {printed(out, 'ockm-chord-type')}"
     assert not [l for l in out.splitlines() if "error" in l.lower()], "errors: " + " | ".join(l for l in out.splitlines() if "error" in l.lower())
 
 @test

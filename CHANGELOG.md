@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.21 (14 October 2026)
+
+**Added**
+- **Compose** tab: who leads the harmony (chords, or key only; melody-led and bass-led coming), key and scale, the chain of who follows whom, and a column each for the chord, bass and lead generators
+- Camera-style lock: a synth part on auto has its steps locked (drawn as outlines). Switch to manual to edit. Manual parts are greyed out on compose and never changed by it
+- The leader is saved with each pattern
+
+**Changed**
+- Generator settings, key, scale, spice and smooth voicing moved from the synth tabs to compose. The synth tabs are now steps and sound
+- Tabs: perform, drums, compose, bass, lead, chord, mixer
+- The separate "follow chords" switches are replaced by the leader setting
+
 ## v0.20 (14 October 2026)
 
 **Added**
