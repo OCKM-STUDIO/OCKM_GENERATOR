@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.26 (14 October 2026)
+
+**Added**
+- **Song mode**, MPC style. A song tab with one song per project: a chain of steps, each a pattern and how many times it plays. Add, change, reorder and remove steps; loop or stop at the end; play from any step. Patterns switch exactly on the bar line. Saved with the project as `song.txt`
+- The play button plays one pattern or the song, and shows the song step while it plays
+- **Copy pattern** to another slot, and **clear pattern**, on the song tab
+- **Setup screen** (tap the tempo): tempo buttons and slider, swing, accent strength, volume, MIDI clock lead or follow
+
+**Changed**
+- Messages now show on every screen (compose's "suggest chords" result was invisible before)
+- The save button no longer looks greyed out
+- Tapping the tempo opens setup; dragging it still changes the tempo
+- Tapping a song row's buttons selects that row
+
+**Fixed**
+- Deleting a project left an empty folder behind if it had a song
+
 ## v0.25 (14 October 2026)
 
 **Added**

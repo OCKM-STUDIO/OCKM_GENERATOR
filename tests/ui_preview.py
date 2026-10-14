@@ -18,7 +18,8 @@ def project_lines(slot=1):
     """Pattern 1 and the project, as mock-script lines."""
     out = []
     for fn in ("project.txt", f"p{slot}.txt"):
-        for raw in open(os.path.join(ROOT, "projects", "default", fn)).read().split(";"):
+        proj = os.environ.get("OCKM_PREVIEW_PROJECT", os.path.join(ROOT, "projects", "default"))
+        for raw in open(os.path.join(proj, fn)).read().split(";"):
             t = raw.split()
             if not t:
                 continue
@@ -86,16 +87,18 @@ def render(lines, label, path):
 SHOTS = [
     ("perform", ["send ockm-play float 1", "send ockm-step float 4"]),
     ("drums", ["test tap 50 137"]),                                   # tap the kick lane name
-    ("bass", ["test tap 521 36", "test tap 89 158"]),                 # bass tab; tapping a step on auto just explains the lock
-    ("chord", ["test tap 681 36"]),
+    ("bass", ["test tap 483 36", "test tap 89 158"]),                 # bass tab; tapping a step on auto just explains the lock
+    ("chord", ["test tap 621 36"]),
     ("compose", ["test tap 441 36"]),
     ("perform-mutes", ["test tap 281 36", "test tap 126 137", "test tap 166 369"]),   # mute kick, solo bass
-    ("mixer", ["test tap 761 36"]),
+    ("mixer", ["test tap 690 36"]),
     ("drums-long", ["test tap 361 36", "test tap 506 88", "test tap 922 88"]),        # 64 steps, forward to the second block
     ("compose-melody", ["test tap 441 36", "test tap 186 154", "test tap 400 540"]),   # melody leads, ask for chords, then mutate the bass
     ("drums-groove", ["test tap 361 36", "test tap 660 445"]),                         # drums tab, tap a groove
     ("project", ["test tap 910 36", "test tap 600 261"]),                              # project screen, pick an older project
-    ("bass-manual", ["test tap 521 36", "test tap 900 283", "test tap 89 158"]),      # switch to manual, then edit step 2
+    ("song", ["test tap 759 36", "test tap 640 282", "test tap 727 282", "test tap 727 282", "test tap 640 332", "test tap 380 199", "test tap 380 199", "test tap 380 199"]),
+    ("setup", ["test tap 150 36"]),
+    ("bass-manual", ["test tap 483 36", "test tap 900 283", "test tap 89 158"]),      # switch to manual, then edit step 2
 ]
 
 

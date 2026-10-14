@@ -562,7 +562,7 @@ def touchscreen_drives_the_engine(work):
     tap(340, 200, 486)                   # spice 3 (ninth)
     tap(345, 281, 36); tap(348, 126, 137)  # perform tab, mute the kick lane
     tap(349, 192 + 47 * 1 + 20, 165)     # perform: snare lane, step 2
-    tap(350, 761, 36)                    # mixer tab
+    tap(350, 690, 36)                    # mixer tab
     tap(355, 673, 341)                   # bass fader, halfway
     tap(360, 130, 505)                   # mute on strip 2
     f = os.path.join(work, "t_touch.pd"); h.finish(600, f)
@@ -600,7 +600,7 @@ def touchscreen_screens_draw(work):
         raise Skip("Pillow not installed")
     p = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_preview.py"), os.path.join(work, "preview")], capture_output=True, text=True)
     assert p.returncode == 0, p.stderr[-800:]
-    assert len(os.listdir(os.path.join(work, "preview"))) == 12, "expected twelve screen pictures"
+    assert len(os.listdir(os.path.join(work, "preview"))) == 14, "expected fourteen screen pictures"
 
 @test
 def mute_solo_and_levels(work):
@@ -671,6 +671,74 @@ def bass_lock_density_and_mutate(work):
     assert 0 < sum(on[3]) < 16, f"density 0.3 should thin the line out: {on[3]}"
     assert notes[4] != notes[0], "mutate should change the line"
     assert notes[5] == notes[0] and on[5] == on[0], "seed 0 should bring back the original"
+
+@test
+def song_mode_plays_the_chain(work):
+    """A song of pattern 1 x2 then pattern 2 x1 plays 3 bars, switching on the bar line, then stops. With loop on it goes round again."""
+    h = Harness(); h.show("ockm-load", "ockm-song-pos", "ockm-play", "ockm-song-show")
+    h.at(100, "ockm-bpm 240 ; ockm-song-loop 0 ; ockm-song-list 0 2 1 1")
+    h.at(200, "ockm-song-start 0")
+    h.at(3800, "ockm-song-loop 1 ; ockm-song-start 0")     # 3 bars at 240 bpm = 3 s
+    h.at(9000, "ockm-play 0")
+    f = os.path.join(work, "t_song.pd"); h.finish(9200, f)
+    out = run(work, f)
+    lines = [l for l in out.splitlines() if l.startswith(("ockm-load:", "ockm-play:", "ockm-song-pos:"))]
+    first = lines[:lines.index(next(l for l in lines if l.startswith("ockm-play:") and l.split()[-1].startswith("0")))+1]
+    loads = [int(float(l.split()[-1])) for l in first if l.startswith("ockm-load")]
+    assert loads == [0, 1], f"song should load pattern 1 then pattern 2: {first}"
+    pos = [tuple(int(float(x)) for x in l.split()[-2:]) for l in first if l.startswith("ockm-song-pos")]
+    assert pos[:4] == [(0, 2), (0, 1), (0, 0), (1, 0)], f"bars left should count down per step: {pos}"
+    rest = lines[len(first):]
+    loads2 = [int(float(l.split()[-1])) for l in rest if l.startswith("ockm-load")]
+    assert loads2[:4] == [0, 1, 0, 1], f"with loop on the song should go round again: {loads2}"
+    assert printed(out, "ockm-song-show")[0].split()[-4:] == ["0", "2", "1", "1"], printed(out, "ockm-song-show")
+
+@test
+def touchscreen_builds_and_plays_a_song(work):
+    """On the song tab: add pattern 2 then pattern 1, give the first step 2 repeats, switch to song mode, press play."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness(); h.show("ockm-song-list", "ockm-song-start", "ockm-load", "ockm-song-mode", "ockm-bpm")
+    tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
+    h.at(100, "ockm-bpm 190")
+    tap(150, 759, 36)                    # song tab
+    tap(200, 727, 282)                   # add pattern 2
+    tap(250, 640, 282)                   # add pattern 1 after it
+    tap(300, 300, 153)                   # select step 1
+    tap(350, 380, 153)                   # step 1: one more repeat
+    tap(400, 856, 156)                   # play button plays: the song
+    tap(450, 48, 36)                     # play
+    h.at(3500, "ockm-play 0")
+    tap(3600, 150, 36)                   # tap the tempo: setup
+    tap(3650, 433, 118)                  # +1 bpm
+    f = os.path.join(work, "t_touchsong.pd"); h.finish(3800, f)
+    out = run(work, f)
+    lists = printed(out, "ockm-song-list")
+    assert lists and lists[-1].split()[-4:] == ["1", "2", "0", "1"], f"song should be pattern 2 x2 then pattern 1 x1: {lists}"
+    assert printed(out, "ockm-song-mode")[-1].split()[-1].startswith("1"), "song mode should be on"
+    assert printed(out, "ockm-song-start"), "play in song mode should start the song"
+    loads = [int(float(v.split()[-1])) for v in printed(out, "ockm-load")]
+    assert loads[-2:] == [1, 0], f"the song should play pattern 2, then pattern 1: {loads} {printed(out, 'ockm-song-start')} {lists}"
+    assert printed(out, "ockm-bpm")[-1].split()[-1].startswith("191"), f"setup +1 should nudge the tempo: {printed(out, 'ockm-bpm')}"
+
+@test
+def song_saved_with_the_project_and_patterns_copy(work):
+    """The song is saved with the project; copying a pattern makes an exact copy; clear empties it."""
+    h = Harness()
+    h.at(100, "ockm-song-list 2 4 0 8 ; ockm-pattern-copy 0 5 ; ockm-save bang")
+    f = os.path.join(work, "t_song1.pd"); h.finish(300, f); run(work, f)
+    song = open(os.path.join(work, "projects", "default", "song.txt")).read().replace(";", " ").split()
+    assert song[:4] == ["2", "4", "0", "8"], f"song.txt should hold the chain: {song}"
+    p1 = [l for l in open(os.path.join(work, "projects", "default", "p1.txt")).read().split(";") if "ockm-pat-d1 " in l]
+    p6 = [l for l in open(os.path.join(work, "projects", "default", "p6.txt")).read().split(";") if "ockm-pat-d1 " in l]
+    assert p1 and p1 == p6, "pattern 6 should be an exact copy of pattern 1"
+    h = Harness(); h.show("ockm-song-show")
+    g = h.add("#X obj 10 300 r test-get;"); a = h.add("#X obj 10 325 array get ockm-pat-d1 0 16;"); pa = h.add("#X obj 10 350 print D1;"); h.con(g, a); h.con(a, pa)
+    h.at(150, "ockm-revert bang"); h.at(200, "ockm-want 5"); h.at(300, "test-get bang"); h.at(400, "ockm-pattern-clear 5"); h.at(500, "test-get bang")
+    f = os.path.join(work, "t_song2.pd"); h.finish(600, f); out = run(work, f)
+    assert printed(out, "ockm-song-show") and printed(out, "ockm-song-show")[-1].split()[-4:] == ["2", "4", "0", "8"], f"the song should come back on reopening: {printed(out, 'ockm-song-show')} {open(os.path.join(work, 'projects', 'default', 'song.txt')).read()}"
+    d1 = [[int(float(x)) for x in v.split()] for v in printed(out, "D1")]
+    assert sum(d1[0]) > 0 and sum(d1[1]) == 0, f"copied pattern should play; clearing the playing pattern should empty it: {d1}"
 
 @test
 def blank_project_synths_start_and_sound(work):

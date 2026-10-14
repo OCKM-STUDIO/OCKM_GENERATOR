@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.25"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.26"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
@@ -112,6 +112,7 @@ function ui:defaults()
   for _, t in ipairs(SYNTHS) do v["ockm-"..t.."-level"] = 1 end
   v["ockm-bass-mode"] = 0; v["ockm-lead-mode"] = 1; v["ockm-chord-mode"] = 0   -- 0 auto, 1 manual
   v["ockm-bass-sync"] = 1; v["ockm-lead-sync"] = 1; v["ockm-leader"] = 0; v["ockm-drum-groove"] = -1
+  v["ockm-swing"] = 56; v["ockm-accent"] = 0.3; v["ockm-sync"] = 0; v["ockm-song-mode"] = 0; v["ockm-song-loop"] = 1; v["ockm-volume"] = 1
   for _, p in ipairs({ "bass", "lead" }) do v["ockm-"..p.."-lock"] = 0; v["ockm-"..p.."-density"] = 1; v["ockm-"..p.."-seed"] = 0 end
   v["ockm-bpm"] = 124; v["ockm-len"] = 16; v["ockm-filter"] = 0; v["ockm-root"] = 9; v["ockm-scale"] = 0
   for i, nm in ipairs(SLOTS) do
@@ -140,6 +141,7 @@ function ui:hooks()
   for _, p in ipairs({ "bass", "lead" }) do
     for _, k in ipairs({ "lock", "density", "seed" }) do h[#h+1] = "ockm-"..p.."-"..k end
   end
+  for _, k in ipairs({ "ockm-swing", "ockm-accent", "ockm-sync", "ockm-song-mode", "ockm-song-loop" }) do h[#h+1] = k end
   for _, k in ipairs({ "ockm-volume", "ockm-verb-mix", "ockm-delay-mix", "ockm-drive", "ockm-delay-fb", "ockm-delay-steps", "ockm-verb-size", "ockm-verb-tone" }) do h[#h+1] = k end
   return h
 end
@@ -164,6 +166,14 @@ function ui:postinitialize()
   listen("ockm-playing", function(o, sel, a) o.playing = tonumber(a[1]) or 0; o:dirty() end)
   listen("ockm-project-name", function(o, sel, a) o.project = tostring(a[1] or "default"); o:dirty() end)
   listen("ockm-project-list-start", function(o) o.incoming = {} end)
+  listen("ockm-song-show", function(o, sel, a)
+    local l = {}
+    for k = 1, #a - 1, 2 do l[#l + 1] = { math.floor(tonumber(a[k]) or 0), math.floor(tonumber(a[k + 1]) or 1) } end
+    o.song = l
+    if (o.song_sel or 0) >= #l then o.song_sel = math.max(0, #l - 1) end
+    o:dirty()
+  end)
+  listen("ockm-song-pos", function(o, sel, a) o.song_pos = { math.floor(tonumber(a[1]) or 0), math.floor(tonumber(a[2]) or 0) }; o:dirty() end)
   listen("ockm-project-item", function(o, sel, a) if o.incoming then o.incoming[#o.incoming + 1] = tostring(a[1]) end end)
   listen("ockm-project-list-end", function(o)
     local l = o.incoming or {}
@@ -272,7 +282,13 @@ function ui:layout()
   elseif self.screen == "mixer" then self:layout_mixer(add)
   elseif self.screen == "compose" then self:layout_compose(add)
   elseif self.screen == "project" then self:layout_project(add)
+  elseif self.screen == "song" then self:layout_song(add)
+  elseif self.screen == "setup" then self:layout_setup(add)
   else self:layout_synth(add) end
+  -- messages on screens that have no message line of their own
+  if self.msg and (self.screen == "perform" or self.screen == "compose" or self.screen == "mixer" or self.screen == "song" or self.screen == "setup") then
+    add{ kind="toast", x=W / 2 - 330, y=H - 50, w=660, h=38, label=self.msg }
+  end
   return L
 end
 
@@ -281,25 +297,31 @@ end
 --   2. navigation strip: pattern, length, which block of 16 steps
 --   3. what you're editing (drum slot tabs on the drums screen), then the steps
 --   4. sound shaping at the bottom
-local TABS = { { "perform", "perform" }, { "drums", "drums" }, { "compose", "compose" }, { "synth", "bass", 1 }, { "synth", "lead", 2 }, { "synth", "chord", 3 }, { "mixer", "mixer" } }
+local TABS = { { "perform", "perform" }, { "drums", "drums" }, { "compose", "compose" }, { "synth", "bass", 1 }, { "synth", "lead", 2 }, { "synth", "chord", 3 }, { "mixer", "mixer" }, { "song", "song" } }
 local NAV_Y, NAV_H = 70, 36
 function ui:layout_top(add)
-  add{ kind="play", x=16, y=12, w=64, h=48, tap=function() self:send("ockm-play", self.playing ~= 0 and 0 or 1) end }
-  add{ kind="bpm", x=92, y=12, w=140, h=48 }
+  add{ kind="play", x=16, y=12, w=64, h=48, tap=function()
+    if self.playing ~= 0 then self:send("ockm-play", 0)
+    elseif (self.v["ockm-song-mode"] or 0) > 0 then
+      if #(self.song or {}) == 0 then self:say("song mode: the song is empty. Add steps on the song tab"); self:open("song")
+      else pd.send("ockm-song-start", "float", { self.song_sel or 0 }) end
+    else self:send("ockm-play", 1) end
+  end }
+  add{ kind="bpm", x=92, y=12, w=140, h=48, tap=function() if self.screen ~= "setup" then self:open("setup") end end }
   for i, t in ipairs(TABS) do
     local sel = (self.screen == t[1]) and (t[3] == nil or t[3] == self.part)
-    add{ kind="tab", x=244 + (i - 1) * 80, y=12, w=74, h=48, label=t[2], sel=sel, tap=function()
+    add{ kind="tab", x=244 + (i - 1) * 69, y=12, w=64, h=48, label=t[2], sel=sel, tap=function()
       if t[3] then
         if self.part ~= t[3] then self.part = t[3]; self.sel_step = 0; self.msg = nil end
       end
       if self.screen ~= t[1] then self:open(t[1]) end
     end }
   end
-  add{ kind="btn", x=W - 154, y=12, w=64, h=48, label="save", quiet=true, tap=function() pd.send("ockm-save", "bang", {}); self:say("saved " .. ockm_pretty(self.project)) end }
+  add{ kind="btn", x=W - 154, y=12, w=64, h=48, label="save", tap=function() pd.send("ockm-save", "bang", {}); self:say("saved " .. ockm_pretty(self.project)) end }
   add{ kind="tab", x=W - 84, y=12, w=68, h=48, label="project", sel=(self.screen == "project"), tap=function()
     if self.screen ~= "project" then self:open("project") end
   end }
-  if self.screen ~= "project" then self:layout_nav(add) end
+  if self.screen ~= "project" and self.screen ~= "setup" then self:layout_nav(add) end
 end
 
 -- the navigation strip: pattern 1-8, length, and the blocks of 16 steps (only as many as the length allows)
@@ -437,7 +459,7 @@ function ui:layout_drums(add)
     add{ kind=clear and "btn" or "choice", x=gx + col * (gw + 6), y=364 + row * 54, w=gw, h=46, label=name, small=true, quiet=clear,
          sel=(not clear) and (cur == n) or nil, tap=function()
            self:send("ockm-drum-groove", n)
-           self:say(clear and "drums cleared" or (name .. ": all 8 drums rewritten (revert undoes it)"))
+           self:say(clear and "drums cleared" or (name .. ": all 8 drums rewritten (back to last save undoes it)"))
          end }
   end
 end
@@ -742,6 +764,140 @@ function ui:start_part(p)
   self:say(p .. " started on auto: change it on compose, or switch to manual to edit")
 end
 
+-- ------------------------------------------------------------------ song
+-- MPC style: a chain of steps, each a pattern and how many times it plays. One song per project.
+function ui:send_song()
+  local flat = {}
+  for _, st in ipairs(self.song or {}) do flat[#flat + 1] = st[1]; flat[#flat + 1] = st[2] end
+  if #flat == 0 then pd.send("ockm-song-list", "bang", {}) else pd.send("ockm-song-list", "list", flat) end
+end
+function ui:song_edit(fn, row)
+  self.song = self.song or {}
+  if row then self.song_sel = row - 1 end
+  fn(self.song)
+  self.song_sel = clamp(self.song_sel or 0, 0, math.max(0, #self.song - 1))
+  self:send_song()
+end
+
+function ui:layout_song(add)
+  local song = self.song or {}
+  local sel = clamp(self.song_sel or 0, 0, math.max(0, #song - 1))
+  local playing_song = self.playing ~= 0 and (self.v["ockm-song-mode"] or 0) > 0
+  local LW = 560
+  add{ kind="text", x=16, y=116, w=300, h=12, label="the song: " .. #song .. (#song == 1 and " step" or " steps") .. ", top to bottom", size=10 }
+  local per = 9
+  local pages = math.max(1, math.ceil(#song / per))
+  self.song_page = clamp(self.song_page or 0, 0, pages - 1)
+  if #song == 0 then
+    add{ kind="text", x=24, y=150, w=LW, h=16, label="Empty. Tap a pattern on the right to add the first step.", size=14, col="txt" }
+    add{ kind="text", x=24, y=176, w=LW, h=14, label="Each step plays one pattern, as many times as you set. Then the next step.", size=12 }
+  end
+  for k = 1, per do
+    local i = self.song_page * per + k
+    local st = song[i]
+    if not st then break end
+    local y = 132 + (k - 1) * 46
+    local now = playing_song and self.song_pos and self.song_pos[1] == i - 1
+    if sel == i - 1 then add{ kind="choice", x=16, y=y, w=LW, h=42, label="", sel=true }
+    else add{ kind="card", x=16, y=y, w=LW, h=42 } end
+    add{ kind="zone", x=16, y=y, w=LW, h=42, tap=function() self.song_sel = i - 1 end }
+    add{ kind="text", x=26, y=y + 14, w=30, h=14, label=tostring(i), size=13, col=(sel == i - 1) and "bg" or "txt" }
+    add{ kind="arrow", x=60, y=y + 4, w=34, h=34, dir=-1, on=st[1] > 0, tap=function() self:song_edit(function(l) l[i][1] = math.max(0, l[i][1] - 1) end, i) end }
+    add{ kind="btn", x=98, y=y + 4, w=104, h=34, label="pattern " .. (st[1] + 1), accent=now, tap=function() self.song_sel = i - 1 end }
+    add{ kind="arrow", x=206, y=y + 4, w=34, h=34, dir=1, on=st[1] < 7, tap=function() self:song_edit(function(l) l[i][1] = math.min(7, l[i][1] + 1) end, i) end }
+    add{ kind="btn", x=262, y=y + 4, w=40, h=34, label="-", tap=function() self:song_edit(function(l) l[i][2] = math.max(1, l[i][2] - 1) end, i) end }
+    add{ kind="text", x=310, y=y + 13, w=50, h=14, label="x " .. st[2], size=15, col=(sel == i - 1) and "bg" or "txt" }
+    add{ kind="btn", x=360, y=y + 4, w=40, h=34, label="+", tap=function() self:song_edit(function(l) l[i][2] = math.min(64, l[i][2] + 1) end, i) end }
+    if now then
+      add{ kind="text", x=414, y=y + 14, w=90, h=14, label=(self.song_pos[2] + 1) .. " bar" .. ((self.song_pos[2] == 0) and "" or "s") .. " left", size=12, col="acc" }
+    end
+    add{ kind="btn", x=LW - 34, y=y + 4, w=40, h=34, label="x", quiet=true, tap=function() self:song_edit(function(l) table.remove(l, i) end) end }
+  end
+  if pages > 1 then
+    add{ kind="arrow", x=16, y=550, w=60, h=40, dir=-1, on=self.song_page > 0, tap=function() self.song_page = self.song_page - 1 end }
+    add{ kind="text", x=84, y=564, w=120, h=14, label="page " .. (self.song_page + 1) .. " of " .. pages, size=11 }
+    add{ kind="arrow", x=200, y=550, w=60, h=40, dir=1, on=self.song_page < pages - 1, tap=function() self.song_page = self.song_page + 1 end }
+  end
+  if #song > 0 then
+    add{ kind="btn", x=LW - 124, y=550, w=140, h=40, label=self.confirm == "song" and "tap again to clear" or "clear the song", quiet=self.confirm ~= "song", tap=function()
+      if self.confirm == "song" then self.confirm = nil; self.song_sel = 0; self:song_edit(function(l) for j = #l, 1, -1 do l[j] = nil end end)
+      else self.confirm = "song" end
+    end }
+  end
+  -- right: how play works, adding steps, moving them, and pattern copy
+  local rx, rw = 600, W - 616
+  local hw = (rw - 8) / 2
+  local sm = (self.v["ockm-song-mode"] or 0) > 0
+  add{ kind="text", x=rx, y=116, w=rw, h=12, label="play button plays", size=10 }
+  add{ kind="choice", x=rx, y=132, w=hw, h=48, label="one pattern", sel=not sm, tap=function() self:send("ockm-song-mode", 0) end }
+  add{ kind="choice", x=rx + hw + 8, y=132, w=hw, h=48, label="the song", sel=sm, accent=true, tap=function() self:send("ockm-song-mode", 1) end }
+  add{ kind="choice", x=rx, y=188, w=hw, h=40, small=true, label="loop at the end", sel=(self.v["ockm-song-loop"] or 1) > 0,
+       tap=function() self:send("ockm-song-loop", ((self.v["ockm-song-loop"] or 1) > 0) and 0 or 1) end }
+  add{ kind="btn", x=rx + hw + 8, y=188, w=hw, h=40, small=true, label=(#song > 0) and ("play from step " .. (sel + 1)) or "play from step", accent=(#song > 0),
+       tap=function()
+         if #song == 0 then return end
+         self:send("ockm-song-mode", 1)
+         if self.playing ~= 0 then self:send("ockm-play", 0) end
+         pd.send("ockm-song-start", "float", { sel })
+       end }
+  add{ kind="text", x=rx, y=244, w=rw, h=12, label=(#song > 0) and ("add a step after step " .. (sel + 1) .. ": tap a pattern") or "add a step: tap a pattern", size=10 }
+  local pw = (rw - 3 * 6) / 4
+  for n = 0, 7 do
+    local col, row = n % 4, math.floor(n / 4)
+    add{ kind="btn", x=rx + col * (pw + 6), y=260 + row * 50, w=pw, h=44, label=tostring(n + 1), tap=function()
+      local at = (#song == 0) and 1 or (sel + 2)
+      self:song_edit(function(l) table.insert(l, at, { n, 1 }) end)
+      self.song_sel = at - 1
+      if self.song_sel >= (self.song_page + 1) * per then self.song_page = math.floor(self.song_sel / per) end
+    end }
+  end
+  add{ kind="btn", x=rx, y=366, w=hw, h=40, small=true, label="move step up", tap=function()
+    if sel > 0 then self:song_edit(function(l) l[sel], l[sel + 1] = l[sel + 1], l[sel] end); self.song_sel = sel - 1 end
+  end }
+  add{ kind="btn", x=rx + hw + 8, y=366, w=hw, h=40, small=true, label="move step down", tap=function()
+    if sel < #song - 1 then self:song_edit(function(l) l[sel + 1], l[sel + 2] = l[sel + 2], l[sel + 1] end); self.song_sel = sel + 1 end
+  end }
+  -- patterns: copy the one you're on to another slot, to make variations
+  local cur = self.cur or 0
+  add{ kind="text", x=rx, y=424, w=rw, h=12, label="copy pattern " .. (cur + 1) .. " (the one you're on) to:", size=10 }
+  local cw8 = (rw - 7 * 4) / 8
+  for n = 0, 7 do
+    add{ kind="btn", x=rx + n * (cw8 + 4), y=440, w=cw8, h=40, small=true, label=tostring(n + 1), quiet=(n == cur), tap=function()
+      if n == cur then return end
+      pd.send("ockm-pattern-copy", "list", { cur, n }); self:say("pattern " .. (cur + 1) .. " copied to " .. (n + 1))
+    end }
+  end
+  add{ kind="btn", x=rx, y=490, w=rw, h=40, small=true, quiet=self.confirm ~= "pat",
+       label=(self.confirm == "pat") and ("tap again to clear pattern " .. (cur + 1)) or ("clear pattern " .. (cur + 1)), tap=function()
+    if self.confirm == "pat" then self.confirm = nil; pd.send("ockm-pattern-clear", "float", { cur }); self:say("pattern " .. (cur + 1) .. " cleared")
+    else self.confirm = "pat" end
+  end }
+end
+
+-- ------------------------------------------------------------------ setup (tap the tempo)
+function ui:layout_setup(add)
+  local bpm = math.floor(self.v["ockm-bpm"] or 124)
+  add{ kind="text", x=16, y=80, w=200, h=12, label="tempo", size=10 }
+  add{ kind="text", x=16, y=96, w=200, h=40, label=bpm .. " bpm", size=34, col="txt" }
+  local steps = { -5, -1, 1, 5 }
+  for i, d in ipairs(steps) do
+    add{ kind="btn", x=230 + (i - 1) * 82, y=92, w=76, h=52, label=(d > 0 and "+" or "") .. d, tap=function() self:send("ockm-bpm", clamp(bpm + d, 40, 200)) end }
+  end
+  add{ kind="slider", x=16, y=156, w=W - 32, h=40, hook="ockm-bpm", lo=60, hi=180, label="tempo" }
+  add{ kind="slider", x=16, y=212, w=W - 32, h=40, hook="ockm-swing", lo=50, hi=75, label="swing" }
+  add{ kind="text", x=126, y=252, w=600, h=12, label="swing belongs to each pattern: 50 is straight, 58 is a gentle house shuffle, 66 is heavy", size=10 }
+  add{ kind="slider", x=16, y=276, w=W - 32, h=40, hook="ockm-accent", lo=0, hi=1, label="accents" }
+  add{ kind="text", x=126, y=316, w=600, h=12, label="how much quieter an ordinary hit is than an accented one", size=10 }
+  add{ kind="slider", x=16, y=340, w=W - 32, h=40, hook="ockm-volume", lo=0, hi=1, label="volume" }
+  add{ kind="text", x=16, y=404, w=300, h=12, label="MIDI clock", size=10 }
+  local half = (W - 40) / 2
+  local sync = math.floor(self.v["ockm-sync"] or 0)
+  add{ kind="choice", x=16, y=420, w=half, h=52, label="lead: use my tempo, send clock out", sel=(sync == 0), tap=function() self:send("ockm-sync", 0) end }
+  add{ kind="choice", x=24 + half, y=420, w=half, h=52, label="follow: play to incoming MIDI clock", sel=(sync == 1), tap=function() self:send("ockm-sync", 1) end }
+  add{ kind="text", x=16, y=496, w=W - 32, h=12, label="tempo, accents, volume and MIDI clock belong to the project. Save to keep them", size=10 }
+  add{ kind="text", x=16, y=516, w=W - 32, h=12, label="OCKM_GENERATOR " .. VERSION .. "  ·  project: " .. ockm_pretty(self.project), size=10 }
+end
+
 -- ------------------------------------------------------------------ projects
 -- A project is a folder: 8 patterns plus the kit, tempo and effects. New ones get two random words and the date.
 local WORDS_A = { "amber", "velvet", "copper", "hollow", "silver", "midnight", "dusty", "neon", "quiet", "golden", "lazy", "electric",
@@ -959,7 +1115,7 @@ function ui:press(x, y)
   self.touch = { w = w, x0 = x, y0 = y, mode = nil }
   if not w then return end
   if w.kind == "slider" or w.kind == "vfader" or w.kind == "hbar" then self.touch.mode = "slider"; self:slide(w, x, y)
-  elseif w.kind == "bpm" then self.touch.mode = "bpm"; self.touch.v0 = self.v["ockm-bpm"] or 124
+  elseif w.kind == "bpm" then self.touch.v0 = self.v["ockm-bpm"] or 124
   elseif w.kind == "mstep" or w.kind == "cstep" then
     self.touch.v0 = (w.kind == "mstep") and self:midi_to_deg(SYNTHS[self.part], self:mono_note_or_default(w.i))
                                          or math.floor(self:chord_get(w.i, "deg"))
@@ -981,6 +1137,7 @@ function ui:move(x, y)
   if not t or not t.w then return end
   local dx, dy = x - t.x0, y - t.y0
   if t.mode == "slider" then self:slide(t.w, x, y); return end
+  if t.mode == nil and t.w.kind == "bpm" and math.abs(dy) > 8 then t.mode = "bpm" end
   if t.mode == "bpm" then
     self:send("ockm-bpm", clamp(math.floor(t.v0 - dy / 3 + 0.5), 40, 200)); return
   end
@@ -1081,19 +1238,29 @@ end
 function ui:draw(g, w)
   local k = w.kind
   local th = self.theme
-  if k == "btn" then
+  if k == "toast" then
+    self:col(g, "txt"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 19)
+    self:ctext(g, w.label, w, 13, "bg")
+  elseif k == "btn" then
     self:col(g, w.accent and "acc" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
     self:ctext(g, w.label, w, w.small and 12 or 14, w.accent and "#ffffff" or (w.quiet and "mute" or "txt"))
   elseif k == "tab" then
     self:col(g, w.sel and "on" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
-    self:ctext(g, w.label, w, 15, w.sel and "bg" or "txt")
+    self:ctext(g, w.label, w, 14, w.sel and "bg" or "txt")
   elseif k == "play" then
     local on = self.playing ~= 0
     self:col(g, on and "acc" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
     self:col(g, on and "#ffffff" or "txt")
     local cx, cy = w.x + w.w / 2, w.y + w.h / 2
+    local sm = (self.v["ockm-song-mode"] or 0) > 0
+    if sm then cy = cy - 5 end
     if on then g:fill_rect(cx - 9, cy - 9, 18, 18)
     else local p = Path(cx - 7, cy - 11); p:line_to(cx + 11, cy); p:line_to(cx - 7, cy + 11); p:close(); g:fill_path(p) end
+    if sm then
+      local lab = "song"
+      if on and self.song_pos and self.song then lab = "song " .. (self.song_pos[1] + 1) .. "/" .. #self.song end
+      self:ctext(g, lab, { x=w.x, y=w.y + w.h - 20, w=w.w, h=14 }, 10, on and "#ffffff" or "txt")
+    end
   elseif k == "bpm" then
     local s = fmt(self.v["ockm-bpm"] or 124)
     self:text(g, s, w.x + 4, w.y + 4, 32, "txt")

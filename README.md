@@ -69,12 +69,22 @@ Tap a track's name on perform or the mixer to jump straight to it.
 - **Sound**: engine, its four knobs (named for the engine), drive, reverb and delay sends, level
 - On manual: the note (or chord) picker for the selected step, and slide
 
+**Song** (the last tab). MPC style: one song per project, a chain of steps, each a pattern and how many times it plays.
+- **Add a step:** tap a pattern number on the right. It goes in after the selected step
+- **Each row:** the arrows change the step's pattern, **-** and **+** set how many times it plays, **x** removes it. Tap a row to select it
+- **Play button plays:** **one pattern** (as before) or **the song**. In song mode the play button says "song", and while it plays it shows which step you're on, like "song 2/5"
+- **Loop at the end**, or stop when the song finishes. **Play from step** starts at the selected step, handy for practising one section
+- Patterns switch exactly on the bar line, so a 32-step pattern played twice lasts 4 bars
+- **Copy pattern** copies the pattern you're on to another slot, to make variations (a breakdown without drums, a busier drop). **Clear pattern** empties it (tap twice)
+
+**Setup** (tap the tempo). Tempo with -5, -1, +1, +5 and a slider, swing for this pattern, how strong accents are, master volume, and MIDI clock: lead (send clock out) or follow (play to incoming clock). Dragging the tempo up or down still changes it directly.
+
 **Mixer**
 - One strip per track: reverb and delay sends at the top, a level fader, then **M** and **S**. Tap a strip's name to open that track
 - **Master** on the right: the reverb and delay return levels, the master volume, and **clear** to undo every mute and solo
 - Drum levels belong to the kit (the project). Bass, lead and chord levels belong to each pattern, like the rest of their sound
 
-Swing, accent amount and MIDI clock aren't on the screens yet. They're still saved, and they're in **pd test-panel**.
+Everything is on the screens now, so `pd test-panel` is only for testing.
 
 **Under the screen:** `pd engine` is the sound and sequencer (open it only if you're curious). `pd test-panel` is the old v0.12 panel with every control on one sheet, kept for testing.
 
@@ -129,9 +139,9 @@ Everything is remembered: drum kit, synth sounds, effects, tempo, swing, key and
 11. ~~8 drum slots, chord and lead synth tracks~~ (v0.10)
 12. ~~One central settings store: projects, patterns and the drum kit, saved and restored~~ (v0.11)
 13. Your drum samples, chosen per slot
-14. Song mode, MPC style: a chain of patterns, each with a repeat count, played in order. Then a song generator that writes a starting chain (intro, build, drop, break, outro) for you to tweak
-15. Tighten up the logic and usability after a round of playing
-16. A settings screen for swing, accent amount and MIDI clock, so nothing needs the old test panel
+14. ~~Song mode, MPC style~~ (v0.26). Next: a song generator that writes a starting chain (intro, build, drop, break, outro) for you to tweak
+15. ~~A usability pass~~ (v0.26). Keep going after each round of playing
+16. ~~A setup screen for tempo, swing, accents, volume and MIDI clock~~ (v0.26)
 
 ## Decisions made
 
@@ -173,7 +183,7 @@ Everything is remembered: drum kit, synth sounds, effects, tempo, swing, key and
 | `ui/` | The touchscreen: `ockm-ui.pd_lua` (all three screens) |
 | `docs/` | The architecture review and the brief for the screens |
 | `seq/` | The old test panel (`ockm-panel`), plus sequencers and generators: drum row, mono pattern and generator (bass and lead), chord pattern and generator, the shared presets (`ockm-presets`) and MIDI clock |
-| `projects/` | One folder per project, named like `2026-10-14-velvet-heron`, each holding `project.txt` (tempo, effects, MIDI, accent, drum kit) and `p1.txt` to `p8.txt`. `current.txt` names the one that opens at start-up. `default` is the blank starter |
+| `projects/` | One folder per project, named like `2026-10-14-velvet-heron`, each holding `project.txt` (tempo, effects, MIDI, accent, drum kit) and `p1.txt` to `p8.txt`. Each also holds `song.txt`, the song. `current.txt` names the one that opens at start-up. `default` is the blank starter |
 | `trash/` | Deleted projects. Empty it by hand when you're sure |
 | `samples/` | One folder per drum sound (kick, snare, clap, rim, hat, open-hat, tom, rimshot) for your own samples. Not saved to git |
 | `sketches/` | Early experiments, kept for reference |
@@ -255,6 +265,14 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 | `ockm-bass-mode`, `ockm-lead-mode`, `ockm-chord-mode` | 0 auto (generated), 1 manual (your notes) |
 | `ockm-bass-sync`, `ockm-lead-sync` | 1 follow the chords, 0 follow the key only |
 | `ockm-leader` | Who leads the harmony: 0 chords, 1 melody, 2 bass, 3 key only |
+| `ockm-song-list <p r p r ...>` | Set the song: pattern (0-7) and repeats for each step. Empty clears it |
+| `ockm-song-start <step>` | Play the song from a step (0 is the first) |
+| `ockm-song-mode` | 0 the play button plays one pattern, 1 it plays the song (the screen decides) |
+| `ockm-song-loop` | 1 go round again at the end, 0 stop |
+| `ockm-song-show`, `ockm-song-pos` | Sent by the engine: the song, and the step playing plus bars left |
+| `ockm-pattern-copy <from> <to>` | Copy a pattern (0-7) to another slot |
+| `ockm-pattern-clear <n>` | Empty a pattern |
+| `ockm-bar` | Sent by the clock at the start of every bar |
 | `ockm-drum-groove` | Fill every drum slot with a groove, 0 to 11, or 12 to clear. Sets the swing too |
 | `ockm-chord-rhythm` | Chord rhythm preset, 0 to 7, and rebuild |
 | `ockm-chord-prog` | Chord progression, 0 to 9, and rebuild |
