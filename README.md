@@ -2,7 +2,7 @@
 
 A drum machine and easy-to-program synths in one box. Built in Pure Data, designed to run on a Raspberry Pi with a touchscreen and a few knobs.
 
-Current version: **v0.18**
+Current version: **v0.19**
 
 ## How to open it
 
@@ -36,6 +36,14 @@ Tap a track's name on perform or the mixer to jump straight to it.
 - **Steps**: tap cycles empty, hit (white), accent (orange)
 - Move between blocks of 16 with the **steps** arrows in the navigation strip, or swipe the step row sideways
 - **Level, tune, decay, reverb, delay** for this slot. These belong to the kit, so they stay when you change pattern
+
+**Auto and manual, like a camera.** Every synth part is either:
+- **Auto:** generated from its presets, and it follows everything else live: the chords, the key, the scale and the length. Bass and chord start in auto
+- **Manual:** your notes, exactly as you left them. Nothing regenerates them. The lead starts in manual, because it's the melody
+
+The switch is on each synth screen, next to sound and fill. Editing a step in auto flips that part to manual (a short message says so). Tap **auto** to hand it back to the generator. Picking a preset in fill, or pressing new, always generates and goes back to auto.
+
+**Follow chords** (in fill, for bass and lead): the part sits on each chord of the chord part instead of the key's root. V, VI and VII go below the root, as a bass player would. On by default for the bass, off for the lead.
 
 **Bass, lead and chord** (a tab each)
 - **Key** and **scale** at the top, shared by all three

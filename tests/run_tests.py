@@ -533,7 +533,7 @@ def front_panel_drives_the_engine(work):
 def touchscreen_drives_the_engine(work):
     if not PDLUA:
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
-    h = Harness(); h.show("ockm-edit", "ockm-page", "ockm-len", "ockm-load", "ockm-d1-sound", "ockm-bass-edit", "ockm-want", "ockm-lead-k1", "ockm-filter", "ockm-chord-prog", "ockm-chord-type", "ockm-d1-mute", "ockm-d2-mute", "ockm-bass-level")
+    h = Harness(); h.show("ockm-edit", "ockm-page", "ockm-len", "ockm-load", "ockm-d1-sound", "ockm-bass-edit", "ockm-want", "ockm-lead-k1", "ockm-filter", "ockm-chord-prog", "ockm-chord-type", "ockm-d1-mute", "ockm-d2-mute", "ockm-bass-level", "ockm-bass-mode")
     tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
     h.at(100, "ockm-resync bang")
     tap(150, 50, 137)                    # perform: open the kick lane
@@ -579,6 +579,7 @@ def touchscreen_drives_the_engine(work):
     assert any(0.4 < x < 0.6 for x in lk), f"perform strip: lead knob 1 should be about halfway: {lk}"
     assert any(abs(float(x)) < 0.1 for x in printed(out, "ockm-filter")), "perform strip: filter in the middle should be about 0"
     assert "4" in printed(out, "ockm-chord-prog"), f"fill: progression 5 should send 4: {printed(out, 'ockm-chord-prog')}"
+    assert "1" in printed(out, "ockm-bass-mode"), "editing a bass step in auto should switch the bass to manual"
     assert "1" in printed(out, "ockm-d1-mute"), "perform: M on the kick lane should mute d1"
     assert "1" in printed(out, "ockm-d2-mute"), "mixer: M on strip 2 should mute d2"
     bl = [float(x) for x in printed(out, "ockm-bass-level")]
@@ -618,6 +619,28 @@ def mute_solo_and_levels(work):
     assert got["d1"] == [1, 0, 0, 1], f"d1: open, muted, not soloed, open: {got['d1']}"
     assert got["d2"] == [1, 1, 1, 1], f"d2: always open (it's the soloed one): {got['d2']}"
     assert got["bass"] == [1, 1, 0, 0.5], f"bass: open, open, not soloed, half level: {got['bass']}"
+
+@test
+def bass_follows_chords_and_manual_stays_put(work):
+    h = Harness(); h.show("ockm-bass-mode", "ockm-len")
+    # bass: root notes on the offbeat rhythm, following the chords. Chords: deep house (i iv VI v, a bar each)
+    h.at(100, "ockm-resync bang ; ockm-root 9 ; ockm-scale 0 ; ockm-bass-sync 1 ; ockm-bass-notes 0 ; ockm-bass-rhythm 0")
+    h.at(150, "ockm-chord-rhythm 0 ; ockm-chord-prog 3")
+    g = h.add("#X obj 10 300 r test-get;"); a = h.add("#X obj 10 330 array get ockm-pat-bass-note 0 64;"); pr = h.add("#X obj 10 360 print NOTES;")
+    h.con(g, a); h.con(a, pr)
+    h.at(200, "test-get bang")
+    h.at(220, "ockm-bass-mode 1 ; ockm-root 0")        # manual: a key change must not rewrite the bass
+    h.at(240, "test-get bang")
+    h.at(260, "ockm-bass-rhythm 1")                    # picking a preset generates again and goes back to auto
+    f = os.path.join(work, "t_sync.pd"); h.finish(320, f)
+    out = run(work, f)
+    notes = [[int(float(x)) for x in v.split()] for v in printed(out, "NOTES")]
+    # step 3 of each bar (offbeat rhythm): A minor bass on i, iv, VI (below), v (below)
+    got = [notes[0][b * 16 + 2] for b in range(4)]
+    assert got == [33, 38, 29, 28], f"bass should follow the chords i iv VI v: {got}"
+    assert notes[1] == notes[0], "in manual, changing the key must not rewrite the bass"
+    modes = printed(out, "ockm-bass-mode")
+    assert modes[-1] == "0", f"picking a rhythm should put the bass back in auto: {modes}"
 
 def main():
     if not PD:

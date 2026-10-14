@@ -427,9 +427,9 @@
 #X obj 400 80 sel 0;
 #X msg 400 105 off;
 #X obj 110 850 ockm-presets;
-#X obj 230 850 ockm-monogen bass 0 3 3;
-#X obj 400 850 ockm-monogen lead 24 6 8;
-#X obj 530 850 ockm-chordgen chord;
+#X obj 230 850 ockm-monogen bass 0 3 3 0 1;
+#X obj 400 850 ockm-monogen lead 24 6 8 1 0;
+#X obj 530 850 ockm-chordgen chord 0;
 #N canvas 260 160 1000 400 synth-settings 0;
 #X text 20 10 Synth settings. Key and scale are shared by bass \, lead and chord. Knobs run 0 to 1. Generator choices rebuild that track's pattern.;
 #X obj 20 40 loadbang;

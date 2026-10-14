@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.18"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.19"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
@@ -106,6 +106,8 @@ function ui:defaults()
   v["ockm-volume"] = 1; v["ockm-verb-mix"] = 0.5; v["ockm-delay-mix"] = 0.5
   v["ockm-drive"] = 0; v["ockm-delay-fb"] = 0.4; v["ockm-delay-steps"] = 3; v["ockm-verb-size"] = 0.6; v["ockm-verb-tone"] = 0.5
   for _, t in ipairs(SYNTHS) do v["ockm-"..t.."-level"] = 1 end
+  v["ockm-bass-mode"] = 0; v["ockm-lead-mode"] = 1; v["ockm-chord-mode"] = 0   -- 0 auto, 1 manual
+  v["ockm-bass-sync"] = 1; v["ockm-lead-sync"] = 0
   v["ockm-bpm"] = 124; v["ockm-len"] = 16; v["ockm-filter"] = 0; v["ockm-root"] = 9; v["ockm-scale"] = 0
   for i, nm in ipairs(SLOTS) do
     v["ockm-"..nm.."-sound"] = ({0,1,2,4,5,7,3,6})[i]
@@ -128,7 +130,8 @@ function ui:hooks()
   end
   for _, k in ipairs({"engine","k1","k2","k3","k4","type","smooth","verb","delay","rhythm","prog"}) do h[#h+1] = "ockm-chord-"..k end
   for _, t in ipairs(TRACKS) do h[#h+1] = "ockm-"..t.."-mute"; h[#h+1] = "ockm-"..t.."-solo" end
-  for _, t in ipairs(SYNTHS) do h[#h+1] = "ockm-"..t.."-level" end
+  for _, t in ipairs(SYNTHS) do h[#h+1] = "ockm-"..t.."-level"; h[#h+1] = "ockm-"..t.."-mode" end
+  h[#h+1] = "ockm-bass-sync"; h[#h+1] = "ockm-lead-sync"
   for _, k in ipairs({ "ockm-volume", "ockm-verb-mix", "ockm-delay-mix", "ockm-drive", "ockm-delay-fb", "ockm-delay-steps", "ockm-verb-size", "ockm-verb-tone" }) do h[#h+1] = k end
   return h
 end
@@ -160,16 +163,29 @@ function ui:postinitialize()
   end
   listen("ockm-ui-test", function(o, sel, a) o:test(sel, a) end)
   self.clock = pd.Clock:new():register(self, "redraw")
+  self.msgclock = pd.Clock:new():register(self, "clear_msg")
 end
 
 function ui:finalize()
   for _, r in ipairs(self.recv or {}) do r:destruct() end
   if self.clock then self.clock:destruct() end
+  if self.msgclock then self.msgclock:destruct() end
   for _, t in pairs(self.tables) do if t.destruct then t:destruct() end end
 end
 
 -- one repaint for a burst of changes
 function ui:dirty() if self.clock then self.clock:delay(5) end end
+-- a short message under the steps, gone after a few seconds
+function ui:say(text) self.msg = text; if self.msgclock then self.msgclock:delay(4000) end; self:dirty() end
+function ui:clear_msg() self.msg = nil; self:repaint() end
+-- the camera's manual mode: editing a step in auto hands the part over to you
+function ui:to_manual()
+  local part = SYNTHS[self.part]
+  if (self.v["ockm-"..part.."-mode"] or 0) == 0 then
+    self:send("ockm-"..part.."-mode", 1)
+    self:say(part .. " is now manual: your edits stay put. Tap auto to hand it back to the generator")
+  end
+end
 function ui:redraw() self:repaint() end
 
 function ui:on_step(n)
@@ -254,7 +270,7 @@ function ui:layout_top(add)
     local sel = (self.screen == t[1]) and (t[3] == nil or t[3] == self.part)
     add{ kind="tab", x=244 + (i - 1) * 92, y=12, w=86, h=48, label=t[2], sel=sel, tap=function()
       if t[3] then
-        if self.part ~= t[3] then self.part = t[3]; self.sel_step = 0 end
+        if self.part ~= t[3] then self.part = t[3]; self.sel_step = 0; self.msg = nil end
       end
       if self.screen ~= t[1] then self:open(t[1]) end
     end }
@@ -337,6 +353,7 @@ function ui:layout_perform(add)
 end
 
 function ui:open(screen)
+  self.msg = nil
   self.screen = screen
   self.sel_step = 0
   self:set_page(self:play_block())
@@ -406,7 +423,15 @@ function ui:layout_synth(add)
   local view = self.synth_view or "sound"
   add{ kind="tab", x=16, y=312, w=110, h=32, label="sound", sel=(view == "sound"), tap=function() self.synth_view = "sound" end }
   add{ kind="tab", x=132, y=312, w=110, h=32, label="fill", sel=(view == "fill"), tap=function() self.synth_view = "fill" end }
-  add{ kind="text", x=260, y=322, w=500, h=12, label=self:step_info(), size=11 }
+  add{ kind="text", x=260, y=322, w=470, h=12, label=self.msg or self:step_info(), size=11, col=self.msg and "acc" or nil }
+  local mkey = "ockm-"..part.."-mode"
+  local manual = (self.v[mkey] or 0) > 0
+  add{ kind="choice", x=W - 16 - 180, y=312, w=88, h=32, label="auto", small=true, sel=not manual, tap=function()
+    if manual then self:send(mkey, 0); pd.send("ockm-"..part.."-gen", "bang", {}); self:say(part .. " is back on auto") end
+  end }
+  add{ kind="choice", x=W - 16 - 88, y=312, w=88, h=32, label="manual", small=true, sel=manual, tap=function()
+    if not manual then self:send(mkey, 1) end
+  end }
   if view == "sound" then self:layout_synth_sound(add, part, mono) else self:layout_synth_fill(add, part, mono) end
 end
 
@@ -451,6 +476,13 @@ function ui:layout_synth_fill(add, part, mono)
     local list = {}
     for i, nm in ipairs(MONO_NOTES) do list[i] = { nm } end
     self:preset_row(add, 456, 48, list, "ockm-"..part.."-notes", "notes")
+    local skey = "ockm-"..part.."-sync"
+    add{ kind="choice", x=W - 136 - 186, y=530, w=176, h=56, label="follow chords", accent=true, sel=(self.v[skey] or 0) > 0,
+         tap=function()
+           self:send(skey, ((self.v[skey] or 0) > 0) and 0 or 1)
+           -- a part in auto regenerates to follow (or stop following); a manual part keeps your notes
+           if (self.v["ockm-"..part.."-mode"] or 0) == 0 then pd.send("ockm-"..part.."-gen", "bang", {}) end
+         end }
     add{ kind="btn", x=W - 136, y=530, w=120, h=56, label="new", accent=true,
          tap=function() pd.send("ockm-"..part.."-gen", "bang", {}); self:dirty() end }
     return
@@ -529,6 +561,7 @@ end
 
 function ui:mono_get(i, f) return self:get("ockm-pat-"..SYNTHS[self.part].."-"..f, self:abs(i)) end
 function ui:mono_write(i, note, on, acc, slide)
+  self:to_manual()
   local part = SYNTHS[self.part]
   pd.send("ockm-"..part.."-edit", "list", { self:abs(i), note, on, acc, slide })
   self:dirty()
@@ -558,6 +591,7 @@ end
 
 function ui:chord_get(i, f) return self:get("ockm-pat-chord-"..f, self:abs(i)) end
 function ui:chord_tap(i)
+  self:to_manual()
   self.sel_step = i
   local v = self:chord_get(i, "on")
   local nv = (v <= 0) and 1 or ((v < 2) and 2 or 0)
@@ -565,6 +599,7 @@ function ui:chord_tap(i)
   self:dirty()
 end
 function ui:chord_set_deg(d)
+  self:to_manual()
   local i = self.sel_step
   local v = self:chord_get(i, "on")
   pd.send("ockm-chord-edit", "list", { self:abs(i), (v > 0) and v or 1, d })

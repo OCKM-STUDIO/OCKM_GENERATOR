@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.19 (14 October 2026)
+
+**Added**
+- Auto and manual for every synth part, like a camera. Auto parts are generated from their presets and follow the chords, key, scale and length. Manual parts keep your notes. Editing a step in auto switches to manual; the auto button hands it back
+- The bass follows the chords: with "follow chords" on, the bass pattern sits on each chord's root (V, VI and VII below). Changing the progression moves the bass straight away
+- The lead can follow the chords too (off by default)
+- Bass and chord start in auto; the lead starts in manual
+- 1 new test: the bass follows a deep house progression, stays put in manual, and goes back to auto when you pick a preset
+
+**Changed**
+- Changing the key or scale no longer rewrites a part that's in manual
+
 ## v0.18 (14 October 2026)
 
 **Added**
