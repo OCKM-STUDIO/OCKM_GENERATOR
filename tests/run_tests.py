@@ -540,7 +540,7 @@ def touchscreen_drives_the_engine(work):
     tap(160, 300, 312)                   # drums: sound pad 3 (clap)
     tap(170, 160, 212); tap(180, 160, 212)   # step 3: on, then accent
     tap(190, 281, 36)                    # perform tab
-    tap(200, 462, 88)                    # length 32 (navigation strip)
+    tap(200, 492, 88)                    # length 32 (navigation strip)
     tap(210, 361, 36)                    # drums tab (back to the kick slot)
     h.at(220, "ockm-ui-test drag 600 212 200 212")   # swipe left: steps 17-32
     tap(230, 45, 212)                    # step 17
@@ -600,7 +600,7 @@ def touchscreen_screens_draw(work):
         raise Skip("Pillow not installed")
     p = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_preview.py"), os.path.join(work, "preview")], capture_output=True, text=True)
     assert p.returncode == 0, p.stderr[-800:]
-    assert len(os.listdir(os.path.join(work, "preview"))) == 14, "expected fourteen screen pictures"
+    assert len(os.listdir(os.path.join(work, "preview"))) == 15, "expected fifteen screen pictures"
 
 @test
 def mute_solo_and_levels(work):
@@ -720,6 +720,27 @@ def touchscreen_builds_and_plays_a_song(work):
     loads = [int(float(v.split()[-1])) for v in printed(out, "ockm-load")]
     assert loads[-2:] == [1, 0], f"the song should play pattern 2, then pattern 1: {loads} {printed(out, 'ockm-song-start')} {lists}"
     assert printed(out, "ockm-bpm")[-1].split()[-1].startswith("191"), f"setup +1 should nudge the tempo: {printed(out, 'ockm-bpm')}"
+
+@test
+def touchscreen_new_pattern_from_a_copy(work):
+    """Tap + by the patterns, choose 'copy of 1': pattern 2 becomes a copy and opens; after save, both are marked as in use."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness(); h.show("ockm-pattern-copy", "ockm-want", "ockm-load", "ockm-used")
+    tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
+    h.at(100, "ockm-used 1")            # only pattern 1 in use
+    tap(150, 355, 88)                   # +
+    tap(200, 306, 302)                  # copy of 1
+    h.at(300, "ockm-save bang")
+    f = os.path.join(work, "t_newpat.pd"); h.finish(400, f)
+    out = run(work, f)
+    assert printed(out, "ockm-pattern-copy") and printed(out, "ockm-pattern-copy")[-1].split()[-2:] in (["0", "1"], ["0.0", "1.0"]), printed(out, "ockm-pattern-copy")
+    assert [int(float(v.split()[-1])) for v in printed(out, "ockm-load")][-1] == 1, "the new pattern should open"
+    proj = open(os.path.join(work, "projects", "default", "project.txt")).read()
+    assert "ockm-used 3;" in proj, f"patterns 1 and 2 should be saved as in use: {[l for l in proj.split(';') if 'used' in l]}"
+    p1 = [l for l in open(os.path.join(work, "projects", "default", "p1.txt")).read().split(";") if "ockm-pat-d1 " in l]
+    p2 = [l for l in open(os.path.join(work, "projects", "default", "p2.txt")).read().split(";") if "ockm-pat-d1 " in l]
+    assert p1 == p2, "pattern 2 should be a copy of pattern 1"
 
 @test
 def song_saved_with_the_project_and_patterns_copy(work):

@@ -262,7 +262,7 @@ def show(h): return "ockm-show-"+h[5:]
 PROJECT_KEYS=[("ockm-bpm",124,"ockm-tempo"),("ockm-volume",1,None),("ockm-accent",0.3,None),("ockm-filter",0,None),("ockm-drive",0,None),
     ("ockm-delay-mix",0.5,None),("ockm-delay-fb",0.4,None),("ockm-delay-steps",3,None),("ockm-verb-mix",0.5,None),
     ("ockm-verb-size",0.6,None),("ockm-verb-tone",0.5,None),("ockm-sync",0,None),("ockm-clock-out",1,None),
-    ("ockm-song-mode",0,None),("ockm-song-loop",1,None)]
+    ("ockm-song-mode",0,None),("ockm-song-loop",1,None),("ockm-used",0,None)]
 for nm,snd in SLOTS:
     PROJECT_KEYS+=[(f"ockm-{nm}-sound",snd,None),(f"ockm-{nm}-tune",0,None),(f"ockm-{nm}-decay",100,None),
                    (f"ockm-{nm}-level",1,None),(f"ockm-{nm}-verb",VERB[snd],None),(f"ockm-{nm}-delay",DLY[snd],None)]

@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.27 (14 October 2026)
+
+**Added**
+- **+** next to the pattern numbers: a new pattern in the next free slot, as a copy of the one you're on or empty, then switches to it
+- Empty pattern slots are drawn faint, so you can see which are in use. Remembered with the project
+- **Save** turns orange with a dot when there are unsaved changes, and says what it saved (all 8 patterns, the song and the kit)
+- Switching to an empty pattern tells you how to fill it
+
+**Changed**
+- The "steps" label in the navigation strip is gone, to make room for +
+
 ## v0.26 (14 October 2026)
 
 **Added**

@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.26"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.27"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
@@ -75,6 +75,15 @@ local DRUM_PARAMS = {
 local function hex(c)
   return tonumber(c:sub(2,3),16), tonumber(c:sub(4,5),16), tonumber(c:sub(6,7),16)
 end
+-- every message out goes through psend, so the save button knows when there are unsaved changes
+local UI_NOW
+local NOT_CHANGES = { ["ockm-play"]=1, ["ockm-want"]=1, ["ockm-page"]=1, ["ockm-save"]=1, ["ockm-revert"]=1, ["ockm-song-start"]=1,
+  ["ockm-project-list"]=1, ["ockm-project-open"]=1, ["ockm-project-new"]=1, ["ockm-project-saveas"]=1, ["ockm-project-delete"]=1,
+  ["ockm-used"]=1, ["ockm-resync"]=1 }
+local function psend(name, sel, atoms)
+  if UI_NOW and not NOT_CHANGES[name] and not name:match("%-mute$") and not name:match("%-solo$") then UI_NOW.unsaved = true end
+  pd["send"](name, sel, atoms)
+end
 local function clamp(v, lo, hi) if v < lo then return lo elseif v > hi then return hi end return v end
 local function inside(w, x, y) return x >= w.x and x < w.x + w.w and y >= w.y and y < w.y + w.h end
 local function fmt(v)
@@ -112,7 +121,7 @@ function ui:defaults()
   for _, t in ipairs(SYNTHS) do v["ockm-"..t.."-level"] = 1 end
   v["ockm-bass-mode"] = 0; v["ockm-lead-mode"] = 1; v["ockm-chord-mode"] = 0   -- 0 auto, 1 manual
   v["ockm-bass-sync"] = 1; v["ockm-lead-sync"] = 1; v["ockm-leader"] = 0; v["ockm-drum-groove"] = -1
-  v["ockm-swing"] = 56; v["ockm-accent"] = 0.3; v["ockm-sync"] = 0; v["ockm-song-mode"] = 0; v["ockm-song-loop"] = 1; v["ockm-volume"] = 1
+  v["ockm-used"] = 0; v["ockm-swing"] = 56; v["ockm-accent"] = 0.3; v["ockm-sync"] = 0; v["ockm-song-mode"] = 0; v["ockm-song-loop"] = 1; v["ockm-volume"] = 1
   for _, p in ipairs({ "bass", "lead" }) do v["ockm-"..p.."-lock"] = 0; v["ockm-"..p.."-density"] = 1; v["ockm-"..p.."-seed"] = 0 end
   v["ockm-bpm"] = 124; v["ockm-len"] = 16; v["ockm-filter"] = 0; v["ockm-root"] = 9; v["ockm-scale"] = 0
   for i, nm in ipairs(SLOTS) do
@@ -141,12 +150,14 @@ function ui:hooks()
   for _, p in ipairs({ "bass", "lead" }) do
     for _, k in ipairs({ "lock", "density", "seed" }) do h[#h+1] = "ockm-"..p.."-"..k end
   end
-  for _, k in ipairs({ "ockm-swing", "ockm-accent", "ockm-sync", "ockm-song-mode", "ockm-song-loop" }) do h[#h+1] = k end
+  for _, k in ipairs({ "ockm-swing", "ockm-accent", "ockm-sync", "ockm-song-mode", "ockm-song-loop", "ockm-used" }) do h[#h+1] = k end
   for _, k in ipairs({ "ockm-volume", "ockm-verb-mix", "ockm-delay-mix", "ockm-drive", "ockm-delay-fb", "ockm-delay-steps", "ockm-verb-size", "ockm-verb-tone" }) do h[#h+1] = k end
   return h
 end
 
 function ui:postinitialize()
+  UI_NOW = self
+  self.usedclock = pd.Clock:new():register(self, "check_used")
   math.randomseed(os.time())
   self.project = "default"
   self.recv = {}
@@ -166,6 +177,7 @@ function ui:postinitialize()
   listen("ockm-playing", function(o, sel, a) o.playing = tonumber(a[1]) or 0; o:dirty() end)
   listen("ockm-project-name", function(o, sel, a) o.project = tostring(a[1] or "default"); o:dirty() end)
   listen("ockm-project-list-start", function(o) o.incoming = {} end)
+  for _, n in ipairs({ "ockm-saved", "ockm-revert", "ockm-project-name" }) do listen(n, function(o) o.unsaved = false; o:dirty() end) end
   listen("ockm-song-show", function(o, sel, a)
     local l = {}
     for k = 1, #a - 1, 2 do l[#l + 1] = { math.floor(tonumber(a[k]) or 0), math.floor(tonumber(a[k + 1]) or 1) } end
@@ -189,8 +201,8 @@ function ui:postinitialize()
   listen("ockm-page",    function(o, sel, a) o.page = math.floor(tonumber(a[1]) or 0); o:dirty() end)
   listen("ockm-step",    function(o, sel, a) o:on_step(math.floor(tonumber(a[1]) or 0)) end)
   for _, n in ipairs({ "ockm-refresh","ockm-edit","ockm-extend","ockm-bass-edit","ockm-lead-edit","ockm-chord-edit",
-                       "ockm-bass-gen","ockm-lead-gen","ockm-chord-gen" }) do
-    listen(n, function(o) o:dirty() end)
+                       "ockm-bass-gen","ockm-lead-gen","ockm-chord-gen","ockm-drums-changed" }) do
+    listen(n, function(o) o:dirty(); if o.usedclock then o.usedclock:delay(0) end end)
   end
   -- a fresh suggestion list whenever the melody, bass, key or progression changes by hand
   for _, n in ipairs({ "ockm-lead-edit", "ockm-bass-edit", "ockm-root", "ockm-scale", "ockm-load", "ockm-lead-gen", "ockm-bass-gen",
@@ -239,12 +251,12 @@ function ui:play_block() return math.floor(self.step / 16) end
 function ui:set_page(p)
   p = clamp(math.floor(p), 0, self:blocks() - 1)
   self.page = p
-  pd.send("ockm-page", "float", { p })
+  psend("ockm-page", "float", { p })
 end
 
 function ui:send(hook, x)
   self.v[hook] = x
-  pd.send(hook, "float", { x })
+  psend(hook, "float", { x })
   self:dirty()
 end
 
@@ -285,6 +297,7 @@ function ui:layout()
   elseif self.screen == "song" then self:layout_song(add)
   elseif self.screen == "setup" then self:layout_setup(add)
   else self:layout_synth(add) end
+  if self.sheet == "newpat" then self:layout_newpat(add) end
   -- messages on screens that have no message line of their own
   if self.msg and (self.screen == "perform" or self.screen == "compose" or self.screen == "mixer" or self.screen == "song" or self.screen == "setup") then
     add{ kind="toast", x=W / 2 - 330, y=H - 50, w=660, h=38, label=self.msg }
@@ -304,7 +317,7 @@ function ui:layout_top(add)
     if self.playing ~= 0 then self:send("ockm-play", 0)
     elseif (self.v["ockm-song-mode"] or 0) > 0 then
       if #(self.song or {}) == 0 then self:say("song mode: the song is empty. Add steps on the song tab"); self:open("song")
-      else pd.send("ockm-song-start", "float", { self.song_sel or 0 }) end
+      else psend("ockm-song-start", "float", { self.song_sel or 0 }) end
     else self:send("ockm-play", 1) end
   end }
   add{ kind="bpm", x=92, y=12, w=140, h=48, tap=function() if self.screen ~= "setup" then self:open("setup") end end }
@@ -317,7 +330,8 @@ function ui:layout_top(add)
       if self.screen ~= t[1] then self:open(t[1]) end
     end }
   end
-  add{ kind="btn", x=W - 154, y=12, w=64, h=48, label="save", tap=function() pd.send("ockm-save", "bang", {}); self:say("saved " .. ockm_pretty(self.project)) end }
+  add{ kind="btn", x=W - 154, y=12, w=64, h=48, label=self.unsaved and "save •" or "save", accent=self.unsaved, tap=function()
+    psend("ockm-save", "bang", {}); self:say("saved " .. ockm_pretty(self.project) .. ": all 8 patterns, the song and the kit") end }
   add{ kind="tab", x=W - 84, y=12, w=68, h=48, label="project", sel=(self.screen == "project"), tap=function()
     if self.screen ~= "project" then self:open("project") end
   end }
@@ -329,17 +343,19 @@ function ui:layout_nav(add)
   local y, h = NAV_Y, NAV_H
   add{ kind="text", x=16, y=y + 12, w=60, h=12, label="pattern", size=10 }
   for i = 0, 7 do
-    add{ kind="pattern", x=66 + i * 34, y=y, w=30, h=h, n=i, tap=function()
-      pd.send("ockm-want", "float", { i })
-      if self.playing ~= 0 and i ~= self.cur then self.want = i end
+    add{ kind="pattern", x=66 + i * 34, y=y, w=30, h=h, n=i, used=self:is_used(i), tap=function()
+      self:go_pattern(i)
+      if i ~= self.cur and not self:is_used(i) then
+        self:say("pattern " .. (i + 1) .. " is empty. Try a groove on the drums tab, or + to copy pattern " .. ((self.cur or 0) + 1))
+      end
     end }
   end
-  add{ kind="text", x=354, y=y + 12, w=50, h=12, label="length", size=10 }
+  add{ kind="btn", x=338, y=y, w=34, h=h, label="+", accent=true, tap=function() self.sheet = "newpat" end }
+  add{ kind="text", x=384, y=y + 12, w=40, h=12, label="length", size=10 }
   for i, n in ipairs({ 16, 32, 64, 128 }) do
-    add{ kind="choice", x=398 + (i - 1) * 44, y=y, w=40, h=h, label=tostring(n), small=true,
-         sel=(self.v["ockm-len"] == n), tap=function() pd.send("ockm-length", "float", { n }) end }
+    add{ kind="choice", x=428 + (i - 1) * 44, y=y, w=40, h=h, label=tostring(n), small=true,
+         sel=(self.v["ockm-len"] == n), tap=function() psend("ockm-length", "float", { n }) end }
   end
-  add{ kind="text", x=584, y=y + 12, w=50, h=12, label="steps", size=10 }
   -- back, the steps you're looking at, forward
   local n = self:blocks()
   add{ kind="arrow", x=622, y=y, w=48, h=h, dir=-1, on=(self:shown_block() > 0), tap=function() self:set_page(self:shown_block() - 1) end }
@@ -411,8 +427,8 @@ end
 function ui:open(screen)
   self.msg = nil
   self.screen = screen
-  self.pick, self.confirm = nil, nil
-  if screen == "project" then pd.send("ockm-project-list", "bang", {}) end
+  self.pick, self.confirm, self.sheet = nil, nil, nil
+  if screen == "project" then psend("ockm-project-list", "bang", {}) end
   self.sel_step = 0
   self:set_page(self:play_block())
 end
@@ -516,7 +532,7 @@ function ui:layout_synth(add)
   end
   local mkey = "ockm-"..part.."-mode"
   add{ kind="choice", x=W - 16 - 180, y=266, w=88, h=34, label="auto", small=true, sel=auto, tap=function()
-    if not auto then self:send(mkey, 0); pd.send("ockm-"..part.."-gen", "bang", {}); self:say(part .. " is back on auto: notes from compose") end
+    if not auto then self:send(mkey, 0); psend("ockm-"..part.."-gen", "bang", {}); self:say(part .. " is back on auto: notes from compose") end
   end }
   add{ kind="choice", x=W - 16 - 88, y=266, w=88, h=34, label="manual", small=true, sel=not auto, tap=function()
     if auto then self:send(mkey, 1); self:say(part .. " is manual: edit the steps. Compose won't change them") end
@@ -559,7 +575,7 @@ function ui:set_leader(n)
   self:send("ockm-leader", n)
   for _, p in ipairs({ "bass", "lead" }) do
     self:send("ockm-"..p.."-sync", FOLLOW[n][p])
-    if self:part_auto(p) and (n == 0 or n == 3) then pd.send("ockm-"..p.."-gen", "bang", {}) end
+    if self:part_auto(p) and (n == 0 or n == 3) then psend("ockm-"..p.."-gen", "bang", {}) end
   end
   self.ranking = nil
   if (n == 1 or n == 2) and self:part_auto("chord") then self:suggest_chords() end
@@ -678,7 +694,7 @@ function ui:layout_compose(add)
     add{ kind="text", x=cx + 12, y=cy + 14, w=120, h=16, label=p, size=15, col="txt" }
     local mkey = "ockm-"..p.."-mode"
     add{ kind="choice", x=cx + colw - 172, y=cy + 8, w=78, h=32, label="auto", small=true, sel=auto, tap=function()
-      if not auto then self:send(mkey, 0); pd.send("ockm-"..p.."-gen", "bang", {}); self:say(p .. " is back on auto") end
+      if not auto then self:send(mkey, 0); psend("ockm-"..p.."-gen", "bang", {}); self:say(p .. " is back on auto") end
     end }
     add{ kind="choice", x=cx + colw - 90, y=cy + 8, w=78, h=32, label="manual", small=true, sel=not auto, tap=function()
       if auto then self:send(mkey, 1) end
@@ -690,7 +706,7 @@ function ui:layout_compose(add)
       add{ kind="text", x=ix, y=cy + 104, w=iw, h=14, label="Back to auto replaces them.", size=12 }
       local empty = self:part_empty(p)
       add{ kind="btn", x=ix, y=cy + 132, w=iw, h=52, label=empty and START[p] or "back to auto", quiet=not empty, accent=empty, tap=function()
-        if empty then self:start_part(p) else self:send(mkey, 0); pd.send("ockm-"..p.."-gen", "bang", {}); self:say(p .. " is back on auto") end
+        if empty then self:start_part(p) else self:send(mkey, 0); psend("ockm-"..p.."-gen", "bang", {}); self:say(p .. " is back on auto") end
       end }
       if empty then add{ kind="text", x=ix, y=cy + 196, w=iw, h=14, label="(or write it yourself on the " .. p .. " tab)", size=11 } end
     elseif p == "chord" then
@@ -760,8 +776,78 @@ function ui:start_part(p)
     self:send("ockm-chord-mode", 0); self.ranking = nil; self:suggest_chords(); return
   end
   self:send("ockm-"..p.."-mode", 0)
-  pd.send("ockm-"..p.."-gen", "bang", {})
+  psend("ockm-"..p.."-gen", "bang", {})
   self:say(p .. " started on auto: change it on compose, or switch to manual to edit")
+end
+
+-- ------------------------------------------------------------------ patterns in use
+function ui:is_used(n) return (math.floor((self.v["ockm-used"] or 0) / 2 ^ n) % 2) == 1 end
+function ui:set_used(n, on)
+  local m = math.floor(self.v["ockm-used"] or 0)
+  local bit = math.floor(2 ^ n)
+  local was = (math.floor(m / bit) % 2) == 1
+  if was == on then return end
+  m = on and (m + bit) or (m - bit)
+  self.v["ockm-used"] = m
+  pd["send"]("ockm-used", "float", { m })     -- remembered with the project, but not a change you'd need to save
+  self:dirty()
+end
+-- does the pattern on screen have anything in it?
+function ui:check_used()
+  local L = math.max(1, math.floor(self.v["ockm-len"] or 16))
+  local has = false
+  local names = {}
+  for _, nm in ipairs(SLOTS) do names[#names + 1] = "ockm-pat-" .. nm end
+  for _, p in ipairs({ "bass", "lead", "chord" }) do names[#names + 1] = "ockm-pat-" .. p .. "-on" end
+  for _, t in ipairs(names) do
+    for i = 0, L - 1 do if self:get(t, i) > 0 then has = true; break end end
+    if has then break end
+  end
+  self:set_used(self.cur or 0, has)
+end
+-- the next free slot after the one you're on
+function ui:free_slot()
+  local cur = self.cur or 0
+  for k = 1, 7 do
+    local n = (cur + k) % 8
+    if not self:is_used(n) then return n end
+  end
+  return nil
+end
+function ui:go_pattern(n)
+  psend("ockm-want", "float", { n })
+  if self.playing ~= 0 and n ~= self.cur then self.want = n end
+end
+function ui:layout_newpat(add)
+  local cur = self.cur or 0
+  local n = self:free_slot()
+  add{ kind="zone", x=0, y=0, w=W, h=H, tap=function() self.sheet = nil end }
+  local x, y, w, h = 200, 130, W - 400, 300
+  add{ kind="sheet", x=x, y=y, w=w, h=h }
+  if not n then
+    add{ kind="text", x=x + 24, y=y + 28, w=w - 48, h=20, label="All 8 patterns are in use", size=20, col="txt" }
+    add{ kind="text", x=x + 24, y=y + 64, w=w - 48, h=14, label="Clear one you don't need on the song tab, then try again.", size=13 }
+    add{ kind="btn", x=x + 24, y=y + h - 76, w=(w - 56) / 2, h=52, label="go to the song tab", accent=true, tap=function() self.sheet = nil; self:open("song") end }
+    add{ kind="btn", x=x + 32 + (w - 56) / 2, y=y + h - 76, w=(w - 56) / 2, h=52, label="cancel", quiet=true, tap=function() self.sheet = nil end }
+    return
+  end
+  local when = (self.playing ~= 0) and " It starts at the next bar." or ""
+  add{ kind="text", x=x + 24, y=y + 28, w=w - 48, h=20, label="New pattern in slot " .. (n + 1), size=20, col="txt" }
+  add{ kind="text", x=x + 24, y=y + 64, w=w - 48, h=14, label="Pattern " .. (cur + 1) .. " stays as it is. Switching keeps your work,", size=13 }
+  add{ kind="text", x=x + 24, y=y + 84, w=w - 48, h=14, label="and save keeps all 8 patterns." .. when, size=13 }
+  local bw = (w - 48 - 16) / 3
+  add{ kind="btn", x=x + 24, y=y + 140, w=bw, h=64, label="copy of " .. (cur + 1), accent=true, tap=function()
+    self.sheet = nil
+    psend("ockm-pattern-copy", "list", { cur, n }); self:set_used(n, true); self:go_pattern(n)
+    self:say("pattern " .. (n + 1) .. ": a copy of pattern " .. (cur + 1) .. ". Change it, then save")
+  end }
+  add{ kind="btn", x=x + 32 + bw, y=y + 140, w=bw, h=64, label="start empty", tap=function()
+    self.sheet = nil
+    psend("ockm-pattern-clear", "float", { n }); self:set_used(n, false); self:go_pattern(n)
+    self:say("pattern " .. (n + 1) .. ": empty, with the same sounds. Try a groove on the drums tab")
+  end }
+  add{ kind="btn", x=x + 40 + 2 * bw, y=y + 140, w=bw, h=64, label="cancel", quiet=true, tap=function() self.sheet = nil end }
+  add{ kind="text", x=x + 24, y=y + 232, w=w - 48, h=12, label="Tip: empty slots are the faint numbers next to the +", size=11 }
 end
 
 -- ------------------------------------------------------------------ song
@@ -769,7 +855,7 @@ end
 function ui:send_song()
   local flat = {}
   for _, st in ipairs(self.song or {}) do flat[#flat + 1] = st[1]; flat[#flat + 1] = st[2] end
-  if #flat == 0 then pd.send("ockm-song-list", "bang", {}) else pd.send("ockm-song-list", "list", flat) end
+  if #flat == 0 then psend("ockm-song-list", "bang", {}) else psend("ockm-song-list", "list", flat) end
 end
 function ui:song_edit(fn, row)
   self.song = self.song or {}
@@ -838,7 +924,7 @@ function ui:layout_song(add)
          if #song == 0 then return end
          self:send("ockm-song-mode", 1)
          if self.playing ~= 0 then self:send("ockm-play", 0) end
-         pd.send("ockm-song-start", "float", { sel })
+         psend("ockm-song-start", "float", { sel })
        end }
   add{ kind="text", x=rx, y=244, w=rw, h=12, label=(#song > 0) and ("add a step after step " .. (sel + 1) .. ": tap a pattern") or "add a step: tap a pattern", size=10 }
   local pw = (rw - 3 * 6) / 4
@@ -864,12 +950,12 @@ function ui:layout_song(add)
   for n = 0, 7 do
     add{ kind="btn", x=rx + n * (cw8 + 4), y=440, w=cw8, h=40, small=true, label=tostring(n + 1), quiet=(n == cur), tap=function()
       if n == cur then return end
-      pd.send("ockm-pattern-copy", "list", { cur, n }); self:say("pattern " .. (cur + 1) .. " copied to " .. (n + 1))
+      psend("ockm-pattern-copy", "list", { cur, n }); self:say("pattern " .. (cur + 1) .. " copied to " .. (n + 1))
     end }
   end
   add{ kind="btn", x=rx, y=490, w=rw, h=40, small=true, quiet=self.confirm ~= "pat",
        label=(self.confirm == "pat") and ("tap again to clear pattern " .. (cur + 1)) or ("clear pattern " .. (cur + 1)), tap=function()
-    if self.confirm == "pat" then self.confirm = nil; pd.send("ockm-pattern-clear", "float", { cur }); self:say("pattern " .. (cur + 1) .. " cleared")
+    if self.confirm == "pat" then self.confirm = nil; psend("ockm-pattern-clear", "float", { cur }); self:say("pattern " .. (cur + 1) .. " cleared")
     else self.confirm = "pat" end
   end }
 end
@@ -932,13 +1018,13 @@ function ui:layout_project(add)
   add{ kind="text", x=16, y=130, w=W - 32, h=14, label=self.msg or "8 patterns, plus the drum kit, tempo and effects", size=11, col=self.msg and "acc" or nil }
   local bw = (W - 32 - 3 * 8) / 4
   local acts = {
-    { "save", function() pd.send("ockm-save", "bang", {}); self:say("saved " .. ockm_pretty(cur)) end },
-    { "back to last save", function() pd.send("ockm-revert", "bang", {}); self:say("back to the last save of " .. ockm_pretty(cur)) end },
+    { "save", function() psend("ockm-save", "bang", {}); self:say("saved " .. ockm_pretty(cur) .. ": all 8 patterns, the song and the kit") end },
+    { "back to last save", function() psend("ockm-revert", "bang", {}); self:say("back to the last save of " .. ockm_pretty(cur)) end },
     { "save as a copy", function()
-        local n = self:new_name(); pd.send("ockm-project-saveas", "symbol", { n }); pd.send("ockm-project-list", "bang", {})
+        local n = self:new_name(); psend("ockm-project-saveas", "symbol", { n }); psend("ockm-project-list", "bang", {})
         self:say("saved a copy as " .. ockm_pretty(n) .. ". You're now working in the copy") end },
     { "new blank project", function()
-        local n = self:new_name(); pd.send("ockm-project-new", "symbol", { n }); pd.send("ockm-project-list", "bang", {})
+        local n = self:new_name(); psend("ockm-project-new", "symbol", { n }); psend("ockm-project-list", "bang", {})
         self.pick = nil; self:say("new project: " .. ockm_pretty(n) .. ". The last one stays as you last saved it") end },
   }
   for i, a in ipairs(acts) do
@@ -972,12 +1058,12 @@ function ui:layout_project(add)
     add{ kind="text", x=16, y=y - 18, w=W - 32, h=12, label=ockm_pretty(p) .. ": open it, or delete it. Opening swaps out " .. ockm_pretty(cur), size=10 }
     local w3 = (W - 32 - 16) / 3
     add{ kind="btn", x=16, y=y, w=w3, h=52, label="save " .. ockm_pretty(cur):match("^[^·]+"):gsub("%s+$", "") .. ", then open", accent=true, tap=function()
-      pd.send("ockm-save", "bang", {}); pd.send("ockm-project-open", "symbol", { p }); self.pick = nil; self:say("opened " .. ockm_pretty(p)) end }
+      psend("ockm-save", "bang", {}); psend("ockm-project-open", "symbol", { p }); self.pick = nil; self:say("opened " .. ockm_pretty(p)) end }
     add{ kind="btn", x=16 + w3 + 8, y=y, w=w3, h=52, label="open without saving", tap=function()
-      pd.send("ockm-project-open", "symbol", { p }); self.pick = nil; self:say("opened " .. ockm_pretty(p)) end }
+      psend("ockm-project-open", "symbol", { p }); self.pick = nil; self:say("opened " .. ockm_pretty(p)) end }
     add{ kind="btn", x=16 + 2 * (w3 + 8), y=y, w=w3, h=52, label=(self.confirm == p) and "tap again to delete" or "delete", quiet=(self.confirm ~= p), tap=function()
       if self.confirm == p then
-        pd.send("ockm-project-delete", "symbol", { p }); self.pick, self.confirm = nil, nil
+        psend("ockm-project-delete", "symbol", { p }); self.pick, self.confirm = nil, nil
         self:say(ockm_pretty(p) .. " moved to the trash folder")
       else self.confirm = p end
     end }
@@ -1038,7 +1124,7 @@ function ui:drum_cycle(slot, step)
   local nm = SLOTS[slot]
   local v = self:get("ockm-pat-"..nm, step)
   local nv = (v <= 0) and 1 or ((v < 2) and 2 or 0)
-  pd.send("ockm-edit", nm, { step, nv })
+  psend("ockm-edit", nm, { step, nv })
   self:dirty()
 end
 function ui:drum_tap(i) self:drum_cycle(self.slot, self:abs(i)) end
@@ -1046,7 +1132,7 @@ function ui:drum_tap(i) self:drum_cycle(self.slot, self:abs(i)) end
 function ui:mono_get(i, f) return self:get("ockm-pat-"..SYNTHS[self.part].."-"..f, self:abs(i)) end
 function ui:mono_write(i, note, on, acc, slide)
   local part = SYNTHS[self.part]
-  pd.send("ockm-"..part.."-edit", "list", { self:abs(i), note, on, acc, slide })
+  psend("ockm-"..part.."-edit", "list", { self:abs(i), note, on, acc, slide })
   self:dirty()
 end
 function ui:mono_note_or_default(i)
@@ -1077,13 +1163,13 @@ function ui:chord_tap(i)
   self.sel_step = i
   local v = self:chord_get(i, "on")
   local nv = (v <= 0) and 1 or ((v < 2) and 2 or 0)
-  pd.send("ockm-chord-edit", "list", { self:abs(i), nv, self:chord_get(i, "deg") })
+  psend("ockm-chord-edit", "list", { self:abs(i), nv, self:chord_get(i, "deg") })
   self:dirty()
 end
 function ui:chord_set_deg(d)
   local i = self.sel_step
   local v = self:chord_get(i, "on")
-  pd.send("ockm-chord-edit", "list", { self:abs(i), (v > 0) and v or 1, d })
+  psend("ockm-chord-edit", "list", { self:abs(i), (v > 0) and v or 1, d })
   self:dirty()
 end
 
@@ -1238,7 +1324,11 @@ end
 function ui:draw(g, w)
   local k = w.kind
   local th = self.theme
-  if k == "toast" then
+  if k == "sheet" then
+    self:col(g, "bg"); g:fill_rounded_rect(w.x - 4, w.y - 4, w.w + 8, w.h + 8, 14)
+    self:col(g, "card"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 12)
+    self:col(g, "acc"); g:stroke_rounded_rect(w.x, w.y, w.w, w.h, 12, 2)
+  elseif k == "toast" then
     self:col(g, "txt"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 19)
     self:ctext(g, w.label, w, 13, "bg")
   elseif k == "btn" then
@@ -1270,9 +1360,10 @@ function ui:draw(g, w)
     self:text(g, w.label, w.x, w.y, w.size or 12, w.col or "mute", w.w)
   elseif k == "pattern" then
     local playing = (w.n == self.cur)
-    self:col(g, playing and "on" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
+    if playing or w.used == nil or w.used then self:col(g, playing and "on" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
+    else self:col(g, "off"); g:stroke_rounded_rect(w.x + 1, w.y + 1, w.w - 2, w.h - 2, 6, 1.5) end
     if self.want == w.n then self:col(g, "acc"); g:stroke_rounded_rect(w.x + 1, w.y + 1, w.w - 2, w.h - 2, 6, 2) end
-    self:ctext(g, string.format("%d", math.floor(w.n + 1)), w, (w.h > 44) and 22 or 13, playing and "bg" or "txt")
+    self:ctext(g, string.format("%d", math.floor(w.n + 1)), w, (w.h > 44) and 22 or 13, playing and "bg" or ((w.used == false) and "mute" or "txt"))
   elseif k == "choice" then
     local sel = w.sel
     self:col(g, sel and (w.accent and "acc" or "on") or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
