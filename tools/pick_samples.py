@@ -97,11 +97,20 @@ for k, bysrc in cands.items():
     picked[k] = out
     print(f"{k:9s} {len(out):2d} picked from {len(bysrc)} sources ({sum(len(v) for v in bysrc.values())} candidates)")
 if COPY:
+    import hashlib
     rows = []
     for k, out in picked.items():
         d = os.path.join(DST, k); os.makedirs(d, exist_ok=True)
+        seen = set(); uniq = []
+        for src, path in out:      # the same hit often sits in two places in a library
+            h = hashlib.md5(open(path, "rb").read()).hexdigest()
+            if h not in seen: seen.add(h); uniq.append((src, path))
+        first = []
+        for src, _ in uniq:
+            if src not in first: first.append(src)
+        out = sorted(uniq, key=lambda t: first.index(t[0]))   # files from one source sit together
         for i, (src, path) in enumerate(out, 1):
-            name = f"{k}-{i:02d}.wav"
+            name = f"{i:02d}.wav"     # plain numbers: the source is only in sources.csv
             shutil.copyfile(path, os.path.join(d, name))
             rows.append([k, name, src, os.path.relpath(path, SRC)])
     with open(os.path.join(DST, "sources.csv"), "w", newline="") as f:

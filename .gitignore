@@ -6,3 +6,4 @@ samples/**/*.wav
 samples/**/*.WAV
 samples/**/*.aif
 samples/**/*.aiff
+samples/sources.csv
