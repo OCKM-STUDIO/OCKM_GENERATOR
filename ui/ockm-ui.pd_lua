@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.29"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.30"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
@@ -315,7 +315,7 @@ end
 --   2. navigation strip: pattern, length, which block of 16 steps
 --   3. what you're editing (drum slot tabs on the drums screen), then the steps
 --   4. sound shaping at the bottom
-local TABS = { { "perform", "perform" }, { "drums", "drums" }, { "compose", "compose" }, { "synth", "bass", 1 }, { "synth", "lead", 2 }, { "synth", "chord", 3 }, { "mixer", "mixer" }, { "song", "song" } }
+local TABS = { { "perform", "perform" }, { "compose", "compose" }, { "drums", "drums" }, { "synth", "bass", 1 }, { "synth", "lead", 2 }, { "synth", "chord", 3 }, { "mixer", "mixer" }, { "song", "song" } }
 local NAV_Y, NAV_H = 70, 36
 function ui:layout_top(add)
   add{ kind="play", x=16, y=12, w=64, h=48, tap=function()
@@ -418,9 +418,11 @@ function ui:layout_perform(add)
   end }
   add{ kind="pad", x=rx + 2 * (mw + 6), y=456, w=mw, h=60, hook="ockm-delay-throw", label="throw", sub="hold" }
   add{ kind="hbar", x=rx + 3 * (mw + 6), y=456, w=mw, h=60, hook="ockm-drive", lo=0, hi=1, label="drive", bold=true }
-  local ROW2 = { { "ockm-delay-fb", 0, 0.9, "feedback" }, { "ockm-delay-steps", 1, 8, "time" }, { "ockm-verb-mix", 0, 1, "reverb" }, { "ockm-verb-size", 0, 1, "size" } }
+  local ROW2 = { { "ockm-delay-mix", 0, 1, "delay" }, { "ockm-delay-fb", 0, 0.9, "feedback" }, { "ockm-delay-steps", 1, 8, "time" },
+                 { "ockm-verb-mix", 0, 1, "reverb" }, { "ockm-verb-size", 0, 1, "size" } }
+  local w5 = (half - 4 * 6) / 5
   for i, m in ipairs(ROW2) do
-    add{ kind="hbar", x=rx + (i - 1) * (mw + 6), y=524, w=mw, h=60, hook=m[1], lo=m[2], hi=m[3], label=m[4], bold=true }
+    add{ kind="hbar", x=rx + (i - 1) * (w5 + 6), y=524, w=w5, h=60, hook=m[1], lo=m[2], hi=m[3], label=m[4], bold=true }
   end
   local part = SYNTHS[self.perf_part or 1]
   local tw = (half - 2 * 6) / 3
@@ -555,27 +557,33 @@ function ui:layout_synth(add)
 end
 
 function ui:layout_synth_sound(add, part, mono)
-  add{ kind="text", x=16, y=314, w=200, h=12, label="sound", size=10 }
+  local half = (W - 48) / 2
+  -- left: where the notes come from (the same settings as this part's column on compose)
+  add{ kind="card", x=16, y=306, w=half, h=H - 306 - 6 }
+  add{ kind="text", x=28, y=318, w=half - 24, h=12, label="notes: the same settings as on compose", size=10 }
+  self:gen_controls(add, part, 28, 290, half - 24, 0.88)
+  -- right: the sound
+  local rx, rw = 16 + half + 16, half
+  add{ kind="text", x=rx, y=314, w=200, h=12, label="sound", size=10 }
   local eng = mono and MONO_ENG or CHORD_ENG
-  local ew = (W - 32) / #eng
+  local ew = rw / #eng
   for e = 0, #eng - 1 do
-    add{ kind="choice", x=16 + e * ew, y=330, w=ew - 6, h=44, label=eng[e + 1], sel=(self.v["ockm-"..part.."-engine"] == e),
+    add{ kind="choice", x=rx + e * ew, y=330, w=ew - 4, h=40, label=eng[e + 1], small=true, sel=(self.v["ockm-"..part.."-engine"] == e),
          tap=function() self:send("ockm-"..part.."-engine", e) end }
   end
   local kn = KNOBS[eng[(self.v["ockm-"..part.."-engine"] or 0) + 1]] or KNOBS.acid
-  local cw = (W - 32 - 16) / 2
+  local kw = (rw - 6) / 2
   for k = 1, 4 do
     local col, row = (k - 1) % 2, math.floor((k - 1) / 2)
-    add{ kind="slider", x=16 + col * (cw + 16), y=392 + row * 48, w=cw, h=38, hook="ockm-"..part.."-k"..k, lo=0, hi=1, label=kn[k] }
+    add{ kind="hbar", x=rx + col * (kw + 6), y=380 + row * 54, w=kw, h=48, hook="ockm-"..part.."-k"..k, lo=0, hi=1, label=kn[k], bold=true }
   end
   local third = {}
   if mono then third[#third + 1] = { "drive", "drive" } end
-  third[#third + 1] = { "verb", "reverb" }; third[#third + 1] = { "delay", "delay" }
-  local tw = (W - 32 - 16 * (#third - 1)) / #third
+  third[#third + 1] = { "verb", "reverb" }; third[#third + 1] = { "delay", "delay" }; third[#third + 1] = { "level", "level" }
+  local tw = (rw - 6 * (#third - 1)) / #third
   for j, t in ipairs(third) do
-    add{ kind="slider", x=16 + (j - 1) * (tw + 16), y=496, w=tw, h=38, hook="ockm-"..part.."-"..t[1], lo=0, hi=1, label=t[2] }
+    add{ kind="hbar", x=rx + (j - 1) * (tw + 6), y=494, w=tw, h=48, hook="ockm-"..part.."-"..t[1], lo=0, hi=1, label=t[2], bold=true }
   end
-  add{ kind="slider", x=16, y=546, w=cw, h=38, hook="ockm-"..part.."-level", lo=0, hi=1, label="level" }
 end
 
 -- ------------------------------------------------------------------ compose
@@ -713,65 +721,72 @@ function ui:layout_compose(add)
     add{ kind="choice", x=cx + colw - 90, y=cy + 8, w=78, h=32, label="manual", small=true, sel=not auto, tap=function()
       if auto then self:send(mkey, 1) end
     end }
-    local ix, iw = cx + 12, colw - 24
-    if not auto then
-      add{ kind="text", x=ix, y=cy + 64, w=iw, h=14, label="manual: your notes, edited by hand.", size=12 }
-      add{ kind="text", x=ix, y=cy + 84, w=iw, h=14, label="Compose won't change them.", size=12 }
-      add{ kind="text", x=ix, y=cy + 104, w=iw, h=14, label="Back to auto replaces them.", size=12 }
-      local empty = self:part_empty(p)
-      add{ kind="btn", x=ix, y=cy + 132, w=iw, h=52, label=empty and START[p] or "back to auto", quiet=not empty, accent=empty, tap=function()
-        if empty then self:start_part(p) else self:send(mkey, 0); psend("ockm-"..p.."-gen", "bang", {}); self:say(p .. " is back on auto") end
-      end }
-      if empty then add{ kind="text", x=ix, y=cy + 196, w=iw, h=14, label="(or write it yourself on the " .. p .. " tab)", size=11 } end
-    elseif p == "chord" then
-      add{ kind="text", x=ix, y=cy + 52, w=iw, h=12, label="progression", size=10 }
-      self:stepper(add, ix, cy + 66, iw, 52, PROGS, "ockm-chord-prog")
-      add{ kind="text", x=ix, y=cy + 124, w=iw, h=12, label="rhythm", size=10 }
-      self:stepper(add, ix, cy + 138, iw, 40, CHORD_RHY, "ockm-chord-rhythm")
-      add{ kind="text", x=ix, y=cy + 184, w=iw, h=12, label="spice", size=10 }
-      local spw = (iw - 18) / 4
-      for i, sp in ipairs(SPICE) do
-        add{ kind="choice", x=ix + (i - 1) * (spw + 6), y=cy + 198, w=spw, h=36, label=i .. " " .. sp[2], small=true,
-             sel=(self.v["ockm-chord-type"] == sp[1]), tap=function() self:send("ockm-chord-type", sp[1]) end }
-      end
-      add{ kind="choice", x=ix, y=cy + 242, w=iw, h=34, label="smooth voicing", accent=true, small=true, sel=(self.v["ockm-chord-smooth"] or 1) > 0,
-           tap=function() self:send("ockm-chord-smooth", ((self.v["ockm-chord-smooth"] or 1) > 0) and 0 or 1) end }
-      local leader = self.v["ockm-leader"] or 0
-      if (leader == 0 or leader == 3) and self:part_empty("chord") then
-        add{ kind="btn", x=ix, y=cy + 284, w=iw, h=40, accent=true, label=START.chord, tap=function() self:start_part("chord") end }
-      elseif leader == 1 or leader == 2 then
-        add{ kind="btn", x=ix, y=cy + 284, w=iw, h=40, accent=true,
-             label=self.ranking and "next suggestion" or ((leader == 1) and "suggest chords for the melody" or "suggest chords for the bass"),
-             tap=function() self:suggest_chords() end }
-      end
-    else
-      local notes = {}
-      for i, nm in ipairs(MONO_NOTES) do notes[i] = { nm } end
-      add{ kind="text", x=ix, y=cy + 52, w=iw, h=12, label="notes", size=10 }
-      self:stepper(add, ix, cy + 66, iw, 52, notes, "ockm-"..p.."-notes")
-      add{ kind="text", x=ix, y=cy + 124, w=iw, h=12, label="rhythm", size=10 }
-      self:stepper(add, ix, cy + 138, iw, 40, RHYTHMS, "ockm-"..p.."-rhythm")
-      local lkey = "ockm-"..p.."-lock"
-      local lw3 = (iw - 12) / 3
-      for li, nm in ipairs({ "own rhythm", "on the kick", "fill gaps" }) do
-        add{ kind="choice", x=ix + (li - 1) * (lw3 + 6), y=cy + 186, w=lw3, h=34, label=nm, small=true,
-             sel=(math.floor(self.v[lkey] or 0) == li - 1), tap=function() self:send(lkey, li - 1) end }
-      end
-      add{ kind="hbar", x=ix, y=cy + 228, w=iw, h=34, hook="ockm-"..p.."-density", lo=0, hi=2, label="density", bold=true }
-      local skey = "ockm-"..p.."-seed"
-      local seed = math.floor(self.v[skey] or 0)
-      if self:part_empty(p) then
-        add{ kind="btn", x=ix, y=cy + 270, w=iw, h=34, accent=true, label=START[p], tap=function() self:start_part(p) end }
-      else
-        add{ kind="btn", x=ix, y=cy + 270, w=(iw - 6) / 2, h=34, label="mutate", tap=function() self:send(skey, seed + 1) end }
-        add{ kind="btn", x=ix + (iw + 6) / 2, y=cy + 270, w=(iw - 6) / 2, h=34, label="original", quiet=(seed == 0), tap=function() self:send(skey, 0) end }
-      end
-      local leader = self.v["ockm-leader"] or 0
-      local leads = (leader == 1 and p == "lead") or (leader == 2 and p == "bass")
-      local follows = (self.v["ockm-"..p.."-sync"] or 0) > 0
-      add{ kind="text", x=ix, y=cy + 314, w=iw, h=14, size=11,
-           label=(leads and "leads the harmony" or (follows and "follows the chords" or "follows the key")) .. ((seed > 0) and ("  ·  variation " .. seed) or "") }
+    self:gen_controls(add, p, cx + 12, cy, colw - 24)
+  end
+end
+
+-- a part's generator settings: the same on compose and on the part's own tab
+function ui:gen_controls(add, p, ix, cy, iw, k)
+  k = k or 1
+  local auto = self:part_auto(p)
+  local mkey = "ockm-"..p.."-mode"
+  if not auto then
+    add{ kind="text", x=ix, y=cy + k * 64, w=iw, h=k * 14, label="manual: your notes, edited by hand.", size=12 }
+    add{ kind="text", x=ix, y=cy + k * 84, w=iw, h=k * 14, label="Compose won't change them.", size=12 }
+    add{ kind="text", x=ix, y=cy + k * 104, w=iw, h=k * 14, label="Back to auto replaces them.", size=12 }
+    local empty = self:part_empty(p)
+    add{ kind="btn", x=ix, y=cy + k * 132, w=iw, h=k * 52, label=empty and START[p] or "back to auto", quiet=not empty, accent=empty, tap=function()
+      if empty then self:start_part(p) else self:send(mkey, 0); psend("ockm-"..p.."-gen", "bang", {}); self:say(p .. " is back on auto") end
+    end }
+    if empty then add{ kind="text", x=ix, y=cy + k * 196, w=iw, h=k * 14, label="(or write it yourself on the " .. p .. " tab)", size=11 } end
+  elseif p == "chord" then
+    add{ kind="text", x=ix, y=cy + k * 52, w=iw, h=k * 12, label="progression", size=10 }
+    self:stepper(add, ix, cy + k * 66, iw, k * 52, PROGS, "ockm-chord-prog")
+    add{ kind="text", x=ix, y=cy + k * 124, w=iw, h=k * 12, label="rhythm", size=10 }
+    self:stepper(add, ix, cy + k * 138, iw, k * 40, CHORD_RHY, "ockm-chord-rhythm")
+    add{ kind="text", x=ix, y=cy + k * 184, w=iw, h=k * 12, label="spice", size=10 }
+    local spw = (iw - 18) / 4
+    for i, sp in ipairs(SPICE) do
+      add{ kind="choice", x=ix + (i - 1) * (spw + 6), y=cy + k * 198, w=spw, h=k * 36, label=i .. " " .. sp[2], small=true,
+           sel=(self.v["ockm-chord-type"] == sp[1]), tap=function() self:send("ockm-chord-type", sp[1]) end }
     end
+    add{ kind="choice", x=ix, y=cy + k * 242, w=iw, h=k * 34, label="smooth voicing", accent=true, small=true, sel=(self.v["ockm-chord-smooth"] or 1) > 0,
+         tap=function() self:send("ockm-chord-smooth", ((self.v["ockm-chord-smooth"] or 1) > 0) and 0 or 1) end }
+    local leader = self.v["ockm-leader"] or 0
+    if (leader == 0 or leader == 3) and self:part_empty("chord") then
+      add{ kind="btn", x=ix, y=cy + k * 284, w=iw, h=k * 40, accent=true, label=START.chord, tap=function() self:start_part("chord") end }
+    elseif leader == 1 or leader == 2 then
+      add{ kind="btn", x=ix, y=cy + k * 284, w=iw, h=k * 40, accent=true,
+           label=self.ranking and "next suggestion" or ((leader == 1) and "suggest chords for the melody" or "suggest chords for the bass"),
+           tap=function() self:suggest_chords() end }
+    end
+  else
+    local notes = {}
+    for i, nm in ipairs(MONO_NOTES) do notes[i] = { nm } end
+    add{ kind="text", x=ix, y=cy + k * 52, w=iw, h=k * 12, label="notes", size=10 }
+    self:stepper(add, ix, cy + k * 66, iw, k * 52, notes, "ockm-"..p.."-notes")
+    add{ kind="text", x=ix, y=cy + k * 124, w=iw, h=k * 12, label="rhythm", size=10 }
+    self:stepper(add, ix, cy + k * 138, iw, k * 40, RHYTHMS, "ockm-"..p.."-rhythm")
+    local lkey = "ockm-"..p.."-lock"
+    local lw3 = (iw - 12) / 3
+    for li, nm in ipairs({ "own rhythm", "on the kick", "fill gaps" }) do
+      add{ kind="choice", x=ix + (li - 1) * (lw3 + 6), y=cy + k * 186, w=lw3, h=k * 34, label=nm, small=true,
+           sel=(math.floor(self.v[lkey] or 0) == li - 1), tap=function() self:send(lkey, li - 1) end }
+    end
+    add{ kind="hbar", x=ix, y=cy + k * 228, w=iw, h=k * 34, hook="ockm-"..p.."-density", lo=0, hi=2, label="density", bold=true }
+    local skey = "ockm-"..p.."-seed"
+    local seed = math.floor(self.v[skey] or 0)
+    if self:part_empty(p) then
+      add{ kind="btn", x=ix, y=cy + k * 270, w=iw, h=k * 34, accent=true, label=START[p], tap=function() self:start_part(p) end }
+    else
+      add{ kind="btn", x=ix, y=cy + k * 270, w=(iw - 6) / 2, h=k * 34, label="mutate", tap=function() self:send(skey, seed + 1) end }
+      add{ kind="btn", x=ix + (iw + 6) / 2, y=cy + k * 270, w=(iw - 6) / 2, h=k * 34, label="original", quiet=(seed == 0), tap=function() self:send(skey, 0) end }
+    end
+    local leader = self.v["ockm-leader"] or 0
+    local leads = (leader == 1 and p == "lead") or (leader == 2 and p == "bass")
+    local follows = (self.v["ockm-"..p.."-sync"] or 0) > 0
+    add{ kind="text", x=ix, y=cy + k * 314, w=iw, h=k * 14, size=11,
+         label=(leads and "leads the harmony" or (follows and "follows the chords" or "follows the key")) .. ((seed > 0) and ("  ·  variation " .. seed) or "") }
   end
 end
 

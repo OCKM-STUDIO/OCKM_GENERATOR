@@ -89,12 +89,12 @@ SHOTS = [
     ("drums", ["test tap 50 137"]),                                   # tap the kick lane name
     ("bass", ["test tap 483 36", "test tap 89 158"]),                 # bass tab; tapping a step on auto just explains the lock
     ("chord", ["test tap 621 36"]),
-    ("compose", ["test tap 441 36"]),
+    ("compose", ["test tap 345 36"]),
     ("perform-mutes", ["test tap 281 36", "test tap 126 137", "test tap 166 369"]),   # mute kick, solo bass
     ("mixer", ["test tap 690 36"]),
-    ("drums-long", ["test tap 361 36", "test tap 880 88", "test tap 194 88"]),        # 64 steps, forward to the second block
-    ("compose-melody", ["test tap 441 36", "test tap 186 154", "test tap 400 540"]),   # melody leads, ask for chords, then mutate the bass
-    ("drums-groove", ["test tap 361 36", "test tap 660 445"]),                         # drums tab, tap a groove
+    ("drums-long", ["test tap 414 36", "test tap 880 88", "test tap 194 88"]),        # 64 steps, forward to the second block
+    ("compose-melody", ["test tap 345 36", "test tap 186 154", "test tap 400 540"]),   # melody leads, ask for chords, then mutate the bass
+    ("drums-groove", ["test tap 414 36", "test tap 660 445"]),                         # drums tab, tap a groove
     ("project", ["test tap 910 36", "test tap 600 261"]),                              # project screen, pick an older project
     ("song", ["test tap 759 36", "test tap 640 282", "test tap 727 282", "test tap 727 282", "test tap 640 332", "test tap 380 199", "test tap 380 199", "test tap 380 199"]),
     ("setup", ["test tap 150 36"]),

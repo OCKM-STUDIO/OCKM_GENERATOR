@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.30 (14 October 2026)
+
+**Changed**
+- The bass, lead and chord tabs show the part's generator settings (notes, rhythm, lock, density, mutate; or progression, rhythm, spice, smooth) next to the sound. They're the same settings as on compose, so they always match
+- Tabs: perform and compose sit side by side (perform, compose, drums, bass, lead, chord, mixer, song)
+- Delay level is back on perform's master FX, next to feedback and time
+
 ## v0.29 (14 October 2026)
 
 **Added**

@@ -11,7 +11,7 @@ Open `OCKM_GENERATOR.pd` in plugdata. Keep the folder together: the main patch f
 The window is the instrument: three touch screens, drawn in Lua (plugdata has Lua built in). Click with the mouse on the Mac, tap with a finger on the Pi. If clicks do nothing, the patch is in edit mode: press Cmd+E.
 
 **How every screen is laid out**, top to bottom:
-1. **Top bar:** play, tempo, then the screens as tabs: **perform, drums, bass, lead, chord, mixer**. Save and **project** on the right. The version number sits next to the tempo
+1. **Top bar:** play, tempo, then the screens as tabs: **perform, compose, drums, bass, lead, chord, mixer, song**. Save and **project** on the right. The version number sits next to the tempo
 2. **Navigation strip:** on the left, right above the steps, the **steps** navigator: back and forward arrows either side of the steps you're looking at (for example "17-32"). The dots show every block of 16: white is the one on screen, orange is the one playing. You can also swipe the step row sideways. In the middle, **pattern**: just the patterns you've made, then **+** for a new one. On the right, **length** (16, 32, 64, 128)
 3. **What you're editing:** the steps (and, on the drums screen, which of the 8 drum slots)
 4. **Sound shaping** at the bottom
@@ -30,7 +30,7 @@ Tap a track's name on perform or the mixer to jump straight to it.
 - **Bottom right, master FX**, played like an SP-404:
   - **Filter** (double width): drag left for low-pass, right for high-pass. Let go and it glides back to off in a fifth of a second. Tap **hold** to make it stay where you leave it; tap hold again and it glides home
   - **Throw** (hold the pad): sends the whole mix into its own echo line. Let go and the echoes ring out and fade, at the delay time and feedback you've set. The dub throw
-  - **Drive**, then delay **feedback** and **time** (in steps), reverb level and **size**. Reverb tone is in setup, and the normal delay level is on the mixer's master strip
+  - **Drive**; then delay level, **feedback** and **time** (in steps); reverb level and **size**. Reverb tone is in setup
 - These are bars: drag along them. The orange line shows the value
 - **Length** is in the navigation strip. Making a pattern longer repeats what's there
 - **Save** and **project**, top right
@@ -71,7 +71,8 @@ Tap a track's name on perform or the mixer to jump straight to it.
 - **Steps**: tap cycles off, on, accent. **Drag a step up or down** to change its note. Or tap a step, then pick its note from the row underneath (the dimmed one is the key's root). **Slide** applies to the selected step
 - Chord steps show the chord on that step of the scale (i, ii, iii...)
 - The **auto | manual** switch, and a line saying where the notes come from
-- **Sound**: engine, its four knobs (named for the engine), drive, reverb and delay sends, level
+- **Notes** (bottom left): the same generator settings as this part's column on compose, so a change in either place shows in both
+- **Sound** (bottom right): engine, its four knobs (named for the engine), drive, reverb and delay sends, level
 - On manual: the note (or chord) picker for the selected step, and slide
 
 **Song** (the last tab). MPC style: one song per project, a chain of steps, each a pattern and how many times it plays.

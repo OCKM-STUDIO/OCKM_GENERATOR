@@ -541,7 +541,7 @@ def touchscreen_drives_the_engine(work):
     tap(170, 160, 212); tap(180, 160, 212)   # step 3: on, then accent
     tap(190, 281, 36)                    # perform tab
     tap(200, 836, 88)                    # length 32 (navigation strip)
-    tap(210, 361, 36)                    # drums tab (back to the kick slot)
+    tap(210, 414, 36)                    # drums tab (back to the kick slot)
     h.at(220, "ockm-ui-test drag 600 212 200 212")   # swipe left: steps 17-32
     tap(230, 45, 212)                    # step 17
     h.at(240, "ockm-ui-test drag 200 212 600 212")   # swipe right: back to 1-16
@@ -557,7 +557,7 @@ def touchscreen_drives_the_engine(work):
     tap(290, 281, 36)                    # perform tab
     tap(300, 373, 88)                    # pattern 3 (navigation strip)
     tap(310, 600, 486)                   # master fx: filter, middle
-    tap(320, 441, 36)                    # compose tab
+    tap(320, 345, 36)                    # compose tab
     tap(335, 283, 349)                   # chord column: next progression
     tap(340, 200, 486)                   # spice 3 (ninth)
     tap(345, 281, 36); tap(348, 126, 137)  # perform tab, mute the kick lane
@@ -902,7 +902,7 @@ def suggest_chords_fit_the_melody(work):
         on = " ".join("1" if i % 4 == 0 else "0" for i in range(64))
         nt = " ".join(str(notes[(i // 4) % len(notes)]) for i in range(64))
         lines = ui_preview.run(["send ockm-length float 64", f"array ockm-pat-lead-on {on}", f"array ockm-pat-lead-note {nt}",
-                                "send ockm-lead-mode float 1", "test tap 441 36", "test tap 186 154", "test tap 100 558"])
+                                "send ockm-lead-mode float 1", "test tap 345 36", "test tap 186 154", "test tap 100 558"])
         return [int(float(l.split()[3])) for l in lines if l.startswith("sent ockm-chord-prog")]
     a_minor = picks([57, 60, 64])           # A C E: the home chord
     assert a_minor[0] == 0, f"a melody on A C E should suggest one chord first: {a_minor}"
@@ -910,7 +910,7 @@ def suggest_chords_fit_the_melody(work):
     # a melody that walks A minor, F, C, G one bar each: the pop progression (i VI III VII) should come first
     pop = picks([57, 60, 64, 57, 65, 69, 72, 65, 60, 64, 67, 60, 67, 71, 74, 67])
     assert ui_preview_shapes()[pop[0]] == [(0, 16), (5, 16), (2, 16), (6, 16)], f"expected the pop progression first: {pop}"
-    empty = ui_preview.run(["test tap 441 36", "test tap 186 154"])
+    empty = ui_preview.run(["test tap 345 36", "test tap 186 154"])
     assert not any(l.startswith("sent ockm-chord-prog") for l in empty), "no melody, no suggestion"
 
 def ui_preview_shapes():
