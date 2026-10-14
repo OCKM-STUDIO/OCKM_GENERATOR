@@ -1582,7 +1582,7 @@ build_project(reset=args.reset_patterns, demo=args.demo)
 
 # ================= sample folders =================
 # One folder per drum sound. Drop WAV or AIFF files in; the drums will pick them up once sample playback is built.
-SAMPLE_DIRS=["kick","snare","clap","rim","hat","open-hat","tom","rimshot"]
+SAMPLE_DIRS=["kick","snare","clap","rim","hat","open-hat","tom","rimshot","perc"]
 def build_samples():
     base=os.path.join(R,"samples")
     for d in SAMPLE_DIRS: os.makedirs(os.path.join(base,d),exist_ok=True)
