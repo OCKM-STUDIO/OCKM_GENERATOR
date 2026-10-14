@@ -68,11 +68,11 @@ Everything is remembered: drum kit, synth sounds, effects, tempo, swing, key and
 
 | Part | Choice | Status |
 |---|---|---|
-| Computer | Raspberry Pi 5, 2GB or 4GB, with Active Cooler and official power supply | Not bought |
-| Screen | Official Raspberry Pi Touch Display 2, 10" (1920 x 1200, Pi 5 only) is the favourite; the 7" is the compact option | Not bought |
+| Computer | Raspberry Pi 5, 2GB (plenty: the patch uses about 11MB), with Active Cooler and the official 27W power supply | Not bought |
+| Screen | Official Raspberry Pi Touch Display 2, 10" (1920 x 1200, Pi 5 only). Decided: big enough for finger-sized steps | Not bought |
 | Audio | iRig Pro Duo (already owned, check it's recognised) | Owned |
-| Knobs | Small USB MIDI knob controller | To choose |
-| Storage | microSD card | Not bought |
+| Controller | Endless knobs with light rings. Front runners: Novation Launch Control 3 (16 knobs, screen) or Behringer X-Touch Mini (8 knobs, 16 buttons). Maybe a Launchpad Mini later for a hands-on step grid | To choose |
+| Storage | microSD card, 32GB | Not bought |
 
 ## Roadmap
 
@@ -97,7 +97,7 @@ Everything is remembered: drum kit, synth sounds, effects, tempo, swing, key and
 - **8 pattern slots, each up to 128 steps.** One length per pattern, shown 16 steps at a time.
 - **Drum slots are flexible.** Each of the 8 slots can play any of the 8 drum sounds, and later any of your samples.
 - **One key for all synths.** Bass, lead and chord share the key and scale, so they always agree.
-- **Touchscreen plus a few knobs.** The screen is for editing. The knobs are for playing. Leaning towards the official 10" screen for bigger steps.
+- **Touchscreen plus a hardware controller.** The screen is for editing and overview. The knobs are for playing. The screen is the official 10" (decided October 2026): the 7" would make mute, solo and step buttons too small for a finger.
 - **Minimal modern look.** Flat, one accent colour (orange), lots of space, light and dark themes. Dark is the default.
 - **Build and test on the Mac first.** Everything runs in plugdata; the Pi only adds audio setup, screen rotation and start-up.
 - **Lua for the screens.** Plain Pd controls can't tell a tap from a swipe, or show one screen at a time. The screens are one Lua object (`ui/ockm-ui.pd_lua`) that only sends and listens to the `ockm-*` hooks. The sound engine stays plain Pd.
