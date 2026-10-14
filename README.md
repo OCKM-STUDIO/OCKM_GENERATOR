@@ -171,6 +171,9 @@ Everything is remembered: drum kit, synth sounds, effects, tempo, swing, key and
 
 ## Parked ideas
 
+- **No sample chopping** (decided October 2026). SP-404 style slicing of loops would make this a different instrument. Samples are one-shots on drum slots only
+- **Patterns stay at 8 bars maximum** (decided October 2026). Longer sections are built in song mode. Revisit only if a long melody or slow progression feels cramped
+
 - FM drum and bass voices (likely to come back with the bass engines)
 - Probability, ratchets and Euclidean patterns
 - Different lengths per row (one length per pattern for now)
