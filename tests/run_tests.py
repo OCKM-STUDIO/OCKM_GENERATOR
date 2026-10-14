@@ -862,6 +862,24 @@ def melody_uses_chord_tones(work):
     assert any(abs(seq[k + 1] - seq[k]) <= 4 for k in range(len(seq) - 1)) and seq[:4] != sorted(seq[:4]), "it should move like a tune, not climb like an arpeggio"
 
 @test
+def synths_sit_at_similar_levels(work):
+    """Bass, melody and every chord engine come out at a similar loudness (within about 4 dB), so nothing gets lost."""
+    def rms(x): return math.sqrt(sum(v * v for v in x) / max(1, len(x)))
+    tracks = ["d1","d2","d3","d4","d5","d6","d7","d8","bass","lead","chord"]
+    levels = {}
+    for part, setup, eng in [("bass", "ockm-bass-gen bang", None), ("chord", "ockm-chord-prog 3 ; ockm-chord-rhythm 4", 0),
+                             ("chord", "ockm-chord-prog 3 ; ockm-chord-rhythm 4", 1), ("chord", "ockm-chord-prog 3 ; ockm-chord-rhythm 4", 2)]:
+        h = Harness(); name = f"lv-{part}{eng}"; h.record(os.path.join(work, name + ".wav"))
+        mutes = " ; ".join(f"ockm-{t}-mute {0 if t == part else 1}" for t in tracks)
+        extra = f" ; ockm-chord-engine {eng}" if eng is not None else ""
+        h.at(100, f"ockm-verb-mix 0 ; ockm-delay-mix 0 ; {mutes}{extra} ; {setup}"); h.at(200, "ockm-play 1"); h.at(3200, "ockm-play 0")
+        _, (snd, sr) = play(work, h, name, ms=3200)
+        levels[name] = rms(snd[int(0.3 * sr):int(3.0 * sr)])
+    ref = levels["lv-bassNone"]
+    for k, v in levels.items():
+        assert 0.6 * ref < v < 1.6 * ref, f"{k} is out of balance with the bass: {v:.3f} vs {ref:.3f} ({levels})"
+
+@test
 def blank_project_synths_start_and_sound(work):
     """On the blank starter, starting the bass and chords gives notes you can hear, with the default sounds."""
     subprocess.run([sys.executable, os.path.join(ROOT, "tools", "build.py"), "--out", work, "--reset-patterns"], check=True, capture_output=True)

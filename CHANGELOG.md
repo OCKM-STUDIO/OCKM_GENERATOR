@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.32 (14 October 2026)
+
+**Fixed**
+- The chords were too quiet: the stab engine came out at a third of the bass's level. All three chord engines are now balanced to sit level with the bass and melody (organ was a little loud, pad a little quiet). A test keeps them balanced
+
 ## v0.31 (14 October 2026)
 
 **Changed**

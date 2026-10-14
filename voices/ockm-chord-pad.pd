@@ -314,7 +314,7 @@
 #X obj 120 260 +~;
 #X obj 120 280 +~;
 #X obj 120 300 +~;
-#X obj 120 330 *~ 0.18;
+#X obj 120 330 *~ 0.25;
 #X obj 120 370 outlet~;
 #X connect 1 0 2 0;
 #X connect 2 0 3 0;

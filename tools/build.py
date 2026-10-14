@@ -1190,6 +1190,7 @@ def chord_voice(sp,kind):
                   (k[0],0,x1,0),(x1,0,l1,1),(x1,0,l2,1),(k[1],0,x2,0),(x2,0,du,1),(x2,1,dd,1),
                   (k[2],0,x3,0),(x3,0,fa3,0),(fa3,1,ad,1),(fa3,0,pa,1),(k[3],0,x4,0),(x4,0,ad,0),(ad,0,pa,2)]: sp.con(*c)
 
+CHORD_GAIN={"stab":0.42,"organ":0.135,"pad":0.25}   # measured: stab was a third as loud as the bass, organ a little loud
 CHORD_ENGINES=[("stab","Stab: two detuned saws through a filter that snaps shut. Dub techno with the delay"),
                ("organ","Organ: sine drawbars plus a percussive click. House organ stabs"),
                ("pad","Pad: three detuned saws with a slow attack. Long chords")]
@@ -1206,7 +1207,7 @@ for idx,(kind,title) in enumerate(CHORD_ENGINES):
         q.L.append(sp.text(f"#N canvas 0 0 980 460 v{v} 0;").rstrip("\n"))
         o=q.add(f"#X restore {120+v*90} 200 pd v{v};"); vs.append(o)
         q.con(up,v,o,0); q.con(up,4,o,1)
-    s1=q.add("#X obj 120 260 +~;"); s2=q.add("#X obj 120 280 +~;"); s3=q.add("#X obj 120 300 +~;"); g=q.add("#X obj 120 330 *~ 0.18;"); out=q.add("#X obj 120 370 outlet~;")
+    s1=q.add("#X obj 120 260 +~;"); s2=q.add("#X obj 120 280 +~;"); s3=q.add("#X obj 120 300 +~;"); g=q.add(f"#X obj 120 330 *~ {CHORD_GAIN[kind]};"); out=q.add("#X obj 120 370 outlet~;")
     for c in [(vs[0],0,s1,0),(vs[1],0,s1,1),(s1,0,s2,0),(vs[2],0,s2,1),(s2,0,s3,0),(vs[3],0,s3,1),(s3,0,g,0),(g,0,out,0)]: q.con(*c)
     q.save(f"voices/ockm-chord-{kind}.pd","#N canvas 160 160 900 420 12;")
 q=P()
