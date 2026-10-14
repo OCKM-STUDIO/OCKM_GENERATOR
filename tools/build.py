@@ -267,7 +267,7 @@ for nm,snd in SLOTS:
     PROJECT_KEYS+=[(f"ockm-{nm}-sound",snd,None),(f"ockm-{nm}-tune",0,None),(f"ockm-{nm}-decay",100,None),
                    (f"ockm-{nm}-level",1,None),(f"ockm-{nm}-verb",VERB[snd],None),(f"ockm-{nm}-delay",DLY[snd],None)]
 SYNTH_DEFAULTS={"bass":dict(engine=0,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.37,k2=0.9,k3=0.31,k4=0.55,drive=0,verb=0,delay=0,rhythm=3,notes=3),
-                "lead":dict(engine=4,mode=1,sync=1,lock=0,density=1,seed=0,level=1,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0.2,delay=0.25,rhythm=6,notes=8),
+                "lead":dict(engine=4,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0.2,delay=0.25,rhythm=8,notes=12),
                 "chord":dict(engine=0,mode=0,level=1,k1=0.45,k2=0.5,k3=0.4,k4=0.3,type=0,smooth=1,verb=0.3,delay=0.35,rhythm=0,prog=0)}
 PATTERN_KEYS=[("ockm-len",16,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None),("ockm-leader",0,None),("ockm-drum-groove",-1,None)]
 for t,d in SYNTH_DEFAULTS.items():
@@ -391,7 +391,7 @@ for nm in ("bass","lead","chord"): p.con(offm,0,synth_voice[nm],0)
 gy=by+3*40+20
 p.add(f"#X obj 110 {gy} ockm-presets;")
 p.add(f"#X obj 230 {gy} ockm-monogen bass 0 3 3 0 1;")
-p.add(f"#X obj 400 {gy} ockm-monogen lead 24 6 8 1 1;")
+p.add(f"#X obj 400 {gy} ockm-monogen lead 24 8 12 0 1;")
 p.add(f"#X obj 530 {gy} ockm-chordgen chord 0;")
 p.add(f"#X obj 700 {gy} ockm-grooves;")
 p.add(f"#X obj 820 {gy} ockm-song;")
@@ -778,11 +778,29 @@ q.add("#X text 500 540 248 clock \\, 250 start \\, 251 continue \\, 252 stop. oc
 q.save("seq/ockm-clock.pd","#N canvas 120 120 1000 580 12;")
 
 # ================= shared presets =================
+# melodies: a wandering line over the chord tones (root, 3rd, 5th, 7th of whatever chord is playing),
+# mostly small steps, the odd leap, and a phrase that comes home to the root or fifth every 8 notes.
+# 'steps' adds passing notes between them. 64 notes long, so it doesn't repeat for a while; mutate starts it elsewhere.
+import random as _random
+def _tune(seed, passing, lift):
+    rnd=_random.Random(seed)
+    ladder=[-3,-1,0,2,4,6,7,9,11] if not passing else [-3,-2,-1,0,1,2,3,4,5,6,7,8,9]
+    home=[ladder.index(0), ladder.index(4)]
+    i=ladder.index(0); out=[]
+    for k in range(64):
+        if k%8==7: i=rnd.choice(home)                       # end of a phrase: home
+        else:
+            mv=rnd.choices([-2,-1,0,1,2,3],[1,4,1,4,1,1])[0]
+            if passing and k%2==0 and ladder[i] in (-2,1,3,5,8): mv=rnd.choice([-1,1])   # passing notes resolve
+            i=max(0,min(len(ladder)-1,i+mv))
+        out.append(ladder[i]+lift)
+    return " ".join(str(v) for v in out)
 PRE={"rhythm":[("offbeat","0 0 2 0 0 0 1 0 0 0 2 0 0 0 1 0"),("rolling","0 2 1 1 0 2 1 1 0 2 1 1 0 2 1 1"),("gallop","0 0 2 1 0 1 2 0 0 0 2 1 0 1 2 0"),
                ("acid-classic","2 1 0 1 3 4 1 0 2 1 3 1 0 2 1 3"),("sparse-dub","2 0 0 0 0 0 0 1 0 0 1 0 0 0 0 0"),("tech-bounce","0 0 2 0 0 1 0 0 0 0 2 0 0 1 0 1"),
-               ("acid-16ths","2 1 3 1 2 1 1 3 2 1 3 1 2 3 1 1"),("trip-hop","2 0 0 0 0 0 3 1 0 0 0 0 0 0 1 0")],
+               ("acid-16ths","2 1 3 1 2 1 1 3 2 1 3 1 2 3 1 1"),("trip-hop","2 0 0 0 0 0 3 1 0 0 0 0 0 0 1 0"),("hook","2 0 0 1 0 0 1 0 0 0 1 0 1 0 0 0"),("sparse-melody","2 0 0 0 0 0 1 0 0 3 0 0 1 0 0 0")],
      "notes":[("root","0"),("octaves","0 7"),("root-fifth","0 4"),("acid-riff","0 0 7 0 2 0 6 4"),("walk-up","0 1 2 4"),("minor-stab","0 2 4 2"),
-              ("dub","0 0 -3 -2"),("pedal","0 0 0 1"),("arp-up","0 2 4 7"),("arp-updown","0 2 4 7 4 2"),("call","4 4 2 0 2 4 5 4"),("descend","7 6 4 2")],
+              ("dub","0 0 -3 -2"),("pedal","0 0 0 1"),("arp-up","0 2 4 7"),("arp-updown","0 2 4 7 4 2"),("call","4 4 2 0 2 4 5 4"),("descend","7 6 4 2"),
+              ("melody",_tune(1,False,0)),("melody-steps",_tune(2,True,0)),("melody-high",_tune(3,False,7))],
      "scale":[("minor","0 2 3 5 7 8 10"),("major","0 2 4 5 7 9 11"),("dorian","0 2 3 5 7 9 10"),("phrygian","0 1 3 5 7 8 10"),
               ("mixolydian","0 2 4 5 7 9 10"),("harmonic-minor","0 2 3 5 7 8 11")],
      "chordrhythm":[("bar-pads","2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"),("two-beat","2 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0"),
@@ -859,7 +877,7 @@ p.save("seq/ockm-presets.pd","#N canvas 200 200 820 200 12;")
 # args: track, octave offset (semitones), default rhythm, default notes
 p=P()
 p.add("#X text 20 10 Mono generator: builds a bass or lead line from a rhythm preset + a note pattern + the shared key. Args: track \\, octave offset \\, default rhythm \\, default notes.;")
-for nm,n in [("r",16),("n",16),("s",7)]: p.add(f"#X obj {700+['r','n','s'].index(nm)*130} 60 array define {D}0-{nm} {n};")
+for nm,n in [("r",16),("n",64),("s",7)]: p.add(f"#X obj {700+['r','n','s'].index(nm)*130} 60 array define {D}0-{nm} {n};")
 regen=p.add("#X obj 20 330 t b b b b b;")
 # Two kinds of trigger. Picking a preset (rhythm, notes) or pressing new always generates, and puts the part in auto.
 # Everything else (key, scale, chords changing) only regenerates a part that is in auto. Nothing fires while a pattern loads.

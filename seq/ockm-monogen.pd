@@ -1,7 +1,7 @@
 #N canvas 120 120 1100 1020 12;
 #X text 20 10 Mono generator: builds a bass or lead line from a rhythm preset + a note pattern + the shared key. Args: track \, octave offset \, default rhythm \, default notes.;
 #X obj 700 60 array define \$0-r 16;
-#X obj 830 60 array define \$0-n 16;
+#X obj 830 60 array define \$0-n 64;
 #X obj 960 60 array define \$0-s 7;
 #X obj 20 330 t b b b b b;
 #X obj 120 230 r ockm-loading;

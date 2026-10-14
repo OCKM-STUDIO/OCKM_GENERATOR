@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.31 (14 October 2026)
+
+**Changed**
+- **Mode dial on compose**, like a camera's priority modes: chord priority, melody priority, bass priority, or manual. The priority part is yours; the other two follow it. Manual makes every part yours and keeps what was generated. This replaces "who leads the harmony" and the per-part auto/manual switches
+- Synth tabs and compose show each part's role: "yours", or what it follows. Following parts are locked; switch to manual to edit them
+- Older patterns with hand-edited following parts open in manual, so nothing is overwritten
+- The melody now starts as a following part (it used to start on manual)
+
+**Added**
+- **Melody** note patterns (melody, melody steps, melody high): a wandering line over the root, 3rd, 5th and 7th of whatever chord is playing, mostly small steps, coming home every 8 notes. 64 notes before it repeats
+- Two melody rhythms with space in them: **hook** and **sparse melody**. The melody now defaults to "melody" over "hook" instead of an arpeggio over 16ths
+
 ## v0.30 (14 October 2026)
 
 **Changed**

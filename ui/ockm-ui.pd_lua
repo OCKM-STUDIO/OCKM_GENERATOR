@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.30"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.31"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
@@ -56,8 +56,8 @@ local KNOBS = {
   pad   = {"brightness","detune","attack","length"},
 }
 -- BEGIN PRESETS (written by tools/build.py from its preset lists: edit them there, not here)
-local RHYTHMS = { { "offbeat" }, { "rolling" }, { "gallop" }, { "acid classic" }, { "sparse dub" }, { "tech bounce" }, { "acid 16ths" }, { "trip hop" } }
-local MONO_NOTES = { "root", "octaves", "root fifth", "acid riff", "walk up", "minor stab", "dub", "pedal", "arp up", "arp updown", "call", "descend" }
+local RHYTHMS = { { "offbeat" }, { "rolling" }, { "gallop" }, { "acid classic" }, { "sparse dub" }, { "tech bounce" }, { "acid 16ths" }, { "trip hop" }, { "hook" }, { "sparse melody" } }
+local MONO_NOTES = { "root", "octaves", "root fifth", "acid riff", "walk up", "minor stab", "dub", "pedal", "arp up", "arp updown", "call", "descend", "melody", "melody steps", "melody high" }
 local CHORD_RHY = { { "bar pads" }, { "two beat" }, { "offbeat" }, { "dub stabs" }, { "house organ" }, { "tresillo" }, { "syncopated" }, { "garage skip" }, { "call answer" }, { "eighths" } }
 local PROGS = { { "one chord", "i" }, { "vamp", "i iv" }, { "dub techno", "i . . VII" }, { "deep house", "i iv VI v" }, { "garage", "i VI iv v" }, { "pop", "i VI III VII" }, { "uplift", "VI VII i" }, { "andalusian", "i VII VI V" }, { "trip hop", "i VII VI v" }, { "soul", "ii V I" } }
 local SPICE = { { 0, "triad" }, { 1, "7th" }, { 6, "9th" }, { 7, "11th" } }
@@ -119,7 +119,7 @@ function ui:defaults()
   v["ockm-volume"] = 1; v["ockm-verb-mix"] = 0.5; v["ockm-delay-mix"] = 0.5
   v["ockm-drive"] = 0; v["ockm-delay-fb"] = 0.4; v["ockm-delay-steps"] = 3; v["ockm-verb-size"] = 0.6; v["ockm-verb-tone"] = 0.5
   for _, t in ipairs(SYNTHS) do v["ockm-"..t.."-level"] = 1 end
-  v["ockm-bass-mode"] = 0; v["ockm-lead-mode"] = 1; v["ockm-chord-mode"] = 0   -- 0 auto, 1 manual
+  v["ockm-bass-mode"] = 0; v["ockm-lead-mode"] = 0; v["ockm-chord-mode"] = 0   -- 0 auto, 1 manual
   v["ockm-bass-sync"] = 1; v["ockm-lead-sync"] = 1; v["ockm-leader"] = 0; v["ockm-drum-groove"] = -1
   v["ockm-swing"] = 56; v["ockm-accent"] = 0.3; v["ockm-sync"] = 0; v["ockm-song-mode"] = 0; v["ockm-song-loop"] = 1; v["ockm-volume"] = 1
   for _, p in ipairs({ "bass", "lead" }) do v["ockm-"..p.."-lock"] = 0; v["ockm-"..p.."-density"] = 1; v["ockm-"..p.."-seed"] = 0 end
@@ -181,6 +181,8 @@ function ui:postinitialize()
     if t and t.w and t.w.hook == "ockm-filter" then return end
     o.v["ockm-filter"] = tonumber(a[1]) or 0; o:dirty()
   end)
+  self.roleclock = pd.Clock:new():register(self, "check_roles")
+  listen("ockm-refresh", function(o) if o.roleclock then o.roleclock:delay(0) end end)
   listen("ockm-patterns-exist", function(o, sel, a) o.exists = math.floor(tonumber(a[1]) or 1); o:dirty() end)
   for _, n in ipairs({ "ockm-saved", "ockm-revert", "ockm-project-name" }) do listen(n, function(o) o.unsaved = false; o:dirty() end) end
   listen("ockm-song-show", function(o, sel, a)
@@ -499,8 +501,31 @@ end
 -- the synth tabs: steps and sound. Notes come from compose while the part is on auto (steps locked, drawn as outlines);
 -- switch to manual, like a camera, to edit them by hand
 function ui:part_auto(part) return (self.v["ockm-"..(part or SYNTHS[self.part]).."-mode"] or 0) == 0 end
+-- The mode dial (ockm-leader): 0 chord priority, 1 melody priority, 2 bass priority, 3 manual.
+-- The priority part is yours; the other two follow it. In manual every part is yours.
+local LEAD_PART = { [0] = "chord", [1] = "lead", [2] = "bass" }
+function ui:mode() return math.floor(self.v["ockm-leader"] or 0) end
+function ui:locked(part)
+  part = part or SYNTHS[self.part]
+  local m = self:mode()
+  if m == 3 then return false end
+  return LEAD_PART[m] ~= part
+end
+-- what a following part is following, in words
+function ui:follows_what(part)
+  local m = self:mode()
+  if part == "chord" then return (m == 1) and "fits the melody" or "fits the bass line" end
+  return "follows the chords"
+end
+-- you've edited a part that's yours: stop the engine regenerating it
+function ui:claim(part)
+  if (self.v["ockm-"..part.."-mode"] or 0) == 0 then self:send("ockm-"..part.."-mode", 1) end
+end
 
 function ui:auto_summary(part)
+  if self:locked(part) then
+    return part .. " " .. self:follows_what(part) .. ": shape it below. To edit the steps, set the mode to manual on compose"
+  end
   local mono = part ~= "chord"
   local parts = {}
   if mono then
@@ -517,7 +542,7 @@ end
 function ui:layout_synth(add)
   local part = SYNTHS[self.part]
   local mono = part ~= "chord"
-  local auto = self:part_auto(part)
+  local auto = self:locked(part)
   self:step_row(add, S_STEP_Y, S_STEP_H, mono and "mstep" or "cstep")
   if not auto then
     -- manual: pick the note (or chord) for the selected step
@@ -536,23 +561,18 @@ function ui:layout_synth(add)
     if self:part_empty(part) then
       add{ kind="btn", x=16, y=216, w=W - 32, h=40, accent=true, label="empty: tap to " .. START[part], tap=function() self:start_part(part) end }
     else
-      add{ kind="locked", x=16, y=216, w=W - 32, h=40, label="on auto: the notes come from compose", tap=function() self:open("compose") end }
+      add{ kind="locked", x=16, y=216, w=W - 32, h=40, label=part .. " " .. self:follows_what(part) .. ": to edit the steps, set the mode to manual on compose", tap=function() self:open("compose") end }
     end
   end
   -- what's in charge, and the camera switch
-  local info = self.msg or (auto and self:auto_summary(part) or ("manual: your notes. " .. self:step_info()))
+  local info = self.msg or (auto and self:auto_summary(part) or ("yours: " .. self:step_info()))
   add{ kind="text", x=16, y=276, w=W - 300, h=12, label=info, size=11, col=self.msg and "acc" or nil }
   if mono and not auto then
     add{ kind="choice", x=W - 16 - 280, y=266, w=86, h=34, label="slide", accent=true, small=true, sel=self:mono_get(self.sel_step, "slide") > 0,
          tap=function() self:mono_toggle_slide() end }
   end
-  local mkey = "ockm-"..part.."-mode"
-  add{ kind="choice", x=W - 16 - 180, y=266, w=88, h=34, label="auto", small=true, sel=auto, tap=function()
-    if not auto then self:send(mkey, 0); psend("ockm-"..part.."-gen", "bang", {}); self:say(part .. " is back on auto: notes from compose") end
-  end }
-  add{ kind="choice", x=W - 16 - 88, y=266, w=88, h=34, label="manual", small=true, sel=not auto, tap=function()
-    if auto then self:send(mkey, 1); self:say(part .. " is manual: edit the steps. Compose won't change them") end
-  end }
+  add{ kind="choice", x=W - 16 - 180, y=266, w=180, h=34, small=true, accent=not auto, sel=not auto,
+       label=auto and self:follows_what(part) or "yours", tap=function() self:open("compose") end }
   self:layout_synth_sound(add, part, mono)
 end
 
@@ -589,18 +609,49 @@ end
 -- ------------------------------------------------------------------ compose
 -- How the pattern is put together: who leads the harmony, the key, and each part's generator.
 -- Compose decides the notes of parts on auto. Parts on manual are greyed out here and never changed.
-local LEADERS = { { 0, "chords" }, { 1, "melody" }, { 2, "bass" }, { 3, "key only" } }
+local LEADERS = { { 0, "chord priority" }, { 1, "melody priority" }, { 2, "bass priority" }, { 3, "manual" } }
 
 -- who follows the chords for each leader: chords lead, melody leads (bass follows), bass leads (lead follows), key only
 local FOLLOW = { [0] = { bass = 1, lead = 1 }, [1] = { bass = 1, lead = 0 }, [2] = { bass = 0, lead = 1 }, [3] = { bass = 0, lead = 0 } }
 function ui:set_leader(n)
   self:send("ockm-leader", n)
-  for _, p in ipairs({ "bass", "lead" }) do
-    self:send("ockm-"..p.."-sync", FOLLOW[n][p])
-    if self:part_auto(p) and (n == 0 or n == 3) then psend("ockm-"..p.."-gen", "bang", {}) end
-  end
   self.ranking = nil
-  if (n == 1 or n == 2) and self:part_auto("chord") then self:suggest_chords() end
+  if n == 3 then
+    for _, p in ipairs(SYNTHS) do self:claim(p) end
+    self:say("manual: every part is yours, exactly as it was. Nothing is regenerated")
+    return
+  end
+  local lp = LEAD_PART[n]
+  for _, p in ipairs({ "bass", "lead" }) do
+    self:send("ockm-"..p.."-sync", (p == lp) and 0 or 1)
+  end
+  if lp == "chord" then
+    for _, p in ipairs({ "bass", "lead" }) do self:send("ockm-"..p.."-mode", 0); psend("ockm-"..p.."-gen", "bang", {}) end
+    self:say("chord priority: the chords are yours, bass and melody follow them")
+  else
+    local other = (lp == "lead") and "bass" or "lead"
+    self:send("ockm-"..other.."-mode", 0)
+    self:send("ockm-chord-mode", 0)
+    if self:part_empty(lp) then psend("ockm-chord-gen", "bang", {}); psend("ockm-"..other.."-gen", "bang", {})
+    else self:suggest_chords() end
+    self:say(((lp == "lead") and "melody" or "bass") .. " priority: it's yours, the chords fit it and the " .. ((other == "lead") and "melody" or "bass") .. " follows")
+  end
+end
+
+-- an older pattern can have hand-edited parts that would now be followers: open it in manual so nothing is lost
+function ui:check_roles()
+  local m = self:mode()
+  if m == 3 then return end
+  for _, p in ipairs(SYNTHS) do
+    if self:locked(p) and (self.v["ockm-"..p.."-mode"] or 0) == 1 then
+      if self:part_empty(p) then self:send("ockm-"..p.."-mode", 0)
+      else
+        self:send("ockm-leader", 3)
+        self:say("this pattern has hand-edited parts, so it's in manual mode. Pick a priority to let it generate again")
+        return
+      end
+    end
+  end
 end
 
 -- melody-led or bass-led: score every progression against the leading part's notes.
@@ -671,10 +722,10 @@ function ui:layout_compose(add)
   local half = (W - 32 - 16) / 2
   local rx = 16 + half + 16
   -- who leads, and the key
-  add{ kind="text", x=16, y=118, w=300, h=12, label="who leads the harmony", size=10 }
+  add{ kind="text", x=16, y=118, w=300, h=12, label="mode: which part is yours (the others follow it)", size=10 }
   local lw = (half - 3 * 6) / 4
   for i, l in ipairs(LEADERS) do
-    add{ kind="choice", x=16 + (i - 1) * (lw + 6), y=132, w=lw, h=44, label=l[3] and (l[2] .. " (soon)") or l[2], small=l[3],
+    add{ kind="choice", x=16 + (i - 1) * (lw + 6), y=132, w=lw, h=44, label=l[2], small=true,
          disabled=l[3], sel=(not l[3]) and (self.v["ockm-leader"] or 0) == l[1], tap=(not l[3]) and function() self:set_leader(l[1]) end or nil }
   end
   add{ kind="text", x=rx, y=118, w=100, h=12, label="key", size=10 }
@@ -687,18 +738,13 @@ function ui:layout_compose(add)
   add{ kind="text", x=16, y=182, w=300, h=12, label="the chain", size=10 }
   local leader = self.v["ockm-leader"] or 0
   local order = ({ [0] = { "chord", "bass", "lead" }, [1] = { "lead", "chord", "bass" }, [2] = { "bass", "chord", "lead" },
-                  [3] = { "key", "chord", "bass", "lead" } })[leader] or { "chord", "bass", "lead" }
+                  [3] = { "chord", "bass", "lead" } })[leader] or { "chord", "bass", "lead" }
   local cw = (half - (#order - 1) * 22) / #order
   for i, p in ipairs(order) do
     local x = 16 + (i - 1) * (cw + 22)
     local tag
-    if p == "key" then tag = "everyone follows"
-    else
-      local auto = self:part_auto(p)
-      local leads = (i == 1) and leader ~= 3
-      tag = (auto and "auto" or "manual") .. (leads and " · leads" or (auto and " · follows" or " · your notes"))
-    end
-    add{ kind="chain", x=x, y=196, w=cw, h=44, label=p, sub=tag, lead=(i == 1) }
+    if self:locked(p) then tag = "follows" else tag = "yours" end
+    add{ kind="chain", x=x, y=196, w=cw, h=44, label=(p == "lead") and "melody" or p, sub=tag, lead=not self:locked(p) }
     if i < #order then add{ kind="text", x=x + cw + 5, y=208, w=14, h=16, label=(leader == 3) and "·" or ">", size=14 } end
   end
   add{ kind="text", x=rx, y=182, w=100, h=12, label="scale", size=10 }
@@ -714,13 +760,9 @@ function ui:layout_compose(add)
     local auto = self:part_auto(p)
     add{ kind="card", x=cx, y=cy, w=colw, h=H - cy - 8 }
     add{ kind="text", x=cx + 12, y=cy + 14, w=120, h=16, label=p, size=15, col="txt" }
-    local mkey = "ockm-"..p.."-mode"
-    add{ kind="choice", x=cx + colw - 172, y=cy + 8, w=78, h=32, label="auto", small=true, sel=auto, tap=function()
-      if not auto then self:send(mkey, 0); psend("ockm-"..p.."-gen", "bang", {}); self:say(p .. " is back on auto") end
-    end }
-    add{ kind="choice", x=cx + colw - 90, y=cy + 8, w=78, h=32, label="manual", small=true, sel=not auto, tap=function()
-      if auto then self:send(mkey, 1) end
-    end }
+    local mine = not self:locked(p)
+    add{ kind="choice", x=cx + colw - 172, y=cy + 8, w=160, h=32, small=true, accent=mine, sel=mine,
+         label=mine and "yours" or self:follows_what(p) }
     self:gen_controls(add, p, cx + 12, cy, colw - 24)
   end
 end
@@ -728,17 +770,14 @@ end
 -- a part's generator settings: the same on compose and on the part's own tab
 function ui:gen_controls(add, p, ix, cy, iw, k)
   k = k or 1
-  local auto = self:part_auto(p)
-  local mkey = "ockm-"..p.."-mode"
-  if not auto then
-    add{ kind="text", x=ix, y=cy + k * 64, w=iw, h=k * 14, label="manual: your notes, edited by hand.", size=12 }
-    add{ kind="text", x=ix, y=cy + k * 84, w=iw, h=k * 14, label="Compose won't change them.", size=12 }
-    add{ kind="text", x=ix, y=cy + k * 104, w=iw, h=k * 14, label="Back to auto replaces them.", size=12 }
-    local empty = self:part_empty(p)
-    add{ kind="btn", x=ix, y=cy + k * 132, w=iw, h=k * 52, label=empty and START[p] or "back to auto", quiet=not empty, accent=empty, tap=function()
-      if empty then self:start_part(p) else self:send(mkey, 0); psend("ockm-"..p.."-gen", "bang", {}); self:say(p .. " is back on auto") end
-    end }
-    if empty then add{ kind="text", x=ix, y=cy + k * 196, w=iw, h=k * 14, label="(or write it yourself on the " .. p .. " tab)", size=11 } end
+  if self:mode() == 3 then
+    add{ kind="text", x=ix, y=cy + k * 64, w=iw, h=k * 14, label="Manual: these notes are yours, edited by hand.", size=12 }
+    add{ kind="text", x=ix, y=cy + k * 84, w=iw, h=k * 14, label="The generators are resting.", size=12 }
+    add{ kind="text", x=ix, y=cy + k * 104, w=iw, h=k * 14, label="Pick a priority to let them write again.", size=12 }
+    if self:part_empty(p) then
+      add{ kind="btn", x=ix, y=cy + k * 132, w=iw, h=k * 52, label=START[p], accent=true, tap=function() self:start_part(p) end }
+      add{ kind="text", x=ix, y=cy + k * 196, w=iw, h=k * 14, label="(or write it yourself on the " .. p .. " tab)", size=11 }
+    end
   elseif p == "chord" then
     add{ kind="text", x=ix, y=cy + k * 52, w=iw, h=k * 12, label="progression", size=10 }
     self:stepper(add, ix, cy + k * 66, iw, k * 52, PROGS, "ockm-chord-prog")
@@ -806,6 +845,7 @@ function ui:start_part(p)
   end
   self:send("ockm-"..p.."-mode", 0)
   psend("ockm-"..p.."-gen", "bang", {})
+  if self:mode() == 3 then self:send("ockm-"..p.."-mode", 1) end
   self:say(p .. " started on auto: change it on compose, or switch to manual to edit")
 end
 
@@ -1163,6 +1203,7 @@ function ui:mono_note_or_default(i)
   return n
 end
 function ui:mono_tap(i)
+  self:claim(SYNTHS[self.part])
   self.sel_step = i
   local on, acc = self:mono_get(i, "on"), self:mono_get(i, "acc")
   local n_on, n_acc
@@ -1170,11 +1211,13 @@ function ui:mono_tap(i)
   self:mono_write(i, self:mono_note_or_default(i), n_on, n_acc, self:mono_get(i, "slide"))
 end
 function ui:mono_set_deg(d)
+  self:claim(SYNTHS[self.part])
   local i = self.sel_step
   local on = self:mono_get(i, "on")
   self:mono_write(i, self:deg_to_midi(SYNTHS[self.part], d), (on > 0) and on or 1, self:mono_get(i, "acc"), self:mono_get(i, "slide"))
 end
 function ui:mono_toggle_slide()
+  self:claim(SYNTHS[self.part])
   local i = self.sel_step
   self:mono_write(i, self:mono_note_or_default(i), self:mono_get(i, "on"), self:mono_get(i, "acc"),
                   (self:mono_get(i, "slide") > 0) and 0 or 1)
@@ -1182,6 +1225,7 @@ end
 
 function ui:chord_get(i, f) return self:get("ockm-pat-chord-"..f, self:abs(i)) end
 function ui:chord_tap(i)
+  self:claim(SYNTHS[self.part])
   self.sel_step = i
   local v = self:chord_get(i, "on")
   local nv = (v <= 0) and 1 or ((v < 2) and 2 or 0)
@@ -1189,6 +1233,7 @@ function ui:chord_tap(i)
   self:dirty()
 end
 function ui:chord_set_deg(d)
+  self:claim(SYNTHS[self.part])
   local i = self.sel_step
   local v = self:chord_get(i, "on")
   psend("ockm-chord-edit", "list", { self:abs(i), (v > 0) and v or 1, d })
@@ -1252,10 +1297,11 @@ function ui:move(x, y)
   end
   if t.mode == nil and (math.abs(dx) > 24 or math.abs(dy) > 16) then
     if t.w.swipe and math.abs(dx) > math.abs(dy) then t.mode = "swipe"
-    elseif (t.w.kind == "mstep" or t.w.kind == "cstep") and math.abs(dy) > math.abs(dx) and not self:part_auto() then t.mode = "note"
+    elseif (t.w.kind == "mstep" or t.w.kind == "cstep") and math.abs(dy) > math.abs(dx) and not self:locked() then t.mode = "note"
     else t.mode = "cancel" end
   end
   if t.mode == "note" then
+    self:claim(SYNTHS[self.part])
     local d = t.v0 - math.floor(dy / 18 + 0.5)
     self.sel_step = t.w.i
     if t.w.kind == "mstep" then
@@ -1287,8 +1333,8 @@ function ui:release(x, y)
     self:set_page(self.page + ((dx < 0) and 1 or -1))
   elseif t.mode == nil and inside(w, x, y) then
     if w.kind == "dstep" then self:drum_tap(w.i)
-    elseif (w.kind == "mstep" or w.kind == "cstep") and self:part_auto() then
-      self:say(SYNTHS[self.part] .. " is on auto: switch to manual to edit")
+    elseif (w.kind == "mstep" or w.kind == "cstep") and self:locked() then
+      self:say(SYNTHS[self.part] .. " " .. self:follows_what(SYNTHS[self.part]) .. ": set the mode to manual on compose to edit it")
     elseif w.kind == "mstep" then self:mono_tap(w.i)
     elseif w.kind == "cstep" then self:chord_tap(w.i)
     elseif w.kind == "ms" then self:send(w.hook, ((self.v[w.hook] or 0) > 0) and 0 or 1)
@@ -1523,7 +1569,7 @@ function ui:draw(g, w)
     if w.i % 4 == 0 then self:col(g, "mute"); g:fill_rect(w.x, w.y + w.h + 4, w.w, 2) end
   elseif k == "mstep" then
     local on, acc = self:mono_get(w.i, "on"), self:mono_get(w.i, "acc")
-    local auto = self:part_auto()
+    local auto = self:locked()
     local c = (on > 0) and ((acc > 0) and "acc" or "on") or "off"
     if auto then
       -- on auto the generator wrote these: outlines, locked
@@ -1543,7 +1589,7 @@ function ui:draw(g, w)
     if w.i % 4 == 0 then self:col(g, "mute"); g:fill_rect(w.x, w.y + w.h + 4, w.w, 2) end
   elseif k == "cstep" then
     local v = self:chord_get(w.i, "on")
-    local auto = self:part_auto()
+    local auto = self:locked()
     local c = (v >= 2) and "acc" or ((v > 0) and "on" or "off")
     if auto then
       self:col(g, "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)

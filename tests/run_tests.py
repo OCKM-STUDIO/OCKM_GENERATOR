@@ -551,13 +551,15 @@ def touchscreen_drives_the_engine(work):
     tap(255, 244, 467); tap(258, 128, 512)   # synth half: lead, then its first knob
     tap(260, 50, 369)                    # open bass from its lane (bass is on auto)
     tap(265, 45, 158)                    # tap a step on auto: locked, nothing is edited
-    tap(268, 900, 283)                   # switch the bass to manual
+    tap(266, 345, 36); tap(267, 417, 154)   # compose: mode manual (every part yours)
+    tap(268, 483, 36)                    # back to the bass tab
     tap(270, 45, 158)                    # now bass step 1 edits
     tap(280, 600, 236)                   # note picker: third note of the scale
     tap(290, 281, 36)                    # perform tab
     tap(300, 373, 88)                    # pattern 3 (navigation strip)
     tap(310, 600, 486)                   # master fx: filter, middle
     tap(320, 345, 36)                    # compose tab
+    tap(330, 71, 154)                    # mode: chord priority again (chords are yours)
     tap(335, 283, 349)                   # chord column: next progression
     tap(340, 200, 486)                   # spice 3 (ninth)
     tap(345, 281, 36); tap(348, 126, 137)  # perform tab, mute the kick lane
@@ -582,7 +584,7 @@ def touchscreen_drives_the_engine(work):
     assert any(abs(float(x)) < 0.1 for x in printed(out, "ockm-filter")), "perform strip: filter in the middle should be about 0"
     assert printed(out, "ockm-chord-prog"), "compose: the progression arrow should pick the next progression"
     assert any(e.startswith("d2 1 ") for e in edits), f"tapping the snare lane on perform should edit d2 step 2: {edits}"
-    assert "1" in printed(out, "ockm-bass-mode"), "the manual switch should put the bass in manual"
+    assert "1" in printed(out, "ockm-bass-mode"), "editing the bass in manual mode should mark it as hand-edited"
     assert "1" in printed(out, "ockm-d1-mute"), "perform: M on the kick lane should mute d1"
     assert "1" in printed(out, "ockm-d2-mute"), "mixer: M on strip 2 should mute d2"
     bl = [float(x) for x in printed(out, "ockm-bass-level")]
@@ -744,6 +746,33 @@ def touchscreen_new_pattern_from_a_copy(work):
     assert p1 == p5, "pattern 5 should be a copy of pattern 1"
 
 @test
+def touchscreen_mode_dial(work):
+    """Compose's mode dial: melody priority makes the melody yours and the bass follow; manual makes every part yours; chord priority hands bass and melody back to the generators."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    names = ["ockm-leader", "ockm-lead-sync", "ockm-bass-sync", "ockm-bass-mode", "ockm-lead-mode", "ockm-chord-mode"]
+    h = Harness(); h.show(*names)
+    tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
+    tap(150, 345, 36)                   # compose
+    tap(200, 186, 154); h.at(250, "test-mark 1")    # melody priority
+    tap(300, 417, 154); h.at(350, "test-mark 2")    # manual
+    tap(400, 71, 154);  h.at(450, "test-mark 3")    # chord priority
+    mk = h.add("#X obj 10 300 r test-mark;"); pm = h.add("#X obj 10 325 print MARK;"); h.con(mk, pm)
+    f = os.path.join(work, "t_dial.pd"); h.finish(500, f)
+    out = run(work, f)
+    state, snaps = {}, {}
+    for line in out.splitlines():
+        if line.startswith("MARK:"):
+            snaps[int(float(line.split()[-1]))] = dict(state)
+        for n in names:
+            if line.startswith(n + ":"):
+                state[n] = int(float(line.split()[-1]))
+    m, man, ch = snaps[1], snaps[2], snaps[3]
+    assert m["ockm-leader"] == 1 and m["ockm-lead-sync"] == 0 and m["ockm-bass-sync"] == 1 and m["ockm-bass-mode"] == 0, f"melody priority: {m}"
+    assert man["ockm-leader"] == 3 and man["ockm-bass-mode"] == 1 and man["ockm-lead-mode"] == 1 and man["ockm-chord-mode"] == 1, f"manual: {man}"
+    assert ch["ockm-leader"] == 0 and ch["ockm-bass-mode"] == 0 and ch["ockm-lead-mode"] == 0 and ch["ockm-bass-sync"] == 1, f"chord priority: {ch}"
+
+@test
 def song_saved_with_the_project_and_patterns_copy(work):
     """The song is saved with the project; copying a pattern makes an exact copy; clear empties it."""
     h = Harness()
@@ -801,6 +830,36 @@ def touchscreen_filter_springs_and_throw(work):
     now = [float(v.split()[-1]) for v in printed(out, "ockm-filter-now")]
     assert min(now) < -0.3 and abs(now[-1]) > 0.3, f"held filter should stay where it was left: last {now[-3:]}"
     assert [int(float(v.split()[-1])) for v in printed(out, "ockm-delay-throw")] == [1, 0], printed(out, "ockm-delay-throw")
+
+@test
+def melody_uses_chord_tones(work):
+    """The 'melody' notes preset: every note is the root, 3rd, 5th or 7th of the chord under it, and it isn't just an arpeggio."""
+    h = Harness()
+    h.at(100, "ockm-root 9 ; ockm-scale 0 ; ockm-chord-mode 0 ; ockm-lead-sync 1 ; ockm-lead-mode 0 ; ockm-lead-lock 0 ; ockm-lead-density 1 ; ockm-lead-seed 0")
+    h.at(150, "ockm-chord-prog 3")                                  # deep house: i iv VI v, a bar each
+    h.at(250, "ockm-lead-rhythm 8 ; ockm-lead-notes 12")
+    g = h.add("#X obj 10 300 r test-get;"); t = h.add("#X obj 10 325 t b b b;")
+    outs = []
+    for k, nm in enumerate(["lead-note", "lead-on", "chord-deg"]):
+        a = h.add(f"#X obj {10+k*200} 350 array get ockm-pat-{nm} 0 64;"); pr = h.add(f"#X obj {10+k*200} 375 print {nm.upper()};")
+        h.con(t, a, 2 - k); h.con(a, pr)
+    h.con(g, t)
+    h.at(350, "test-get bang")
+    f = os.path.join(work, "t_melody.pd"); h.finish(400, f)
+    out = run(work, f)
+    notes = [int(float(x)) for x in printed(out, "LEAD-NOTE")[-1].split()]
+    on = [int(float(x)) for x in printed(out, "LEAD-ON")[-1].split()]
+    deg = [int(float(x)) for x in printed(out, "CHORD-DEG")[-1].split()]
+    minor = [0, 2, 3, 5, 7, 8, 10]
+    played = [(i, notes[i]) for i in range(64) if on[i] > 0]
+    assert len(played) > 12, f"the melody should have notes: {on}"
+    for i, n in played:
+        d = deg[i]
+        tones = {(9 + minor[(d + k) % 7]) % 12 for k in (0, 2, 4, 6)}
+        assert n % 12 in tones, f"step {i}: note {n} is not a chord tone of degree {d} ({sorted(tones)})"
+    seq = [n for _, n in played]
+    assert len(set(seq)) >= 4, "it should use several different notes"
+    assert any(abs(seq[k + 1] - seq[k]) <= 4 for k in range(len(seq) - 1)) and seq[:4] != sorted(seq[:4]), "it should move like a tune, not climb like an arpeggio"
 
 @test
 def blank_project_synths_start_and_sound(work):

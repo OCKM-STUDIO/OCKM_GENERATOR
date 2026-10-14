@@ -548,8 +548,8 @@
 #X msg 480 1970 set \$1;
 #X obj 560 1970 s ockm-show-lead-engine;
 #X obj 20 1992 r ockm-lead-mode;
-#X obj 200 1992 f 1;
-#X obj 420 1992 f 1;
+#X obj 200 1992 f 0;
+#X obj 420 1992 f 0;
 #X msg 260 1992 add ockm-lead-mode \$1;
 #X msg 480 1992 set \$1;
 #X obj 560 1992 s ockm-show-lead-mode;
@@ -626,14 +626,14 @@
 #X msg 480 2256 set \$1;
 #X obj 560 2256 s ockm-show-lead-delay;
 #X obj 20 2278 r ockm-lead-rhythm;
-#X obj 200 2278 f 6;
-#X obj 420 2278 f 6;
+#X obj 200 2278 f 8;
+#X obj 420 2278 f 8;
 #X msg 260 2278 add ockm-lead-rhythm \$1;
 #X msg 480 2278 set \$1;
 #X obj 560 2278 s ockm-show-lead-rhythm;
 #X obj 20 2300 r ockm-lead-notes;
-#X obj 200 2300 f 8;
-#X obj 420 2300 f 8;
+#X obj 200 2300 f 12;
+#X obj 420 2300 f 12;
 #X msg 260 2300 add ockm-lead-notes \$1;
 #X msg 480 2300 set \$1;
 #X obj 560 2300 s ockm-show-lead-notes;
@@ -1091,7 +1091,7 @@
 #X obj 700 2900 file join;
 #X obj 700 2925 file mkdir;
 #X obj 700 2850 t s b;
-#X msg 300 2925 0 clear \, 0 add ockm-len 16 \, 0 add ockm-swing 56 \, 0 add ockm-root 9 \, 0 add ockm-scale 0 \, 0 add ockm-leader 0 \, 0 add ockm-drum-groove -1 \, 0 add ockm-bass-engine 0 \, 0 add ockm-bass-mode 0 \, 0 add ockm-bass-sync 1 \, 0 add ockm-bass-lock 0 \, 0 add ockm-bass-density 1 \, 0 add ockm-bass-seed 0 \, 0 add ockm-bass-level 1 \, 0 add ockm-bass-k1 0.37 \, 0 add ockm-bass-k2 0.9 \, 0 add ockm-bass-k3 0.31 \, 0 add ockm-bass-k4 0.55 \, 0 add ockm-bass-drive 0 \, 0 add ockm-bass-verb 0 \, 0 add ockm-bass-delay 0 \, 0 add ockm-bass-rhythm 3 \, 0 add ockm-bass-notes 3 \, 0 add ockm-lead-engine 4 \, 0 add ockm-lead-mode 1 \, 0 add ockm-lead-sync 1 \, 0 add ockm-lead-lock 0 \, 0 add ockm-lead-density 1 \, 0 add ockm-lead-seed 0 \, 0 add ockm-lead-level 1 \, 0 add ockm-lead-k1 0.55 \, 0 add ockm-lead-k2 0.3 \, 0 add ockm-lead-k3 0.4 \, 0 add ockm-lead-k4 0.45 \, 0 add ockm-lead-drive 0 \, 0 add ockm-lead-verb 0.2 \, 0 add ockm-lead-delay 0.25 \, 0 add ockm-lead-rhythm 6 \, 0 add ockm-lead-notes 8 \, 0 add ockm-chord-engine 0 \, 0 add ockm-chord-mode 0 \, 0 add ockm-chord-level 1 \, 0 add ockm-chord-k1 0.45 \, 0 add ockm-chord-k2 0.5 \, 0 add ockm-chord-k3 0.4 \, 0 add ockm-chord-k4 0.3 \, 0 add ockm-chord-type 0 \, 0 add ockm-chord-smooth 1 \, 0 add ockm-chord-verb 0.3 \, 0 add ockm-chord-delay 0.35 \, 0 add ockm-chord-rhythm 0 \, 0 add ockm-chord-prog 0 \, 0 add ockm-empty 1 \, 1 clear \, 1 add ockm-empty 1 \, 2 clear \, 2 add ockm-empty 1 \, 3 clear \, 3 add ockm-empty 1 \, 4 clear \, 4 add ockm-empty 1 \, 5 clear \, 5 add ockm-empty 1 \, 6 clear \, 6 add ockm-empty 1 \, 7 clear \, 7 add ockm-empty 1;
+#X msg 300 2925 0 clear \, 0 add ockm-len 16 \, 0 add ockm-swing 56 \, 0 add ockm-root 9 \, 0 add ockm-scale 0 \, 0 add ockm-leader 0 \, 0 add ockm-drum-groove -1 \, 0 add ockm-bass-engine 0 \, 0 add ockm-bass-mode 0 \, 0 add ockm-bass-sync 1 \, 0 add ockm-bass-lock 0 \, 0 add ockm-bass-density 1 \, 0 add ockm-bass-seed 0 \, 0 add ockm-bass-level 1 \, 0 add ockm-bass-k1 0.37 \, 0 add ockm-bass-k2 0.9 \, 0 add ockm-bass-k3 0.31 \, 0 add ockm-bass-k4 0.55 \, 0 add ockm-bass-drive 0 \, 0 add ockm-bass-verb 0 \, 0 add ockm-bass-delay 0 \, 0 add ockm-bass-rhythm 3 \, 0 add ockm-bass-notes 3 \, 0 add ockm-lead-engine 4 \, 0 add ockm-lead-mode 0 \, 0 add ockm-lead-sync 1 \, 0 add ockm-lead-lock 0 \, 0 add ockm-lead-density 1 \, 0 add ockm-lead-seed 0 \, 0 add ockm-lead-level 1 \, 0 add ockm-lead-k1 0.55 \, 0 add ockm-lead-k2 0.3 \, 0 add ockm-lead-k3 0.4 \, 0 add ockm-lead-k4 0.45 \, 0 add ockm-lead-drive 0 \, 0 add ockm-lead-verb 0.2 \, 0 add ockm-lead-delay 0.25 \, 0 add ockm-lead-rhythm 8 \, 0 add ockm-lead-notes 12 \, 0 add ockm-chord-engine 0 \, 0 add ockm-chord-mode 0 \, 0 add ockm-chord-level 1 \, 0 add ockm-chord-k1 0.45 \, 0 add ockm-chord-k2 0.5 \, 0 add ockm-chord-k3 0.4 \, 0 add ockm-chord-k4 0.3 \, 0 add ockm-chord-type 0 \, 0 add ockm-chord-smooth 1 \, 0 add ockm-chord-verb 0.3 \, 0 add ockm-chord-delay 0.35 \, 0 add ockm-chord-rhythm 0 \, 0 add ockm-chord-prog 0 \, 0 add ockm-empty 1 \, 1 clear \, 1 add ockm-empty 1 \, 2 clear \, 2 add ockm-empty 1 \, 3 clear \, 3 add ockm-empty 1 \, 4 clear \, 4 add ockm-empty 1 \, 5 clear \, 5 add ockm-empty 1 \, 6 clear \, 6 add ockm-empty 1 \, 7 clear \, 7 add ockm-empty 1;
 #X msg 250 2950 clear \, add ockm-bpm 124 \, add ockm-volume 1 \, add ockm-accent 0.3 \, add ockm-filter 0 \, add ockm-drive 0 \, add ockm-delay-mix 0.5 \, add ockm-delay-fb 0.4 \, add ockm-delay-steps 3 \, add ockm-verb-mix 0.5 \, add ockm-verb-size 0.6 \, add ockm-verb-tone 0.5 \, add ockm-sync 0 \, add ockm-clock-out 1 \, add ockm-song-mode 0 \, add ockm-song-loop 1 \, add ockm-d1-sound 0 \, add ockm-d1-tune 0 \, add ockm-d1-decay 100 \, add ockm-d1-level 1 \, add ockm-d1-verb 0 \, add ockm-d1-delay 0 \, add ockm-d2-sound 1 \, add ockm-d2-tune 0 \, add ockm-d2-decay 100 \, add ockm-d2-level 1 \, add ockm-d2-verb 0.25 \, add ockm-d2-delay 0 \, add ockm-d3-sound 2 \, add ockm-d3-tune 0 \, add ockm-d3-decay 100 \, add ockm-d3-level 1 \, add ockm-d3-verb 0.35 \, add ockm-d3-delay 0 \, add ockm-d4-sound 4 \, add ockm-d4-tune 0 \, add ockm-d4-decay 100 \, add ockm-d4-level 1 \, add ockm-d4-verb 0.1 \, add ockm-d4-delay 0 \, add ockm-d5-sound 5 \, add ockm-d5-tune 0 \, add ockm-d5-decay 100 \, add ockm-d5-level 1 \, add ockm-d5-verb 0.15 \, add ockm-d5-delay 0 \, add ockm-d6-sound 7 \, add ockm-d6-tune 0 \, add ockm-d6-decay 100 \, add ockm-d6-level 1 \, add ockm-d6-verb 0.25 \, add ockm-d6-delay 0.3 \, add ockm-d7-sound 3 \, add ockm-d7-tune 0 \, add ockm-d7-decay 100 \, add ockm-d7-level 1 \, add ockm-d7-verb 0.2 \, add ockm-d7-delay 0.25 \, add ockm-d8-sound 6 \, add ockm-d8-tune 0 \, add ockm-d8-decay 100 \, add ockm-d8-level 1 \, add ockm-d8-verb 0.2 \, add ockm-d8-delay 0 \, rewind \, bang;
 #X msg 450 2950 \; ockm-song-file clear;
 #X obj 400 2900 s \$0-setname;

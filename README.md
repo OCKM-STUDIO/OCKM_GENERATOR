@@ -43,14 +43,14 @@ Tap a track's name on perform or the mixer to jump straight to it.
 - **Level, tune, decay, reverb, delay** for this slot. These belong to the kit, so they stay when you change pattern
 - **Grooves** (right of the sliders): tap one to fill all 8 drums at once. Each slot gets the part for the sound it plays, so a groove's hats land on whichever slot is your hat. It fills the whole pattern length and sets a swing to suit. Twelve to pick from: four floor, house, deep house, tech house, minimal, techno, dub techno, garage, breakbeat, boom bap, trip hop, electro. **Clear** empties the drums. A groove replaces your drum steps, so **back to last save** (on the project screen) is your undo
 
-**Compose** (a tab between drums and the synths): how the pattern is put together.
-- **Who leads the harmony:**
-  - **chords:** the progression leads; bass and lead follow it
-  - **melody:** start with a tune. Write the lead by hand, then tap **suggest chords for the melody**. It tries all 10 progressions against your notes and picks the best fit. Tap again for the next best. The bass follows the chords it picks
-  - **bass:** the same, starting from the bass line. The lead follows the chords
-  - **key only:** no connections. Every part just uses the key
+**Compose** (next to perform): how the pattern is put together.
+- **Mode**, like a camera's priority modes: which part is yours. The others follow it
+  - **chord priority:** the chords are yours (a progression, or edit the chord steps). Bass and melody follow the chords
+  - **melody priority:** the melody is yours. The chords are picked to fit it (**suggest chords** tries all 10 progressions and picks the best; tap again for the next best), and the bass follows the chords
+  - **bass priority:** the same, starting from the bass line. The melody follows the chords
+  - **manual:** every part is yours, exactly as it was. Nothing is regenerated. Switch here when you want to hand-edit a part that was following
 - **Key and scale**, shared by every part
-- **The chain:** which part leads, which follow, and which are on manual
+- **The chain:** which part is yours and which follow
 - **A column each for chord, bass and lead** with their generator settings. Use the arrows to step through the presets. A change rewrites the part straight away
   - Chord: progression, rhythm, spice and smooth voicing
   - Bass and lead: notes and rhythm, then:
@@ -60,11 +60,11 @@ Tap a track's name on perform or the mixer to jump straight to it.
 
 **Starting from empty.** A synth part with no notes says so: on perform its lane reads "empty: tap to start", and compose and its own tab show a **start** button. Start hands the part to its generator (auto) and makes notes straight away. For the lead you can also just write a tune by hand on the lead tab.
 
-**The rule: compose decides the notes, the synth tabs decide the sound.** Every synth part is on **auto** or **manual**, like a camera:
-- **Auto:** the notes come from compose and follow the chain. On the synth tab its steps are drawn as outlines and locked; tapping one just reminds you it's on auto
-- **Manual:** your notes. Switch to manual on the synth tab (or on compose) and edit the steps. Compose greys the part out and never changes it. **Back to auto** hands it back to the generator and replaces your notes
-- Sound controls (engine, knobs, drive, sends, level) always work, in either mode
-- Bass and chord start on auto; the lead starts on manual, because it's the melody
+**The rule: the priority part is yours, the other two follow it.**
+- **Yours:** edit the steps freely, or use its presets as a starting point. Picking a preset replaces what's there
+- **Follows:** generated to fit. Its steps are drawn as outlines and locked, but you can still shape it with its settings (notes, rhythm, lock, density, mutate). To edit its steps, switch the mode to **manual**: you keep everything that was generated
+- Sound controls (engine, knobs, drive, sends, level) always work, whatever the mode
+- Going from manual back to a priority regenerates the following parts. An older pattern with hand-edited following parts opens in manual, so nothing is lost
 
 **Bass, lead and chord** (a tab each)
 - **Key** and **scale** at the top, shared by all three
@@ -270,7 +270,7 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 | `ockm-bass-seed`, `ockm-lead-seed` | Variation number: 0 is the original, anything else a mutation |
 | `ockm-bass-mode`, `ockm-lead-mode`, `ockm-chord-mode` | 0 auto (generated), 1 manual (your notes) |
 | `ockm-bass-sync`, `ockm-lead-sync` | 1 follow the chords, 0 follow the key only |
-| `ockm-leader` | Who leads the harmony: 0 chords, 1 melody, 2 bass, 3 key only |
+| `ockm-leader` | The mode: 0 chord priority, 1 melody priority, 2 bass priority, 3 manual |
 | `ockm-song-list <p r p r ...>` | Set the song: pattern (0-7) and repeats for each step. Empty clears it |
 | `ockm-song-start <step>` | Play the song from a step (0 is the first) |
 | `ockm-song-mode` | 0 the play button plays one pattern, 1 it plays the song (the screen decides) |
@@ -372,9 +372,9 @@ Pick the MIDI port in plugdata's audio and MIDI settings. On the Pi, the iRig Pr
 
 **Chords** are built from a progression and a chord rhythm. Each progression has its own length (1, 2, 4 or 8 bars) and its own timing: some change chord every half bar, some hold a chord for two. If the pattern is shorter than the progression, picking it makes the pattern longer. It never makes a pattern shorter.
 
-**Rhythms** (when it plays): 0 offbeat, 1 rolling, 2 gallop, 3 acid classic, 4 sparse dub, 5 tech bounce, 6 acid 16ths, 7 trip hop
+**Rhythms** (when it plays): 0 offbeat, 1 rolling, 2 gallop, 3 acid classic, 4 sparse dub, 5 tech bounce, 6 acid 16ths, 7 trip hop, 8 hook, 9 sparse melody
 
-**Note patterns** (what it plays, used in turn on each note): 0 root, 1 octaves, 2 root and fifth, 3 acid riff, 4 walk up, 5 minor stab, 6 dub, 7 pedal, 8 arp up, 9 arp up-down, 10 call, 11 descend
+**Note patterns** (what it plays, used in turn on each note): 0 root, 1 octaves, 2 root and fifth, 3 acid riff, 4 walk up, 5 minor stab, 6 dub, 7 pedal, 8 arp up, 9 arp up-down, 10 call, 11 descend, 12 melody, 13 melody steps, 14 melody high. The melodies wander over the chord tones (root, 3rd, 5th, 7th of the chord playing), mostly in small steps, and come home to the root or fifth every 8 notes; "steps" adds passing notes. They run 64 notes before repeating, and mutate starts them somewhere else
 
 **Chord rhythms**, simplest first: 1 bar pads, 2 two beat, 3 offbeat, 4 dub stabs, 5 house organ, 6 tresillo (3-3-2), 7 syncopated, 8 garage skip (2 bars), 9 call and answer (2 bars), 10 eighths
 
