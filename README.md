@@ -53,6 +53,8 @@ Tap a track's name on perform or the mixer to jump straight to it.
   - **density:** drag left for fewer notes, right for more. The middle is the preset as written
   - **mutate:** a new variation of the same idea (different note order, the odd octave jump). Tap again for another. **Original** goes back
 
+**Starting from empty.** A synth part with no notes says so: on perform its lane reads "empty: tap to start", and compose and its own tab show a **start** button. Start hands the part to its generator (auto) and makes notes straight away. For the lead you can also just write a tune by hand on the lead tab.
+
 **The rule: compose decides the notes, the synth tabs decide the sound.** Every synth part is on **auto** or **manual**, like a camera:
 - **Auto:** the notes come from compose and follow the chain. On the synth tab its steps are drawn as outlines and locked; tapping one just reminds you it's on auto
 - **Manual:** your notes. Switch to manual on the synth tab (or on compose) and edit the steps. Compose greys the part out and never changes it. **Back to auto** hands it back to the generator and replaces your notes
@@ -168,6 +170,7 @@ Everything is remembered: drum kit, synth sounds, effects, tempo, swing, key and
 | `seq/` | The old test panel (`ockm-panel`), plus sequencers and generators: drum row, mono pattern and generator (bass and lead), chord pattern and generator, the shared presets (`ockm-presets`) and MIDI clock |
 | `projects/` | One folder per project, named like `2026-10-14-velvet-heron`, each holding `project.txt` (tempo, effects, MIDI, accent, drum kit) and `p1.txt` to `p8.txt`. `current.txt` names the one that opens at start-up. `default` is the blank starter |
 | `trash/` | Deleted projects. Empty it by hand when you're sure |
+| `samples/` | One folder per drum sound (kick, snare, clap, rim, hat, open-hat, tom, rimshot) for your own samples. Not saved to git |
 | `sketches/` | Early experiments, kept for reference |
 | `tools/build.py` | Builds every `.pd` file (the panel's layout and colours are in `tools/panel.py`). Structural changes are made here, then the patch files are rebuilt |
 | `tests/run_tests.py` | Plays the patch headless and checks it still works (sounds, accents, patterns, swing, bass, effects, MIDI clock, both panels) |

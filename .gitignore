@@ -2,3 +2,7 @@
 *.wav.tmp
 __pycache__/
 trash/
+samples/**/*.wav
+samples/**/*.WAV
+samples/**/*.aif
+samples/**/*.aiff

@@ -1351,6 +1351,8 @@ def build_project(reset=False, demo=False):
     chord_on=[st(offb),st({3,10},{3}),st({0},{0}),st({0,8})]
     pad=lambda v:" ".join(str(x) for x in v+[0]*(STEPS-16))
     for k in range(SLOTN):
+        if k==0 and not demo:  # pattern 1 of a blank project: the default sounds and settings, no steps
+            write("p1.txt",[f"{h} {fmt(d)}" for h,d,_ in PATTERN_KEYS]+["ockm-empty 1"]); continue
         if k>=4 or not demo:   # empty: no steps, and it takes on the sounds you're already using
             write(f"p{k+1}.txt",["ockm-empty 1"]); continue
         lines=[f"{h} {fmt(d)}" for h,d,_ in PATTERN_KEYS]
@@ -1362,4 +1364,25 @@ def build_project(reset=False, demo=False):
 
 
 build_project(reset=args.reset_patterns, demo=args.demo)
+
+# ================= sample folders =================
+# One folder per drum sound. Drop WAV or AIFF files in; the drums will pick them up once sample playback is built.
+SAMPLE_DIRS=["kick","snare","clap","rim","hat","open-hat","tom","rimshot"]
+def build_samples():
+    base=os.path.join(R,"samples")
+    for d in SAMPLE_DIRS: os.makedirs(os.path.join(base,d),exist_ok=True)
+    readme=os.path.join(base,"README.md")
+    if not os.path.exists(readme):
+        open(readme,"w").write("""# Samples
+
+One folder per drum sound: """+", ".join(SAMPLE_DIRS)+""".
+
+- WAV or AIFF, 16 or 24 bit, 44.1 or 48 kHz. Mono is best for drums
+- Short one-shots, trimmed so the hit starts right at the beginning of the file
+- Names show on the screen, so keep them short and clear: `909-tight.wav`, not `KICK_FINAL_v2 (1).wav`
+- Up to about 64 per folder keeps browsing quick on the 10-inch screen
+
+Audio files in here aren't saved to git (they're big). Back the folder up yourself.
+""")
+build_samples()
 print("built", R)

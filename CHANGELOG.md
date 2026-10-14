@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.25 (14 October 2026)
+
+**Added**
+- Start buttons for empty synth parts: "empty: tap to start" on the perform lanes, and a start button on compose and on each synth tab
+- A `samples` folder with one folder per drum sound, ready for your own samples
+
+**Fixed**
+- A blank project was silent even once the synths had notes: pattern 1 never got the default synth sounds, so the filters sat shut. Blank projects now start with the default sounds
+
 ## v0.24 (14 October 2026)
 
 **Added**

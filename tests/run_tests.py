@@ -673,6 +673,17 @@ def bass_lock_density_and_mutate(work):
     assert notes[5] == notes[0] and on[5] == on[0], "seed 0 should bring back the original"
 
 @test
+def blank_project_synths_start_and_sound(work):
+    """On the blank starter, starting the bass and chords gives notes you can hear, with the default sounds."""
+    subprocess.run([sys.executable, os.path.join(ROOT, "tools", "build.py"), "--out", work, "--reset-patterns"], check=True, capture_output=True)
+    for part, gen in (("bass", "ockm-bass-gen bang"), ("chord", "ockm-chord-gen bang")):
+        h = Harness(); h.record(os.path.join(work, f"blank-{part}.wav"))
+        others = " ; ".join(f"ockm-{t}-mute 1" for t in ["d1","d2","d3","d4","d5","d6","d7","d8","bass","lead","chord"] if t != part)
+        h.at(100, f"{gen} ; {others} ; ockm-play 1"); h.at(2500, "ockm-play 0")
+        _, (snd, sr) = play(work, h, f"t_blank_{part}", ms=2500)
+        assert peak(snd) > 0.05, f"{part} on a blank project should be heard once started: peak {peak(snd):.3f}"
+
+@test
 def projects_new_open_saveas_list_delete(work):
     """Projects are folders: save as copies, new starts blank, open brings one back, delete moves it to the trash."""
     h = Harness()

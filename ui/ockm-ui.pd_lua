@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.24"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.25"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
@@ -34,6 +34,7 @@ local THEMES = {
 
 local SLOTS   = { "d1","d2","d3","d4","d5","d6","d7","d8" }
 local SOUNDS  = { "kick","snare","clap","rim","closed hat","open hat","tom","rimshot" }
+local START = { bass = "start the bass line", lead = "start a melody", chord = "start the chords" }
 local SHORT   = { "kick","snare","clap","rim","hat","open hat","tom","rimshot" }
 local SYNTHS  = { "bass","lead","chord" }
 local TRACKS  = { "d1","d2","d3","d4","d5","d6","d7","d8","bass","lead","chord" }
@@ -346,6 +347,11 @@ function ui:layout_perform(add)
       if isdrum then self.slot = i; self:open("drums") else self.part = i - 8; self:open("synth") end
     end }
     add{ kind="lane", x=LANE_X, y=y, w=W - LANE_X - 16, h=LANE_H, track=i }
+    if not isdrum and self:part_empty(SYNTHS[i - 8]) then
+      local p = SYNTHS[i - 8]
+      add{ kind="btn", x=LANE_X, y=y + 2, w=W - LANE_X - 16, h=LANE_H - 4, small=true, quiet=true, label="empty: tap to " .. START[p],
+           tap=function() self:start_part(p) end }
+    end
     if isdrum then
       -- drum lanes are editable here too: tap cycles empty, hit, accent on the block on screen
       local cw = (W - LANE_X - 16) / 16
@@ -473,7 +479,11 @@ function ui:layout_synth(add)
       end
     end
   else
-    add{ kind="locked", x=16, y=216, w=W - 32, h=40, label="on auto: the notes come from compose", tap=function() self:open("compose") end }
+    if self:part_empty(part) then
+      add{ kind="btn", x=16, y=216, w=W - 32, h=40, accent=true, label="empty: tap to " .. START[part], tap=function() self:start_part(part) end }
+    else
+      add{ kind="locked", x=16, y=216, w=W - 32, h=40, label="on auto: the notes come from compose", tap=function() self:open("compose") end }
+    end
   end
   -- what's in charge, and the camera switch
   local info = self.msg or (auto and self:auto_summary(part) or ("manual: your notes. " .. self:step_info()))
@@ -656,9 +666,11 @@ function ui:layout_compose(add)
       add{ kind="text", x=ix, y=cy + 64, w=iw, h=14, label="manual: your notes, edited by hand.", size=12 }
       add{ kind="text", x=ix, y=cy + 84, w=iw, h=14, label="Compose won't change them.", size=12 }
       add{ kind="text", x=ix, y=cy + 104, w=iw, h=14, label="Back to auto replaces them.", size=12 }
-      add{ kind="btn", x=ix, y=cy + 132, w=iw, h=52, label="back to auto", quiet=true, tap=function()
-        self:send(mkey, 0); pd.send("ockm-"..p.."-gen", "bang", {}); self:say(p .. " is back on auto")
+      local empty = self:part_empty(p)
+      add{ kind="btn", x=ix, y=cy + 132, w=iw, h=52, label=empty and START[p] or "back to auto", quiet=not empty, accent=empty, tap=function()
+        if empty then self:start_part(p) else self:send(mkey, 0); pd.send("ockm-"..p.."-gen", "bang", {}); self:say(p .. " is back on auto") end
       end }
+      if empty then add{ kind="text", x=ix, y=cy + 196, w=iw, h=14, label="(or write it yourself on the " .. p .. " tab)", size=11 } end
     elseif p == "chord" then
       add{ kind="text", x=ix, y=cy + 52, w=iw, h=12, label="progression", size=10 }
       self:stepper(add, ix, cy + 66, iw, 52, PROGS, "ockm-chord-prog")
@@ -673,7 +685,9 @@ function ui:layout_compose(add)
       add{ kind="choice", x=ix, y=cy + 242, w=iw, h=34, label="smooth voicing", accent=true, small=true, sel=(self.v["ockm-chord-smooth"] or 1) > 0,
            tap=function() self:send("ockm-chord-smooth", ((self.v["ockm-chord-smooth"] or 1) > 0) and 0 or 1) end }
       local leader = self.v["ockm-leader"] or 0
-      if leader == 1 or leader == 2 then
+      if (leader == 0 or leader == 3) and self:part_empty("chord") then
+        add{ kind="btn", x=ix, y=cy + 284, w=iw, h=40, accent=true, label=START.chord, tap=function() self:start_part("chord") end }
+      elseif leader == 1 or leader == 2 then
         add{ kind="btn", x=ix, y=cy + 284, w=iw, h=40, accent=true,
              label=self.ranking and "next suggestion" or ((leader == 1) and "suggest chords for the melody" or "suggest chords for the bass"),
              tap=function() self:suggest_chords() end }
@@ -694,8 +708,12 @@ function ui:layout_compose(add)
       add{ kind="hbar", x=ix, y=cy + 228, w=iw, h=34, hook="ockm-"..p.."-density", lo=0, hi=2, label="density", bold=true }
       local skey = "ockm-"..p.."-seed"
       local seed = math.floor(self.v[skey] or 0)
-      add{ kind="btn", x=ix, y=cy + 270, w=(iw - 6) / 2, h=34, label="mutate", tap=function() self:send(skey, seed + 1) end }
-      add{ kind="btn", x=ix + (iw + 6) / 2, y=cy + 270, w=(iw - 6) / 2, h=34, label="original", quiet=(seed == 0), tap=function() self:send(skey, 0) end }
+      if self:part_empty(p) then
+        add{ kind="btn", x=ix, y=cy + 270, w=iw, h=34, accent=true, label=START[p], tap=function() self:start_part(p) end }
+      else
+        add{ kind="btn", x=ix, y=cy + 270, w=(iw - 6) / 2, h=34, label="mutate", tap=function() self:send(skey, seed + 1) end }
+        add{ kind="btn", x=ix + (iw + 6) / 2, y=cy + 270, w=(iw - 6) / 2, h=34, label="original", quiet=(seed == 0), tap=function() self:send(skey, 0) end }
+      end
       local leader = self.v["ockm-leader"] or 0
       local leads = (leader == 1 and p == "lead") or (leader == 2 and p == "bass")
       local follows = (self.v["ockm-"..p.."-sync"] or 0) > 0
@@ -703,6 +721,25 @@ function ui:layout_compose(add)
            label=(leads and "leads the harmony" or (follows and "follows the chords" or "follows the key")) .. ((seed > 0) and ("  ·  variation " .. seed) or "") }
     end
   end
+end
+
+-- is a synth part empty across the whole pattern?
+function ui:part_empty(p)
+  local L = math.max(1, math.floor(self.v["ockm-len"] or 16))
+  for i = 0, L - 1 do
+    if self:get("ockm-pat-"..p.."-on", i) > 0 then return false end
+  end
+  return true
+end
+-- start a part: hand it to its generator (auto) and make notes now
+function ui:start_part(p)
+  local leader = self.v["ockm-leader"] or 0
+  if p == "chord" and (leader == 1 or leader == 2) then
+    self:send("ockm-chord-mode", 0); self.ranking = nil; self:suggest_chords(); return
+  end
+  self:send("ockm-"..p.."-mode", 0)
+  pd.send("ockm-"..p.."-gen", "bang", {})
+  self:say(p .. " started on auto: change it on compose, or switch to manual to edit")
 end
 
 -- ------------------------------------------------------------------ projects
@@ -1046,7 +1083,7 @@ function ui:draw(g, w)
   local th = self.theme
   if k == "btn" then
     self:col(g, w.accent and "acc" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
-    self:ctext(g, w.label, w, 14, w.accent and "#ffffff" or (w.quiet and "mute" or "txt"))
+    self:ctext(g, w.label, w, w.small and 12 or 14, w.accent and "#ffffff" or (w.quiet and "mute" or "txt"))
   elseif k == "tab" then
     self:col(g, w.sel and "on" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
     self:ctext(g, w.label, w, 15, w.sel and "bg" or "txt")
