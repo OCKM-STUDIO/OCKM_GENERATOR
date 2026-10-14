@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.19"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.20"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
@@ -40,7 +40,7 @@ local TRACKS  = { "d1","d2","d3","d4","d5","d6","d7","d8","bass","lead","chord" 
 local NOTES   = { "C","C#","D","D#","E","F","F#","G","G#","A","A#","B" }
 local SCALES  = { {0,2,3,5,7,8,10}, {0,2,4,5,7,9,11}, {0,2,3,5,7,9,10}, {0,1,3,5,7,8,10}, {0,2,4,5,7,9,10}, {0,2,3,5,7,8,11} }
 local SCALE_NAMES = { "minor","major","dorian","phrygian","mixo","harm min" }
-local MONO_ENG  = { "acid","sub","fm","reese","pluck","saw" }
+local MONO_ENG  = { "acid","sub","fm","reese","pluck","saw","house" }
 local CHORD_ENG = { "stab","organ","pad" }
 local KNOBS = {
   acid  = {"cutoff","resonance","env amount","decay"},
@@ -49,6 +49,7 @@ local KNOBS = {
   reese = {"cutoff","detune","env amount","decay"},
   pluck = {"brightness","saw-square","snap","decay"},
   saw   = {"tone","detune","sub","decay"},
+  house = {"tone","body","pluck","decay"},
   stab  = {"brightness","detune","snap","length"},
   organ = {"drawbars","click","sub","length"},
   pad   = {"brightness","detune","attack","length"},
@@ -325,6 +326,13 @@ function ui:layout_perform(add)
       if isdrum then self.slot = i; self:open("drums") else self.part = i - 8; self:open("synth") end
     end }
     add{ kind="lane", x=LANE_X, y=y, w=W - LANE_X - 16, h=LANE_H, track=i }
+    if isdrum then
+      -- drum lanes are editable here too: tap cycles empty, hit, accent on the block on screen
+      local cw = (W - LANE_X - 16) / 16
+      for c = 0, 15 do
+        add{ kind="pcell", x=LANE_X + c * cw, y=y, w=cw, h=LANE_H, tap=function() self:drum_cycle(i, self:shown_block() * 16 + c) end }
+      end
+    end
   end
   -- bottom: the chosen synth's four main knobs on the left, master effects on the right (the way the sound flows)
   local half = (W - 32 - 16) / 2
@@ -551,13 +559,14 @@ end
 -- ------------------------------------------------------------------ step edits
 function ui:abs(i) return self.page * 16 + i end
 
-function ui:drum_tap(i)
-  local nm = SLOTS[self.slot]
-  local v = self:get("ockm-pat-"..nm, self:abs(i))
+function ui:drum_cycle(slot, step)
+  local nm = SLOTS[slot]
+  local v = self:get("ockm-pat-"..nm, step)
   local nv = (v <= 0) and 1 or ((v < 2) and 2 or 0)
-  pd.send("ockm-edit", nm, { self:abs(i), nv })
+  pd.send("ockm-edit", nm, { step, nv })
   self:dirty()
 end
+function ui:drum_tap(i) self:drum_cycle(self.slot, self:abs(i)) end
 
 function ui:mono_get(i, f) return self:get("ockm-pat-"..SYNTHS[self.part].."-"..f, self:abs(i)) end
 function ui:mono_write(i, note, on, acc, slide)
@@ -883,7 +892,7 @@ function ui:draw(g, w)
     if self.playing ~= 0 and w.b == self:play_block() then
       self:col(g, "acc"); g:fill_rect(w.x + 4, w.y + w.h - 4, w.w - 8, 3)
     end
-  elseif k == "steprow" or k == "stripname" then
+  elseif k == "steprow" or k == "stripname" or k == "pcell" then
     -- nothing to draw: it only catches swipes between the pads
   elseif k == "dstep" then
     local v = self:get("ockm-pat-"..SLOTS[self.slot], self:abs(w.i))

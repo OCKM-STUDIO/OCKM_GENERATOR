@@ -401,14 +401,14 @@ def row(y,label,items):
         fa=sub.add(f"#X floatatom {x} {y} 5 {lo} {hi} 0 - - {hook};")
         m=sub.add(f"#X obj {x+45} {y-18} r {show(hook)};"); sub.con(m,0,fa,0)
 row(80,"key",[("root",9,0,11,"ockm-root",False),("scale",0,0,5,"ockm-scale",False)])
-row(140,"bass",[("engine",0,0,5,"ockm-bass-engine",True),("k1",0.37,0,1,"ockm-bass-k1",True),("k2",0.9,0,1,"ockm-bass-k2",True),("k3",0.31,0,1,"ockm-bass-k3",True),
+row(140,"bass",[("engine",0,0,6,"ockm-bass-engine",True),("k1",0.37,0,1,"ockm-bass-k1",True),("k2",0.9,0,1,"ockm-bass-k2",True),("k3",0.31,0,1,"ockm-bass-k3",True),
                 ("k4",0.55,0,1,"ockm-bass-k4",True),("drive",0,0,1,"ockm-bass-drive",True),("rhythm",3,0,7,"ockm-bass-rhythm",False),("notes",3,0,11,"ockm-bass-notes",False)])
-row(200,"lead",[("engine",4,0,5,"ockm-lead-engine",True),("k1",0.55,0,1,"ockm-lead-k1",True),("k2",0.3,0,1,"ockm-lead-k2",True),("k3",0.4,0,1,"ockm-lead-k3",True),
+row(200,"lead",[("engine",4,0,6,"ockm-lead-engine",True),("k1",0.55,0,1,"ockm-lead-k1",True),("k2",0.3,0,1,"ockm-lead-k2",True),("k3",0.4,0,1,"ockm-lead-k3",True),
                 ("k4",0.45,0,1,"ockm-lead-k4",True),("drive",0,0,1,"ockm-lead-drive",True),("rhythm",6,0,7,"ockm-lead-rhythm",False),("notes",8,0,11,"ockm-lead-notes",False)])
 row(260,"chord",[("engine",0,0,2,"ockm-chord-engine",True),("k1",0.45,0,1,"ockm-chord-k1",True),("k2",0.5,0,1,"ockm-chord-k2",True),("k3",0.4,0,1,"ockm-chord-k3",True),
                  ("k4",0.3,0,1,"ockm-chord-k4",True),("type",0,0,7,"ockm-chord-type",True),("smooth",1,0,1,"ockm-chord-smooth",True),("rhythm",0,0,9,"ockm-chord-rhythm",False),("prog",0,0,9,"ockm-chord-prog",False)])
 sub.add("#X text 20 300 key root: 0 C ... 9 A ... 11 B. Scale: 0 minor 1 major 2 dorian 3 phrygian 4 mixolydian 5 harmonic minor;")
-sub.add("#X text 20 320 bass and lead engines: 0 acid 1 sub 2 FM 3 reese 4 pluck 5 saw. Chord engines: 0 stab 1 organ 2 pad. Chord type: 0 triad 1 seventh 2 sus2 3 power 4 sus4 5 sixth 6 ninth 7 eleventh;")
+sub.add("#X text 20 320 bass and lead engines: 0 acid 1 sub 2 FM 3 reese 4 pluck 5 saw 6 house. Chord engines: 0 stab 1 organ 2 pad. Chord type: 0 triad 1 seventh 2 sus2 3 power 4 sus4 5 sixth 6 ninth 7 eleventh;")
 sub.add("#X text 20 340 bass/lead rhythm: 0 offbeat 1 rolling 2 gallop 3 acid 4 dub 5 bounce 6 acid16 7 trip-hop. Notes: 0 root 1 octaves 2 root-fifth 3 acid-riff 4 walk-up 5 stab 6 dub 7 pedal 8 arp-up 9 arp-updown 10 call 11 descend;")
 sub.add("#X text 20 360 chord rhythm 0-9 and progression 0-9: the names are on the synths screen and in tools/build.py (PRE and PROGS). Smooth 1 = chords move by small steps.;")
 p.L.append(sub.text("#N canvas 260 160 1000 400 synth-settings 0;").rstrip("\n"))
@@ -482,6 +482,22 @@ for j,(t,fv) in enumerate(vals):
     q.con(t,0,tb,0); q.con(tb,j,fv,0); q.con(fv,0,ex,j)   # the hot inlet (mute) fires last
 for c in [(ex,0,pk,0),(pk,0,ln,0),(ln,0,m_,1),(i_,0,m_,0),(m_,0,o_,0)]: q.con(*c)
 q.save("seq/ockm-gate.pd","#N canvas 200 200 760 380 12;")
+
+# ================= band-limited oscillators =================
+# PolyBLEP: a phasor-based saw or square with the sharp edges smoothed over one sample, so the top end stays clean.
+BLEP="if({t}<{D}v3 \\, ({t}/{D}v3)*2-({t}/{D}v3)*({t}/{D}v3)-1 \\, if({t}>1-{D}v3 \\, (({t}-1)/{D}v3)*(({t}-1)/{D}v3)+2*(({t}-1)/{D}v3)+1 \\, 0))"
+for kind in ("saw","square"):
+    q=P()
+    q.add(f"#X text 20 10 Band-limited {kind}: frequency in \\, a clean {kind} out (PolyBLEP).;")
+    i_=q.add("#X obj 30 50 inlet~;"); ph=q.add("#X obj 30 90 phasor~;"); o=q.add("#X obj 30 300 outlet~;")
+    lb=q.add("#X obj 300 40 loadbang;"); sr=q.add("#X obj 300 65 samplerate~;"); dv=q.add("#X obj 200 130 /~ 44100;")
+    sh=q.add("#X obj 120 130 +~ 0.5;"); wr=q.add("#X obj 120 160 wrap~;")
+    if kind=="saw":
+        ex=q.add("#X obj 30 220 expr~ 2*"+D+"v1-1-("+BLEP.format(t=D+"v1",D=D)+");")
+    else:
+        ex=q.add("#X obj 30 220 expr~ if("+D+"v1<0.5 \\, 1 \\, -1)+("+BLEP.format(t=D+"v1",D=D)+")-("+BLEP.format(t=D+"v2",D=D)+");")
+    for c in [(i_,0,ph,0),(i_,0,dv,0),(lb,0,sr,0),(sr,0,dv,1),(ph,0,sh,0),(sh,0,wr,0),(ph,0,ex,0),(wr,0,ex,1),(dv,0,ex,2),(ex,0,o,0)]: q.con(*c)
+    q.save(f"voices/ockm-bl{kind}.pd","#N canvas 200 200 600 340 12;")
 
 # ================= bass core: shared note logic for every engine =================
 q=P()
@@ -594,6 +610,20 @@ engine("voices/ockm-mono-acid.pd",0,"Acid engine: saw wave into a resonant filte
 engine("voices/ockm-mono-sub.pd",1,"Sub engine: a driven sine wave with a pitch drop. Deep and clean",sub)
 engine("voices/ockm-mono-fm.pd",2,"FM engine: one sine wave bending another. Punchy and metallic",fm)
 engine("voices/ockm-mono-reese.pd",3,"Reese engine: three detuned saws beating against each other. Dark and wide",reese)
+def house(q,core,ks,out):
+    # classic deep house / garage bass: a clean square plus a sine an octave down, through a warm low-pass with a short pluck
+    mt=q.add("#X obj 30 200 mtof~;"); sq=q.add("#X obj 30 230 ockm-blsquare;"); sqg=q.add("#X obj 30 260 *~ 0.55;")
+    hz=q.add("#X obj 160 230 *~ 0.5;"); so=q.add("#X obj 160 260 osc~;"); sog=q.add("#X obj 160 290 *~;")
+    em=q.add("#X obj 450 230 *~ 2500;"); ad=q.add("#X obj 450 260 +~ 200;"); cl=q.add("#X obj 450 290 clip~ 40 8000;")
+    bob=q.add("#X obj 30 330 bob~;"); rs=q.add("#X msg 600 300 0.4;"); lb=q.add("#X obj 600 270 loadbang;")
+    mix=q.add("#X obj 30 370 +~;"); am=q.add("#X obj 30 400 *~;"); g=q.add("#X obj 30 430 *~ 0.9;")
+    k1=q.add(f"#X obj 200 140 expr 60*pow(2\\,6*{D}f1);"); k2=q.add("#X obj 310 140 * 0.8;"); k3=q.add("#X obj 420 140 * 4000;")
+    for c in [(core,0,mt,0),(mt,0,sq,0),(sq,0,sqg,0),(mt,0,hz,0),(hz,0,so,0),(so,0,sog,0),
+              (core,1,em,0),(em,0,ad,0),(ad,0,cl,0),(cl,0,bob,1),(lb,0,rs,0),(rs,0,bob,2),
+              (sqg,0,bob,0),(bob,0,mix,0),(sog,0,mix,1),(mix,0,am,0),(core,2,am,1),(am,0,g,0),(g,0,out,0),
+              (ks[0],0,k1,0),(k1,0,ad,1),(ks[1],0,k2,0),(k2,0,sog,1),(ks[2],0,k3,0),(k3,0,em,1)]: q.con(*c)
+    q.add("#X text 200 110 k1 tone / k2 body (sub sine) / k3 pluck (filter snap on each note);")
+
 engine("voices/ockm-mono-pluck.pd",4,"Pluck engine: short and bright. Good for rolling riffs",pluck)
 
 def sawe(q,core,ks,out):
@@ -617,6 +647,7 @@ def sawe(q,core,ks,out):
               (ks[2],0,k3,0),(k3,0,g3,1),(k3,0,nm,2)]: q.con(*c)
     q.add("#X text 200 110 k1 tone (1 = fully raw) / k2 second saw detune (0 = single saw) / k3 sub saw an octave down / k4 note length. Notes play at full level then stop hard.;")
 
+engine("voices/ockm-mono-house.pd",6,"House engine: clean square plus a sub sine through a warm filter with a short pluck. Deep house and garage",house)
 engine("voices/ockm-mono-saw.pd",5,"Saw engine: a raw sawtooth. No squelch \\, just a hard buzzy bass",sawe)
 
 # ================= bass wrapper =================
@@ -624,7 +655,7 @@ q=P()
 q.add("#X text 20 10 Mono synth (bass or lead): six engines \\, one plays at a time (ockm-<track>-engine 0 to 5). Knobs k1-k4 and drive come in on hooks.;")
 inl=q.add("#X obj 30 50 inlet;")
 ks=[q.add(f"#X obj {200+i*130} 50 r ockm-{D}1-k{i+1};") for i in range(4)]
-names=["acid","sub","fm","reese","pluck","saw"]
+names=["acid","sub","fm","reese","pluck","saw","house"]
 eng=[q.add(f"#X obj {30+i*130} 130 ockm-mono-{n} {D}1;") for i,n in enumerate(names)]
 sm=q.add("#X obj 30 200 +~;")
 for i,e in enumerate(eng):
@@ -632,7 +663,7 @@ for i,e in enumerate(eng):
     for j,k in enumerate(ks): q.con(k,0,e,j+1)
     q.con(e,0,sm,0)
 rd=q.add(f"#X obj 400 200 r ockm-{D}1-drive;"); dx=q.add(f"#X obj 400 230 expr 1+{D}f1*9;")
-th=q.add(f"#X obj 30 260 expr~ tanh({D}v1*max({D}f2\\,1))/sqrt(max({D}f2\\,1));"); out=q.add("#X obj 30 300 outlet~;")
+th=q.add(f"#X obj 30 260 expr~ if({D}f2>1.001 \\, tanh({D}v1*{D}f2)/sqrt({D}f2) \\, {D}v1);"); out=q.add("#X obj 30 300 outlet~;")   # drive 0 is clean
 q.add("#X text 400 260 drive: 0 clean \\, 1 heavy;")
 for c in [(rd,0,dx,0),(dx,0,th,1),(sm,0,th,0),(th,0,out,0)]: q.con(*c)
 q.save("voices/ockm-mono.pd","#N canvas 140 140 900 340 12;")
@@ -648,13 +679,13 @@ h1=q.add("#X obj 30 90 hip~ 10;"); h2=q.add("#X obj 30 115 hip~ 10;"); l1=q.add(
 rf=q.add("#X obj 300 50 r ockm-filter;")
 fx=q.add(f"#X obj 300 80 expr if({D}f1>0 \\, 20*pow(2\\,{D}f1*9.6) \\, 10) \; if({D}f1<0 \\, 20000*pow(2\\,{D}f1*9.6) \\, 20000);")
 rdv=q.add("#X obj 300 200 r ockm-drive;"); dvx=q.add(f"#X obj 300 230 expr 1+{D}f1*9;")
-th=q.add(f"#X obj 30 230 expr~ tanh({D}v1*max({D}f2\\,1))/sqrt(max({D}f2\\,1));")
+th=q.add(f"#X obj 30 230 expr~ if({D}f2>1.001 \\, tanh({D}v1*{D}f2)/sqrt({D}f2) \\, {D}v1);")   # drive 0 is clean
 dw=q.add(f"#X obj 200 330 delwrite~ {D}0-dly 4000;"); dr=q.add(f"#X obj 200 290 delread~ {D}0-dly 363;")
 fb=q.add("#X obj 200 360 *~ 0.4;"); mx=q.add("#X obj 200 400 *~ 0;")
 rst=q.add("#X obj 500 250 r ockm-stepms;"); rsteps=q.add("#X obj 620 250 r ockm-delay-steps;"); dtm=q.add("#X obj 500 280 * 3;")
 rfb=q.add("#X obj 500 330 r ockm-delay-fb;"); rmx=q.add("#X obj 500 380 r ockm-delay-mix;")
 tff=q.add("#X obj 620 280 t b f;"); fs=q.add("#X obj 500 220 f 121;")
-sm=q.add("#X obj 30 440 +~;"); lim=q.add(f"#X obj 30 470 expr~ tanh({D}v1);"); out=q.add("#X obj 30 510 outlet~;")
+sm=q.add("#X obj 30 440 +~;"); lim=q.add(f"#X obj 30 470 expr~ if(abs({D}v1)<0.8 \\, {D}v1 \\, (0.8+0.2*tanh((abs({D}v1)-0.8)/0.2))*({D}v1/abs({D}v1)));"); out=q.add("#X obj 30 510 outlet~;")   # limiter: clean below 0.8
 for c in [(inl,0,h1,0),(h1,0,h2,0),(h2,0,l1,0),(l1,0,l2,0),(rf,0,fx,0),(fx,0,h1,1),(fx,0,h2,1),(fx,1,l1,1),(fx,1,l2,1),
           (rdv,0,dvx,0),(dvx,0,th,1),(l2,0,th,0),(dcat,0,dw,0),(dr,0,fb,0),(fb,0,dw,0),(dr,0,mx,0),(mx,0,inl,1),
           (rst,0,fs,0),(fs,0,dtm,0),(rsteps,0,tff,0),(tff,1,dtm,1),(tff,0,fs,0),(dtm,0,dr,0),(rfb,0,fb,1),(rmx,0,mx,1),

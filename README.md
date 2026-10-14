@@ -2,7 +2,7 @@
 
 A drum machine and easy-to-program synths in one box. Built in Pure Data, designed to run on a Raspberry Pi with a touchscreen and a few knobs.
 
-Current version: **v0.19**
+Current version: **v0.20**
 
 ## How to open it
 
@@ -21,7 +21,7 @@ Tap a track's name on perform or the mixer to jump straight to it.
 **Perform** (home)
 - **Play** and **tempo** top left. Drag the tempo number up or down
 - Patterns are in the navigation strip: tap to switch. While playing it waits for the end of the bar; the queued one gets an orange outline
-- **Now**: all 11 tracks for the 16 steps that are playing, with the playhead running above them. It's a picture, not an editor
+- **Now**: all 11 tracks for the 16 steps on screen, with the playhead running above them. **Tap a drum lane's steps to edit them** (empty, hit, accent), just like the drums screen. The bass, lead and chord lanes are a picture: edit those on their own tabs
 - Tap a track's **name** to open it
 - **M** mutes a track and **S** solos it (several can be soloed at once). Silent tracks go dim. Mutes and solos are for playing live, so they aren't saved
 - **Bottom left, synth:** pick bass, lead or chord, then play its four main knobs (named for the engine it's using)
@@ -258,7 +258,7 @@ Slot sounds, tune, decay, level and sends are part of the drum kit, which is sav
 
 ## Bass and lead engines
 
-Bass and lead are the same mono synth, so each has the same six engines (the lead plays two octaves higher). Only the chosen engine runs, so the others cost no processing power. Every engine uses the same four knobs, 0 to 1. k4 is always decay.
+Bass and lead are the same mono synth, so each has the same seven engines (the lead plays two octaves higher). Only the chosen engine runs, so the others cost no processing power. Every engine uses the same four knobs, 0 to 1. k4 is always decay.
 
 | Engine | k1 | k2 | k3 | Character |
 |---|---|---|---|---|
@@ -268,8 +268,9 @@ Bass and lead are the same mono synth, so each has the same six engines (the lea
 | 3 reese | cutoff | detune (width) | envelope amount | Dark and wide |
 | 4 pluck | brightness | saw to square | filter snap | Rings out and fades over the decay time, with a sub an octave down. Ignores the short 303-style note length |
 | 5 saw | tone (1 = fully raw) | second saw detune (0 = single saw) | sub saw an octave down | Hard and buzzy. Notes play at full level for the decay time, then stop |
+| 6 house | tone | body (sub sine an octave down) | pluck (filter snap) | Deep house and garage: a clean square and a sub sine through a warm filter |
 
-The drive comes after the engine, so it works on all of them. Defaults: bass on acid, lead on pluck.
+The drive comes after the engine, so it works on all of them. At 0 it's completely clean; it only colours the sound as you turn it up. Defaults: bass on acid, lead on pluck.
 
 ## Chord synth
 

@@ -159,17 +159,17 @@ def build_panel(P, D, save_dir_save, SLOTS, SLOTN, show, theme="dark"):
     lab(370, SY, "scale", TXT, 13)
     hrad(430, SY - 4, 22, 6, "ockm-scale", show("ockm-scale"))
     labels_under(430, SY + 22, 22, ["min", "maj", "dor", "phr", "mix", "hm"])
-    SECT = [("bass", ["acid", "sub", "fm", "reese", "pluck", "saw"], 12, "rhythm", "notes"),
-            ("lead", ["acid", "sub", "fm", "reese", "pluck", "saw"], 12, "rhythm", "notes"),
+    SECT = [("bass", ["acid", "sub", "fm", "reese", "pluck", "saw", "house"], 12, "rhythm", "notes"),
+            ("lead", ["acid", "sub", "fm", "reese", "pluck", "saw", "house"], 12, "rhythm", "notes"),
             ("chord", ["stab", "organ", "pad"], 10, "rhythm", "prog")]
     for si, (t, engs, nsecond, g1, g2) in enumerate(SECT):
         x = 20 + si * 360; y = SY + 50
         card(x, y, 340, 262)
         x += 14; y += 12
         lab(x, y + 4, t, TXT, 14)
-        hrad(x + 60, y, 30, len(engs), f"ockm-{t}-engine", show(f"ockm-{t}-engine"))
+        hrad(x + 60, y, 26 if len(engs) > 6 else 30, len(engs), f"ockm-{t}-engine", show(f"ockm-{t}-engine"))
         for i, n in enumerate(engs):
-            lab(x + 61 + i * 30, y + 38, n, size=9)
+            lab(x + 61 + i * (26 if len(engs) > 6 else 30), y + 38, n, size=8)
         for k in range(4):
             hsl(x, y + 62 + k * 30, 150, 0, 1, f"ockm-{t}-k{k+1}", show(f"ockm-{t}-k{k+1}"), f"k{k+1}")
         if t != "chord":

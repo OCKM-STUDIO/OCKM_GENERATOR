@@ -428,7 +428,7 @@ def chord_engines_sound(work):
 
 @test
 def bass_engines_play_in_tune(work):
-    for eng, name in enumerate(["acid", "sub", "fm", "reese", "pluck", "saw"]):
+    for eng, name in enumerate(["acid", "sub", "fm", "reese", "pluck", "saw", "house"]):
         h = Harness(dut="ockm-mono zz")
         h.record(os.path.join(work, f"b_{name}.wav"), source="dut")
         h.at(20, f"ockm-zz-engine {eng} ; ockm-zz-k1 0.5 ; ockm-zz-k2 0.3 ; ockm-zz-k3 0 ; ockm-zz-k4 0.9 ; ockm-zz-drive 0")
@@ -560,6 +560,7 @@ def touchscreen_drives_the_engine(work):
     tap(335, 430, 399)                   # progression 5 (garage)
     tap(340, 300, 564)                   # spice 3 (ninth)
     tap(345, 287, 36); tap(348, 126, 137)  # perform tab, mute the kick lane
+    tap(349, 192 + 47 * 1 + 20, 165)     # perform: snare lane, step 2
     tap(350, 747, 36)                    # mixer tab
     tap(355, 673, 341)                   # bass fader, halfway
     tap(360, 130, 505)                   # mute on strip 2
@@ -579,6 +580,7 @@ def touchscreen_drives_the_engine(work):
     assert any(0.4 < x < 0.6 for x in lk), f"perform strip: lead knob 1 should be about halfway: {lk}"
     assert any(abs(float(x)) < 0.1 for x in printed(out, "ockm-filter")), "perform strip: filter in the middle should be about 0"
     assert "4" in printed(out, "ockm-chord-prog"), f"fill: progression 5 should send 4: {printed(out, 'ockm-chord-prog')}"
+    assert any(e.startswith("d2 1 ") for e in edits), f"tapping the snare lane on perform should edit d2 step 2: {edits}"
     assert "1" in printed(out, "ockm-bass-mode"), "editing a bass step in auto should switch the bass to manual"
     assert "1" in printed(out, "ockm-d1-mute"), "perform: M on the kick lane should mute d1"
     assert "1" in printed(out, "ockm-d2-mute"), "mixer: M on strip 2 should mute d2"

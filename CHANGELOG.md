@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.20 (14 October 2026)
+
+**Added**
+- House bass engine (engine 6, bass and lead): a clean square plus a sub sine an octave down, through a warm low-pass with a short pluck. Knobs: tone, body, pluck, decay
+- Band-limited saw and square oscillators (`ockm-blsaw`, `ockm-blsquare`), so new engines don't alias
+- The drum lanes on perform are editable: tap a step to cycle empty, hit, accent
+
+**Fixed**
+- Fizzy bass and lead. Every note was going through three saturation stages even with drive at 0. The bass/lead drive and the master drive are now completely clean at 0, and the limiter only touches peaks above 80% of full level
+
 ## v0.19 (14 October 2026)
 
 **Added**

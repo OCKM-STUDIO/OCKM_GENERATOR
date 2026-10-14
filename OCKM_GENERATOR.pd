@@ -442,7 +442,7 @@
 #X obj 260 62 r ockm-show-scale;
 #X text 20 140 bass;
 #X text 120 122 engine;
-#X floatatom 120 140 5 0 5 0 - - ockm-bass-engine;
+#X floatatom 120 140 5 0 6 0 - - ockm-bass-engine;
 #X obj 165 122 r ockm-show-bass-engine;
 #X text 215 122 k1;
 #X floatatom 215 140 5 0 1 0 - - ockm-bass-k1;
@@ -467,7 +467,7 @@
 #X obj 830 122 r ockm-show-bass-notes;
 #X text 20 200 lead;
 #X text 120 182 engine;
-#X floatatom 120 200 5 0 5 0 - - ockm-lead-engine;
+#X floatatom 120 200 5 0 6 0 - - ockm-lead-engine;
 #X obj 165 182 r ockm-show-lead-engine;
 #X text 215 182 k1;
 #X floatatom 215 200 5 0 1 0 - - ockm-lead-k1;
@@ -519,7 +519,7 @@
 #X floatatom 880 260 5 0 9 0 - - ockm-chord-prog;
 #X obj 925 242 r ockm-show-chord-prog;
 #X text 20 300 key root: 0 C ... 9 A ... 11 B. Scale: 0 minor 1 major 2 dorian 3 phrygian 4 mixolydian 5 harmonic minor;
-#X text 20 320 bass and lead engines: 0 acid 1 sub 2 FM 3 reese 4 pluck 5 saw. Chord engines: 0 stab 1 organ 2 pad. Chord type: 0 triad 1 seventh 2 sus2 3 power 4 sus4 5 sixth 6 ninth 7 eleventh;
+#X text 20 320 bass and lead engines: 0 acid 1 sub 2 FM 3 reese 4 pluck 5 saw 6 house. Chord engines: 0 stab 1 organ 2 pad. Chord type: 0 triad 1 seventh 2 sus2 3 power 4 sus4 5 sixth 6 ninth 7 eleventh;
 #X text 20 340 bass/lead rhythm: 0 offbeat 1 rolling 2 gallop 3 acid 4 dub 5 bounce 6 acid16 7 trip-hop. Notes: 0 root 1 octaves 2 root-fifth 3 acid-riff 4 walk-up 5 stab 6 dub 7 pedal 8 arp-up 9 arp-updown 10 call 11 descend;
 #X text 20 360 chord rhythm 0-9 and progression 0-9: the names are on the synths screen and in tools/build.py (PRE and PROGS). Smooth 1 = chords move by small steps.;
 #X connect 5 0 4 0;
