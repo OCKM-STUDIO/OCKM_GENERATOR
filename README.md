@@ -70,7 +70,8 @@ Everything is remembered: drum kit, synth sounds, effects, tempo, swing, key and
 |---|---|---|
 | Computer | Raspberry Pi 5, 2GB (plenty: the patch uses about 11MB), with Active Cooler and the official 27W power supply | Not bought |
 | Screen | Official Raspberry Pi Touch Display 2, 10" (1920 x 1200, Pi 5 only). Decided: big enough for finger-sized steps | Not bought |
-| Audio | iRig Pro Duo (already owned, check it's recognised) | Owned |
+| Audio | Raspberry Pi DAC Pro on the GPIO pins (the Pi 5 has no audio socket). RCA outputs, then a 2 x RCA to 2 x 1/4" TS lead into a stereo channel of the mixer (Zoom L6, channels 3/4 or 5/6). The iRig Pro Duo works for testing on the Mac | Not bought |
+| Screen power | Small USB power adapter for the screen, because the DAC Pro covers the GPIO pins the screen would normally take power from | Not bought |
 | Controller | Endless knobs with light rings. Front runners: Novation Launch Control 3 (16 knobs, screen) or Behringer X-Touch Mini (8 knobs, 16 buttons). Maybe a Launchpad Mini later for a hands-on step grid | To choose |
 | Storage | microSD card, 32GB | Not bought |
 
