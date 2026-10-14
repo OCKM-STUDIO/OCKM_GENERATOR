@@ -2,7 +2,7 @@
 
 A drum machine and easy-to-program synths in one box. Built in Pure Data, designed to run on a Raspberry Pi with a touchscreen and a few knobs.
 
-Current version: **v0.17.1**
+Current version: **v0.18**
 
 ## How to open it
 
@@ -24,7 +24,9 @@ Tap a track's name on perform or the mixer to jump straight to it.
 - **Now**: all 11 tracks for the 16 steps that are playing, with the playhead running above them. It's a picture, not an editor
 - Tap a track's **name** to open it
 - **M** mutes a track and **S** solos it (several can be soloed at once). Silent tracks go dim. Mutes and solos are for playing live, so they aren't saved
-- **Sound strip**: pick bass, lead or chord, then play its four main knobs (named for the engine it's using). The **filter** next to length is the master DJ filter
+- **Bottom left, synth:** pick bass, lead or chord, then play its four main knobs (named for the engine it's using)
+- **Bottom right, master FX:** filter (centre is off: left is low-pass, right is high-pass), drive, delay level, feedback and time (in steps), reverb level, size and tone
+- These are bars: drag along them. The orange line shows the value
 - **Length** is in the navigation strip. Making a pattern longer repeats what's there
 - **Save** and **revert**, top right
 
@@ -48,7 +50,7 @@ Tap a track's name on perform or the mixer to jump straight to it.
 - **Master** on the right: the reverb and delay return levels, the master volume, and **clear** to undo every mute and solo
 - Drum levels belong to the kit (the project). Bass, lead and chord levels belong to each pattern, like the rest of their sound
 
-Swing, accent amount, the other master effects and MIDI clock aren't on the screens yet. They're still saved, and they're in **pd test-panel**.
+Swing, accent amount and MIDI clock aren't on the screens yet. They're still saved, and they're in **pd test-panel**.
 
 **Under the screen:** `pd engine` is the sound and sequencer (open it only if you're curious). `pd test-panel` is the old v0.12 panel with every control on one sheet, kept for testing.
 

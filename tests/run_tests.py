@@ -548,13 +548,13 @@ def touchscreen_drives_the_engine(work):
     tap(245, 922, 88)                    # forward arrow (steps 17-32)
     tap(248, 644, 88)                    # back arrow (steps 1-16)
     tap(250, 287, 36)                    # perform tab
-    tap(255, 116, 518); tap(258, 427, 470)   # sound strip: lead, then its first knob
+    tap(255, 244, 467); tap(258, 128, 512)   # synth half: lead, then its first knob
     tap(260, 50, 369)                    # open bass from its lane
     tap(270, 45, 158)                    # bass step 1
     tap(280, 600, 236)                   # note picker: third note of the scale
     tap(290, 287, 36)                    # perform tab
     tap(300, 149, 88)                    # pattern 3 (navigation strip)
-    tap(310, 608, 566)                   # master filter, middle
+    tap(310, 543, 486)                   # master fx: filter, middle
     tap(320, 655, 36)                    # chord tab
     tap(330, 187, 328)                   # fill view
     tap(335, 430, 399)                   # progression 5 (garage)

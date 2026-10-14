@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.18 (14 October 2026)
+
+**Added**
+- The master effects are back on screen: the bottom of perform is now half synth on the left (bass, lead or chord selector, then its four main knobs) and half master FX on the right (filter, drive, delay level, feedback and time, reverb level, size and tone)
+- Compact bar controls with the name and value inside and an orange line at the value. The filter fills from the middle
+
 ## v0.17.1 (14 October 2026)
 
 **Changed**

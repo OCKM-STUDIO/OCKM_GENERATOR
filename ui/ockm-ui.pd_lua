@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.17.1"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.18"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
@@ -104,6 +104,7 @@ function ui:defaults()
   local v = self.v
   v["ockm-chord-smooth"] = 1
   v["ockm-volume"] = 1; v["ockm-verb-mix"] = 0.5; v["ockm-delay-mix"] = 0.5
+  v["ockm-drive"] = 0; v["ockm-delay-fb"] = 0.4; v["ockm-delay-steps"] = 3; v["ockm-verb-size"] = 0.6; v["ockm-verb-tone"] = 0.5
   for _, t in ipairs(SYNTHS) do v["ockm-"..t.."-level"] = 1 end
   v["ockm-bpm"] = 124; v["ockm-len"] = 16; v["ockm-filter"] = 0; v["ockm-root"] = 9; v["ockm-scale"] = 0
   for i, nm in ipairs(SLOTS) do
@@ -128,7 +129,7 @@ function ui:hooks()
   for _, k in ipairs({"engine","k1","k2","k3","k4","type","smooth","verb","delay","rhythm","prog"}) do h[#h+1] = "ockm-chord-"..k end
   for _, t in ipairs(TRACKS) do h[#h+1] = "ockm-"..t.."-mute"; h[#h+1] = "ockm-"..t.."-solo" end
   for _, t in ipairs(SYNTHS) do h[#h+1] = "ockm-"..t.."-level" end
-  for _, k in ipairs({ "ockm-volume", "ockm-verb-mix", "ockm-delay-mix" }) do h[#h+1] = k end
+  for _, k in ipairs({ "ockm-volume", "ockm-verb-mix", "ockm-delay-mix", "ockm-drive", "ockm-delay-fb", "ockm-delay-steps", "ockm-verb-size", "ockm-verb-tone" }) do h[#h+1] = k end
   return h
 end
 
@@ -309,20 +310,30 @@ function ui:layout_perform(add)
     end }
     add{ kind="lane", x=LANE_X, y=y, w=W - LANE_X - 16, h=LANE_H, track=i }
   end
-  -- live sound strip: pick a synth, play its four main knobs, plus the master filter
+  -- bottom: the chosen synth's four main knobs on the left, master effects on the right (the way the sound flows)
+  local half = (W - 32 - 16) / 2
+  local lx, rx = 16, 16 + half + 16
+  add{ kind="text", x=rx, y=441, w=200, h=10, label="master fx", size=9 }
+  local MFX = { { "ockm-filter", -1, 1, "filter" }, { "ockm-drive", 0, 1, "drive" }, { "ockm-delay-mix", 0, 1, "delay" }, { "ockm-delay-fb", 0, 0.9, "feedback" },
+                { "ockm-delay-steps", 1, 8, "time" }, { "ockm-verb-mix", 0, 1, "reverb" }, { "ockm-verb-size", 0, 1, "size" }, { "ockm-verb-tone", 0, 1, "tone" } }
+  local mw = (half - 3 * 6) / 4
+  for i, m in ipairs(MFX) do
+    local col, row = (i - 1) % 4, math.floor((i - 1) / 4)
+    add{ kind="hbar", x=rx + col * (mw + 6), y=456 + row * 68, w=mw, h=60, hook=m[1], lo=m[2], hi=m[3], label=m[4], bold=true }
+  end
   local part = SYNTHS[self.perf_part or 1]
+  local tw = (half - 2 * 6) / 3
   for i, t in ipairs(SYNTHS) do
-    add{ kind="choice", x=16 + (i - 1) * 68, y=452, w=62, h=132, label=t, sel=((self.perf_part or 1) == i),
+    add{ kind="choice", x=lx + (i - 1) * (tw + 6), y=452, w=tw, h=30, label=t, small=true, sel=((self.perf_part or 1) == i),
          tap=function() self.perf_part = i end }
   end
   local eng = (part == "chord") and CHORD_ENG or MONO_ENG
   local kn = KNOBS[eng[(self.v["ockm-"..part.."-engine"] or 0) + 1]] or KNOBS.acid
-  local cw = (W - 232 - 16 - 12) / 2
+  local kw = (half - 6) / 2
   for k = 1, 4 do
     local col, row = (k - 1) % 2, math.floor((k - 1) / 2)
-    add{ kind="slider", x=232 + col * (cw + 12), y=452 + row * 46, w=cw, h=36, hook="ockm-"..part.."-k"..k, lo=0, hi=1, label=kn[k] }
+    add{ kind="hbar", x=lx + col * (kw + 6), y=490 + row * 52, w=kw, h=46, hook="ockm-"..part.."-k"..k, lo=0, hi=1, label=kn[k], bold=true }
   end
-  add{ kind="slider", x=232, y=548, w=W - 248, h=36, hook="ockm-filter", lo=-1, hi=1, label="filter" }
 end
 
 function ui:open(screen)
@@ -762,8 +773,21 @@ function ui:draw(g, w)
     local v = self.v[w.hook] or 0
     local f = clamp((v - w.lo) / (w.hi - w.lo), 0, 1)
     self:col(g, "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 4)
-    self:col(g, "dim"); g:fill_rounded_rect(w.x, w.y, math.max(6, w.w * f), w.h, 4)
-    self:ctext(g, w.label, w, 10, "txt")
+    if w.bold then
+      -- grey fill up to the value (from the middle for controls centred on zero), orange line at the value
+      local vx = w.x + w.w * f
+      local x0 = (w.lo < 0) and (w.x + w.w * (-w.lo) / (w.hi - w.lo)) or w.x
+      self:col(g, "dim"); g:fill_rounded_rect(math.min(x0, vx), w.y, math.max(4, math.abs(vx - x0)), w.h, 4)
+      self:col(g, "acc"); g:fill_rect(clamp(vx - 2, w.x, w.x + w.w - 3), w.y, 3, w.h)
+    else
+      self:col(g, "dim"); g:fill_rounded_rect(w.x, w.y, math.max(6, w.w * f), w.h, 4)
+    end
+    if w.h >= 40 then
+      self:ctext(g, w.label, { x=w.x, y=w.y + w.h / 2 - 16, w=w.w, h=14 }, 12, "txt")
+      self:ctext(g, fmt(v), { x=w.x, y=w.y + w.h / 2 + 2, w=w.w, h=12 }, 10, "txt")
+    else
+      self:ctext(g, w.label, w, 10, "txt")
+    end
   elseif k == "vfader" then
     local v = self.v[w.hook] or 0
     local f = clamp((v - w.lo) / (w.hi - w.lo), 0, 1)
