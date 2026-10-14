@@ -36,6 +36,7 @@ Tap a track's name on perform or the mixer to jump straight to it.
 - **Steps**: tap cycles empty, hit (white), accent (orange)
 - Move between blocks of 16 with the **steps** arrows in the navigation strip, or swipe the step row sideways
 - **Level, tune, decay, reverb, delay** for this slot. These belong to the kit, so they stay when you change pattern
+- **Grooves** (right of the sliders): tap one to fill all 8 drums at once. Each slot gets the part for the sound it plays, so a groove's hats land on whichever slot is your hat. It fills the whole pattern length and sets a swing to suit. Twelve to pick from: four floor, house, deep house, tech house, minimal, techno, dub techno, garage, breakbeat, boom bap, trip hop, electro. **Clear** empties the drums. A groove replaces your drum steps, so **revert** is your undo
 
 **Compose** (a tab between drums and the synths): how the pattern is put together.
 - **Who leads the harmony:**
@@ -233,6 +234,7 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 | `ockm-bass-mode`, `ockm-lead-mode`, `ockm-chord-mode` | 0 auto (generated), 1 manual (your notes) |
 | `ockm-bass-sync`, `ockm-lead-sync` | 1 follow the chords, 0 follow the key only |
 | `ockm-leader` | Who leads the harmony: 0 chords, 1 melody, 2 bass, 3 key only |
+| `ockm-drum-groove` | Fill every drum slot with a groove, 0 to 11, or 12 to clear. Sets the swing too |
 | `ockm-chord-rhythm` | Chord rhythm preset, 0 to 7, and rebuild |
 | `ockm-chord-prog` | Chord progression, 0 to 9, and rebuild |
 | `ockm-chord-type` | 0 triad, 1 seventh, 2 sus2, 3 power chord. Applies straight away |

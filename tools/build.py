@@ -266,7 +266,7 @@ for nm,snd in SLOTS:
 SYNTH_DEFAULTS={"bass":dict(engine=0,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.37,k2=0.9,k3=0.31,k4=0.55,drive=0,verb=0,delay=0,rhythm=3,notes=3),
                 "lead":dict(engine=4,mode=1,sync=1,lock=0,density=1,seed=0,level=1,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0.2,delay=0.25,rhythm=6,notes=8),
                 "chord":dict(engine=0,mode=0,level=1,k1=0.45,k2=0.5,k3=0.4,k4=0.3,type=0,smooth=1,verb=0.3,delay=0.35,rhythm=0,prog=0)}
-PATTERN_KEYS=[("ockm-len",16,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None),("ockm-leader",0,None)]
+PATTERN_KEYS=[("ockm-len",16,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None),("ockm-leader",0,None),("ockm-drum-groove",-1,None)]
 for t,d in SYNTH_DEFAULTS.items():
     PATTERN_KEYS+=[(f"ockm-{t}-{k}",v,None) for k,v in d.items()]
 TABLES=[f"ockm-pat-{n}" for n,_ in SLOTS]+[f"ockm-pat-{t}-{f}" for t in ("bass","lead") for f in MONO]+[f"ockm-pat-chord-{f}" for f in CHORD]
@@ -389,6 +389,8 @@ p.add(f"#X obj 110 {gy} ockm-presets;")
 p.add(f"#X obj 230 {gy} ockm-monogen bass 0 3 3 0 1;")
 p.add(f"#X obj 400 {gy} ockm-monogen lead 24 6 8 1 1;")
 p.add(f"#X obj 530 {gy} ockm-chordgen chord 0;")
+p.add(f"#X obj 700 {gy} ockm-grooves;")
+for i,(nm,snd) in enumerate(SLOTS): p.add(f"#X obj {110+i*120} {gy+30} ockm-drumgen {nm} {snd};")
 # synth settings subpatch: key, engines, knobs, generator choices
 sub=P()
 sub.add("#X text 20 10 Synth settings. Key and scale are shared by bass \\, lead and chord. Knobs run 0 to 1. Generator choices rebuild that track's pattern.;")
@@ -784,6 +786,30 @@ PROGS=[("one-chord","i",[(0,1)]),("vamp","i iv",[(0,1),(3,1)]),("dub-techno","i 
        ("pop","i VI III VII",[(0,1),(5,1),(2,1),(6,1)]),("uplift","VI VII i",[(5,1),(6,1),(0,2)]),
        ("andalusian","i VII VI V",[(0,1),(6,1),(5,1),(4,1)]),("trip-hop","i VII VI v",[(0,2),(6,2),(5,2),(4,2)]),
        ("soul","ii V I",[(1,1),(4,1),(0,2)])]
+# drum grooves: one 16-step line per drum sound (x hit, X accent). Swing 0 = leave it as it is.
+# sounds: kick snare clap rim hat open-hat tom rimshot. A groove lands on whichever slot plays that sound.
+GROOVES=[
+ ("four-floor",56,dict(kick="X...X...X...X...",clap="....x.......x...",hat="..x...x...x...x.")),
+ ("house",56,dict(kick="X...x...X...x...",clap="....X.......X...",ohat="..x...x...x...x.",hat=".x.x.x.x.x.x.x.x")),
+ ("deep-house",58,dict(kick="X...x...X...x...",clap="....x.......x...",ohat="..x...x...x...x.",rim=".x....x..x....x.",hat="x...x...x...x...")),
+ ("tech-house",54,dict(kick="X...x...X...x...",clap="....X.......X...",ohat="..X...X...X...X.",hat="xx.xxx.xxx.xxx.x",rim="...x..x....x..x.",tom=".......x........")),
+ ("minimal",54,dict(kick="X...x...X...x...",rim="...x..x...x..x..",hat=".x.x.x.x.x.x.x.x",clap="............x...",tom=".........x......")),
+ ("techno",50,dict(kick="X...X...X...X...",ohat="..x...x...x...x.",hat="xx.xxx.xxx.xxx.x",clap="....x.......x...",rimshot="...x......x.....")),
+ ("dub-techno",54,dict(kick="X...x...X...x...",rim="...x.....x....x.",ohat="..x...x...x...x.",hat="x.x.x.x.x.x.x.x.")),
+ ("garage",64,dict(kick="X.......x.x.....",snare="....X.......X...",hat="x.xxx.x.x.xxx.x.",rim="......x......x..",ohat="..x.......x.....")),
+ ("breakbeat",54,dict(kick="X.x.......xx....",snare="....X..x.x..X..x",hat="x.x.x.x.x.x.x.x.")),
+ ("boom-bap",62,dict(kick="X......x..x.....",snare="....X.......X...",hat="x.x.x.x.x.x.x.x.",ohat="..............x.")),
+ ("trip-hop",60,dict(kick="X.........x.....",snare="....X.......X...",hat="x...x.x.x...x.x.",rim="..x.......x.....",tom=".............x..")),
+ ("electro",50,dict(kick="X.....x...x.....",clap="....X.......X...",hat="xxxxxxxxxxxxxxxx",tom="..........x..x..")),
+ ("clear",0,dict()),
+]
+_SND=["kick","snare","clap","rim","hat","ohat","tom","rimshot"]
+def _groove_line(sw,parts):
+    for k,v in parts.items(): assert k in _SND and len(v)==16, (k,v)
+    vals=[]
+    for nm in _SND: vals+=[{".":0,"x":1,"X":2}[c] for c in parts.get(nm,"."*16)]
+    return " ".join(str(v) for v in [sw]+vals)
+PRE["groove"]=[(nm,_groove_line(sw,parts)) for nm,sw,parts in GROOVES]
 PRE["progx"]=[]
 for nm,_,chords in PROGS:
     steps=[]
@@ -803,6 +829,7 @@ if os.path.exists(_ui_src):
             "local CHORD_RHY = "+_lua_list([(n.replace("-"," "),) for n,_ in PRE["chordrhythm"]])+"\n"
             "local PROGS = "+_lua_list([(n.replace("-"," "),lab) for n,lab,_ in PROGS])+"\n"
             "local SPICE = "+_lua_list([(i,lab) for i,lab in SPICE])+"\n"
+            "local GROOVES = { "+", ".join(f'"{n.replace("-"," ")}"' for n,_,_ in GROOVES)+" }\n"
             "local PROG_SHAPES = { "+", ".join("{ "+", ".join(f"{{ {d}, {int(b*16)} }}" for d,b in ch)+" }" for _,_,ch in PROGS)+" }\n")
     os.makedirs(os.path.join(R,"ui"),exist_ok=True)
     open(os.path.join(R,"ui","ockm-ui.pd_lua"),"w").write(_t[:_a]+_block+_t[_b:])
@@ -842,7 +869,7 @@ for j,nm in enumerate(["lock","density","seed"]):
     r=p.add(f"#X obj {x} 170 r ockm-{D}1-{nm};"); t=p.add(f"#X obj {x} 195 t b f;"); p.con(r,0,t,0); p.con(t,0,exg,0); var[nm]=t
 lbd=p.add("#X obj 1360 120 loadbang;"); one_d=p.add("#X msg 1360 145 1;"); p.con(lbd,0,one_d,0)
 # a part locked to the kick follows your drum edits
-red=p.add("#X obj 1200 230 r ockm-edit;"); teb=p.add("#X obj 1200 255 t b;"); lkg=p.add("#X obj 1200 280 spigot;"); lk0=p.add("#X obj 1280 230 != 0;")
+red=p.add("#X obj 1200 230 r ockm-edit;"); teb=p.add("#X obj 1200 255 t b;"); rdc=p.add("#X obj 1120 230 r ockm-drums-changed;"); p.con(rdc,0,teb,0); lkg=p.add("#X obj 1200 280 spigot;"); lk0=p.add("#X obj 1280 230 != 0;")
 for c in [(red,0,teb,0),(teb,0,lkg,0),(var["lock"],1,lk0,0),(lk0,0,lkg,1),(lkg,0,img,0)]: p.con(*c)
 # sync: follow the chord part. When the chords change, a synced part in auto regenerates
 rsy=p.add(f"#X obj 760 230 r ockm-{D}1-sync;"); nsy=p.add("#X obj 760 255 != 0;"); fsy=p.add(f"#X obj 860 230 f {D}6;")
@@ -971,6 +998,35 @@ mr=p.add(f"#X obj 20 620 expr int({D}f1) % int(max({D}f2\\,1));"); rr=p.add(f"#X
 for c in [(ti,1,two,1),(ti,1,twd,1),(tl2,1,bx,0),(plen,0,bx,1),(bx,0,rp,0),(rp,0,twd,0),(tl2,0,mr,0),(llr,0,mr,1),(mr,0,rr,0),(rr,0,two,0)]: p.con(*c)
 p.add("#X text 20 760 hooks: ockm-<track>-rhythm 0-9 \\, ockm-<track>-prog 0-9 \\, ockm-<track>-gen (rebuild). Presets live in tools/build.py (PRE and PROGS).;")
 p.save("seq/ockm-chordgen.pd","#N canvas 120 120 900 800 12;")
+
+# ================= drum grooves =================
+p=P()
+p.add("#X text 20 10 Drum grooves: ockm-drum-groove <n> writes a groove into every drum slot \\, by the sound each slot plays \\, across the whole pattern length. Sets the swing too. Ignored while a pattern loads. Then tells the screens and any part locked to the kick.;")
+r=p.add("#X obj 20 60 r ockm-drum-groove;"); gate=p.add("#X obj 20 90 spigot 1;"); rld=p.add("#X obj 140 60 r ockm-loading;"); nl0=p.add("#X obj 140 85 == 0;")
+mo=p.add("#X obj 20 120 moses 0;"); t=p.add("#X obj 60 150 t b b f f;")
+tg=p.add("#X obj 260 190 text get ockm-presets-groove;"); l1=p.add("#X obj 260 220 list split 1;"); l2=p.add("#X obj 260 250 list split 1;")
+sw=p.add("#X obj 260 280 moses 1;"); ssw=p.add("#X obj 300 310 s ockm-swing;")
+go=p.add("#X obj 160 190 s ockm-groove-go;"); rf=p.add("#X obj 60 340 s ockm-refresh;"); dc=p.add("#X obj 110 310 s ockm-drums-changed;")
+for c in [(r,0,gate,0),(rld,0,nl0,0),(nl0,0,gate,1),(gate,0,mo,0),(mo,1,t,0),(t,3,tg,0),(tg,0,l1,0),(l1,1,l2,0),(l2,0,sw,0),(sw,1,ssw,0),
+          (t,2,go,0),(t,1,dc,0),(t,0,rf,0)]: p.con(*c)
+p.save("seq/ockm-grooves.pd","#N canvas 120 120 700 400 12;")
+
+p=P()
+p.add(f"#X text 20 10 One drum slot's share of a groove: picks the 16 steps for the sound this slot plays \\, then repeats them across the pattern. Args: slot \\, default sound.;")
+p.add(f"#X obj 500 60 array define {D}0-g 16;")
+lb=p.add("#X obj 300 40 loadbang;"); snd0=p.add(f"#X obj 300 65 f {D}2;"); rs=p.add(f"#X obj 380 65 r ockm-{D}1-sound;"); m16=p.add("#X obj 300 95 * 16;")
+p.con(lb,0,snd0,0); p.con(snd0,0,m16,0); p.con(rs,0,m16,0)
+r=p.add("#X obj 20 60 r ockm-groove-go;"); t=p.add("#X obj 20 90 t b f;")
+tg=p.add("#X obj 120 120 text get ockm-presets-groove;"); l1=p.add("#X obj 120 150 list split 2;"); ls=p.add("#X obj 120 180 list split 0;"); l16=p.add("#X obj 120 210 list split 16;")
+ag=p.add(f"#X obj 120 240 array set {D}0-g;")
+for c in [(r,0,t,0),(t,1,tg,0),(tg,0,l1,0),(l1,1,ls,0),(m16,0,ls,1),(ls,1,l16,0),(l16,0,ag,0)]: p.con(*c)
+ln=p.add("#X obj 20 270 f 16;"); rl=p.add("#X obj 80 245 r ockm-len;"); z=p.add("#X msg 80 270 0;")
+un=p.add("#X obj 20 300 until;"); fi=p.add("#X obj 20 330 f;"); pi=p.add("#X obj 70 330 + 1;"); ti=p.add("#X obj 20 360 t f f;")
+md=p.add("#X obj 20 390 % 16;"); rd=p.add(f"#X obj 20 420 tabread {D}0-g;"); tw=p.add(f"#X obj 20 450 tabwrite ockm-pat-{D}1;")
+tb=p.add("#X obj 20 240 t b b;")
+for c in [(t,0,tb,0),(tb,1,z,0),(z,0,fi,1),(tb,0,ln,0),(rl,0,ln,1),(ln,0,un,0),(un,0,fi,0),(fi,0,pi,0),(pi,0,fi,1),(fi,0,ti,0),
+          (ti,1,tw,1),(ti,0,md,0),(md,0,rd,0),(rd,0,tw,0)]: p.con(*c)
+p.save("seq/ockm-drumgen.pd","#N canvas 140 140 700 500 12;")
 
 # ================= chord sound: 3 engines x 4 voices =================
 def chord_voice(sp,kind):

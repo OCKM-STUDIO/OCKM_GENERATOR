@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.22"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.23"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
@@ -60,6 +60,7 @@ local MONO_NOTES = { "root", "octaves", "root fifth", "acid riff", "walk up", "m
 local CHORD_RHY = { { "bar pads" }, { "two beat" }, { "offbeat" }, { "dub stabs" }, { "house organ" }, { "tresillo" }, { "syncopated" }, { "garage skip" }, { "call answer" }, { "eighths" } }
 local PROGS = { { "one chord", "i" }, { "vamp", "i iv" }, { "dub techno", "i . . VII" }, { "deep house", "i iv VI v" }, { "garage", "i VI iv v" }, { "pop", "i VI III VII" }, { "uplift", "VI VII i" }, { "andalusian", "i VII VI V" }, { "trip hop", "i VII VI v" }, { "soul", "ii V I" } }
 local SPICE = { { 0, "triad" }, { 1, "7th" }, { 6, "9th" }, { 7, "11th" } }
+local GROOVES = { "four floor", "house", "deep house", "tech house", "minimal", "techno", "dub techno", "garage", "breakbeat", "boom bap", "trip hop", "electro", "clear" }
 local PROG_SHAPES = { { { 0, 16 } }, { { 0, 16 }, { 3, 16 } }, { { 0, 48 }, { 6, 16 } }, { { 0, 16 }, { 3, 16 }, { 5, 16 }, { 4, 16 } }, { { 0, 8 }, { 5, 8 }, { 3, 8 }, { 4, 8 } }, { { 0, 16 }, { 5, 16 }, { 2, 16 }, { 6, 16 } }, { { 5, 16 }, { 6, 16 }, { 0, 32 } }, { { 0, 16 }, { 6, 16 }, { 5, 16 }, { 4, 16 } }, { { 0, 32 }, { 6, 32 }, { 5, 32 }, { 4, 32 } }, { { 1, 16 }, { 4, 16 }, { 0, 32 } } }
 -- END PRESETS
 local ROMAN = { "i","ii","iii","iv","v","vi","vii" }
@@ -109,7 +110,7 @@ function ui:defaults()
   v["ockm-drive"] = 0; v["ockm-delay-fb"] = 0.4; v["ockm-delay-steps"] = 3; v["ockm-verb-size"] = 0.6; v["ockm-verb-tone"] = 0.5
   for _, t in ipairs(SYNTHS) do v["ockm-"..t.."-level"] = 1 end
   v["ockm-bass-mode"] = 0; v["ockm-lead-mode"] = 1; v["ockm-chord-mode"] = 0   -- 0 auto, 1 manual
-  v["ockm-bass-sync"] = 1; v["ockm-lead-sync"] = 1; v["ockm-leader"] = 0
+  v["ockm-bass-sync"] = 1; v["ockm-lead-sync"] = 1; v["ockm-leader"] = 0; v["ockm-drum-groove"] = -1
   for _, p in ipairs({ "bass", "lead" }) do v["ockm-"..p.."-lock"] = 0; v["ockm-"..p.."-density"] = 1; v["ockm-"..p.."-seed"] = 0 end
   v["ockm-bpm"] = 124; v["ockm-len"] = 16; v["ockm-filter"] = 0; v["ockm-root"] = 9; v["ockm-scale"] = 0
   for i, nm in ipairs(SLOTS) do
@@ -134,7 +135,7 @@ function ui:hooks()
   for _, k in ipairs({"engine","k1","k2","k3","k4","type","smooth","verb","delay","rhythm","prog"}) do h[#h+1] = "ockm-chord-"..k end
   for _, t in ipairs(TRACKS) do h[#h+1] = "ockm-"..t.."-mute"; h[#h+1] = "ockm-"..t.."-solo" end
   for _, t in ipairs(SYNTHS) do h[#h+1] = "ockm-"..t.."-level"; h[#h+1] = "ockm-"..t.."-mode" end
-  h[#h+1] = "ockm-bass-sync"; h[#h+1] = "ockm-lead-sync"; h[#h+1] = "ockm-leader"
+  h[#h+1] = "ockm-bass-sync"; h[#h+1] = "ockm-lead-sync"; h[#h+1] = "ockm-leader"; h[#h+1] = "ockm-drum-groove"
   for _, p in ipairs({ "bass", "lead" }) do
     for _, k in ipairs({ "lock", "density", "seed" }) do h[#h+1] = "ockm-"..p.."-"..k end
   end
@@ -396,8 +397,24 @@ function ui:layout_drums(add)
     add{ kind="choice", x=16 + s * (tw + 8), y=290, w=tw, h=44, label=SOUNDS[s + 1], accent=true,
          sel=(self.v["ockm-"..nm.."-sound"] == s), tap=function() self:send("ockm-"..nm.."-sound", s) end }
   end
+  -- this slot's sound on the left, grooves for the whole kit on the right
+  local half = (W - 48) / 2
   for j, p in ipairs(DRUM_PARAMS) do
-    add{ kind="slider", x=16, y=350 + (j - 1) * 46, w=W - 32, h=36, hook="ockm-"..nm.."-"..p[1], lo=p[2], hi=p[3], label=p[4] or p[1] }
+    add{ kind="slider", x=16, y=350 + (j - 1) * 46, w=half, h=36, hook="ockm-"..nm.."-"..p[1], lo=p[2], hi=p[3], label=p[4] or p[1] }
+  end
+  local gx = 16 + half + 16
+  add{ kind="text", x=gx, y=346, w=half, h=12, label=self.msg or "grooves: tap one to fill all 8 drums", size=self.msg and 11 or 10, col=self.msg and "acc" or nil }
+  local gw = (half - 18) / 4
+  local cur = math.floor(self.v["ockm-drum-groove"] or -1)
+  for i, name in ipairs(GROOVES) do
+    local n = i - 1
+    local col, row = n % 4, math.floor(n / 4)
+    local clear = (name == "clear")
+    add{ kind=clear and "btn" or "choice", x=gx + col * (gw + 6), y=364 + row * 54, w=gw, h=46, label=name, small=true, quiet=clear,
+         sel=(not clear) and (cur == n) or nil, tap=function()
+           self:send("ockm-drum-groove", n)
+           self:say(clear and "drums cleared" or (name .. ": all 8 drums rewritten (revert undoes it)"))
+         end }
   end
 end
 

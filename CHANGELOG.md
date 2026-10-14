@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.23 (14 October 2026)
+
+**Added**
+- Drum grooves on the drums tab: 12 presets (four floor to electro) plus clear. One tap fills all 8 drum slots, matched by the sound each slot plays, across the whole pattern, and sets the swing
+- A bass or lead locked to the kick follows a new groove straight away
+
+**Changed**
+- The drum sliders sit on the left half of the drums tab, to make room for the grooves
+
 ## v0.22 (14 October 2026)
 
 **Added**

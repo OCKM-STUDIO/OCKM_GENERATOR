@@ -430,6 +430,15 @@
 #X obj 230 850 ockm-monogen bass 0 3 3 0 1;
 #X obj 400 850 ockm-monogen lead 24 6 8 1 1;
 #X obj 530 850 ockm-chordgen chord 0;
+#X obj 700 850 ockm-grooves;
+#X obj 110 880 ockm-drumgen d1 0;
+#X obj 230 880 ockm-drumgen d2 1;
+#X obj 350 880 ockm-drumgen d3 2;
+#X obj 470 880 ockm-drumgen d4 4;
+#X obj 590 880 ockm-drumgen d5 5;
+#X obj 710 880 ockm-drumgen d6 7;
+#X obj 830 880 ockm-drumgen d7 3;
+#X obj 950 880 ockm-drumgen d8 6;
 #N canvas 260 160 1000 400 synth-settings 0;
 #X text 20 10 Synth settings. Key and scale are shared by bass \, lead and chord. Knobs run 0 to 1. Generator choices rebuild that track's pattern.;
 #X obj 20 40 loadbang;

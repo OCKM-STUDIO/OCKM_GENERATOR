@@ -600,7 +600,7 @@ def touchscreen_screens_draw(work):
         raise Skip("Pillow not installed")
     p = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_preview.py"), os.path.join(work, "preview")], capture_output=True, text=True)
     assert p.returncode == 0, p.stderr[-800:]
-    assert len(os.listdir(os.path.join(work, "preview"))) == 10, "expected ten screen pictures"
+    assert len(os.listdir(os.path.join(work, "preview"))) == 11, "expected eleven screen pictures"
 
 @test
 def mute_solo_and_levels(work):
@@ -671,6 +671,32 @@ def bass_lock_density_and_mutate(work):
     assert 0 < sum(on[3]) < 16, f"density 0.3 should thin the line out: {on[3]}"
     assert notes[4] != notes[0], "mutate should change the line"
     assert notes[5] == notes[0] and on[5] == on[0], "seed 0 should bring back the original"
+
+@test
+def drum_grooves_fill_every_slot(work):
+    """A groove lands on each slot by the sound it plays, repeats across the pattern, sets the swing and moves a part locked to the kick."""
+    h = Harness()
+    h.at(100, "ockm-resync bang ; ockm-length 32 ; ockm-bass-lock 1 ; ockm-bass-mode 0")
+    h.at(150, "ockm-drum-groove 3")                              # tech house
+    g = h.add("#X obj 10 300 r test-get;"); t = h.add("#X obj 10 325 t b b b b;")
+    outs = []
+    for k, nm in enumerate(["d1", "d4", "d5", "bass-on"]):
+        a = h.add(f"#X obj {10+k*190} 350 array get ockm-pat-{nm} 0 32;"); pr = h.add(f"#X obj {10+k*190} 375 print {nm.upper()};")
+        h.con(t, a, 3 - k); h.con(a, pr); outs.append(nm.upper())
+    h.con(g, t)
+    sw = h.add("#X obj 800 300 r ockm-swing;"); psw = h.add("#X obj 800 325 print SWING;"); h.con(sw, psw)
+    h.at(200, "test-get bang")
+    h.at(220, "ockm-d1-sound 4 ; ockm-drum-groove 12"); h.at(260, "test-get bang")   # clear
+    f = os.path.join(work, "t_groove.pd"); h.finish(300, f)
+    out = run(work, f)
+    rows = {n: [[int(float(x)) for x in v.split()] for v in printed(out, n)] for n in outs}
+    kick = [2,0,0,0,1,0,0,0,2,0,0,0,1,0,0,0] * 2
+    assert rows["D1"][0] == kick, f"slot 1 (kick) should get the tech house kick, twice over 32 steps: {rows['D1'][0]}"
+    assert rows["D4"][0][:16] == [1,1,0,1,1,1,0,1,1,1,0,1,1,1,0,1], f"slot 4 (hat) should get the hats: {rows['D4'][0]}"
+    assert rows["D5"][0][:16] == [0,0,2,0,0,0,2,0,0,0,2,0,0,0,2,0], f"slot 5 (open hat) should get the open hats: {rows['D5'][0]}"
+    assert [1 if v else 0 for v in rows["BASS-ON"][0][:16]] == [1 if v else 0 for v in kick[:16]], f"bass locked to the kick should follow the new kick: {rows['BASS-ON'][0]}"
+    assert "54" in [v.split()[0].split(".")[0] for v in printed(out, "SWING")], f"tech house should set swing 54: {printed(out, 'SWING')}"
+    assert all(v == 0 for n in ("D1", "D4", "D5") for v in rows[n][1]), "clear should empty every slot"
 
 @test
 def suggest_chords_fit_the_melody(work):
