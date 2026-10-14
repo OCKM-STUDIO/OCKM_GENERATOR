@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.17.1 (14 October 2026)
+
+**Changed**
+- Step navigation is now back and forward arrows around the steps on screen ("17-32"), with a dot per block: white for the one on screen, orange for the one playing
+
 ## v0.17 (14 October 2026)
 
 **Changed**

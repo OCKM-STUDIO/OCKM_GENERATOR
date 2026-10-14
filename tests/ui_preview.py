@@ -92,7 +92,7 @@ SHOTS = [
     ("bass-fill", ["test tap 471 36"]),
     ("perform-mutes", ["test tap 287 36", "test tap 126 137", "test tap 166 369"]),   # mute kick, solo bass
     ("mixer", ["test tap 747 36"]),
-    ("drums-long", ["test tap 379 36", "test tap 462 88", "test tap 860 88"]),          # 32 steps, second block
+    ("drums-long", ["test tap 379 36", "test tap 506 88", "test tap 922 88"]),          # 64 steps, forward to the second block
 ]
 
 

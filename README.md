@@ -2,7 +2,7 @@
 
 A drum machine and easy-to-program synths in one box. Built in Pure Data, designed to run on a Raspberry Pi with a touchscreen and a few knobs.
 
-Current version: **v0.17**
+Current version: **v0.17.1**
 
 ## How to open it
 
@@ -12,7 +12,7 @@ The window is the instrument: three touch screens, drawn in Lua (plugdata has Lu
 
 **How every screen is laid out**, top to bottom:
 1. **Top bar:** play, tempo, then the screens as tabs: **perform, drums, bass, lead, chord, mixer**. Save and revert on the right. The version number sits next to the tempo
-2. **Navigation strip:** **pattern** 1 to 8 (small), **length** (16, 32, 64, 128), and **steps**: one button per block of 16 steps, only as many as the length allows. The filled one is the block you're looking at; an orange bar marks the block that's playing. You can also swipe the step row sideways
+2. **Navigation strip:** **pattern** 1 to 8 (small), **length** (16, 32, 64, 128), and **steps**: back and forward arrows either side of the steps you're looking at (for example "17-32"). The dots underneath show every block of 16: white is the one on screen, orange is the one playing. You can also swipe the step row sideways
 3. **What you're editing:** the steps (and, on the drums screen, which of the 8 drum slots)
 4. **Sound shaping** at the bottom
 
@@ -32,7 +32,7 @@ Tap a track's name on perform or the mixer to jump straight to it.
 - The 8 slots along the top, named by the sound they play
 - **Sound**: 8 pads, one per drum sound
 - **Steps**: tap cycles empty, hit (white), accent (orange)
-- Move between blocks of 16 with the **steps** buttons in the navigation strip, or swipe the step row sideways
+- Move between blocks of 16 with the **steps** arrows in the navigation strip, or swipe the step row sideways
 - **Level, tune, decay, reverb, delay** for this slot. These belong to the kit, so they stay when you change pattern
 
 **Bass, lead and chord** (a tab each)

@@ -545,8 +545,8 @@ def touchscreen_drives_the_engine(work):
     h.at(220, "ockm-ui-test drag 600 212 200 212")   # swipe left: steps 17-32
     tap(230, 45, 212)                    # step 17
     h.at(240, "ockm-ui-test drag 200 212 600 212")   # swipe right: back to 1-16
-    tap(245, 860, 88)                    # block button 2 (steps 17-32)
-    tap(248, 622 + 40, 88)               # block button 1 (steps 1-16)
+    tap(245, 922, 88)                    # forward arrow (steps 17-32)
+    tap(248, 644, 88)                    # back arrow (steps 1-16)
     tap(250, 287, 36)                    # perform tab
     tap(255, 116, 518); tap(258, 427, 470)   # sound strip: lead, then its first knob
     tap(260, 50, 369)                    # open bass from its lane

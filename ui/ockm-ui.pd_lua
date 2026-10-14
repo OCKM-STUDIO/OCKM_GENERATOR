@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.17"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.17.1"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
@@ -279,12 +279,17 @@ function ui:layout_nav(add)
          sel=(self.v["ockm-len"] == n), tap=function() pd.send("ockm-length", "float", { n }) end }
   end
   add{ kind="text", x=584, y=y + 12, w=50, h=12, label="steps", size=10 }
+  -- back, the steps you're looking at, forward
   local n = self:blocks()
-  local bx, bw = 622, (W - 16 - 622) / n
-  for b = 0, n - 1 do
-    local label = (n <= 4) and string.format("%d-%d", b * 16 + 1, b * 16 + 16) or tostring(b + 1)
-    add{ kind="block", x=bx + b * bw, y=y, w=bw - 4, h=h, b=b, label=label, tap=function() self:set_page(b) end }
-  end
+  add{ kind="arrow", x=622, y=y, w=48, h=h, dir=-1, on=(self:shown_block() > 0), tap=function() self:set_page(self:shown_block() - 1) end }
+  add{ kind="steps", x=676, y=y, w=W - 16 - 676 - 54, h=h }
+  add{ kind="arrow", x=W - 16 - 48, y=y, w=48, h=h, dir=1, on=(self:shown_block() < n - 1), tap=function() self:set_page(self:shown_block() + 1) end }
+end
+
+-- the block on screen: perform follows the playhead while playing, the edit screens stay where you put them
+function ui:shown_block()
+  if self.screen == "perform" and self.playing ~= 0 then return clamp(self:play_block(), 0, self:blocks() - 1) end
+  return clamp(self.page, 0, self:blocks() - 1)
 end
 
 local LANE_Y, LANE_H, LANE_P, LANE_X = 124, 26, 28, 192
@@ -785,6 +790,30 @@ function ui:draw(g, w)
     self:col(g, cur and "on" or "off"); g:fill_rounded_rect(w.x + 4, w.y + 8, w.w - 8, w.h - 16, 4)
     if self.playing ~= 0 and w.b == self:play_block() and not cur then
       self:col(g, "acc"); g:fill_rect(w.x + 4, w.y + w.h - 5, w.w - 8, 3)
+    end
+  elseif k == "arrow" then
+    self:col(g, "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
+    self:col(g, w.on and "txt" or "dim")
+    local cx, cy = w.x + w.w / 2, w.y + w.h / 2
+    local p
+    if w.dir < 0 then p = Path(cx + 5, cy - 8); p:line_to(cx - 5, cy); p:line_to(cx + 5, cy + 8)
+    else p = Path(cx - 5, cy - 8); p:line_to(cx + 5, cy); p:line_to(cx - 5, cy + 8) end
+    p:close(); g:fill_path(p)
+  elseif k == "steps" then
+    local n, b = self:blocks(), self:shown_block()
+    local len = self.v["ockm-len"] or 16
+    local s = string.format("%d-%d", b * 16 + 1, math.min((b + 1) * 16, len))
+    self:col(g, "card"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
+    self:ctext(g, s, { x=w.x, y=w.y + 3, w=w.w, h=18 }, 13, "txt")
+    if n > 1 then
+      local dw = 10
+      local x0 = w.x + (w.w - n * dw) / 2
+      for i = 0, n - 1 do
+        local playing = self.playing ~= 0 and i == self:play_block()
+        self:col(g, (i == b) and "on" or (playing and "acc" or "dim"))
+        if playing and i == b then self:col(g, "acc") end
+        g:fill_ellipse(x0 + i * dw + 2, w.y + w.h - 10, 6, 6)
+      end
     end
   elseif k == "block" then
     -- the block you're looking at is filled; an orange bar marks the one that's playing
