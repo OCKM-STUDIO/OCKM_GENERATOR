@@ -42,6 +42,7 @@ Tap a track's name on perform or the mixer to jump straight to it.
 - Move between blocks of 16 with the **steps** arrows in the navigation strip, or swipe the step row sideways
 - **Level, tune, decay, reverb, delay** for this slot. These belong to the kit, so they stay when you change pattern
 - **Grooves** (right of the sliders): tap one to fill all 8 drums at once. Each slot gets the part for the sound it plays, so a groove's hats land on whichever slot is your hat. It fills the whole pattern length and sets a swing to suit. Twelve to pick from: four floor, house, deep house, tech house, minimal, techno, dub techno, garage, breakbeat, boom bap, trip hop, electro. **Clear** empties the drums. A groove replaces your drum steps, so **back to last save** (on the project screen) is your undo
+- **Fills** (under the grooves): **fill on the last bar of every** 4, 8 or 16 bars, counted from when you press play. Styles: **snare roll** (builds through the second half of the bar), **tom run**, **drop** (kick and claps out for the last half bar, hats out for the last beat, so the next downbeat lands harder), **build** (snare 16ths rising over the whole bar). A fill only replaces the drums it uses; everything else keeps playing your pattern, and your steps are never changed. Saved with each pattern, so a breakdown can have fills off
 
 **Compose** (next to perform): how the pattern is put together.
 - **Mode**, like a camera's priority modes: which part is yours. The others follow it
@@ -279,6 +280,8 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 | `ockm-pattern-copy <from> <to>` | Copy a pattern (0-7) to another slot |
 | `ockm-pattern-clear <n>` | Empty a pattern |
 | `ockm-bar` | Sent by the clock at the start of every bar |
+| `ockm-fill-every` | 0 no fills, or 4, 8, 16: the last bar of every so many bars plays a drum fill |
+| `ockm-fill-style` | 0 snare roll, 1 tom run, 2 drop, 3 build |
 | `ockm-drum-groove` | Fill every drum slot with a groove, 0 to 11, or 12 to clear. Sets the swing too |
 | `ockm-chord-rhythm` | Chord rhythm preset, 0 to 7, and rebuild |
 | `ockm-chord-prog` | Chord progression, 0 to 9, and rebuild |

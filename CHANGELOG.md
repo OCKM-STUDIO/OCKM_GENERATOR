@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.33 (14 October 2026)
+
+**Added**
+- **Drum fills** on the drums tab: on the last bar of every 4, 8 or 16 bars the drums play a fill (snare roll, tom run, drop or build), then go straight back. Only the drums the fill uses change; your steps are never rewritten. Saved with each pattern
+
+**Changed**
+- The grooves grid is five across, to make room for the fill controls
+
 ## v0.32 (14 October 2026)
 
 **Fixed**

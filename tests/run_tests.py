@@ -880,6 +880,23 @@ def synths_sit_at_similar_levels(work):
         assert 0.6 * ref < v < 1.6 * ref, f"{k} is out of balance with the bass: {v:.3f} vs {ref:.3f} ({levels})"
 
 @test
+def drum_fill_on_the_fourth_bar(work):
+    """Fill every 4 bars, snare roll: pattern 1 has no snare, so the snare is silent for 3 bars, rolls in the second half of bar 4, then stops."""
+    h = Harness(); h.record(os.path.join(work, "fill.wav"))
+    mutes = " ; ".join(f"ockm-{t}-mute 1" for t in ["d1","d3","d4","d5","d6","d7","d8","bass","lead","chord"])
+    h.at(100, f"ockm-bpm 200 ; ockm-verb-mix 0 ; ockm-delay-mix 0 ; ockm-swing 50 ; ockm-length 16 ; ockm-fill-style 0 ; ockm-fill-every 4 ; {mutes}")
+    h.at(200, "ockm-play 1"); h.at(6400, "ockm-play 0")
+    _, (snd, sr) = play(work, h, "t_fill", ms=6400)
+    bar = 16 * 15000 / 200 / 1000.0                     # seconds per bar at 200 bpm
+    t0 = next(i for i, v in enumerate(snd) if abs(v) > 1e-4) / sr if any(abs(v) > 1e-4 for v in snd) else None
+    assert t0 is not None, "the snare never played"
+    start = 0.2 + 0.0                                    # play started at 200 ms
+    def seg(a, b): return peak(snd[int((start + a) * sr):int((start + b) * sr)])
+    assert seg(0.05, 3 * bar - 0.05) < 0.01, f"bars 1-3 should have no snare: {seg(0.05, 3 * bar - 0.05):.3f}"
+    assert seg(3.5 * bar, 4 * bar) > 0.05, f"the second half of bar 4 should have the snare roll: {seg(3.5 * bar, 4 * bar):.3f}"
+    assert seg(4 * bar + 0.15, 5 * bar - 0.05) < 0.01, "bar 5 should be back to normal (no snare)"
+
+@test
 def blank_project_synths_start_and_sound(work):
     """On the blank starter, starting the bass and chords gives notes you can hear, with the default sounds."""
     subprocess.run([sys.executable, os.path.join(ROOT, "tools", "build.py"), "--out", work, "--reset-patterns"], check=True, capture_output=True)

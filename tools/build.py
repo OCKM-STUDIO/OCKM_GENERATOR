@@ -179,7 +179,10 @@ racc=p.add("#X obj 230 190 r ockm-accent;")
 p.add(f"#X obj 30 300 table ockm-pat-\\$1 {STEPS};")
 tw=p.add(f"#X obj 400 520 tabwrite ockm-pat-{D}1;")
 upk=p.add("#X obj 400 460 unpack f f;"); offs=p.add("#X obj 480 490 + 0;")
-for c in [(inl,0,tr,0),(tr,0,sel,0),(sel,1,vel,0),(racc,0,vel,1),(vel,0,out,0),(upk,1,offs,0),(offs,0,tw,1),(upk,0,tw,0)]: p.con(*c)
+tfi=p.add("#X obj 30 135 t f f;"); fix=p.add(f"#X obj 160 135 expr int({D}f1)%16 + 16*{D}f2;"); rsn=p.add(f"#X obj 260 110 r ockm-{D}1-sound;")
+frd=p.add("#X obj 160 160 tabread ockm-fillx;"); fsel=p.add(f"#X obj 30 175 expr if(ockm_fill_on && {D}f2>=0 \\, {D}f2 \\, {D}f1);")
+for c in [(inl,0,tfi,0),(tfi,1,fix,0),(rsn,0,fix,1),(fix,0,frd,0),(frd,0,fsel,1),(tfi,0,tr,0),(tr,0,fsel,0),(fsel,0,sel,0),
+          (sel,1,vel,0),(racc,0,vel,1),(vel,0,out,0),(upk,1,offs,0),(offs,0,tw,1),(upk,0,tw,0)]: p.con(*c)
 for i in range(16):
     x=102+i*20+(i//4)*6
     t=p.add(f"#X obj {x} 22 tgl 18 0 empty ockm-sq-{D}1-{i} empty 17 7 0 10 #fcfcfc #000000 #000000 0 1;")
@@ -269,7 +272,7 @@ for nm,snd in SLOTS:
 SYNTH_DEFAULTS={"bass":dict(engine=0,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.37,k2=0.9,k3=0.31,k4=0.55,drive=0,verb=0,delay=0,rhythm=3,notes=3),
                 "lead":dict(engine=4,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0.2,delay=0.25,rhythm=8,notes=12),
                 "chord":dict(engine=0,mode=0,level=1,k1=0.45,k2=0.5,k3=0.4,k4=0.3,type=0,smooth=1,verb=0.3,delay=0.35,rhythm=0,prog=0)}
-PATTERN_KEYS=[("ockm-len",16,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None),("ockm-leader",0,None),("ockm-drum-groove",-1,None)]
+PATTERN_KEYS=[("ockm-len",16,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None),("ockm-leader",0,None),("ockm-drum-groove",-1,None),("ockm-fill-every",0,None),("ockm-fill-style",0,None)]
 for t,d in SYNTH_DEFAULTS.items():
     PATTERN_KEYS+=[(f"ockm-{t}-{k}",v,None) for k,v in d.items()]
 TABLES=[f"ockm-pat-{n}" for n,_ in SLOTS]+[f"ockm-pat-{t}-{f}" for t in ("bass","lead") for f in MONO]+[f"ockm-pat-chord-{f}" for f in CHORD]
@@ -842,6 +845,19 @@ def _groove_line(sw,parts):
     for nm in _SND: vals+=[{".":0,"x":1,"X":2}[c] for c in parts.get(nm,"."*16)]
     return " ".join(str(v) for v in [sw]+vals)
 PRE["groove"]=[(nm,_groove_line(sw,parts)) for nm,sw,parts in GROOVES]
+# drum fills: what changes on the last bar of a phrase. Per drum sound, 16 steps: '.' keep your pattern, '-' silent, 'x' hit, 'X' accent.
+FILLS=[
+ ("snare-roll",dict(snare="........x-x-xxXX",clap="........--------")),
+ ("tom-run",dict(tom="........X-x-xxxX",kick="........x-------",snare="........--------")),
+ ("drop",dict(kick="........--------",hat="............----",ohat="............----",clap="........--------")),
+ ("build",dict(snare="x-x-x-x-xxxxXXXX",clap="........x-x-xxxx",hat="xxxxxxxxxxxxxxxx")),
+]
+def _fill_line(parts):
+    for k,v in parts.items(): assert k in _SND and len(v)==16, (k,v)
+    vals=[]
+    for nm in _SND: vals+=[{".":-1,"-":0,"x":1,"X":2}[c] for c in parts.get(nm,"."*16)]
+    return " ".join(str(v) for v in vals)
+PRE["fill"]=[(nm,_fill_line(parts)) for nm,parts in FILLS]
 PRE["progx"]=[]
 for nm,_,chords in PROGS:
     steps=[]
@@ -861,6 +877,7 @@ if os.path.exists(_ui_src):
             "local CHORD_RHY = "+_lua_list([(n.replace("-"," "),) for n,_ in PRE["chordrhythm"]])+"\n"
             "local PROGS = "+_lua_list([(n.replace("-"," "),lab) for n,lab,_ in PROGS])+"\n"
             "local SPICE = "+_lua_list([(i,lab) for i,lab in SPICE])+"\n"
+            "local FILLS = { "+", ".join(f'"{n.replace("-"," ")}"' for n,_ in FILLS)+" }\n"
             "local GROOVES = { "+", ".join(f'"{n.replace("-"," ")}"' for n,_,_ in GROOVES)+" }\n"
             "local PROG_SHAPES = { "+", ".join("{ "+", ".join(f"{{ {d}, {int(b*16)} }}" for d,b in ch)+" }" for _,_,ch in PROGS)+" }\n")
     os.makedirs(os.path.join(R,"ui"),exist_ok=True)
@@ -1041,6 +1058,22 @@ sw=p.add("#X obj 260 280 moses 1;"); ssw=p.add("#X obj 300 310 s ockm-swing;")
 go=p.add("#X obj 160 190 s ockm-groove-go;"); rf=p.add("#X obj 60 340 s ockm-refresh;"); dc=p.add("#X obj 110 310 s ockm-drums-changed;")
 for c in [(r,0,gate,0),(rld,0,nl0,0),(nl0,0,gate,1),(gate,0,mo,0),(mo,1,t,0),(t,3,tg,0),(tg,0,l1,0),(l1,1,l2,0),(l2,0,sw,0),(sw,1,ssw,0),
           (t,2,go,0),(t,1,dc,0),(t,0,rf,0)]: p.con(*c)
+# fills: on the last bar of every 4, 8 or 16 bars (counted from play), the drums play the chosen fill
+p.add(f"#X obj 500 20 table ockm-fillx 128;")
+lbf=p.add("#X obj 500 50 loadbang;"); m1=p.add("#X msg 500 75 const -1;"); p.con(lbf,0,m1,0)
+q_tab=p.add("#X obj 500 100 s ockm-fillx;"); p.con(m1,0,q_tab,0)
+rst=p.add("#X obj 500 140 r ockm-fill-style;"); tgs=p.add("#X obj 500 165 text get ockm-presets-fill;"); ls1=p.add("#X obj 500 190 list split 1;"); asf=p.add("#X obj 500 215 array set ockm-fillx;")
+for c in [(rst,0,tgs,0),(tgs,0,ls1,0),(ls1,1,asf,0)]: p.con(*c)
+p.con(lbf,0,p.add("#X msg 600 75 0;"),0)
+ini=p.add("#X msg 600 100 0;"); p.con(lbf,0,ini,0); p.con(ini,0,tgs,0)
+rev=p.add("#X obj 700 140 r ockm-fill-every;"); fev=p.add("#X obj 700 165 f 0;"); p.con(rev,0,fev,1)
+rb=p.add("#X obj 500 260 r ockm-bar;"); tbb=p.add("#X obj 500 285 t b b;"); cnt=p.add("#X obj 500 310 f 0;"); inc=p.add("#X obj 550 310 + 1;")
+on=p.add(f"#X obj 500 360 expr if({D}f2>0 \\, ({D}f1 % {D}f2) == {D}f2-1 \\, 0);"); von=p.add("#X obj 500 385 v ockm_fill_on;")
+sfo=p.add("#X obj 600 385 s ockm-fill-now;")
+for c in [(rb,0,tbb,0),(tbb,1,fev,0),(fev,0,on,1),(tbb,0,cnt,0),(cnt,0,inc,0),(inc,0,cnt,1),(cnt,0,on,0),(on,0,von,0),(on,0,sfo,0)]: p.con(*c)
+# play starts the count again; stop ends any fill
+rpl=p.add("#X obj 700 260 r ockm-play;"); tpl=p.add("#X obj 700 285 t b f;"); z0=p.add("#X msg 700 310 0;"); z1=p.add("#X msg 760 310 0;"); von2=p.add("#X obj 760 335 v ockm_fill_on;")
+for c in [(rpl,0,tpl,0),(tpl,0,z0,0),(z0,0,cnt,1),(tpl,0,z1,0),(z1,0,von2,0)]: p.con(*c)
 p.save("seq/ockm-grooves.pd","#N canvas 120 120 700 400 12;")
 
 p=P()
