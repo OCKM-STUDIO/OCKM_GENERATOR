@@ -600,7 +600,7 @@ def touchscreen_screens_draw(work):
         raise Skip("Pillow not installed")
     p = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_preview.py"), os.path.join(work, "preview")], capture_output=True, text=True)
     assert p.returncode == 0, p.stderr[-800:]
-    assert len(os.listdir(os.path.join(work, "preview"))) == 9, "expected nine screen pictures"
+    assert len(os.listdir(os.path.join(work, "preview"))) == 10, "expected ten screen pictures"
 
 @test
 def mute_solo_and_levels(work):
@@ -644,6 +644,69 @@ def bass_follows_chords_and_manual_stays_put(work):
     assert notes[1] == notes[0], "in manual, changing the key must not rewrite the bass"
     modes = printed(out, "ockm-bass-mode")
     assert modes[-1] == "0", f"picking a rhythm should put the bass back in auto: {modes}"
+
+@test
+def bass_lock_density_and_mutate(work):
+    h = Harness()
+    kick = "1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0"
+    h.at(100, f"ockm-resync bang ; ockm-pat-d1 0 {kick} ; ockm-bass-sync 0 ; ockm-bass-notes 3 ; ockm-bass-rhythm 6 ; ockm-length 16")
+    g = h.add("#X obj 10 300 r test-get;"); t = h.add("#X obj 10 325 t b b;")
+    a1 = h.add("#X obj 10 350 array get ockm-pat-bass-on 0 16;"); p1 = h.add("#X obj 10 375 print ON;")
+    a2 = h.add("#X obj 200 350 array get ockm-pat-bass-note 0 16;"); p2 = h.add("#X obj 200 375 print NOTE;")
+    h.con(g, t); h.con(t, a2, 0); h.con(t, a1, 1); h.con(a1, p1); h.con(a2, p2)
+    h.at(150, "test-get bang")                                  # 0: own rhythm (acid 16ths: every step)
+    h.at(160, "ockm-bass-lock 1"); h.at(170, "test-get bang")   # 1: lock to kick
+    h.at(180, "ockm-bass-lock 2"); h.at(190, "test-get bang")   # 2: fill the gaps
+    h.at(200, "ockm-bass-lock 0 ; ockm-bass-density 0.3"); h.at(210, "test-get bang")   # 3: thinner
+    h.at(220, "ockm-bass-density 1 ; ockm-bass-seed 3"); h.at(230, "test-get bang")     # 4: mutated
+    h.at(240, "ockm-bass-seed 0"); h.at(250, "test-get bang")                          # 5: back to the original
+    f = os.path.join(work, "t_lock.pd"); h.finish(300, f)
+    out = run(work, f)
+    on = [[int(float(x)) for x in v.split()] for v in printed(out, "ON")]
+    notes = [[int(float(x)) for x in v.split()] for v in printed(out, "NOTE")]
+    kicks = [int(x) for x in kick.split()]
+    assert on[0] == [1] * 16, f"acid 16ths should play every step: {on[0]}"
+    assert on[1] == kicks, f"lock to kick should play only with the kick: {on[1]}"
+    assert on[2] == [1 - k for k in kicks], f"fill the gaps should play only between kicks: {on[2]}"
+    assert 0 < sum(on[3]) < 16, f"density 0.3 should thin the line out: {on[3]}"
+    assert notes[4] != notes[0], "mutate should change the line"
+    assert notes[5] == notes[0] and on[5] == on[0], "seed 0 should bring back the original"
+
+@test
+def suggest_chords_fit_the_melody(work):
+    """Melody leads: the screen scores every progression against the lead notes and picks the best fit."""
+    sys.path.insert(0, os.path.join(ROOT, "tests"))
+    import ui_preview
+    if not ui_preview.LUA:
+        raise Skip("no lua to run the screen")
+    def picks(notes):
+        on = " ".join("1" if i % 4 == 0 else "0" for i in range(64))
+        nt = " ".join(str(notes[(i // 4) % len(notes)]) for i in range(64))
+        lines = ui_preview.run(["send ockm-length float 64", f"array ockm-pat-lead-on {on}", f"array ockm-pat-lead-note {nt}",
+                                "send ockm-lead-mode float 1", "test tap 441 36", "test tap 186 154", "test tap 100 558"])
+        return [int(float(l.split()[3])) for l in lines if l.startswith("sent ockm-chord-prog")]
+    a_minor = picks([57, 60, 64])           # A C E: the home chord
+    assert a_minor[0] == 0, f"a melody on A C E should suggest one chord first: {a_minor}"
+    assert len(a_minor) == 2 and a_minor[1] != a_minor[0], f"a second tap should give the next suggestion: {a_minor}"
+    # a melody that walks A minor, F, C, G one bar each: the pop progression (i VI III VII) should come first
+    pop = picks([57, 60, 64, 57, 65, 69, 72, 65, 60, 64, 67, 60, 67, 71, 74, 67])
+    assert ui_preview_shapes()[pop[0]] == [(0, 16), (5, 16), (2, 16), (6, 16)], f"expected the pop progression first: {pop}"
+    empty = ui_preview.run(["test tap 441 36", "test tap 186 154"])
+    assert not any(l.startswith("sent ockm-chord-prog") for l in empty), "no melody, no suggestion"
+
+def ui_preview_shapes():
+    """The progression shapes the screen uses, read back from its presets block."""
+    import re
+    line = next(l for l in open(os.path.join(ROOT, "ui", "ockm-ui.pd_lua")) if l.startswith("local PROG_SHAPES"))
+    body = line.split("=", 1)[1].strip()[1:-1]
+    progs, depth, cur = [], 0, ""
+    for ch in body:
+        if ch == "{": depth += 1
+        if depth >= 1: cur += ch
+        if ch == "}":
+            depth -= 1
+            if depth == 0: progs.append([(int(d), int(b)) for d, b in re.findall(r"\{ (\d+), (\d+) \}", cur)]); cur = ""
+    return progs
 
 def main():
     if not PD:

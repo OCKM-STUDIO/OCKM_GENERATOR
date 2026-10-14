@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.22 (14 October 2026)
+
+**Added**
+- Melody-led and bass-led harmony. Write the lead (or let the bass generate), then tap **suggest chords**: every progression is scored against your notes and the best fit is picked. Tap again for the next best
+- Rhythm lock for bass and lead: own rhythm, on the kick, or fill the gaps between kicks. Editing the kick redraws a locked part
+- Density for bass and lead: fewer or more notes than the preset
+- Mutate: a new variation of the bass or lead line. Original brings the preset back
+- The chain on compose shows the order for each leader
+
 ## v0.21 (14 October 2026)
 
 **Added**

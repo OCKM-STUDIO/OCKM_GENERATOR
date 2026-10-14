@@ -38,10 +38,19 @@ Tap a track's name on perform or the mixer to jump straight to it.
 - **Level, tune, decay, reverb, delay** for this slot. These belong to the kit, so they stay when you change pattern
 
 **Compose** (a tab between drums and the synths): how the pattern is put together.
-- **Who leads the harmony:** chords (the chord progression leads; bass and lead follow it) or key only (no connections: every part just uses the key). Melody-led and bass-led are coming
+- **Who leads the harmony:**
+  - **chords:** the progression leads; bass and lead follow it
+  - **melody:** start with a tune. Write the lead by hand, then tap **suggest chords for the melody**. It tries all 10 progressions against your notes and picks the best fit. Tap again for the next best. The bass follows the chords it picks
+  - **bass:** the same, starting from the bass line. The lead follows the chords
+  - **key only:** no connections. Every part just uses the key
 - **Key and scale**, shared by every part
 - **The chain:** which part leads, which follow, and which are on manual
-- **A column each for chord, bass and lead** with their generator settings: progression, rhythm, spice and smooth voicing for the chord; notes and rhythm for bass and lead. Use the arrows to step through the presets. A change rewrites the part straight away
+- **A column each for chord, bass and lead** with their generator settings. Use the arrows to step through the presets. A change rewrites the part straight away
+  - Chord: progression, rhythm, spice and smooth voicing
+  - Bass and lead: notes and rhythm, then:
+  - **own rhythm | on the kick | fill gaps:** use the preset rhythm, play only where the kick plays, or play only where it doesn't. Locked parts redraw when you edit the kick
+  - **density:** drag left for fewer notes, right for more. The middle is the preset as written
+  - **mutate:** a new variation of the same idea (different note order, the odd octave jump). Tap again for another. **Original** goes back
 
 **The rule: compose decides the notes, the synth tabs decide the sound.** Every synth part is on **auto** or **manual**, like a camera:
 - **Auto:** the notes come from compose and follow the chain. On the synth tab its steps are drawn as outlines and locked; tapping one just reminds you it's on auto
@@ -218,14 +227,20 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 | `ockm-bass-rhythm`, `ockm-lead-rhythm` | Rhythm preset, 0 to 7, and rebuild that track |
 | `ockm-bass-notes`, `ockm-lead-notes` | Note pattern, 0 to 11, and rebuild that track |
 | `ockm-bass-gen`, `ockm-lead-gen`, `ockm-chord-gen` | Rebuild that track with the current settings |
+| `ockm-bass-lock`, `ockm-lead-lock` | 0 own rhythm, 1 play on the kick, 2 fill the gaps between kicks |
+| `ockm-bass-density`, `ockm-lead-density` | 0 to 2: fewer to more notes, 1 is the preset as written |
+| `ockm-bass-seed`, `ockm-lead-seed` | Variation number: 0 is the original, anything else a mutation |
+| `ockm-bass-mode`, `ockm-lead-mode`, `ockm-chord-mode` | 0 auto (generated), 1 manual (your notes) |
+| `ockm-bass-sync`, `ockm-lead-sync` | 1 follow the chords, 0 follow the key only |
+| `ockm-leader` | Who leads the harmony: 0 chords, 1 melody, 2 bass, 3 key only |
 | `ockm-chord-rhythm` | Chord rhythm preset, 0 to 7, and rebuild |
-| `ockm-chord-prog` | Chord progression, 0 to 7, and rebuild |
+| `ockm-chord-prog` | Chord progression, 0 to 9, and rebuild |
 | `ockm-chord-type` | 0 triad, 1 seventh, 2 sus2, 3 power chord. Applies straight away |
 | `ockm-edit` | Set one drum step: slot, step (0 to 127), value (0 off, 1 on, 2 accent). For example `d1 4 2` |
 | `ockm-bass-edit`, `ockm-lead-edit` | Set one bass or lead step: step (0 to 127), note (MIDI), on, accent, slide. For example `0 33 1 1 0` |
 | `ockm-chord-edit` | Set one chord step: step, 0 off / 1 on / 2 accent, chord root as a scale step (0 is the key's root). For example `4 1 5` |
 | `ockm-accent` | Accent amount, 0 to 1 |
-| `ockm-<synth>-engine` | bass and lead: 0 acid, 1 sub, 2 FM, 3 reese, 4 pluck, 5 saw. chord: 0 stab, 1 organ, 2 pad |
+| `ockm-<synth>-engine` | bass and lead: 0 acid, 1 sub, 2 FM, 3 reese, 4 pluck, 5 saw, 6 house. chord: 0 stab, 1 organ, 2 pad |
 | `ockm-<synth>-k1` to `-k4` | Synth knobs, 0 to 1. What they do depends on the engine (see below) |
 | `ockm-bass-drive`, `ockm-lead-drive` | Distortion, 0 to 1 |
 | `ockm-filter` | Master DJ filter, -1 to 1. Below 0 cuts the top, above 0 cuts the bottom, 0 is off |
@@ -303,7 +318,7 @@ Pick the MIDI port in plugdata's audio and MIDI settings. On the Pi, the iRig Pr
 
 ## Generators
 
-**Bass and lead** are built from a rhythm, a note pattern, and the shared key and scale. Change any one and the track rebuilds straight away, filling the whole pattern length. The 16-step rhythm repeats, and the note pattern carries on across bars. Changing the key rebuilds both bass and lead.
+**Bass and lead** are built from a rhythm, a note pattern, and the shared key and scale. Then the rhythm lock (own, on the kick, fill gaps), density and mutate are applied, in that order. Change any one and the track rebuilds straight away, filling the whole pattern length. The 16-step rhythm repeats, and the note pattern carries on across bars. Changing the key rebuilds both bass and lead.
 
 **Chords** are built from a progression and a chord rhythm. Each progression has its own length (1, 2, 4 or 8 bars) and its own timing: some change chord every half bar, some hold a chord for two. If the pattern is shorter than the progression, picking it makes the pattern longer. It never makes a pattern shorter.
 
@@ -328,7 +343,9 @@ Pick the MIDI port in plugdata's audio and MIDI settings. On the Pi, the iRig Pr
 | 9 | trip hop | i VII VI v, two bars each | 8 |
 | 10 | soul | ii V I (held two bars) | 4 |
 
-The presets live in `tools/build.py` (`PRE` and `PROGS`). The build writes their names into the touchscreen too, so they always match.
+The presets live in `tools/build.py` (`PRE` and `PROGS`). The build writes their names and shapes into the touchscreen too, so they always match.
+
+**Suggest chords** (melody or bass leads) scores each progression against the leading part's notes: a note on the chord's root scores 3, another note of the chord 2, anything else -1. Notes on the beat and accented notes count for more. The best average wins.
 
 **Chord types**: 0 triad, 1 seventh, 2 sus2, 3 power
 

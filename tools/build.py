@@ -263,8 +263,8 @@ PROJECT_KEYS=[("ockm-bpm",124,"ockm-tempo"),("ockm-volume",1,None),("ockm-accent
 for nm,snd in SLOTS:
     PROJECT_KEYS+=[(f"ockm-{nm}-sound",snd,None),(f"ockm-{nm}-tune",0,None),(f"ockm-{nm}-decay",100,None),
                    (f"ockm-{nm}-level",1,None),(f"ockm-{nm}-verb",VERB[snd],None),(f"ockm-{nm}-delay",DLY[snd],None)]
-SYNTH_DEFAULTS={"bass":dict(engine=0,mode=0,sync=1,level=1,k1=0.37,k2=0.9,k3=0.31,k4=0.55,drive=0,verb=0,delay=0,rhythm=3,notes=3),
-                "lead":dict(engine=4,mode=1,sync=1,level=1,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0.2,delay=0.25,rhythm=6,notes=8),
+SYNTH_DEFAULTS={"bass":dict(engine=0,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.37,k2=0.9,k3=0.31,k4=0.55,drive=0,verb=0,delay=0,rhythm=3,notes=3),
+                "lead":dict(engine=4,mode=1,sync=1,lock=0,density=1,seed=0,level=1,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0.2,delay=0.25,rhythm=6,notes=8),
                 "chord":dict(engine=0,mode=0,level=1,k1=0.45,k2=0.5,k3=0.4,k4=0.3,type=0,smooth=1,verb=0.3,delay=0.35,rhythm=0,prog=0)}
 PATTERN_KEYS=[("ockm-len",16,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None),("ockm-leader",0,None)]
 for t,d in SYNTH_DEFAULTS.items():
@@ -802,7 +802,8 @@ if os.path.exists(_ui_src):
             "local MONO_NOTES = { "+", ".join(f'"{n.replace("-"," ")}"' for n,_ in PRE["notes"])+" }\n"
             "local CHORD_RHY = "+_lua_list([(n.replace("-"," "),) for n,_ in PRE["chordrhythm"]])+"\n"
             "local PROGS = "+_lua_list([(n.replace("-"," "),lab) for n,lab,_ in PROGS])+"\n"
-            "local SPICE = "+_lua_list([(i,lab) for i,lab in SPICE])+"\n")
+            "local SPICE = "+_lua_list([(i,lab) for i,lab in SPICE])+"\n"
+            "local PROG_SHAPES = { "+", ".join("{ "+", ".join(f"{{ {d}, {int(b*16)} }}" for d,b in ch)+" }" for _,_,ch in PROGS)+" }\n")
     os.makedirs(os.path.join(R,"ui"),exist_ok=True)
     open(os.path.join(R,"ui","ockm-ui.pd_lua"),"w").write(_t[:_a]+_block+_t[_b:])
 p=P()
@@ -834,6 +835,15 @@ for j,(hook,dflt,kind) in enumerate([(f"ockm-{D}1-rhythm",f"{D}3","x"),(f"ockm-{
     r=p.add(f"#X obj {x} 170 r {hook};"); t=p.add(f"#X obj {x} 200 t b f;"); fs=p.add(f"#X obj {x} 290 f {dflt};")
     p.con(r,0,t,0); p.con(t,1,fs,1); p.con(t,0,exg if kind=="x" else img,0); store.append(fs)
 rg=p.add(f"#X obj 720 170 r ockm-{D}1-gen;"); p.con(rg,0,ext,0)
+# rhythm lock (0 own rhythm, 1 lock to kick, 2 fill the gaps), density (1 = as the preset), mutate seed (0 = the original)
+var={}
+for j,nm in enumerate(["lock","density","seed"]):
+    x=1200+j*160
+    r=p.add(f"#X obj {x} 170 r ockm-{D}1-{nm};"); t=p.add(f"#X obj {x} 195 t b f;"); p.con(r,0,t,0); p.con(t,0,exg,0); var[nm]=t
+lbd=p.add("#X obj 1360 120 loadbang;"); one_d=p.add("#X msg 1360 145 1;"); p.con(lbd,0,one_d,0)
+# a part locked to the kick follows your drum edits
+red=p.add("#X obj 1200 230 r ockm-edit;"); teb=p.add("#X obj 1200 255 t b;"); lkg=p.add("#X obj 1200 280 spigot;"); lk0=p.add("#X obj 1280 230 != 0;")
+for c in [(red,0,teb,0),(teb,0,lkg,0),(var["lock"],1,lk0,0),(lk0,0,lkg,1),(lkg,0,img,0)]: p.con(*c)
 # sync: follow the chord part. When the chords change, a synced part in auto regenerates
 rsy=p.add(f"#X obj 760 230 r ockm-{D}1-sync;"); nsy=p.add("#X obj 760 255 != 0;"); fsy=p.add(f"#X obj 860 230 f {D}6;")
 syg=p.add("#X obj 760 300 spigot;")
@@ -860,16 +870,23 @@ tws={}
 for j,nm in enumerate(["note","on","acc","slide"]):
     tws[nm]=p.add(f"#X obj {200+j*170} 900 tabwrite ockm-pat-{D}1-{nm};"); p.con(ti,2,tws[nm],1)
 m16=p.add("#X obj 20 700 mod 16;"); rd=p.add(f"#X obj 20 720 tabread {D}0-r;")
+kick=p.add("#X obj 1000 700 tabread ockm-pat-d1;")
+lockx=p.add(f"#X obj 160 720 expr if({D}f3==1 \\, if({D}f2>0 \\, if({D}f1==2 || {D}f1==4 || {D}f2>=2 \\, 2 \\, 1) \\, 0) \\, if({D}f3==2 \\, if({D}f2>0 \\, 0 \\, {D}f1) \\, {D}f1));")
+H=f"(abs(sin({D}f4*12.9898+{D}f3*78.233+1.7)*43758.5453)-floor(abs(sin({D}f4*12.9898+{D}f3*78.233+1.7)*43758.5453)))"
+dens=p.add(f"#X obj 160 735 expr if({D}f1>0 && {D}f2<1 && {D}f1!=2 && {D}f1!=4 && {H}>{D}f2 \\, 0 \\, if({D}f1==0 && {D}f2>1 && {H}<({D}f2-1)*0.5 \\, 1 \\, {D}f1));")
 cx=p.add(f"#X obj 20 745 expr {D}f1>0 \; {D}f1==2 || {D}f1==4 \; {D}f1>=3;")
-for c in [(ti,0,m16,0),(m16,0,rd,0),(rd,0,cx,0),(cx,2,tws["slide"],0),(cx,1,tws["acc"],0)]: p.con(*c)
+for c in [(ti,0,m16,0),(m16,0,rd,0),(rd,0,lockx,0),(lockx,0,dens,0),(dens,0,cx,0),(cx,2,tws["slide"],0),(cx,1,tws["acc"],0),
+          (ti,1,kick,0),(kick,0,lockx,1),(var["lock"],1,lockx,2),(var["density"],1,dens,1),(one_d,0,dens,1),(var["seed"],1,dens,2),(ti,1,dens,3)]: p.con(*c)
 to=p.add("#X obj 20 780 t f f;"); s1=p.add("#X obj 20 810 sel 1;"); th=p.add("#X obj 400 790 t f f;")
-ix=p.add(f"#X obj 400 820 expr int({D}f1) % int({D}f2);"); rn=p.add(f"#X obj 400 845 tabread {D}0-n;"); td=p.add("#X obj 400 870 t f f;")
+ix=p.add(f"#X obj 400 820 expr int({D}f1+{D}f3) % int({D}f2);"); rn=p.add(f"#X obj 400 845 tabread {D}0-n;"); td=p.add("#X obj 400 870 t f f;")
 sx=p.add(f"#X obj 560 870 expr ((int({D}f1)%7)+7)%7;"); rs=p.add(f"#X obj 560 895 tabread {D}0-s;")
 addc=p.add("#X obj 400 857 + 0;")
+ojump=p.add(f"#X obj 400 850 expr {D}f1 + 7*({D}f2>0 && (abs(sin({D}f3*7.13+{D}f2*3.7+0.3)*9137.21)-floor(abs(sin({D}f3*7.13+{D}f2*3.7+0.3)*9137.21)))<0.2);")
+p.con(var["seed"],1,ix,2); p.con(var["seed"],1,ojump,1); p.con(ti,1,ojump,2)
 nx=p.add(f"#X obj 400 930 expr {D}f2 + 12*floor({D}f1/7) + {D}f3;")
-for c in [(cx,0,to,0),(to,1,tws["on"],0),(to,0,s1,0),(s1,0,fh,0),(fh,0,th,0),(th,1,ph,0),(ph,0,fh,1),(th,0,ix,0),(ll,0,ix,1),(ix,0,rn,0),(rn,0,addc,0),(fold,0,addc,1),(addc,0,td,0),
+for c in [(cx,0,to,0),(to,1,tws["on"],0),(to,0,s1,0),(s1,0,fh,0),(fh,0,th,0),(th,1,ph,0),(ph,0,fh,1),(th,0,ix,0),(ll,0,ix,1),(ix,0,rn,0),(rn,0,ojump,0),(ojump,0,addc,0),(fold,0,addc,1),(addc,0,td,0),
           (td,1,sx,0),(sx,0,rs,0),(rs,0,nx,2),(td,0,nx,0),(ro,0,nx,1),(nx,0,tws["note"],0)]: p.con(*c)
-p.add("#X text 20 980 hooks: ockm-<track>-rhythm 0-7 \\, ockm-<track>-notes 0-11 \\, ockm-<track>-gen (rebuild) \\, ockm-<track>-mode (0 auto \\, 1 manual) \\, ockm-<track>-sync (follow the chords) \\, and the shared ockm-root 0-11 and ockm-scale 0-5. Args: track \\, octave \\, rhythm \\, notes \\, default mode \\, default sync.;")
+p.add("#X text 20 980 hooks: ockm-<track>-rhythm 0-7 \\, ockm-<track>-notes 0-11 \\, ockm-<track>-gen (rebuild) \\, ockm-<track>-mode (0 auto \\, 1 manual) \\, ockm-<track>-sync (follow the chords) \\, ockm-<track>-lock (0 own rhythm \\, 1 lock to kick \\, 2 fill the gaps) \\, ockm-<track>-density (0-2 \\, 1 = the preset) \\, ockm-<track>-seed (mutate: 0 = the original) \\, and the shared ockm-root 0-11 and ockm-scale 0-5. Args: track \\, octave \\, rhythm \\, notes \\, default mode \\, default sync.;")
 p.save("seq/ockm-monogen.pd","#N canvas 120 120 1100 1020 12;")
 
 # ================= chord sequencer =================

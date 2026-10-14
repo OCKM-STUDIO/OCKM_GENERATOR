@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.21"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.22"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
@@ -60,6 +60,7 @@ local MONO_NOTES = { "root", "octaves", "root fifth", "acid riff", "walk up", "m
 local CHORD_RHY = { { "bar pads" }, { "two beat" }, { "offbeat" }, { "dub stabs" }, { "house organ" }, { "tresillo" }, { "syncopated" }, { "garage skip" }, { "call answer" }, { "eighths" } }
 local PROGS = { { "one chord", "i" }, { "vamp", "i iv" }, { "dub techno", "i . . VII" }, { "deep house", "i iv VI v" }, { "garage", "i VI iv v" }, { "pop", "i VI III VII" }, { "uplift", "VI VII i" }, { "andalusian", "i VII VI V" }, { "trip hop", "i VII VI v" }, { "soul", "ii V I" } }
 local SPICE = { { 0, "triad" }, { 1, "7th" }, { 6, "9th" }, { 7, "11th" } }
+local PROG_SHAPES = { { { 0, 16 } }, { { 0, 16 }, { 3, 16 } }, { { 0, 48 }, { 6, 16 } }, { { 0, 16 }, { 3, 16 }, { 5, 16 }, { 4, 16 } }, { { 0, 8 }, { 5, 8 }, { 3, 8 }, { 4, 8 } }, { { 0, 16 }, { 5, 16 }, { 2, 16 }, { 6, 16 } }, { { 5, 16 }, { 6, 16 }, { 0, 32 } }, { { 0, 16 }, { 6, 16 }, { 5, 16 }, { 4, 16 } }, { { 0, 32 }, { 6, 32 }, { 5, 32 }, { 4, 32 } }, { { 1, 16 }, { 4, 16 }, { 0, 32 } } }
 -- END PRESETS
 local ROMAN = { "i","ii","iii","iv","v","vi","vii" }
 local OCT_OFFSET = { bass = 0, lead = 24 }   -- matches ockm-monogen args
@@ -109,6 +110,7 @@ function ui:defaults()
   for _, t in ipairs(SYNTHS) do v["ockm-"..t.."-level"] = 1 end
   v["ockm-bass-mode"] = 0; v["ockm-lead-mode"] = 1; v["ockm-chord-mode"] = 0   -- 0 auto, 1 manual
   v["ockm-bass-sync"] = 1; v["ockm-lead-sync"] = 1; v["ockm-leader"] = 0
+  for _, p in ipairs({ "bass", "lead" }) do v["ockm-"..p.."-lock"] = 0; v["ockm-"..p.."-density"] = 1; v["ockm-"..p.."-seed"] = 0 end
   v["ockm-bpm"] = 124; v["ockm-len"] = 16; v["ockm-filter"] = 0; v["ockm-root"] = 9; v["ockm-scale"] = 0
   for i, nm in ipairs(SLOTS) do
     v["ockm-"..nm.."-sound"] = ({0,1,2,4,5,7,3,6})[i]
@@ -133,6 +135,9 @@ function ui:hooks()
   for _, t in ipairs(TRACKS) do h[#h+1] = "ockm-"..t.."-mute"; h[#h+1] = "ockm-"..t.."-solo" end
   for _, t in ipairs(SYNTHS) do h[#h+1] = "ockm-"..t.."-level"; h[#h+1] = "ockm-"..t.."-mode" end
   h[#h+1] = "ockm-bass-sync"; h[#h+1] = "ockm-lead-sync"; h[#h+1] = "ockm-leader"
+  for _, p in ipairs({ "bass", "lead" }) do
+    for _, k in ipairs({ "lock", "density", "seed" }) do h[#h+1] = "ockm-"..p.."-"..k end
+  end
   for _, k in ipairs({ "ockm-volume", "ockm-verb-mix", "ockm-delay-mix", "ockm-drive", "ockm-delay-fb", "ockm-delay-steps", "ockm-verb-size", "ockm-verb-tone" }) do h[#h+1] = k end
   return h
 end
@@ -161,6 +166,11 @@ function ui:postinitialize()
   for _, n in ipairs({ "ockm-refresh","ockm-edit","ockm-extend","ockm-bass-edit","ockm-lead-edit","ockm-chord-edit",
                        "ockm-bass-gen","ockm-lead-gen","ockm-chord-gen" }) do
     listen(n, function(o) o:dirty() end)
+  end
+  -- a fresh suggestion list whenever the melody, bass, key or progression changes by hand
+  for _, n in ipairs({ "ockm-lead-edit", "ockm-bass-edit", "ockm-root", "ockm-scale", "ockm-load", "ockm-lead-gen", "ockm-bass-gen",
+                       "ockm-lead-seed", "ockm-bass-seed", "ockm-lead-notes", "ockm-bass-notes", "ockm-lead-rhythm", "ockm-bass-rhythm", "ockm-chord-prog" }) do
+    listen(n, function(o) if not o.suggesting then o.ranking = nil end end)
   end
   listen("ockm-ui-test", function(o, sel, a) o:test(sel, a) end)
   self.clock = pd.Clock:new():register(self, "redraw")
@@ -474,15 +484,71 @@ end
 -- ------------------------------------------------------------------ compose
 -- How the pattern is put together: who leads the harmony, the key, and each part's generator.
 -- Compose decides the notes of parts on auto. Parts on manual are greyed out here and never changed.
-local LEADERS = { { 0, "chords" }, { 1, "melody", true }, { 2, "bass", true }, { 3, "key only" } }   -- true = coming soon
+local LEADERS = { { 0, "chords" }, { 1, "melody" }, { 2, "bass" }, { 3, "key only" } }
 
+-- who follows the chords for each leader: chords lead, melody leads (bass follows), bass leads (lead follows), key only
+local FOLLOW = { [0] = { bass = 1, lead = 1 }, [1] = { bass = 1, lead = 0 }, [2] = { bass = 0, lead = 1 }, [3] = { bass = 0, lead = 0 } }
 function ui:set_leader(n)
   self:send("ockm-leader", n)
-  local follow = (n == 0) and 1 or 0
   for _, p in ipairs({ "bass", "lead" }) do
-    self:send("ockm-"..p.."-sync", follow)
-    if self:part_auto(p) then pd.send("ockm-"..p.."-gen", "bang", {}) end
+    self:send("ockm-"..p.."-sync", FOLLOW[n][p])
+    if self:part_auto(p) and (n == 0 or n == 3) then pd.send("ockm-"..p.."-gen", "bang", {}) end
   end
+  self.ranking = nil
+  if (n == 1 or n == 2) and self:part_auto("chord") then self:suggest_chords() end
+end
+
+-- melody-led or bass-led: score every progression against the leading part's notes.
+-- A note on the chord's root scores 3, another chord note 2, anything else -1; downbeats and accents count more.
+function ui:score_prog(pi, src)
+  local shape = PROG_SHAPES[pi]
+  if not shape then return -1 end
+  local steps = {}
+  for _, seg in ipairs(shape) do for _ = 1, seg[2] do steps[#steps + 1] = seg[1] end end
+  local plen = #steps
+  local L = math.max(1, math.floor(self.v["ockm-len"] or 16))
+  local sc, root = self:scale(), math.floor(self.v["ockm-root"] or 9)
+  local total, weight = 0, 0
+  for i = 0, math.max(plen, L) - 1 do
+    local j = i % L
+    if self:get("ockm-pat-"..src.."-on", j) > 0 then
+      local pc = math.floor(self:get("ockm-pat-"..src.."-note", j)) % 12
+      local d = steps[(i % plen) + 1]
+      local w = ((j % 4) == 0) and 1.5 or 1
+      if self:get("ockm-pat-"..src.."-acc", j) > 0 then w = w * 1.3 end
+      local rpc = (root + sc[(d % 7) + 1]) % 12
+      local s3 = (root + sc[((d + 2) % 7) + 1]) % 12
+      local s5 = (root + sc[((d + 4) % 7) + 1]) % 12
+      if pc == rpc then total = total + 3 * w elseif pc == s3 or pc == s5 then total = total + 2 * w else total = total - w end
+      weight = weight + w
+    end
+  end
+  if weight == 0 then return nil end
+  return total / weight
+end
+
+function ui:suggest_chords()
+  local leader = self.v["ockm-leader"] or 0
+  local src = (leader == 2) and "bass" or "lead"
+  local what = (src == "lead") and "melody" or "bass line"
+  if not self.ranking then
+    local r = {}
+    for pi = 1, #PROG_SHAPES do
+      local sc = self:score_prog(pi, src)
+      if not sc then self:say("the " .. what .. " has no notes yet: write some, then ask again"); return end
+      r[#r + 1] = { pi - 1, sc }
+    end
+    table.sort(r, function(a, b) if a[2] ~= b[2] then return a[2] > b[2] end return a[1] < b[1] end)
+    self.ranking, self.rank_at = r, 0
+  end
+  self.rank_at = (self.rank_at % #self.ranking) + 1
+  local pick = self.ranking[self.rank_at]
+  self.suggesting = true
+  self:send("ockm-chord-prog", pick[1])
+  self.suggesting = false
+  local fit = math.floor(clamp((pick[2] + 1) / 4, 0, 1) * 100 + 0.5)
+  self:say(string.format("suggestion %d of %d for the %s: %s, fits %d%%", self.rank_at, #self.ranking,
+    what, (PROGS[pick[1] + 1] or { "" })[1], fit))
 end
 
 -- a stepper: back, the current choice (number, name, detail), forward
@@ -515,7 +581,8 @@ function ui:layout_compose(add)
   -- the chain, and the scale
   add{ kind="text", x=16, y=182, w=300, h=12, label="the chain", size=10 }
   local leader = self.v["ockm-leader"] or 0
-  local order = (leader == 3) and { "key", "chord", "bass", "lead" } or { "chord", "bass", "lead" }
+  local order = ({ [0] = { "chord", "bass", "lead" }, [1] = { "lead", "chord", "bass" }, [2] = { "bass", "chord", "lead" },
+                  [3] = { "key", "chord", "bass", "lead" } })[leader] or { "chord", "bass", "lead" }
   local cw = (half - (#order - 1) * 22) / #order
   for i, p in ipairs(order) do
     local x = 16 + (i - 1) * (cw + 22)
@@ -523,7 +590,8 @@ function ui:layout_compose(add)
     if p == "key" then tag = "everyone follows"
     else
       local auto = self:part_auto(p)
-      tag = (auto and "auto" or "manual") .. ((i == 1) and " · leads" or (auto and " · follows" or " · your notes"))
+      local leads = (i == 1) and leader ~= 3
+      tag = (auto and "auto" or "manual") .. (leads and " · leads" or (auto and " · follows" or " · your notes"))
     end
     add{ kind="chain", x=x, y=196, w=cw, h=44, label=p, sub=tag, lead=(i == 1) }
     if i < #order then add{ kind="text", x=x + cw + 5, y=208, w=14, h=16, label=(leader == 3) and "·" or ">", size=14 } end
@@ -558,26 +626,46 @@ function ui:layout_compose(add)
       end }
     elseif p == "chord" then
       add{ kind="text", x=ix, y=cy + 52, w=iw, h=12, label="progression", size=10 }
-      self:stepper(add, ix, cy + 66, iw, 58, PROGS, "ockm-chord-prog")
-      add{ kind="text", x=ix, y=cy + 132, w=iw, h=12, label="rhythm", size=10 }
-      self:stepper(add, ix, cy + 146, iw, 44, CHORD_RHY, "ockm-chord-rhythm")
-      add{ kind="text", x=ix, y=cy + 198, w=iw, h=12, label="spice", size=10 }
+      self:stepper(add, ix, cy + 66, iw, 52, PROGS, "ockm-chord-prog")
+      add{ kind="text", x=ix, y=cy + 124, w=iw, h=12, label="rhythm", size=10 }
+      self:stepper(add, ix, cy + 138, iw, 40, CHORD_RHY, "ockm-chord-rhythm")
+      add{ kind="text", x=ix, y=cy + 184, w=iw, h=12, label="spice", size=10 }
       local spw = (iw - 18) / 4
       for i, sp in ipairs(SPICE) do
-        add{ kind="choice", x=ix + (i - 1) * (spw + 6), y=cy + 212, w=spw, h=40, label=i .. " " .. sp[2], small=true,
+        add{ kind="choice", x=ix + (i - 1) * (spw + 6), y=cy + 198, w=spw, h=36, label=i .. " " .. sp[2], small=true,
              sel=(self.v["ockm-chord-type"] == sp[1]), tap=function() self:send("ockm-chord-type", sp[1]) end }
       end
-      add{ kind="choice", x=ix, y=cy + 262, w=iw, h=40, label="smooth voicing", accent=true, small=true, sel=(self.v["ockm-chord-smooth"] or 1) > 0,
+      add{ kind="choice", x=ix, y=cy + 242, w=iw, h=34, label="smooth voicing", accent=true, small=true, sel=(self.v["ockm-chord-smooth"] or 1) > 0,
            tap=function() self:send("ockm-chord-smooth", ((self.v["ockm-chord-smooth"] or 1) > 0) and 0 or 1) end }
+      local leader = self.v["ockm-leader"] or 0
+      if leader == 1 or leader == 2 then
+        add{ kind="btn", x=ix, y=cy + 284, w=iw, h=40, accent=true,
+             label=self.ranking and "next suggestion" or ((leader == 1) and "suggest chords for the melody" or "suggest chords for the bass"),
+             tap=function() self:suggest_chords() end }
+      end
     else
       local notes = {}
       for i, nm in ipairs(MONO_NOTES) do notes[i] = { nm } end
       add{ kind="text", x=ix, y=cy + 52, w=iw, h=12, label="notes", size=10 }
-      self:stepper(add, ix, cy + 66, iw, 58, notes, "ockm-"..p.."-notes")
-      add{ kind="text", x=ix, y=cy + 132, w=iw, h=12, label="rhythm", size=10 }
-      self:stepper(add, ix, cy + 146, iw, 44, RHYTHMS, "ockm-"..p.."-rhythm")
+      self:stepper(add, ix, cy + 66, iw, 52, notes, "ockm-"..p.."-notes")
+      add{ kind="text", x=ix, y=cy + 124, w=iw, h=12, label="rhythm", size=10 }
+      self:stepper(add, ix, cy + 138, iw, 40, RHYTHMS, "ockm-"..p.."-rhythm")
+      local lkey = "ockm-"..p.."-lock"
+      local lw3 = (iw - 12) / 3
+      for li, nm in ipairs({ "own rhythm", "on the kick", "fill gaps" }) do
+        add{ kind="choice", x=ix + (li - 1) * (lw3 + 6), y=cy + 186, w=lw3, h=34, label=nm, small=true,
+             sel=(math.floor(self.v[lkey] or 0) == li - 1), tap=function() self:send(lkey, li - 1) end }
+      end
+      add{ kind="hbar", x=ix, y=cy + 228, w=iw, h=34, hook="ockm-"..p.."-density", lo=0, hi=2, label="density", bold=true }
+      local skey = "ockm-"..p.."-seed"
+      local seed = math.floor(self.v[skey] or 0)
+      add{ kind="btn", x=ix, y=cy + 270, w=(iw - 6) / 2, h=34, label="mutate", tap=function() self:send(skey, seed + 1) end }
+      add{ kind="btn", x=ix + (iw + 6) / 2, y=cy + 270, w=(iw - 6) / 2, h=34, label="original", quiet=(seed == 0), tap=function() self:send(skey, 0) end }
+      local leader = self.v["ockm-leader"] or 0
+      local leads = (leader == 1 and p == "lead") or (leader == 2 and p == "bass")
       local follows = (self.v["ockm-"..p.."-sync"] or 0) > 0
-      add{ kind="text", x=ix, y=cy + 206, w=iw, h=14, label=follows and "follows the chords" or "follows the key", size=12 }
+      add{ kind="text", x=ix, y=cy + 314, w=iw, h=14, size=11,
+           label=(leads and "leads the harmony" or (follows and "follows the chords" or "follows the key")) .. ((seed > 0) and ("  ·  variation " .. seed) or "") }
     end
   end
 end
