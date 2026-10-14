@@ -129,6 +129,8 @@ Everything is remembered: drum kit, synth sounds, effects, tempo, swing, key and
 11. ~~8 drum slots, chord and lead synth tracks~~ (v0.10)
 12. ~~One central settings store: projects, patterns and the drum kit, saved and restored~~ (v0.11)
 13. Your drum samples, chosen per slot
+14. Song mode, MPC style: a chain of patterns, each with a repeat count, played in order. Then a song generator that writes a starting chain (intro, build, drop, break, outro) for you to tweak
+15. Tighten up the logic and usability after a round of playing
 
 ## Decisions made
 
@@ -146,6 +148,7 @@ Everything is remembered: drum kit, synth sounds, effects, tempo, swing, key and
 - **Synthesised drums for now.** Samples can be swapped in later, one voice at a time.
 - **Projects and patterns saved as readable text files** in `projects/`, so saving works on the Pi without a keyboard.
 - **The drum kit belongs to the project; synth sounds belong to each pattern.** See "How it's organised".
+- **Song mode works like the MPC: one song per project** (decided October 2026). A song is a chain of steps, each a pattern plus how many times it repeats. A song/pattern switch sits by play.
 
 ## Parked ideas
 
