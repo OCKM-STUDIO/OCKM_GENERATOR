@@ -12,7 +12,7 @@ The window is the instrument: three touch screens, drawn in Lua (plugdata has Lu
 
 **How every screen is laid out**, top to bottom:
 1. **Top bar:** play, tempo, then the screens as tabs: **perform, drums, bass, lead, chord, mixer**. Save and **project** on the right. The version number sits next to the tempo
-2. **Navigation strip:** **pattern** 1 to 8 (faint ones are empty), **+** for a new pattern, **length** (16, 32, 64, 128), and **steps**: back and forward arrows either side of the steps you're looking at (for example "17-32"). The dots underneath show every block of 16: white is the one on screen, orange is the one playing. You can also swipe the step row sideways
+2. **Navigation strip:** on the left, right above the steps, the **steps** navigator: back and forward arrows either side of the steps you're looking at (for example "17-32"). The dots show every block of 16: white is the one on screen, orange is the one playing. You can also swipe the step row sideways. In the middle, **pattern**: just the patterns you've made, then **+** for a new one. On the right, **length** (16, 32, 64, 128)
 3. **What you're editing:** the steps (and, on the drums screen, which of the 8 drum slots)
 4. **Sound shaping** at the bottom
 
@@ -20,8 +20,8 @@ Tap a track's name on perform or the mixer to jump straight to it.
 
 **Perform** (home)
 - **Play** and **tempo** top left. Drag the tempo number up or down
-- Patterns are in the navigation strip: tap to switch. While playing it waits for the end of the bar; the queued one gets an orange outline. Faint numbers are empty slots
-- **+** makes a new pattern in the next free slot: **copy of** the one you're on (best for variations) or **start empty** (keeps your sounds). Then it switches to it
+- Patterns are in the navigation strip: tap to switch. While playing it waits for the end of the bar; the queued one gets an orange outline. Only the patterns you've made are shown
+- **+** makes the next pattern (2, then 3, and so on): **copy of** the one you're on (best for variations) or **start empty** (keeps your sounds). Then it switches to it
 - Switching keeps your work in memory. **Save** keeps all 8 patterns, the song and the kit. It turns orange with a dot when there's something unsaved
 - **Now**: all 11 tracks for the 16 steps on screen, with the playhead running above them. **Tap a drum lane's steps to edit them** (empty, hit, accent), just like the drums screen. The bass, lead and chord lanes are a picture: edit those on their own tabs
 - Tap a track's **name** to open it

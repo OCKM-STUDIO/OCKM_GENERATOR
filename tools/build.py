@@ -262,7 +262,7 @@ def show(h): return "ockm-show-"+h[5:]
 PROJECT_KEYS=[("ockm-bpm",124,"ockm-tempo"),("ockm-volume",1,None),("ockm-accent",0.3,None),("ockm-filter",0,None),("ockm-drive",0,None),
     ("ockm-delay-mix",0.5,None),("ockm-delay-fb",0.4,None),("ockm-delay-steps",3,None),("ockm-verb-mix",0.5,None),
     ("ockm-verb-size",0.6,None),("ockm-verb-tone",0.5,None),("ockm-sync",0,None),("ockm-clock-out",1,None),
-    ("ockm-song-mode",0,None),("ockm-song-loop",1,None),("ockm-used",0,None)]
+    ("ockm-song-mode",0,None),("ockm-song-loop",1,None)]
 for nm,snd in SLOTS:
     PROJECT_KEYS+=[(f"ockm-{nm}-sound",snd,None),(f"ockm-{nm}-tune",0,None),(f"ockm-{nm}-decay",100,None),
                    (f"ockm-{nm}-level",1,None),(f"ockm-{nm}-verb",VERB[snd],None),(f"ockm-{nm}-delay",DLY[snd],None)]
@@ -1278,6 +1278,22 @@ spj=q.add(f"#X obj 1500 {Y0+175} spigot;"); z8=q.add(f"#X msg 1750 {Y0+175} 0;")
 ssf=q.add(f"#X obj 1500 {Y0+250} s ockm-song-file;")
 for c in [(sj,0,tsj,0),(tsj,1,isj,0),(isj,0,spj,1),(isj,1,z8,0),(z8,0,spj,1),(isj,1,clj,0),(clj,0,ssf,0),(tsj,0,spj,0)]: q.con(*c)
 cmd(spj,0,"read",1500,Y0+200,ssf)
+# which patterns exist (made, even if empty): pattern 1 always; others when their file is more than one line
+rra3=q.add(f"#X obj 1500 {Y0+300} r {D}0-readall;"); dr3=holder("dir",1500,Y0+350); q.con(rra3,0,dr3,0)
+tx=q.add(f"#X obj 1500 {Y0+375} t b "+" ".join(["s"]*SLOTN)+";"); q.con(dr3,0,tx,0)
+for n in range(SLOTN):
+    x=1500+n*150; yy=Y0+400
+    txd=q.add(f"#X obj {x+150} {yy+250} text define {D}0-px{n};")
+    pf=joined(tx,SLOTN-n,f"p{n+1}.txt",x,yy); tf2=q.add(f"#X obj {x} {yy+50} t s s b;")
+    z=q.add(f"#X msg {x+100} {yy+75} 0;"); vz=q.add(f"#X obj {x+100} {yy+100} v ockm_px{n};"); q.con(tf2,2,z,0); q.con(z,0,vz,0)
+    isf=q.add(f"#X obj {x+60} {yy+75} file isfile;"); spf=q.add(f"#X obj {x} {yy+100} spigot;"); z2=q.add(f"#X msg {x+120} {yy+125} 0;")
+    q.con(pf,0,tf2,0); q.con(tf2,1,isf,0); q.con(isf,0,spf,1); q.con(isf,1,z2,0); q.con(z2,0,spf,1); q.con(tf2,0,spf,0)
+    rdm=q.add(f"#X obj {x} {yy+125} list prepend read;"); rdt=q.add(f"#X obj {x} {yy+150} list trim;"); td=q.add(f"#X obj {x} {yy+175} t b a;")
+    sz=q.add(f"#X obj {x} {yy+200} text size {D}0-px{n};"); gt=q.add(f"#X obj {x} {yy+225} > 1;"); vv=q.add(f"#X obj {x} {yy+250} v ockm_px{n};")
+    tdef=q.add(f"#X obj {x+80} {yy+200} r {D}0-px{n}-cmd;"); q.con(tdef,0,txd,0)
+    q.con(spf,0,rdm,0); q.con(rdm,0,rdt,0); q.con(rdt,0,td,0); q.con(td,1,q.add(f"#X obj {x+80} {yy+175} s {D}0-px{n}-cmd;"),0); q.con(td,0,sz,0); q.con(sz,0,gt,0); q.con(gt,0,vv,0)
+ex=q.add(f"#X obj 1500 {Y0+700} expr 1 + "+" + ".join(f"{2**n}*ockm_px{n}" for n in range(1,SLOTN))+";")
+q.con(tx,0,ex,0); q.con(ex,0,q.add(f"#X obj 1500 {Y0+725} s ockm-patterns-exist;"),0)
 # write every buffer into the open project folder (save captures the live pattern first)
 Y1=Y0+300
 rwa=q.add(f"#X obj 20 {Y1} r {D}0-writeall;"); dw=holder("dir",20,Y1+50); q.con(rwa,0,dw,0)
@@ -1397,7 +1413,8 @@ tcl=q.add(f"#X obj 1100 {YC+200} t s s;"); q.con(clip,0,tcl,0); q.con(tcl,1,wr1,
 tob=q.add(f"#X obj 1000 {YC+275} f;"); q.con(seq,0,tob,0); q.con(ucp,1,tob,1)
 reload_if_current(tob,0,1000,YC+300)
 rcl=q.add(f"#X obj 1400 {YC} r ockm-pattern-clear;"); tclr=q.add(f"#X obj 1400 {YC+25} t f f;")
-mcl=q.add(f"#X msg 1400 {YC+50} {D}1 clear \\, {D}1 add ockm-empty 1;")
+mcl=q.add(f"#X msg 1400 {YC+50} {D}1 clear \\, {D}1 add ockm-created 1 \\, {D}1 add ockm-empty 1;")
+q.add(f"#X obj 1600 {YC+50} r ockm-created;")   # marker only: a pattern made with 'start empty' still counts as made
 q.con(rcl,0,tclr,0); q.con(tclr,1,mcl,0); q.con(mcl,0,sq,0); reload_if_current(tclr,0,1400,YC+100)
 Y7=YC+200
 # ockm-project-list: one ockm-project-item <name> per project folder, between -start and -end

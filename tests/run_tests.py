@@ -540,13 +540,13 @@ def touchscreen_drives_the_engine(work):
     tap(160, 300, 312)                   # drums: sound pad 3 (clap)
     tap(170, 160, 212); tap(180, 160, 212)   # step 3: on, then accent
     tap(190, 281, 36)                    # perform tab
-    tap(200, 492, 88)                    # length 32 (navigation strip)
+    tap(200, 836, 88)                    # length 32 (navigation strip)
     tap(210, 361, 36)                    # drums tab (back to the kick slot)
     h.at(220, "ockm-ui-test drag 600 212 200 212")   # swipe left: steps 17-32
     tap(230, 45, 212)                    # step 17
     h.at(240, "ockm-ui-test drag 200 212 600 212")   # swipe right: back to 1-16
-    tap(245, 922, 88)                    # forward arrow (steps 17-32)
-    tap(248, 644, 88)                    # back arrow (steps 1-16)
+    tap(245, 194, 88)                    # forward arrow (steps 17-32)
+    tap(248, 38, 88)                     # back arrow (steps 1-16)
     tap(250, 281, 36)                    # perform tab
     tap(255, 244, 467); tap(258, 128, 512)   # synth half: lead, then its first knob
     tap(260, 50, 369)                    # open bass from its lane (bass is on auto)
@@ -555,7 +555,7 @@ def touchscreen_drives_the_engine(work):
     tap(270, 45, 158)                    # now bass step 1 edits
     tap(280, 600, 236)                   # note picker: third note of the scale
     tap(290, 281, 36)                    # perform tab
-    tap(300, 149, 88)                    # pattern 3 (navigation strip)
+    tap(300, 373, 88)                    # pattern 3 (navigation strip)
     tap(310, 543, 486)                   # master fx: filter, middle
     tap(320, 441, 36)                    # compose tab
     tap(335, 283, 349)                   # chord column: next progression
@@ -723,24 +723,25 @@ def touchscreen_builds_and_plays_a_song(work):
 
 @test
 def touchscreen_new_pattern_from_a_copy(work):
-    """Tap + by the patterns, choose 'copy of 1': pattern 2 becomes a copy and opens; after save, both are marked as in use."""
+    """The demo has patterns 1-4, so + makes pattern 5. 'copy of 1' copies and opens it; after a save and a reload, 5 is still there."""
     if not PDLUA:
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
-    h = Harness(); h.show("ockm-pattern-copy", "ockm-want", "ockm-load", "ockm-used")
+    h = Harness(); h.show("ockm-pattern-copy", "ockm-load", "ockm-patterns-exist")
     tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
-    h.at(100, "ockm-used 1")            # only pattern 1 in use
-    tap(150, 355, 88)                   # +
+    tap(150, 441, 88)                   # + (after patterns 1-4)
     tap(200, 306, 302)                  # copy of 1
     h.at(300, "ockm-save bang")
-    f = os.path.join(work, "t_newpat.pd"); h.finish(400, f)
+    h.at(350, "ockm-revert bang")       # read everything back from disk
+    f = os.path.join(work, "t_newpat.pd"); h.finish(450, f)
     out = run(work, f)
-    assert printed(out, "ockm-pattern-copy") and printed(out, "ockm-pattern-copy")[-1].split()[-2:] in (["0", "1"], ["0.0", "1.0"]), printed(out, "ockm-pattern-copy")
-    assert [int(float(v.split()[-1])) for v in printed(out, "ockm-load")][-1] == 1, "the new pattern should open"
-    proj = open(os.path.join(work, "projects", "default", "project.txt")).read()
-    assert "ockm-used 3;" in proj, f"patterns 1 and 2 should be saved as in use: {[l for l in proj.split(';') if 'used' in l]}"
+    cp = printed(out, "ockm-pattern-copy")
+    assert cp and [int(float(x)) for x in cp[-1].split()[-2:]] == [0, 4], f"+ should copy pattern 1 into slot 5: {cp}"
+    assert 4 in [int(float(v.split()[-1])) for v in printed(out, "ockm-load")], "the new pattern should open"
+    ex = printed(out, "ockm-patterns-exist")
+    assert ex and int(float(ex[-1].split()[-1])) == 31, f"after saving, patterns 1-5 should exist: {ex}"
     p1 = [l for l in open(os.path.join(work, "projects", "default", "p1.txt")).read().split(";") if "ockm-pat-d1 " in l]
-    p2 = [l for l in open(os.path.join(work, "projects", "default", "p2.txt")).read().split(";") if "ockm-pat-d1 " in l]
-    assert p1 == p2, "pattern 2 should be a copy of pattern 1"
+    p5 = [l for l in open(os.path.join(work, "projects", "default", "p5.txt")).read().split(";") if "ockm-pat-d1 " in l]
+    assert p1 == p5, "pattern 5 should be a copy of pattern 1"
 
 @test
 def song_saved_with_the_project_and_patterns_copy(work):

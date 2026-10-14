@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.28 (14 October 2026)
+
+**Changed**
+- The navigation strip only shows the patterns you've made, then +. Tap + and the next number appears. A pattern started empty still counts as made
+- Which patterns exist is worked out from the saved files when a project opens, so older projects (like demo grooves) show theirs too
+- The step navigator is compact and sits on the left, right above the steps. Pattern in the middle, length on the right
+- The song tab only offers patterns you've made
+- A key on the drums tab: white is a hit, orange is an accent (louder)
+
 ## v0.27 (14 October 2026)
 
 **Added**
