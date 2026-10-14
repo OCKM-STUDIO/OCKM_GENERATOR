@@ -119,36 +119,23 @@ tom,tom-17.wav,C2 Disco Samples,C2 Disco Samples/Songstarters/Songstarters_Sampl
 tom,tom-18.wav,Analog Drums 808,Analog Drums 808/14_LTom_808.wav
 tom,tom-19.wav,DC_Grope,DC_Grope/TD1_15_Tom02.wav
 tom,tom-20.wav,01LM_Sebastien Leger,01LM_Sebastien Leger/SLT_12_LowTom.wav
-rim,rim-01.wav,Tape909_Samples,Tape909_Samples/Perc/909RimV2_Orig.wav
-rim,rim-02.wav,Tape909_Samples,Tape909_Samples/Perc/909Rim_misc01.wav
-rim,rim-03.wav,Tape909_Samples,Tape909_Samples/Perc/909Rim_Sweet01.wav
-rim,rim-04.wav,Tape909_Samples,Tape909_Samples/Perc/909RimV3_X.wav
-rim,rim-05.wav,Tape909_Samples,Tape909_Samples/Perc/909Rim_amp01.wav
-rim,rim-06.wav,C2 Disco Samples,C2 Disco Samples/Songstarters/Songstarters_Future_Disco_Kit3_G#_120/FD_Kit3_Rimshot__G#_120.wav
-rim,rim-07.wav,Analog Drums 909,Analog Drums 909/08_Rim_TAccent_909.wav
-rim,rim-08.wav,KSHMR Vol 5,KSHMR Vol 5/Drums/Snares/Acoustic Snares/KSHMR Acoustic Snare - Rim - Clean.wav
-rim,rim-09.wav,F9_Drums,F9_Drums/A_Rims/House-Rim-F9 Yoshi Rim 02.WAV
-rim,rim-10.wav,KSHMR Vol 5,KSHMR Vol 5/Drums/Snares/Rims/KSHMR Rim - Digital - Zap.wav
-rim,rim-11.wav,F9_Drums,F9_Drums/A_Rims/House-Rim-F9 OR Rim 05.WAV
-rim,rim-12.wav,KSHMR Vol 5,KSHMR Vol 5/Drums/Snares/Rims/KSHMR Rim - Digital - Saturated.wav
-rim,rim-13.wav,F9_Drums,F9_Drums/A_Rims/House-Rim-F9 Diirty 909 Rim 4.WAV
-perc,perc-01.wav,like,_HATS/015 Hat Shaker-like.wav
-perc,perc-02.wav,f9,_SHAKERS/House-Perc-F9 Antales Shaker.WAV
-perc,perc-03.wav,that,_HATS/011 THAT cowbell C.wav
-perc,perc-04.wav,t,_KICKS/T_AH_kick_oneshot_percos.wav
-perc,perc-05.wav,misc,_SHAKERS/012 Shaker.wav
+perc,perc-01.wav,Tape909_Samples,Tape909_Samples/Perc/909Rim_amp01.wav
+perc,perc-02.wav,Tape909_Samples,Tape909_Samples/Perc/909rim.wav
+perc,perc-03.wav,Tape909_Samples,Tape909_Samples/Perc/909Rim_Sweet02.wav
+perc,perc-04.wav,Tape909_Samples,Tape909_Samples/Perc/909Rim_misc01.wav
+perc,perc-05.wav,Tape909_Samples,Tape909_Samples/Perc/909Rim_Sweet01.wav
 perc,perc-06.wav,bge,_SHAKERS/BGE_07_Shaker.wav
 perc,perc-07.wav,hiphop,_SHAKERS/HipHop-Shaker-UC shk 012.WAV
-perc,perc-08.wav,Freddie Joachim_Drum,Freddie Joachim_Drum/FJ_07_Tambourine_01.wav
-perc,perc-09.wav,F9_Drums,F9_Drums/A_Shakers/House-Shaker-F9 OR Shaker 08.WAV
-perc,perc-10.wav,Shades of Minimal Techno,Shades of Minimal Techno/Drum One-Shots/SHMT1_Perc08.wav
-perc,perc-11.wav,SAS121_Samplesound_Dimel_Minimal Tech House (b296f285726e),SAS121_Samplesound_Dimel_Minimal Tech House (b296f285726e)/Drum Hits/Single Percussion Hits/MT Percussion Hit 08.wav
-perc,perc-12.wav,AudioTent Minimal,AudioTent Minimal/Drum Hits/Perc/12 AT Mnml Percussion - Organic.wav
-perc,perc-13.wav,C2 Disco Samples,C2 Disco Samples/Drum Hits/Percussion/DSS_Percussion_One_Shot_17_Joe.wav
-perc,perc-14.wav,AudioTent_Revival,AudioTent_Revival/Drum Hits/Percussion/10 AT Revival Percussion - Tilt.wav
-perc,perc-15.wav,Dimel_Minimal Tech House ,Dimel_Minimal Tech House /Drum Hits/Single Percussion Hits/MT Percussion Hit 01.wav
-perc,perc-16.wav,Analog Drums 808,Analog Drums 808/09_HConga_808.wav
-perc,perc-17.wav,DX7,DX7/Inst-Percussion-DX7 Tine-081 A4.WAV
-perc,perc-18.wav,5PIN_One_Shott,5PIN_One_Shott/Drum_&_Perc/Perc/HTM2_Perc_29.wav
-perc,perc-19.wav,Maribou State_Drum,Maribou State_Drum/MBS_08_Perc_02.wav
-perc,perc-20.wav,Toolroom Trademark,Toolroom Trademark/SINGLE HITS/PERC/TA_MK_PERC_7.wav
+perc,perc-08.wav,f9,_SHAKERS/House-Shaker-F9 OR Shaker 04.WAV
+perc,perc-09.wav,that,_HATS/011 THAT cowbell C.wav
+perc,perc-10.wav,misc,_SHAKERS/014 Shaker 3.wav
+perc,perc-11.wav,like,_HATS/015 Hat Shaker-like.wav
+perc,perc-12.wav,t,_KICKS/T_AH_kick_oneshot_percos.wav
+perc,perc-13.wav,Gabe Miller Sample Pack ,Gabe Miller Sample Pack /03 GM_Hats and Cymbals/015 Hat Shaker-like.wav
+perc,perc-14.wav,LOFI Drums V.6,LOFI Drums V.6/Percs/perc-9.wav
+perc,perc-15.wav,Analog Drums 909,Analog Drums 909/08_Rim_TAccent_909.wav
+perc,perc-16.wav,Maribou State_Drum,Maribou State_Drum/MBS_08_Perc_02.wav
+perc,perc-17.wav,DX7,DX7/Inst-Percussion-DX7 Tine-086 D5.WAV
+perc,perc-18.wav,DC_Grope,DC_Grope/TD1_12_Percussion01.wav
+perc,perc-19.wav,SPLICE_DUMP,SPLICE_DUMP/PERC_ONESHOT/12_MT_Perc.wav
+perc,perc-20.wav,DABRO  Deephaus ,DABRO  Deephaus /DRUM_HITS/PERCS/Perc_03_DBR_DV2.wav

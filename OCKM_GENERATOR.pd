@@ -217,7 +217,7 @@
 #X obj 990 542 *~ 0;
 #X obj 1060 542 throw~ ockm-dlybus;
 #X obj 990 522 r ockm-d5-delay;
-#X text 20 582 d6 rimshot;
+#X text 20 582 d6 perc-2;
 #X obj 110 580 ockm-row d6;
 #X obj 560 582 ockm-drum d6;
 #X obj 660 582 ockm-gate d6 nolevel;
@@ -227,7 +227,7 @@
 #X obj 990 582 *~ 0;
 #X obj 1060 582 throw~ ockm-dlybus;
 #X obj 990 562 r ockm-d6-delay;
-#X text 20 622 d7 rim;
+#X text 20 622 d7 perc-1;
 #X obj 110 620 ockm-row d7;
 #X obj 560 622 ockm-drum d7;
 #X obj 660 622 ockm-gate d7 nolevel;
@@ -248,7 +248,7 @@
 #X obj 1060 662 throw~ ockm-dlybus;
 #X obj 990 642 r ockm-d8-delay;
 #N canvas 300 200 940 360 drum-settings 0;
-#X text 20 10 Drum slots. Sound 0 kick 1 snare 2 clap 3 rim 4 closed hat 5 open hat 6 tom 7 rimshot. Tune in semitones \, decay in % (100 = normal) \, level 0 to 1.;
+#X text 20 10 Drum slots. Sound 0 kick 1 snare 2 clap 3 perc-1 4 closed hat 5 open hat 6 tom 7 perc-2. Tune in semitones \, decay in % (100 = normal) \, level 0 to 1.;
 #X obj 20 40 loadbang;
 #X text 20 80 d1;
 #X obj 70 62 r ockm-show-d1-sound;

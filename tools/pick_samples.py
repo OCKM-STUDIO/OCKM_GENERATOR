@@ -7,7 +7,7 @@ DST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "samples")
 COPY = "--copy" in sys.argv
 PER, CAP, TAPE = 20, 3, 5
 TAPEPAT = re.compile(r"^909\w*?_(orig|tape|tapesat|x|tech\d+|amp\d+|misc\d+|sweet\d+)\.wav$", re.I)
-MAXLEN = {"kick": 1.6, "snare": 1.6, "clap": 1.6, "hat": 0.9, "open-hat": 2.5, "tom": 2.0, "rim": 1.2, "perc": 1.5}
+MAXLEN = {"kick": 1.6, "snare": 1.6, "clap": 1.6, "hat": 0.9, "open-hat": 2.5, "tom": 2.0, "perc": 1.5}
 BAD = re.compile(r"loop|bpm|\bfill|roll|no kick|with |groove|break|phrase|\d{2,3} ?bpm|top|full|beat|chop|vox|vocal|fx\b|riser|sweep|reverse", re.I)
 def wav_len(p):
     try:
@@ -33,8 +33,8 @@ def kind(name, path):
     m = re.match(r"909(bd|sd|snr|ohh|oh|hh|ht|mt|lt|tom|rim|clap|cym)", n)
     if m:
         return {"bd":"kick","sd":"snare","snr":"snare","ohh":"open-hat","oh":"open-hat","hh":"hat","ht":"tom","mt":"tom",
-                "lt":"tom","tom":"tom","rim":"rim","clap":"clap","cym":None}[m.group(1)]
-    if re.search(r"rim ?shot|side ?stick|sidestick|\brim\b|rim[_ -]|rim\d|\d+rim", n): return "rim"
+                "lt":"tom","tom":"tom","rim":"perc","clap":"clap","cym":None}[m.group(1)]
+    if re.search(r"rim ?shot|side ?stick|sidestick|\brim\b|rim[_ -]|rim\d|\d+rim", n): return "perc"
     if re.search(r"shaker|shkr|conga|bongo|cowbell|clave|tamb|perc|block|guiro|cabasa|timbale|agogo", n): return "perc"
     if re.search(r"open|\boh\b|_oh|ohh", n) and re.search(r"hat|hh|oh", n): return "open-hat"
     if re.search(r"kick|\bkik\b|kik[ _\d]|\bbd\b|bassdrum", n): return "kick"

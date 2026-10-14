@@ -72,7 +72,7 @@
 #X connect 6 1 7 0;
 #X connect 6 0 1 1;
 #X restore 300 100 pd s3;
-#X text 300 125 3 rim;
+#X text 300 125 3 perc;
 #N canvas 0 0 420 160 s4 0;
 #X obj 20 20 inlet;
 #X obj 20 50 spigot;
@@ -144,7 +144,7 @@
 #X connect 6 1 7 0;
 #X connect 6 0 1 1;
 #X restore 660 100 pd s7;
-#X text 660 125 7 rimshot;
+#X text 660 125 7 perc;
 #X obj 30 200 +~;
 #X obj 30 200 +~;
 #X obj 30 200 +~;

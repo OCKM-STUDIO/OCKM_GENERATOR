@@ -147,7 +147,7 @@ tonal_voice("voices/ockm-perc.pd","Perc: a 909-style rimshot. Two woody tones pl
 
 # ---------------- drum slot: any of the 8 drum sounds ----------------
 SOUNDS=["ockm-kick","ockm-snare","ockm-clap","ockm-rim","ockm-hat","ockm-ohat","ockm-tom","ockm-perc"]
-SOUND_NAMES=["kick","snare","clap","rim","closed hat","open hat","tom","rimshot"]
+SOUND_NAMES=["kick","snare","clap","perc 1","closed hat","open hat","tom","perc 2"]
 p=P()
 p.add("#X text 20 10 Drum slot: plays one of the 8 drum sounds (ockm-<slot>-sound 0-7). Only the chosen sound runs.;")
 inl=p.add("#X obj 30 50 inlet;")
@@ -367,7 +367,7 @@ for r,(nm,snd) in enumerate(SLOTS):
     p.con(v,0,ds,0); p.con(ds,0,dt_,0); p.con(dr_,0,ds,1)
 # drum settings subpatch
 sub=P()
-sub.add("#X text 20 10 Drum slots. Sound 0 kick 1 snare 2 clap 3 rim 4 closed hat 5 open hat 6 tom 7 rimshot. Tune in semitones \\, decay in % (100 = normal) \\, level 0 to 1.;")
+sub.add("#X text 20 10 Drum slots. Sound 0 kick 1 snare 2 clap 3 perc-1 4 closed hat 5 open hat 6 tom 7 perc-2. Tune in semitones \\, decay in % (100 = normal) \\, level 0 to 1.;")
 slb=sub.add("#X obj 20 40 loadbang;")
 for i,(nm,snd) in enumerate(SLOTS):
     y=80+i*30
@@ -830,23 +830,23 @@ PROGS=[("one-chord","i",[(0,1)]),("vamp","i iv",[(0,1),(3,1)]),("dub-techno","i 
        ("andalusian","i VII VI V",[(0,1),(6,1),(5,1),(4,1)]),("trip-hop","i VII VI v",[(0,2),(6,2),(5,2),(4,2)]),
        ("soul","ii V I",[(1,1),(4,1),(0,2)])]
 # drum grooves: one 16-step line per drum sound (x hit, X accent). Swing 0 = leave it as it is.
-# sounds: kick snare clap rim hat open-hat tom rimshot. A groove lands on whichever slot plays that sound.
+# sounds: kick snare clap perc1 hat open-hat tom perc2. A groove lands on whichever slot plays that sound.
 GROOVES=[
  ("four-floor",56,dict(kick="X...X...X...X...",clap="....x.......x...",hat="..x...x...x...x.")),
  ("house",56,dict(kick="X...x...X...x...",clap="....X.......X...",ohat="..x...x...x...x.",hat=".x.x.x.x.x.x.x.x")),
- ("deep-house",58,dict(kick="X...x...X...x...",clap="....x.......x...",ohat="..x...x...x...x.",rim=".x....x..x....x.",hat="x...x...x...x...")),
- ("tech-house",54,dict(kick="X...x...X...x...",clap="....X.......X...",ohat="..X...X...X...X.",hat="xx.xxx.xxx.xxx.x",rim="...x..x....x..x.",tom=".......x........")),
- ("minimal",54,dict(kick="X...x...X...x...",rim="...x..x...x..x..",hat=".x.x.x.x.x.x.x.x",clap="............x...",tom=".........x......")),
- ("techno",50,dict(kick="X...X...X...X...",ohat="..x...x...x...x.",hat="xx.xxx.xxx.xxx.x",clap="....x.......x...",rimshot="...x......x.....")),
- ("dub-techno",54,dict(kick="X...x...X...x...",rim="...x.....x....x.",ohat="..x...x...x...x.",hat="x.x.x.x.x.x.x.x.")),
- ("garage",64,dict(kick="X.......x.x.....",snare="....X.......X...",hat="x.xxx.x.x.xxx.x.",rim="......x......x..",ohat="..x.......x.....")),
+ ("deep-house",58,dict(kick="X...x...X...x...",clap="....x.......x...",ohat="..x...x...x...x.",perc1=".x....x..x....x.",hat="x...x...x...x...")),
+ ("tech-house",54,dict(kick="X...x...X...x...",clap="....X.......X...",ohat="..X...X...X...X.",hat="xx.xxx.xxx.xxx.x",perc1="...x..x....x..x.",tom=".......x........")),
+ ("minimal",54,dict(kick="X...x...X...x...",perc1="...x..x...x..x..",hat=".x.x.x.x.x.x.x.x",clap="............x...",tom=".........x......")),
+ ("techno",50,dict(kick="X...X...X...X...",ohat="..x...x...x...x.",hat="xx.xxx.xxx.xxx.x",clap="....x.......x...",perc2="...x......x.....")),
+ ("dub-techno",54,dict(kick="X...x...X...x...",perc1="...x.....x....x.",ohat="..x...x...x...x.",hat="x.x.x.x.x.x.x.x.")),
+ ("garage",64,dict(kick="X.......x.x.....",snare="....X.......X...",hat="x.xxx.x.x.xxx.x.",perc1="......x......x..",ohat="..x.......x.....")),
  ("breakbeat",54,dict(kick="X.x.......xx....",snare="....X..x.x..X..x",hat="x.x.x.x.x.x.x.x.")),
  ("boom-bap",62,dict(kick="X......x..x.....",snare="....X.......X...",hat="x.x.x.x.x.x.x.x.",ohat="..............x.")),
- ("trip-hop",60,dict(kick="X.........x.....",snare="....X.......X...",hat="x...x.x.x...x.x.",rim="..x.......x.....",tom=".............x..")),
+ ("trip-hop",60,dict(kick="X.........x.....",snare="....X.......X...",hat="x...x.x.x...x.x.",perc1="..x.......x.....",tom=".............x..")),
  ("electro",50,dict(kick="X.....x...x.....",clap="....X.......X...",hat="xxxxxxxxxxxxxxxx",tom="..........x..x..")),
  ("clear",0,dict()),
 ]
-_SND=["kick","snare","clap","rim","hat","ohat","tom","rimshot"]
+_SND=["kick","snare","clap","perc1","hat","ohat","tom","perc2"]
 def _groove_line(sw,parts):
     for k,v in parts.items(): assert k in _SND and len(v)==16, (k,v)
     vals=[]
@@ -1582,15 +1582,15 @@ build_project(reset=args.reset_patterns, demo=args.demo)
 
 # ================= sample folders =================
 # One folder per drum sound. Drop WAV or AIFF files in; the drums will pick them up once sample playback is built.
-SAMPLE_DIRS=["kick","snare","clap","rim","hat","open-hat","tom","rimshot","perc"]
+SAMPLE_DIRS=["kick","snare","clap","perc","hat","open-hat","tom"]
 def build_samples():
     base=os.path.join(R,"samples")
     for d in SAMPLE_DIRS: os.makedirs(os.path.join(base,d),exist_ok=True)
     readme=os.path.join(base,"README.md")
-    if not os.path.exists(readme):
+    if True:  # always refresh the readme
         open(readme,"w").write("""# Samples
 
-One folder per drum sound: """+", ".join(SAMPLE_DIRS)+""".
+One folder per drum sound: """+", ".join(SAMPLE_DIRS)+""". Perc 1 and perc 2 both pick from the perc folder, so you can mix and match.
 
 - WAV or AIFF, 16 or 24 bit, 44.1 or 48 kHz. Mono is best for drums
 - Short one-shots, trimmed so the hit starts right at the beginning of the file

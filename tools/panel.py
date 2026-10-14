@@ -149,7 +149,7 @@ def build_panel(P, D, save_dir_save, SLOTS, SLOTN, show, theme="dark"):
         x0 = GX + 16 * SQ + 20
         for j, (param, lo, hi, nice) in enumerate([("level", 0, 1, "level"), ("tune", -12, 12, "tune"), ("decay", 10, 400, "decay"), ("verb", 0, 1, "reverb"), ("delay", 0, 1, "delay")]):
             hsl(x0 + j * 84, y + 9, 70, lo, hi, f"ockm-{nm}-{param}", show(f"ockm-{nm}-{param}"), nice if ri == 0 else "", h=10)
-    lab(GX, GY + 8 * (SQ + 4) + 10, "sound: kick snare clap rim hat open-hat tom rimshot", size=10)
+    lab(GX, GY + 8 * (SQ + 4) + 10, "sound: kick snare clap perc-1 hat open-hat tom perc-2", size=10)
 
     # ---------- synths ----------
     SY = 420

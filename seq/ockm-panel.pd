@@ -599,7 +599,7 @@
 #X obj 838 357 hsl 70 10 10 400 0 0 ockm-d8-decay ockm-show-d8-decay empty 0 -9 0 10 #2a2a2a #ff5a24 #7a7a7a 0 1;
 #X obj 922 357 hsl 70 10 0 1 0 0 ockm-d8-verb ockm-show-d8-verb empty 0 -9 0 10 #2a2a2a #ff5a24 #7a7a7a 0 1;
 #X obj 1006 357 hsl 70 10 0 1 0 0 ockm-d8-delay ockm-show-d8-delay empty 0 -9 0 10 #2a2a2a #ff5a24 #7a7a7a 0 1;
-#X obj 170 392 cnv 1 1 1 empty empty sound:\ kick\ snare\ clap\ rim\ hat\ open-hat\ tom\ rimshot 0 6 0 10 #141414 #7a7a7a 0;
+#X obj 170 392 cnv 1 1 1 empty empty sound:\ kick\ snare\ clap\ perc-1\ hat\ open-hat\ tom\ perc-2 0 6 0 10 #141414 #7a7a7a 0;
 #X obj 20 420 cnv 1 1 1 empty empty key 0 6 0 13 #141414 #ededed 0;
 #X obj 70 416 hradio 22 1 0 12 ockm-root ockm-show-root empty 0 -9 0 10 #2a2a2a #ededed #7a7a7a 0;
 #X obj 72 442 cnv 1 1 1 empty empty C 0 6 0 10 #141414 #7a7a7a 0;

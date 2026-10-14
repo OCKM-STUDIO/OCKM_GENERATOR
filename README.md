@@ -195,7 +195,7 @@ Everything is remembered: drum kit, synth sounds, effects, tempo, swing, key and
 | `seq/` | The old test panel (`ockm-panel`), plus sequencers and generators: drum row, mono pattern and generator (bass and lead), chord pattern and generator, the shared presets (`ockm-presets`) and MIDI clock |
 | `projects/` | One folder per project, named like `2026-10-14-velvet-heron`, each holding `project.txt` (tempo, effects, MIDI, accent, drum kit) and `p1.txt` to `p8.txt`. Each also holds `song.txt`, the song. `current.txt` names the one that opens at start-up. `default` is the blank starter |
 | `trash/` | Deleted projects. Empty it by hand when you're sure |
-| `samples/` | One folder per drum sound (kick, snare, clap, rim, hat, open-hat, tom, rimshot) for your own samples. Not saved to git |
+| `samples/` | One folder per drum sound (kick, snare, clap, perc, hat, open-hat, tom) for your own samples. Perc 1 and perc 2 share the perc folder. Not saved to git |
 | `sketches/` | Early experiments, kept for reference |
 | `tools/build.py` | Builds every `.pd` file (the panel's layout and colours are in `tools/panel.py`). Structural changes are made here, then the patch files are rebuilt |
 | `tests/run_tests.py` | Plays the patch headless and checks it still works (sounds, accents, patterns, swing, bass, effects, MIDI clock, both panels) |
@@ -307,7 +307,7 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 | `ockm-verb-mix` | Reverb return level, 0 to 1 |
 | `ockm-verb-size` | Reverb size, 0 (small room, about 0.4s) to 1 (big hall, about 3s) |
 | `ockm-verb-tone` | Reverb tone, 0 dark to 1 bright |
-| `ockm-<slot>-sound` | Which sound a drum slot plays: 0 kick, 1 snare, 2 clap, 3 rim, 4 closed hat, 5 open hat, 6 tom, 7 rimshot |
+| `ockm-<slot>-sound` | Which sound a drum slot plays: 0 kick, 1 snare, 2 clap, 3 perc 1, 4 closed hat, 5 open hat, 6 tom, 7 perc 2 |
 | `ockm-<slot>-verb` | How much of that slot goes to the reverb, 0 to 1 |
 | `ockm-<slot>-delay` | How much of that slot goes to the delay, 0 to 1 |
 | `ockm-<synth>-verb`, `ockm-<synth>-delay` | Reverb and delay sends for bass, lead and chord |
@@ -325,7 +325,7 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 
 ## Drums
 
-Eight drum slots, d1 to d8. Each slot can play any of 8 sounds: 0 kick, 1 snare, 2 clap, 3 rim, 4 closed hat, 5 open hat, 6 tom, 7 rimshot (the old cowbell is in `sketches/`). Only the chosen sound runs. The default line-up is kick, snare, clap, closed hat, open hat, rimshot, rim and tom.
+Eight drum slots, d1 to d8. Each slot can play any of 8 sounds: 0 kick, 1 snare, 2 clap, 3 perc 1, 4 closed hat, 5 open hat, 6 tom, 7 perc 2 (until sample playback lands, perc 1 is a short rim and perc 2 a 909-style rimshot; the old cowbell is in `sketches/`). Only the chosen sound runs. The default line-up is kick, snare, clap, closed hat, open hat, rimshot, rim and tom.
 
 Each step can be off, on or accented. Accented steps play at full strength. Normal steps play at full strength minus the accent amount. For now, accents are set with the `ockm-edit` hook. The squares show on or off only, until the touchscreen work.
 

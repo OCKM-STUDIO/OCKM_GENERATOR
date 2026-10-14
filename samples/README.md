@@ -1,6 +1,6 @@
 # Samples
 
-One folder per drum sound: kick, snare, clap, rim, hat, open-hat, tom, rimshot.
+One folder per drum sound: kick, snare, clap, perc, hat, open-hat, tom. Perc 1 and perc 2 both pick from the perc folder, so you can mix and match.
 
 - WAV or AIFF, 16 or 24 bit, 44.1 or 48 kHz. Mono is best for drums
 - Short one-shots, trimmed so the hit starts right at the beginning of the file

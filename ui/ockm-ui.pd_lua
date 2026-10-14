@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.34"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.35"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
@@ -33,9 +33,9 @@ local THEMES = {
 }
 
 local SLOTS   = { "d1","d2","d3","d4","d5","d6","d7","d8" }
-local SOUNDS  = { "kick","snare","clap","rim","closed hat","open hat","tom","rimshot" }
+local SOUNDS  = { "kick","snare","clap","perc 1","closed hat","open hat","tom","perc 2" }
 local START = { bass = "start the bass line", lead = "start a melody", chord = "start the chords" }
-local SHORT   = { "kick","snare","clap","rim","hat","open hat","tom","rimshot" }
+local SHORT   = { "kick","snare","clap","perc 1","hat","open hat","tom","perc 2" }
 local SYNTHS  = { "bass","lead","chord" }
 local TRACKS  = { "d1","d2","d3","d4","d5","d6","d7","d8","bass","lead","chord" }
 local NOTES   = { "C","C#","D","D#","E","F","F#","G","G#","A","A#","B" }

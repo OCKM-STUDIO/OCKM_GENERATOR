@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.35 (14 October 2026)
+
+- Rim and rimshot are now **perc 1** and **perc 2**. Both pick from one shared `samples/perc` folder, so you can mix and match
+- Sample folders filled from your library: 20 numbered one-shots per sound, with a batch from Tape909 in each (`tools/pick_samples.py`, sources listed in `samples/sources.csv`)
+- Until sample playback lands, perc 1 still plays the short rim synth and perc 2 the 909-style rimshot
+
 ## v0.34 (14 October 2026)
 
 **Changed**
