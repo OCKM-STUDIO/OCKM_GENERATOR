@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.41 (15 October 2026)
+
+- **Export** (project screen): the song or a pattern as a stereo mix, stems (drums, bass, lead, chords, effects) and/or a MIDI file
+- **Record what I play**: a live recording of the mix (and stems) until you stop it
+- Saves to the exports folder, or a USB stick when one is plugged in
+
 ## v0.40 (15 October 2026)
 
 - **Arrange**: on the song tab, turn pattern 1 into a whole track. Writes intro, groove, build, breakdown, drop B, key lift and outro variations into patterns 2-8, plus the song chain. Options for style, length, sections, builds, breakdowns, key lift and variation, and a surprise me button

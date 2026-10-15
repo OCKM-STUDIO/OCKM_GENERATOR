@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.40"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.41"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
@@ -78,6 +78,7 @@ local SPICE = { { 0, "triad" }, { 1, "7th" }, { 6, "9th" }, { 7, "11th" } }
 local FILLS = { "snare roll", "tom run", "drop", "build" }
 local GROOVES = { "four floor", "house", "deep house", "tech house", "minimal", "techno", "dub techno", "garage", "breakbeat", "boom bap", "trip hop", "electro", "clear", "chicago", "jackin", "disco", "soulful", "afro house", "lofi house", "2 step", "speed garage", "funky house", "ghetto house", "nu disco", "rolling", "detroit", "berlin", "industrial", "hypnotic", "acid techno", "think break", "jungle", "big beat", "downtempo", "one drop", "half time", "lofi hip hop" }
 local GROOVE_BANKS = { { "classics", 0 }, { "house + garage", 13 }, { "techno + breaks", 25 } }
+local CHORD_TYPES = { { 0, 2, 4, -1 }, { 0, 2, 4, 6 }, { 0, 1, 4, -1 }, { 0, 4, 7, -1 }, { 0, 3, 4, -1 }, { 0, 2, 4, 5 }, { 0, 2, 6, 8 }, { 0, 6, 8, 10 } }
 local PROG_SHAPES = { { { 0, 16 } }, { { 0, 16 }, { 3, 16 } }, { { 0, 48 }, { 6, 16 } }, { { 0, 16 }, { 3, 16 }, { 5, 16 }, { 4, 16 } }, { { 0, 8 }, { 5, 8 }, { 3, 8 }, { 4, 8 } }, { { 0, 16 }, { 5, 16 }, { 2, 16 }, { 6, 16 } }, { { 5, 16 }, { 6, 16 }, { 0, 32 } }, { { 0, 16 }, { 6, 16 }, { 5, 16 }, { 4, 16 } }, { { 0, 32 }, { 6, 32 }, { 5, 32 }, { 4, 32 } }, { { 1, 16 }, { 4, 16 }, { 0, 32 } } }
 -- END PRESETS
 local ROMAN = { "i","ii","iii","iv","v","vi","vii" }
@@ -95,9 +96,9 @@ end
 local UI_NOW
 local NOT_CHANGES = { ["ockm-play"]=1, ["ockm-want"]=1, ["ockm-page"]=1, ["ockm-save"]=1, ["ockm-revert"]=1, ["ockm-song-start"]=1,
   ["ockm-project-list"]=1, ["ockm-project-open"]=1, ["ockm-project-new"]=1, ["ockm-project-saveas"]=1, ["ockm-project-delete"]=1,
-  ["ockm-resync"]=1, ["ockm-filter"]=1, ["ockm-filter-glide"]=1, ["ockm-delay-throw"]=1 }
+  ["ockm-resync"]=1, ["ockm-usb-scan"]=1, ["ockm-exports-ask"]=1, ["ockm-mkdir"]=1, ["ockm-rec-stop"]=1, ["ockm-filter"]=1, ["ockm-filter-glide"]=1, ["ockm-delay-throw"]=1 }
 local function psend(name, sel, atoms)
-  if UI_NOW and not NOT_CHANGES[name] and not name:match("%-mute$") and not name:match("%-solo$") and not name:match("%-audition$")
+  if UI_NOW and not NOT_CHANGES[name] and not name:match("^ockm%-rec%-") and not name:match("%-mute$") and not name:match("%-solo$") and not name:match("%-audition$")
      and name ~= "ockm-samples-scan" then UI_NOW.unsaved = true end
   pd["send"](name, sel, atoms)
 end
@@ -208,7 +209,17 @@ function ui:postinitialize()
     for k = 1, #FOLDERS do o.scount[k] = math.floor(tonumber(a[k]) or 0) end
     o:dirty()
   end)
-  listen("ockm-patterns-exist",function(o, sel, a) o.exists = math.floor(tonumber(a[1]) or 1); o:dirty() end)
+  listen("ockm-exports-dir", function(o, sel, a) o.exports_dir = tostring(a[1]) end)
+  listen("ockm-usb-list-start", function(o) o.usb_in = {} end)
+  listen("ockm-usb-item", function(o, sel, a)
+    local pth = tostring(a[1]); local nm = pth:match("[^/]+$") or ""
+    if o.usb_in and not USB_SKIP[nm] and not nm:match("^com%.apple") then o.usb_in[#o.usb_in + 1] = pth end
+  end)
+  listen("ockm-usb-list-end", function(o) o.usb = o.usb_in or {}; o.usb_in = nil; o:dirty() end)
+  listen("ockm-playing", function(o, sel, a)
+    if o.exporting and o.exporting.song and (tonumber(a[1]) or 0) == 0 and not o.exporting.tail then o:export_end() end
+  end)
+  listen("ockm-patterns-exist", function(o, sel, a) o.exists = math.floor(tonumber(a[1]) or 1); o:dirty() end)
   for _, n in ipairs({ "ockm-saved", "ockm-revert", "ockm-project-name" }) do listen(n, function(o) o.unsaved = false; o:dirty() end) end
   listen("ockm-song-show", function(o, sel, a)
     local l = {}
@@ -246,6 +257,8 @@ function ui:postinitialize()
   self.msgclock = pd.Clock:new():register(self, "clear_msg")
   self.audclock = pd.Clock:new():register(self, "audition")
   self.jobclock = pd.Clock:new():register(self, "job_step")
+  self.expclock = pd.Clock:new():register(self, "export_end")
+  self.tickclock = pd.Clock:new():register(self, "tick")
 end
 
 -- play a drum slot once. After a sample change it waits a moment, so the new file is loaded first
@@ -279,6 +292,8 @@ function ui:finalize()
   if self.msgclock then self.msgclock:destruct() end
   if self.audclock then self.audclock:destruct() end
   if self.jobclock then self.jobclock:destruct() end
+  if self.expclock then self.expclock:destruct() end
+  if self.tickclock then self.tickclock:destruct() end
   for _, t in pairs(self.tables) do if t.destruct then t:destruct() end end
 end
 
@@ -360,6 +375,7 @@ function ui:layout()
   else self:layout_synth(add) end
   if self.sheet == "newpat" then self:layout_newpat(add) end
   if self.sheet == "arrange" then self:layout_arrange(add) end
+  if self.sheet == "export" then self:layout_export(add) end
   -- messages on screens that have no message line of their own
   if self.msg and (self.screen == "perform" or self.screen == "compose" or self.screen == "mixer" or self.screen == "song" or self.screen == "setup" or self.screen == "drums") then
     add{ kind="toast", x=W / 2 - 330, y=H - 50, w=660, h=38, label=self.msg }
@@ -392,8 +408,15 @@ function ui:layout_top(add)
       if self.screen ~= t[1] then self:open(t[1]) end
     end }
   end
+  if self.recording or self.exporting then
+    local x = self.recording or self.exporting
+    local secs = os.time() - x.t0
+    add{ kind="btn", x=W - 224, y=12, w=134, h=48, accent=true, label=string.format("%s %d:%02d  stop", self.recording and "rec" or "export", math.floor(secs / 60), secs % 60),
+         tap=function() if self.recording then self:record_stop() else self:export_cancel() end end }
+  else
   add{ kind="btn", x=W - 154, y=12, w=64, h=48, label=self.unsaved and "save •" or "save", accent=self.unsaved, tap=function()
     psend("ockm-save", "bang", {}); self:say("saved " .. ockm_pretty(self.project) .. ": all 8 patterns, the song and the kit") end }
+  end
   add{ kind="tab", x=W - 84, y=12, w=68, h=48, label="project", sel=(self.screen == "project"), tap=function()
     if self.screen ~= "project" then self:open("project") end
   end }
@@ -1271,6 +1294,285 @@ function ui:layout_arrange(add)
        tap=function() self.sheet = nil; self:arrange() end }
 end
 
+-- ------------------------------------------------------------------ export
+-- Audio (a stereo mix and/or stems: drums, bass, lead, chords, effects) is recorded as it plays, in real time.
+-- MIDI is written straight away from the patterns. Files go to the exports folder, or a USB stick when one is in.
+local STEM_NAMES = { "drums", "bass", "lead", "chord", "fx" }
+local GM_DRUM = { [0] = 36, [1] = 38, [2] = 39, [3] = 37, [4] = 42, [5] = 46, [6] = 45, [7] = 56 }   -- by sound
+local USB_SKIP = { ["Macintosh HD"] = 1, ["Recovery"] = 1, ["Data"] = 1, ["Preboot"] = 1, ["VM"] = 1, ["Update"] = 1 }
+
+function ui:exp_opts()
+  if not self.exp then self.exp = { what = 1, times = 2, mix = 1, stems = 0, midi = 0, dest = 1 } end
+  return self.exp
+end
+function ui:exp_dir()
+  local e = self:exp_opts()
+  if e.dest == 2 and self.usb and self.usb[1] then
+    local d = self.usb[1] .. "/OCKM_EXPORTS"
+    psend("ockm-mkdir", "symbol", { d })
+    return d, "your USB stick (" .. self.usb[1]:match("[^/]+$") .. ")"
+  end
+  return self.exports_dir or "exports", "the exports folder"
+end
+function ui:exp_name(what)
+  local n = (self.project or "ockm"):gsub("[^%w%-]", "-")
+  return n .. "-" .. what .. "-" .. os.date("%H%M%S")
+end
+-- open the writers for this take and start them together
+function ui:rec_open(dir, base, stems)
+  psend("ockm-rec-mix-open", "symbol", { dir .. "/" .. base .. ".wav" })
+  if stems then for _, st in ipairs(STEM_NAMES) do psend("ockm-rec-" .. st .. "-open", "symbol", { dir .. "/" .. base .. "-" .. st .. ".wav" }) end end
+end
+function ui:rec_start(stems)
+  psend("ockm-rec-mix-start", "bang", {})
+  if stems then for _, st in ipairs(STEM_NAMES) do psend("ockm-rec-" .. st .. "-start", "bang", {}) end end
+end
+function ui:tick() if self.recording or self.exporting then self:dirty(); self.tickclock:delay(500) end end
+
+-- live recording: whatever you play, from now until you stop it
+function ui:record_live()
+  local e = self:exp_opts()
+  local dir, where = self:exp_dir()
+  local base = self:exp_name("live")
+  self:rec_open(dir, base, e.stems > 0); self:rec_start(e.stems > 0)
+  self.recording = { t0 = os.time(), where = where, base = base }
+  self.tickclock:delay(500)
+  self:say("recording to " .. where .. ". Tap the red button to stop")
+end
+function ui:record_stop()
+  psend("ockm-rec-stop", "bang", {})
+  local r = self.recording; self.recording = nil
+  if r then self:say("saved " .. r.base .. ".wav to " .. r.where) end
+end
+
+-- export: MIDI first (instant for a pattern, a quick pass through the patterns for a song), then the audio as it plays
+function ui:export()
+  local e = self:exp_opts()
+  local song = e.what == 1 and #(self.song or {}) > 0
+  if self.playing ~= 0 then psend("ockm-play", "float", { 0 }) end
+  local dir, where = self:exp_dir()
+  self.exp_where = where
+  local jobs = {}
+  if e.midi > 0 then
+    local base = self:exp_name(song and "song" or "pattern")
+    if song then
+      local data, need, order = {}, {}, {}
+      for _, st in ipairs(self.song) do if not need[st[1]] then need[st[1]] = true; order[#order + 1] = st[1] end end
+      local back = self.cur or 0
+      for _, n in ipairs(order) do
+        jobs[#jobs + 1] = function() psend("ockm-want", "float", { n }) end
+        jobs[#jobs + 1] = function() data[n] = self:collect_pattern() end
+      end
+      jobs[#jobs + 1] = function()
+        psend("ockm-want", "float", { back })
+        local chain = {}
+        for _, st in ipairs(self.song) do chain[#chain + 1] = { data[st[1]], st[2] } end
+        self:write_midi(dir .. "/" .. base .. ".mid", chain)
+      end
+    else
+      jobs[#jobs + 1] = function() self:write_midi(dir .. "/" .. base .. ".mid", { { self:collect_pattern(), e.times } }) end
+    end
+  end
+  if e.mix > 0 or e.stems > 0 then
+    jobs[#jobs + 1] = function() self:export_audio(dir, song) end
+  else
+    jobs[#jobs + 1] = function() self:say("exported MIDI to " .. where) end
+  end
+  self.jobs = jobs; self.jobclock:delay(10)
+end
+function ui:export_audio(dir, song)
+  local e = self:exp_opts()
+  local base = self:exp_name(song and "song" or "pattern")
+  self:rec_open(dir, base, e.stems > 0)
+  self.exporting = { t0 = os.time(), song = song, base = base, loop = self.v["ockm-song-loop"] or 1, mode = self.v["ockm-song-mode"] or 0 }
+  self:rec_start(e.stems > 0)
+  if song then
+    psend("ockm-song-loop", "float", { 0 }); psend("ockm-song-mode", "float", { 1 })
+    psend("ockm-song-start", "float", { 0 })
+  else
+    psend("ockm-song-mode", "float", { 0 }); psend("ockm-play", "float", { 1 })
+    local bars = e.times * math.max(1, math.floor((self.v["ockm-len"] or 64) / 16))
+    self.expclock:delay(bars * 16 * 15000 / (self.v["ockm-bpm"] or 124))
+  end
+  self.tickclock:delay(500)
+end
+-- the pattern's time is up, or the song ended: stop, let the effects ring out, then close the files
+function ui:export_end()
+  local x = self.exporting
+  if not x then return end
+  if not x.tail then
+    x.tail = true
+    if self.playing ~= 0 then psend("ockm-play", "float", { 0 }) end
+    self.expclock:delay(2500)
+    return
+  end
+  psend("ockm-rec-stop", "bang", {})
+  psend("ockm-song-loop", "float", { x.loop }); psend("ockm-song-mode", "float", { x.mode })
+  self.exporting = nil
+  self:say("exported " .. x.base .. " to " .. (self.exp_where or "the exports folder"))
+end
+function ui:export_cancel()
+  if self.exporting then
+    psend("ockm-play", "float", { 0 }); psend("ockm-rec-stop", "bang", {})
+    psend("ockm-song-loop", "float", { self.exporting.loop }); psend("ockm-song-mode", "float", { self.exporting.mode })
+    self.exporting = nil; self:say("export stopped. The part already written is in the file")
+  end
+end
+
+-- everything MIDI needs from the pattern that's open
+function ui:collect_pattern()
+  local d = { len = math.floor(self.v["ockm-len"] or 64), root = math.floor(self.v["ockm-root"] or 9), scale = self:scale(),
+              ctype = math.floor(self.v["ockm-chord-type"] or 0), smooth = (self.v["ockm-chord-smooth"] or 1) > 0,
+              loop = math.floor(self.v["ockm-drum-loop"] or 0), on = {}, drums = {}, mono = {}, chord = {} }
+  for _, t in ipairs(SYNTHS) do d.on[t] = (self.v["ockm-"..t.."-on"] or 1) > 0 end
+  for _, nm in ipairs(SLOTS) do
+    local sl = { sound = math.floor(self.v["ockm-"..nm.."-sound"] or 0), v = {}, n = {} }
+    for st = 0, d.len - 1 do sl.v[st] = self:get("ockm-pat-"..nm, st); sl.n[st] = self:get("ockm-pat-"..nm.."-nudge", st) end
+    d.drums[nm] = sl
+  end
+  for _, part in ipairs({ "bass", "lead" }) do
+    local m = {}
+    for st = 0, d.len - 1 do
+      m[st] = { note = self:get("ockm-pat-"..part.."-note", st), on = self:get("ockm-pat-"..part.."-on", st),
+                acc = self:get("ockm-pat-"..part.."-acc", st), slide = self:get("ockm-pat-"..part.."-slide", st) }
+    end
+    d.mono[part] = m
+  end
+  for st = 0, d.len - 1 do d.chord[st] = { on = self:get("ockm-pat-chord-on", st), deg = self:get("ockm-pat-chord-deg", st) } end
+  return d
+end
+-- a chord's notes, worked out the way the chord sequencer does it
+local function chord_notes(d, deg)
+  local rox = (d.root <= 7) and (48 + d.root) or (36 + d.root)
+  local ty = CHORD_TYPES[d.ctype + 1] or CHORD_TYPES[1]
+  local out = {}
+  for k = 1, 4 do
+    if ty[k] >= 0 then
+      local a = math.floor(deg) + ty[k]
+      local n = rox + 12 * math.floor(a / 7) + d.scale[(a % 7) + 1]
+      if d.smooth then n = n - 12 * math.floor((n - rox) / 12) end
+      out[#out + 1] = n
+    end
+  end
+  return out
+end
+local function vlq(n)
+  local b = { n % 128 }
+  n = math.floor(n / 128)
+  while n > 0 do table.insert(b, 1, 128 + n % 128); n = math.floor(n / 128) end
+  return string.char(table.unpack(b))
+end
+local function be(n, bytes) local t = {} for i = bytes - 1, 0, -1 do t[#t + 1] = math.floor(n / 256 ^ i) % 256 end return string.char(table.unpack(t)) end
+local function track_chunk(name, ev)
+  table.sort(ev, function(a, b) if a[1] ~= b[1] then return a[1] < b[1] end return a[3] < b[3] end)   -- note offs first at the same time
+  local out, last = { "\0\255\3" .. vlq(#name) .. name }, 0
+  for _, e in ipairs(ev) do out[#out + 1] = vlq(e[1] - last) .. e[2]; last = e[1] end
+  out[#out + 1] = "\0\255\47\0"
+  local body = table.concat(out)
+  return "MTrk" .. be(#body, 4) .. body
+end
+-- chain: { { pattern data, repeats }, ... }. 96 ticks a beat, so a step is 24
+function ui:write_midi(path, chain)
+  local Q = 24
+  local tr = { drums = {}, bass = {}, lead = {}, chord = {} }
+  local function note(list, ch, t, n, vel, dur)
+    if t < 0 then t = 0 end
+    list[#list + 1] = { t, string.char(0x90 + ch, n, vel), 1 }
+    list[#list + 1] = { t + dur, string.char(0x80 + ch, n, 0), 0 }
+  end
+  local t0 = 0
+  for _, link in ipairs(chain) do
+    local d, reps = link[1], link[2]
+    for _ = 1, reps do
+      for _, sl in pairs(d.drums) do
+        for st = 0, d.len - 1 do
+          local i = (d.loop > 0) and (st % d.loop) or st
+          local v = sl.v[i] or 0
+          if v > 0 then
+            local vel = clamp(math.floor(self:drum_vel(v) * 127 + 0.5), 1, 127)
+            note(tr.drums, 9, t0 + st * Q + math.floor((sl.n[i] or 0) * Q + 0.5), GM_DRUM[sl.sound] or 36, vel, 12)
+          end
+        end
+      end
+      for ch, part in ipairs({ "bass", "lead" }) do
+        if d.on[part] then
+          local m = d.mono[part]
+          for st = 0, d.len - 1 do
+            if m[st].on > 0 then
+              local dur = (st + 1 < d.len and m[st + 1].on > 0 and m[st + 1].slide > 0) and (Q + 2) or (Q - 4)
+              note(tr[part], ch - 1, t0 + st * Q, clamp(math.floor(m[st].note), 0, 127), (m[st].acc > 0) and 120 or 92, dur)
+            end
+          end
+        end
+      end
+      if d.on.chord then
+        for st = 0, d.len - 1 do
+          local c = d.chord[st]
+          if c.on > 0 then
+            local nx = st + 1
+            while nx < d.len and nx - st < 16 and d.chord[nx].on <= 0 do nx = nx + 1 end
+            for _, n in ipairs(chord_notes(d, c.deg)) do note(tr.chord, 2, t0 + st * Q, clamp(n, 0, 127), (c.on > 1) and 120 or 95, (nx - st) * Q - 2) end
+          end
+        end
+      end
+      t0 = t0 + d.len * Q
+    end
+  end
+  local tempo = math.floor(60000000 / (self.v["ockm-bpm"] or 124))
+  local head = track_chunk("OCKM_GENERATOR", { { 0, "\255\81\3" .. be(tempo, 3), 0 }, { 0, "\255\88\4\4\2\24\8", 0 } })
+  local body = { head, track_chunk("drums", tr.drums), track_chunk("bass", tr.bass), track_chunk("lead", tr.lead), track_chunk("chords", tr.chord) }
+  local f = io.open(path, "wb")
+  if not f then self:say("couldn't write " .. path); return end
+  f:write("MThd" .. be(6, 4) .. be(1, 2) .. be(#body, 2) .. be(96, 2) .. table.concat(body)); f:close()
+  self.last_midi = path
+end
+
+function ui:layout_export(add)
+  local e = self:exp_opts()
+  add{ kind="zone", x=0, y=0, w=W, h=H, tap=function() end }
+  local x, y, w, h = 24, 56, W - 48, H - 72
+  add{ kind="sheet", x=x, y=y, w=w, h=h }
+  add{ kind="text", x=x + 20, y=y + 16, w=w - 40, h=20, label="Export", size=18, col="txt" }
+  add{ kind="text", x=x + 20, y=y + 42, w=w - 40, h=12, size=11,
+       label="Audio is recorded as it plays (you'll hear it). MIDI is written straight away." }
+  local lx, cx = x + 20, x + 150
+  local function row(yy, label, list, cur, fn, wd)
+    add{ kind="text", x=lx, y=yy + 10, w=120, h=12, label=label, size=11 }
+    for i, it in ipairs(list) do
+      add{ kind="choice", x=cx + (i - 1) * ((wd or 150) + 6), y=yy, w=wd or 150, h=32, small=true, label=it, sel=(cur == i), tap=function() fn(i) end }
+    end
+  end
+  local has_song = #(self.song or {}) > 0
+  if not has_song then e.what = 2 end
+  row(y + 70, "what", { has_song and "the song" or "the song (empty)", "this pattern" }, e.what, function(i) if i == 1 and not has_song then return end e.what = i end, 180)
+  if e.what == 2 then
+    local times = { 1, 2, 4, 8 }
+    local labs = {}; for i, t in ipairs(times) do labs[i] = (t == 1) and "once" or (t .. " times") end
+    local cur = 1; for i, t in ipairs(times) do if t == e.times then cur = i end end
+    row(y + 110, "plays", labs, cur, function(i) e.times = times[i] end, 100)
+  end
+  add{ kind="text", x=lx, y=y + 160, w=120, h=12, label="files", size=11 }
+  for i, f in ipairs({ { "mix", "stereo mix (WAV)" }, { "stems", "stems (5 WAVs)" }, { "midi", "MIDI (.mid)" } }) do
+    local on = (e[f[1]] or 0) > 0
+    add{ kind="choice", x=cx + (i - 1) * 226, y=y + 150, w=220, h=32, small=true, accent=true, label=f[2], sel=on, tap=function() e[f[1]] = on and 0 or 1 end }
+  end
+  local usb = self.usb and self.usb[1]
+  if e.dest == 2 and not usb then e.dest = 1 end
+  row(y + 200, "save to", { "exports folder", usb and ("USB: " .. usb:match("[^/]+$")) or "USB (none found)" }, e.dest,
+      function(i) if i == 2 and not usb then psend("ockm-usb-scan", "bang", {}); return end e.dest = i end, 220)
+  add{ kind="text", x=lx, y=y + 250, w=w - 40, h=12, size=11,
+       label="Stems: drums, bass, lead, chords and effects, each on its own (before the master filter and drive)." }
+  add{ kind="text", x=lx, y=y + 270, w=w - 40, h=12, size=11,
+       label="The MIDI file has a track each for drums (GM drum notes, channel 10), bass, lead and chords." }
+  local any = (e.mix + e.stems + e.midi) > 0
+  local by = y + h - 64
+  add{ kind="btn", x=lx, y=by, w=220, h=48, label="record what I play", tap=function()
+         self.sheet = nil; self:record_live() end }
+  add{ kind="btn", x=x + w - 20 - 160, y=by, w=160, h=48, label="cancel", quiet=true, tap=function() self.sheet = nil end }
+  add{ kind="btn", x=x + w - 20 - 160 - 12 - 200, y=by, w=200, h=48, accent=any, disabled=not any, label="export",
+       tap=function() if any then self.sheet = nil; self:export() end end }
+end
+
 function ui:layout_song(add)
   local song = self.song or {}
   local sel = clamp(self.song_sel or 0, 0, math.max(0, #song - 1))
@@ -1439,7 +1741,7 @@ function ui:layout_project(add)
   add{ kind="text", x=16, y=80, w=300, h=12, label="open now", size=10 }
   add{ kind="text", x=16, y=96, w=W - 32, h=24, label=ockm_pretty(cur), size=22, col="txt" }
   add{ kind="text", x=16, y=130, w=W - 32, h=14, label=self.msg or "8 patterns, plus the drum kit, tempo and effects", size=11, col=self.msg and "acc" or nil }
-  local bw = (W - 32 - 3 * 8) / 4
+  local bw = (W - 32 - 4 * 8) / 5
   local acts = {
     { "save", function() psend("ockm-save", "bang", {}); self:say("saved " .. ockm_pretty(cur) .. ": all 8 patterns, the song and the kit") end },
     { "back to last save", function() psend("ockm-revert", "bang", {}); self:say("back to the last save of " .. ockm_pretty(cur)) end },
@@ -1449,9 +1751,10 @@ function ui:layout_project(add)
     { "new blank project", function()
         local n = self:new_name(); self.exists = 1; psend("ockm-project-new", "symbol", { n }); psend("ockm-project-list", "bang", {})
         self.pick = nil; self:say("new project: " .. ockm_pretty(n) .. ". The last one stays as you last saved it") end },
+    { "export...", function() psend("ockm-usb-scan", "bang", {}); psend("ockm-exports-ask", "bang", {}); self.sheet = "export" end },
   }
   for i, a in ipairs(acts) do
-    add{ kind="btn", x=16 + (i - 1) * (bw + 8), y=152, w=bw, h=52, label=a[1], accent=(i == 4), tap=a[2] }
+    add{ kind="btn", x=16 + (i - 1) * (bw + 8), y=152, w=bw, h=52, label=a[1], accent=(i == 4 or i == 5), tap=a[2] }
   end
   -- every project, newest first
   local list = self.projects or {}

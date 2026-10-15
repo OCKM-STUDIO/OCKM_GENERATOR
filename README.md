@@ -147,7 +147,7 @@ Everything is remembered: drum kit, synth sounds, effects, tempo, swing, key and
 11. ~~8 drum slots, chord and lead synth tracks~~ (v0.10)
 12. ~~One central settings store: projects, patterns and the drum kit, saved and restored~~ (v0.11)
 13. ~~Your drum samples, chosen per slot~~ (v0.36). Later: load sample folders from a USB stick or SD card on the Pi
-14. ~~Song mode, MPC style~~ (v0.26). ~~Arrange: turn pattern 1 into a whole track~~ (v0.40). Next: export
+14. ~~Song mode, MPC style~~ (v0.26). ~~Arrange: turn pattern 1 into a whole track~~ (v0.40). ~~Export: mix, stems, MIDI and live recording~~ (v0.41)
 15. ~~A usability pass~~ (v0.26). Keep going after each round of playing
 16. ~~A setup screen for tempo, swing, accents, volume and MIDI clock~~ (v0.26)
 
@@ -436,6 +436,18 @@ On the song tab, **arrange...** turns pattern 1 (your groove) into a whole track
 **Surprise me** picks the options at random. If patterns 2 to 8 already have something in, arrange says so first; back to last save undoes it.
 
 Two settings it uses are useful by hand too: **part on/off** (on each synth tab: the part plays in this pattern or doesn't) and **rise** (on perform, by the filter: the high-pass climbs across this pattern and drops back on the next).
+
+## Export
+
+On the project screen, **export...** opens the export sheet.
+
+- **What:** the song, or this pattern played once, 2, 4 or 8 times
+- **Files:** a stereo mix (24-bit WAV), stems (drums, bass, lead, chords and the effects returns, each its own WAV, before the master filter and drive), and a MIDI file (type 1: drums on channel 10 with General MIDI drum notes, bass on 1, lead on 2, chords on 3; velocity and micro timing included)
+- **Save to:** the `exports` folder (on the Pi, that's on its SD card), or a USB stick when one is plugged in (into an `OCKM_EXPORTS` folder on it)
+
+Audio is recorded as it plays, so you hear the export; the effects get 2.5 seconds to ring out at the end. A red **export / stop** button replaces save while it runs. **Record what I play** records the mix (and stems, if chosen) from now until you tap the red **rec / stop** button, tweaks and all.
+
+`exports/` isn't saved to git.
 
 ## Generators
 

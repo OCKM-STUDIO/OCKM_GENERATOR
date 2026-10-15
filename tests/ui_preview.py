@@ -103,6 +103,7 @@ SHOTS = [
     ("project", ["test tap 910 36", "test tap 600 261"]),                              # project screen, pick an older project
     ("song", ["test tap 759 36", "test tap 640 282", "test tap 727 282", "test tap 727 282", "test tap 640 332", "test tap 380 199", "test tap 380 199", "test tap 380 199"]),
     ("setup", ["test tap 150 36"]),
+    ("export", ["test tap 910 36", "test tap 854 178"]),                                    # project screen, export...
     ("arrange", ["test tap 759 36", "test tap 348 570"]),                                   # song tab, open arrange
     ("new-pattern", ["test tap 276 36", "test tap 441 88"]),             # perform, then + next to the patterns
     ("bass-manual", ["test tap 483 36", "test tap 900 283", "test tap 89 158"]),      # switch to manual, then edit step 2

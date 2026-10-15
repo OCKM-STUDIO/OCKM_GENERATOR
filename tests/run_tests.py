@@ -643,7 +643,7 @@ def touchscreen_screens_draw(work):
         raise Skip("Pillow not installed")
     p = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_preview.py"), os.path.join(work, "preview")], capture_output=True, text=True)
     assert p.returncode == 0, p.stderr[-800:]
-    assert len(os.listdir(os.path.join(work, "preview"))) == 20, "expected twenty screen pictures"
+    assert len(os.listdir(os.path.join(work, "preview"))) == 21, "expected twenty-one screen pictures"
 
 @test
 def mute_solo_and_levels(work):
@@ -1071,7 +1071,7 @@ def touchscreen_makes_and_opens_projects(work):
     h = Harness(); h.show("ockm-project-name", "ockm-project-new", "ockm-project-open")
     tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
     tap(150, 910, 36)                    # project screen
-    tap(200, 831, 178)                   # new blank project
+    tap(200, 667, 178)                   # new blank project
     f = os.path.join(work, "t_touchproj.pd"); h.finish(400, f)
     out = run(work, f)
     errs = [l for l in out.splitlines() if "error" in l.lower() and "current.txt" not in l]
@@ -1206,6 +1206,69 @@ def touchscreen_arranges_a_track(work):
     assert last("ockm-root", 6) == 11, f"the key lift (pattern 7) is 2 semitones up from A: {last('ockm-root', 6)}"
     sn = printed(out, "SNARE")
     assert sn[0] == sn[-1], f"pattern 1 should be untouched: {sn[0]} then {sn[-1]}"
+
+@test
+def touchscreen_exports_audio_stems_and_midi(work):
+    """Project screen, export: this pattern once, with the mix, stems and MIDI. The WAVs have sound in them,
+    and the MIDI file is a proper type 1 file with drums on channel 10 and notes for each part."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness()
+    h.at(100, "ockm-bass-gen bang ; ockm-chord-gen bang ; ockm-bpm 160")
+    h.at(300, "ockm-ui-test tap 910 36")      # project
+    h.at(400, "ockm-ui-test tap 854 178")     # export...
+    h.at(500, "ockm-ui-test tap 450 142")     # this pattern
+    h.at(600, "ockm-ui-test tap 224 182")     # once
+    h.at(700, "ockm-ui-test tap 510 222")     # stems on
+    h.at(800, "ockm-ui-test tap 736 222")     # MIDI on
+    h.at(900, "ockm-ui-test tap 644 544")     # export
+    f = os.path.join(work, "t_export.pd"); h.finish(6500, f)
+    run(work, f, timeout=60)
+    ex = os.path.join(work, "exports")
+    files = sorted(os.listdir(ex)) if os.path.isdir(ex) else []
+    wavs = [n for n in files if n.endswith(".wav")]
+    mids = [n for n in files if n.endswith(".mid")]
+    assert len(wavs) == 6, f"expected the mix and 5 stems: {files}"
+    mix = [n for n in wavs if not any(n.endswith(f"-{s}.wav") for s in ["drums", "bass", "lead", "chord", "fx"])][0]
+    w = wave.open(os.path.join(ex, mix)); assert w.getnchannels() == 2 and w.getsampwidth() == 3, "the mix should be 24-bit stereo"
+    secs = w.getnframes() / w.getframerate()
+    assert 3.0 < secs < 6.5, f"one bar at 160 bpm plus the tail should be about 4 seconds: {secs:.1f}"
+    raw = w.readframes(w.getnframes()); w.close()
+    loud = max(abs(int.from_bytes(raw[i:i + 3], "little", signed=True)) for i in range(0, len(raw), 6 * 50))
+    assert loud > 100000, "the mix is silent"
+    assert len(mids) == 1, f"expected one MIDI file: {files}"
+    m = open(os.path.join(ex, mids[0]), "rb").read()
+    assert m[:4] == b"MThd" and m[8:10] == b"\x00\x01" and m[10:12] == b"\x00\x05", "MIDI header: type 1, 5 tracks"
+    assert m.count(b"MTrk") == 5
+    assert b"\x99" in m, "drum notes on channel 10"
+    assert b"\x90" in m and b"\x92" in m, "bass (channel 1) and chords (channel 3) notes"
+
+@test
+def touchscreen_exports_a_song_and_records_live(work):
+    """Export the song (2 bars at 160 bpm): it stops by itself at the end and lets the effects ring out.
+    Then 'record what I play': recording runs until the red stop button."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness()
+    h.at(100, "ockm-bass-gen bang ; ockm-bpm 160 ; ockm-song-list 0 1 1 1")
+    h.at(300, "ockm-ui-test tap 910 36"); h.at(400, "ockm-ui-test tap 854 178")   # project, export...
+    h.at(500, "ockm-ui-test tap 264 142")     # the song
+    h.at(600, "ockm-ui-test tap 644 544")     # export (stereo mix)
+    h.at(8000, "ockm-ui-test tap 910 36"); h.at(8100, "ockm-ui-test tap 854 178")
+    h.at(8200, "ockm-ui-test tap 154 544")    # record what I play
+    h.at(8300, "ockm-play 1")
+    h.at(9800, "ockm-ui-test tap 803 36")     # stop recording
+    f = os.path.join(work, "t_export_song.pd"); h.finish(10200, f)
+    run(work, f, timeout=60)
+    ex = os.path.join(work, "exports")
+    files = sorted(os.listdir(ex)) if os.path.isdir(ex) else []
+    song = [n for n in files if "-song-" in n and n.endswith(".wav")]
+    live = [n for n in files if "-live-" in n and n.endswith(".wav")]
+    assert len(song) == 1 and len(live) == 1, f"expected a song mix and a live recording: {files}"
+    w = wave.open(os.path.join(ex, song[0])); secs = w.getnframes() / w.getframerate(); w.close()
+    assert 4.5 < secs < 7, f"2 bars at 160 bpm (3 s) plus a 2.5 s tail: {secs:.1f} s"
+    w = wave.open(os.path.join(ex, live[0])); secs = w.getnframes() / w.getframerate(); w.close()
+    assert 1.2 < secs < 2.2, f"the live recording should be about 1.6 s: {secs:.1f} s"
 
 def write_tone(path, hz, secs, sr=44100, channels=1):
     w = wave.open(path, "w"); w.setnchannels(channels); w.setsampwidth(2); w.setframerate(sr)

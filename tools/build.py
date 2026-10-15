@@ -224,6 +224,37 @@ for i,d in enumerate(SAMPLE_DIRS):
     for c in [(hb,0,la,0),(la,0,fj,0),(fj,0,t3,0),(t3,2,z,0),(z,0,cnt,1),(z,0,rd,1),(t3,1,gi,0),(go,0,tb,0),(tb,0,cnt,0),(cnt,0,inc,0),(inc,0,cnt,1),(inc,0,rd,1),(t3,0,rd,0),(rd,0,pkc,i)]: p.con(*c)
 p.save("seq/ockm-samplelib.pd","#N canvas 150 150 1900 880 12;")
 
+# ---------------- recorder: the mix and stems to WAV files ----------------
+STEMS=["drums","bass","lead","chord","fx"]
+p=P(); header_text(p,"Recorder. ockm-rec-<name>-open <path> then ockm-rec-<name>-start for mix (stereo) and the stems "+" ".join(STEMS)+" (mono). ockm-rec-stop stops them all. 24-bit WAV. Also: ockm-exports-dir on load \\, ockm-usb-scan finds USB sticks \\, ockm-mkdir <path>.")
+rstop=p.add("#X obj 30 40 r ockm-rec-stop;")
+mr=p.add("#X obj 30 80 r~ ockm-master;")
+for i,nm in enumerate(["mix"]+STEMS):
+    x=30+i*170
+    ro=p.add(f"#X obj {x} 120 r ockm-rec-{nm}-open;"); lp=p.add(f"#X obj {x} 145 list prepend open -bytes 3;"); lt=p.add(f"#X obj {x} 170 list trim;")
+    rs=p.add(f"#X obj {x+80} 120 r ockm-rec-{nm}-start;"); ms=p.add(f"#X msg {x+80} 145 start;"); mstp=p.add(f"#X msg {x+40} 195 stop;")
+    w=p.add(f"#X obj {x} 260 writesf~ {2 if nm=='mix' else 1};")
+    for c in [(ro,0,lp,0),(lp,0,lt,0),(lt,0,w,0),(rs,0,ms,0),(ms,0,w,0),(rstop,0,mstp,0),(mstp,0,w,0)]: p.con(*c)
+    if nm=="mix": p.con(mr,0,w,0); p.con(mr,0,w,1)
+    else: p.con(p.add(f"#X obj {x} 230 catch~ ockm-stem-{nm};"),0,w,0)
+# exports folder: OCKM_GENERATOR/exports, made on load and announced
+lb=p.add("#X obj 30 330 loadbang;"); md=p.add("#X msg 30 355 dir;"); pc=p.add("#X obj 30 380 pdcontrol;")
+la=p.add("#X obj 30 405 list append ../exports;"); fj=p.add("#X obj 30 430 file join;"); te=p.add("#X obj 30 455 t s s;")
+mk=p.add("#X obj 130 480 file mkdir;"); sd=p.add("#X obj 30 505 s ockm-exports-dir;")
+rex=p.add("#X obj 200 330 r ockm-exports-ask;"); hold=p.add("#X obj 30 480 symbol;")
+for c in [(lb,0,md,0),(md,0,pc,0),(pc,0,la,0),(la,0,fj,0),(fj,0,te,0),(te,1,mk,0),(te,0,hold,0),(hold,0,sd,0),(rex,0,hold,0)]: p.con(*c)
+rmk=p.add("#X obj 400 330 r ockm-mkdir;"); mk2=p.add("#X obj 400 355 file mkdir;"); p.con(rmk,0,mk2,0)
+# USB sticks: anything mounted under /Volumes (Mac) or /media/<user> (Pi), except the Mac's own disks
+rus=p.add("#X obj 600 330 r ockm-usb-scan;"); tus=p.add("#X obj 600 355 t b b b b;")
+st=p.add("#X msg 760 380 \\; ockm-usb-list-start bang;"); en=p.add("#X msg 600 600 \\; ockm-usb-list-end bang;")
+g1=p.add("#X msg 680 380 symbol /Volumes/*;"); g2=p.add("#X msg 700 405 symbol /media/*/*;"); fg=p.add("#X obj 680 430 file glob;")
+ug=p.add("#X obj 680 455 unpack s f;"); sp=p.add("#X obj 680 480 spigot;"); sk=p.add("#X obj 680 505 route symbol;")
+skip=p.add("#X obj 680 530 select /Volumes/Macintosh\\ HD /Volumes/Recovery /Volumes/Data /Volumes/Preboot /Volumes/VM /Volumes/Update;")
+si=p.add("#X obj 680 575 s ockm-usb-item;"); sy=p.add("#X obj 680 555 symbol;")
+for c in [(rus,0,tus,0),(tus,3,st,0),(tus,2,g1,0),(tus,1,g2,0),(tus,0,en,0),(g1,0,fg,0),(g2,0,fg,0),(fg,0,ug,0),(ug,1,sp,1),(ug,0,sp,0),
+          (sp,0,skip,0),(skip,6,sy,0),(sy,0,si,0)]: p.con(*c)
+p.save("seq/ockm-recorder.pd","#N canvas 120 120 1300 640 12;")
+
 # ---------------- drum slot: any of the 8 drum sounds ----------------
 SOUNDS=["ockm-kick","ockm-snare","ockm-clap","ockm-rim","ockm-hat","ockm-ohat","ockm-tom","ockm-perc"]
 SOUND_NAMES=["kick","snare","clap","perc 1","closed hat","open hat","tom","perc 2"]
@@ -453,9 +484,10 @@ for r,(nm,snd) in enumerate(SLOTS):
     y=380+r*40
     p.add(f"#X text 20 {y+2} {nm} {SOUND_NAMES[snd].replace(' ','-')};")
     row=p.add(f"#X obj 110 {y} ockm-row {nm};"); v=p.add(f"#X obj 560 {y+2} ockm-drum {nm};")
-    if r==0: p.add(f"#X obj 1200 {y} ockm-samplelib;")
+    if r==0: p.add(f"#X obj 1200 {y} ockm-samplelib;"); p.add(f"#X obj 1200 {y+25} ockm-recorder;")
     gt=p.add(f"#X obj 660 {y+2} ockm-gate {nm} nolevel;")
     p.con(pipe,0,row,0); p.con(row,0,v,0); p.con(v,0,gt,0); p.con(gt,0,mix,0); v=gt
+    p.con(gt,0,p.add(f"#X obj 700 {y+22} throw~ ockm-stem-drums;"),0)
     vs=p.add(f"#X obj 760 {y+2} *~ 0;"); vt=p.add(f"#X obj 830 {y+2} throw~ ockm-revbus;"); vr=p.add(f"#X obj 760 {y-18} r ockm-{nm}-verb;")
     p.con(v,0,vs,0); p.con(vs,0,vt,0); p.con(vr,0,vs,1)
     ds=p.add(f"#X obj 990 {y+2} *~ 0;"); dt_=p.add(f"#X obj 1060 {y+2} throw~ ockm-dlybus;"); dr_=p.add(f"#X obj 990 {y-18} r ockm-{nm}-delay;")
@@ -513,6 +545,7 @@ for r,(nm,seqo,voi) in enumerate(SYN):
     s0n=p.add(f"#X obj 480 {y+6} sel 0;"); ofn=p.add(f"#X msg 480 {y+24} off;")
     for c in [(lq,0,pon,0),(pon,0,sq,0),(ron,0,ton,0),(ton,1,pon,1),(ton,0,s0n,0),(s0n,0,ofn,0),(ofn,0,vo,0)]: p.con(*c)
     p.con(sq,0,vo,0); p.con(vo,0,gt,0); p.con(gt,0,mix,0)
+    p.con(gt,0,p.add(f"#X obj 700 {y+22} throw~ ockm-stem-{nm};"),0)
     vs=p.add(f"#X obj 760 {y} *~ 0;"); vt=p.add(f"#X obj 830 {y} throw~ ockm-revbus;"); vr=p.add(f"#X obj 760 {y-18} r ockm-{nm}-verb;")
     p.con(gt,0,vs,0); p.con(vs,0,vt,0); p.con(vr,0,vs,1)
     ds=p.add(f"#X obj 990 {y} *~ 0;"); dt_=p.add(f"#X obj 1060 {y} throw~ ockm-dlybus;"); dr_=p.add(f"#X obj 990 {y-18} r ockm-{nm}-delay;")
@@ -976,8 +1009,9 @@ q.add("#X text 500 410 delay time = step length x delay steps (3 = dotted 8th);"
 rth=q.add("#X obj 700 450 r ockm-delay-throw;"); thm=q.add(f"#X msg 700 475 {D}1 15;"); thl=q.add("#X obj 700 500 line~;")
 ths=q.add("#X obj 600 525 *~;"); tdw=q.add(f"#X obj 600 600 delwrite~ {D}0-thr 4000;"); tdr=q.add(f"#X obj 600 550 delread~ {D}0-thr 363;")
 tfb=q.add("#X obj 700 575 *~ 0.4;"); tad=q.add("#X obj 600 575 +~;"); tgo=q.add("#X obj 600 640 *~ 0.8;")
+st_fx=q.add("#X obj 400 120 throw~ ockm-stem-fx;"); q.con(vm,0,st_fx,0); q.con(mx,0,st_fx,0)
 for c in [(rth,0,thm,0),(thm,0,thl,0),(pre,0,ths,0),(thl,0,ths,1),(ths,0,tad,0),(tdr,0,tfb,0),(tfb,0,tad,1),(tad,0,tdw,0),
-          (dtm,0,tdr,0),(rfb,0,tfb,1),(tdr,0,tgo,0),(tgo,0,inl2,1)]: q.con(*c)
+          (dtm,0,tdr,0),(rfb,0,tfb,1),(tdr,0,tgo,0),(tgo,0,inl2,1),(tgo,0,st_fx,0)]: q.con(*c)
 q.save("voices/ockm-fx.pd","#N canvas 140 140 900 560 12;")
 
 # ================= reverb =================
@@ -1175,6 +1209,7 @@ if os.path.exists(_ui_src):
             "local FILLS = { "+", ".join(f'"{n.replace("-"," ")}"' for n,_ in FILLS)+" }\n"
             "local GROOVES = { "+", ".join(f'"{n.replace("-"," ")}"' for n,_,_ in GROOVES)+" }\n"
             "local GROOVE_BANKS = { "+", ".join(f'{{ "{n}", {i} }}' for n,i in GROOVE_BANKS)+" }\n"
+            "local CHORD_TYPES = { "+", ".join("{ "+", ".join(v.split())+" }" for _,v in PRE["chordtype"])+" }\n"
             "local PROG_SHAPES = { "+", ".join("{ "+", ".join(f"{{ {d}, {int(b*16)} }}" for d,b in ch)+" }" for _,_,ch in PROGS)+" }\n")
     os.makedirs(os.path.join(R,"ui"),exist_ok=True)
     open(os.path.join(R,"ui","ockm-ui.pd_lua"),"w").write(_t[:_a]+_block+_t[_b:])
