@@ -224,6 +224,64 @@ for i,d in enumerate(SAMPLE_DIRS):
     for c in [(hb,0,la,0),(la,0,fj,0),(fj,0,t3,0),(t3,2,z,0),(z,0,cnt,1),(z,0,rd,1),(t3,1,gi,0),(go,0,tb,0),(tb,0,cnt,0),(cnt,0,inc,0),(inc,0,cnt,1),(inc,0,rd,1),(t3,0,rd,0),(rd,0,pkc,i)]: p.con(*c)
 p.save("seq/ockm-samplelib.pd","#N canvas 150 150 1900 880 12;")
 
+# ---------------- transition sounds: a riser and an impact ----------------
+p=P(); header_text(p,"Transition sounds. ockm-riser-go <ms>: white noise sweeping up and getting louder over that time. ockm-impact-go: a crash and a sub boom. ockm-riser-stop cuts the riser (on the drop).")
+out=p.add("#X obj 30 560 outlet~;")
+# riser: noise through a band-pass that sweeps up, fading in, then cut dead
+rr=p.add("#X obj 30 40 r ockm-riser-go;"); tr_=p.add("#X obj 30 65 t f f;")
+mf=p.add(f"#X msg 30 95 300 \\, 9000 {D}1;"); mg=p.add(f"#X msg 150 95 0 \\, 0.32 {D}1 \\, 0 5 {D}1;")
+fv=p.add("#X obj 30 125 vline~;"); gv=p.add("#X obj 150 125 vline~;")
+nz=p.add("#X obj 300 125 noise~;"); bp=p.add("#X obj 300 160 vcf~ 4;"); rg=p.add("#X obj 300 195 *~;")
+rs=p.add("#X obj 450 40 r ockm-riser-stop;"); ms_=p.add("#X msg 450 65 0 5;")
+for c in [(rr,0,tr_,0),(tr_,1,mf,0),(tr_,0,mg,0),(mf,0,fv,0),(mg,0,gv,0),(nz,0,bp,0),(fv,0,bp,1),(bp,0,rg,0),(gv,0,rg,1),(rg,0,out,0),(rs,0,ms_,0),(ms_,0,gv,0)]: p.con(*c)
+# impact: a crash (bright noise, long fade) plus a sub boom (a sine falling from 90 to 38 Hz)
+ri=p.add("#X obj 30 260 r ockm-impact-go;"); ti=p.add("#X obj 30 285 t b b b;")
+cm=p.add("#X msg 30 315 0.45 \\, 0 1800 2;"); cv=p.add("#X obj 30 345 vline~;"); cn=p.add("#X obj 150 315 noise~;"); ch=p.add("#X obj 150 345 hip~ 4000;")
+ch2=p.add("#X obj 150 370 hip~ 2500;"); cg=p.add("#X obj 150 400 *~;")
+pm=p.add("#X msg 300 315 90 \\, 38 350;"); pv=p.add("#X obj 300 345 vline~;"); po=p.add("#X obj 300 370 osc~;")
+am=p.add("#X msg 420 315 0.7 \\, 0 900 5;"); av=p.add("#X obj 420 345 vline~;"); pg=p.add("#X obj 300 400 *~;")
+for c in [(ri,0,ti,0),(ti,2,cm,0),(cm,0,cv,0),(cn,0,ch,0),(ch,0,ch2,0),(ch2,0,cg,0),(cv,0,cg,1),(cg,0,out,0),
+          (ti,1,pm,0),(pm,0,pv,0),(pv,0,po,0),(ti,0,am,0),(am,0,av,0),(po,0,pg,0),(av,0,pg,1),(pg,0,out,0),(ri,0,p.add("#X msg 520 285 \; ockm-riser-stop bang;"),0)]: p.con(*c)
+p.save("voices/ockm-transfx.pd","#N canvas 120 120 700 600 12;")
+
+# ---------------- transitions: what happens where song sections meet ----------------
+# Per pattern: ockm-end (how its last bar in the song plays: 0 nothing, 1 fill, 2 riser, 3 riser + gap, 4 dub out)
+# and ockm-impact (1: a crash and sub boom on its first downbeat). Song mode only: it listens to ockm-song-pos <step> <bars left>.
+p=P(); header_text(p,"Transitions (song mode). On a section's last bar: its ending (ockm-end: 1 fill \\, 2 riser \\, 3 riser + a one-beat gap \\, 4 dub out). On a new section's first downbeat: an impact if that pattern has ockm-impact 1.")
+re_=p.add("#X obj 30 40 r ockm-end;"); ve=p.add("#X obj 30 65 v ockm_end;"); p.con(re_,0,ve,0)
+ri=p.add("#X obj 150 40 r ockm-impact;"); vi=p.add("#X obj 150 65 v ockm_impact;"); p.con(ri,0,vi,0)
+rp=p.add("#X obj 30 110 r ockm-song-pos;"); up=p.add("#X obj 30 135 unpack f f;"); tl=p.add("#X obj 30 160 t f f;")
+# a new section: impact a quarter step later (the engine plays a quarter step behind, and the new pattern has loaded by then)
+lst=p.add("#X obj 300 160 f -1;"); neq=p.add("#X obj 300 185 !=;"); tneq=p.add("#X obj 300 135 t f f;")
+sl=p.add("#X obj 300 210 sel 1;"); dq=p.add("#X obj 300 235 delay;"); qx=p.add("#X obj 380 210 expr ockm_stepms*0.25;")
+ig=p.add("#X obj 300 260 expr ockm_impact;"); si=p.add("#X obj 300 285 sel 1;"); sim=p.add("#X msg 300 310 \; ockm-impact-go bang;")
+for c in [(rp,0,up,0),(up,0,tneq,0),(tneq,1,neq,0),(lst,0,neq,1),(tneq,0,lst,1),(neq,0,sl,0),(sl,0,qx,0),(qx,0,dq,0),(sl,0,dq,0),(dq,0,ig,0),(ig,0,si,0),(si,0,sim,0)]: p.con(*c)
+# hmm: the delay takes its time first, then the bang: send the time to its right inlet
+p.C=[c for c in p.C if c!=(qx,0,dq,0)]; p.con(qx,0,dq,1)
+p.C=[c for c in p.C if c!=(sl,0,qx,0) and c!=(sl,0,dq,0)]; tsl=p.add("#X obj 300 222 t b b;"); p.con(sl,0,tsl,0); p.con(tsl,1,qx,0); p.con(tsl,0,dq,0)
+# the last bar: left = 0
+s0=p.add("#X obj 30 210 sel 0;"); fe0=p.add("#X msg 120 235 0;"); vfe=p.add("#X obj 120 260 v ockm_fill_end;")
+ge=p.add("#X obj 30 235 expr ockm_end;"); se=p.add("#X obj 30 260 sel 1 2 3 4;")
+fe1=p.add("#X msg 30 290 1;"); vfe1=p.add("#X obj 30 315 v ockm_fill_end;")
+# riser over the bar (2 riser) or the first 3 beats (3 riser + gap)
+rb=p.add("#X obj 100 290 expr ockm_stepms*16;"); rsb=p.add("#X obj 100 315 s ockm-riser-go;")
+rb3=p.add("#X obj 200 290 expr ockm_stepms*12;"); tg3=p.add("#X obj 200 315 t f f;"); rsb3=p.add("#X obj 260 340 s ockm-riser-go;")
+dgap=p.add("#X obj 200 365 delay;"); gon=p.add("#X msg 200 390 \; ockm-gap 1;")
+gx=p.add("#X obj 300 390 expr ockm_stepms*4-6;"); dgo=p.add("#X obj 200 415 delay;"); goff=p.add("#X msg 200 440 \; ockm-gap 0;")
+# dub out: throw the last beat into the delay
+d12=p.add("#X obj 450 290 expr ockm_stepms*12;"); dd=p.add("#X obj 450 315 delay;"); thr=p.add("#X msg 450 340 \; ockm-delay-throw 1;")
+d4=p.add("#X obj 560 340 expr ockm_stepms*4-6;"); dd2=p.add("#X obj 450 365 delay;"); thr0=p.add("#X msg 450 390 \; ockm-delay-throw 0;")
+for c in [(up,1,s0,0),(s0,1,fe0,0),(fe0,0,vfe,0),(s0,0,ge,0),(ge,0,se,0),(se,0,fe1,0),(fe1,0,vfe1,0),(se,1,rb,0),(rb,0,rsb,0),
+          (se,2,rb3,0),(rb3,0,tg3,0),(tg3,1,rsb3,0),(tg3,0,dgap,0),(dgap,0,gon,0),(dgap,0,gx,0),(gx,0,dgo,0),(dgo,0,goff,0),
+          (se,3,d12,0),(d12,0,dd,0),(dd,0,thr,0),(dd,0,d4,0),(d4,0,dd2,0),(dd2,0,thr0,0)]: p.con(*c)
+# a delay given a float starts with that time: [delay] takes 'float' as a new time and starts. Good.
+# stop: everything back to normal
+rpl=p.add("#X obj 600 40 r ockm-playing;"); sp0=p.add("#X obj 600 65 sel 0;")
+rst=p.add("#X msg 600 90 \; ockm-gap 0 \; ockm-delay-throw 0 \; ockm-riser-stop bang;"); fz=p.add("#X msg 760 90 0;"); vfz=p.add("#X obj 760 115 v ockm_fill_end;")
+stp=p.add("#X msg 600 120 stop;"); lr=p.add("#X msg 680 120 -1;")
+for c in [(rpl,0,sp0,0),(sp0,0,rst,0),(sp0,0,fz,0),(fz,0,vfz,0),(sp0,0,stp,0),(stp,0,dgap,0),(stp,0,dgo,0),(stp,0,dd,0),(stp,0,dd2,0),(stp,0,dq,0),(sp0,0,lr,0),(lr,0,lst,1)]: p.con(*c)
+p.save("seq/ockm-transitions.pd","#N canvas 120 120 900 500 12;")
+
 # ---------------- recorder: the mix and stems to WAV files ----------------
 STEMS=["drums","bass","lead","chord","fx"]
 p=P(); header_text(p,"Recorder. ockm-rec-<name>-open <path> then ockm-rec-<name>-start for mix (stereo) and the stems "+" ".join(STEMS)+" (mono). ockm-rec-stop stops them all. 24-bit WAV. Also: ockm-exports-dir on load \\, ockm-usb-scan finds USB sticks \\, ockm-mkdir <path>.")
@@ -297,10 +355,11 @@ upk=p.add("#X obj 400 460 unpack f f;"); offs=p.add("#X obj 480 490 + 0;")
 tnd=p.add("#X obj 30 152 t f f;"); nrd=p.add(f"#X obj 300 160 tabread ockm-pat-{D}1-nudge;")
 nex=p.add(f"#X obj 300 185 expr ({D}f1+0.25)*ockm_stepms;"); npp=p.add("#X obj 70 240 pipe 0;")
 p.add(f"#X obj 300 300 table ockm-pat-{D}1-nudge {STEPS};")
+kspg=p.add("#X obj 120 270 spigot;"); kis=p.add("#X obj 200 245 == 0;"); skh=p.add("#X obj 120 295 s ockm-kick-hit;")   # a kick: tell the pump
 tfi=p.add("#X obj 30 135 t f f;"); dlp=p.add(f"#X obj 30 148 expr if(ockm_dloop>0 \\, {D}f1 % ockm_dloop \\, {D}f1);"); fix=p.add(f"#X obj 160 135 expr int({D}f1)%16 + 16*{D}f2;"); rsn=p.add(f"#X obj 260 110 r ockm-{D}1-sound;")
-frd=p.add("#X obj 160 160 tabread ockm-fillx;"); fsel=p.add(f"#X obj 30 175 expr if(ockm_fill_on && {D}f2>=0 \\, {D}f2 \\, {D}f1);")
+frd=p.add("#X obj 160 160 tabread ockm-fillx;"); fsel=p.add(f"#X obj 30 175 expr if((ockm_fill_on || ockm_fill_end) && {D}f2>=0 \\, {D}f2 \\, {D}f1);")
 for c in [(inl,0,tfi,0),(tfi,1,fix,0),(rsn,0,fix,1),(fix,0,frd,0),(frd,0,fsel,1),(tfi,0,dlp,0),(dlp,0,tnd,0),(tnd,1,nrd,0),(nrd,0,nex,0),(nex,0,npp,1),(tnd,0,tr,0),(tr,0,fsel,0),(fsel,0,sel,0),
-          (sel,1,vel,0),(racc,0,vel,1),(vel,0,npp,0),(npp,0,out,0),(upk,1,offs,0),(offs,0,tw,1),(upk,0,tw,0)]: p.con(*c)
+          (sel,1,vel,0),(racc,0,vel,1),(vel,0,npp,0),(npp,0,out,0),(npp,0,kspg,0),(kspg,0,skh,0),(rsn,0,kis,0),(kis,0,kspg,1),(upk,1,offs,0),(offs,0,tw,1),(upk,0,tw,0)]: p.con(*c)
 for i in range(16):
     x=102+i*20+(i//4)*6
     t=p.add(f"#X obj {x} 22 tgl 18 0 empty ockm-sq-{D}1-{i} empty 17 7 0 10 #fcfcfc #000000 #000000 0 1;")
@@ -397,7 +456,7 @@ for nm,snd in SLOTS:
 SYNTH_DEFAULTS={"bass":dict(engine=0,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.37,k2=0.9,k3=0.31,k4=0.55,drive=0,verb=0,delay=0,rhythm=3,notes=3),
                 "lead":dict(engine=4,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0.2,delay=0.25,rhythm=8,notes=12),
                 "chord":dict(engine=0,mode=0,level=1,k1=0.45,k2=0.5,k3=0.4,k4=0.3,type=0,smooth=1,verb=0.3,delay=0.35,rhythm=0,prog=0)}
-PATTERN_KEYS=[("ockm-bass-on",1,None),("ockm-lead-on",1,None),("ockm-chord-on",1,None),("ockm-rise",0,None),("ockm-drum-loop",0,None),("ockm-len",64,None),("ockm-len-max",64,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None),("ockm-leader",0,None),("ockm-drum-groove",-1,None),("ockm-fill-every",0,None),("ockm-fill-style",0,None)]
+PATTERN_KEYS=[("ockm-end",0,None),("ockm-impact",0,None),("ockm-pump",0,None),("ockm-bass-on",1,None),("ockm-lead-on",1,None),("ockm-chord-on",1,None),("ockm-rise",0,None),("ockm-drum-loop",0,None),("ockm-len",64,None),("ockm-len-max",64,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None),("ockm-leader",0,None),("ockm-drum-groove",-1,None),("ockm-fill-every",0,None),("ockm-fill-style",0,None)]
 for t,d in SYNTH_DEFAULTS.items():
     PATTERN_KEYS+=[(f"ockm-{t}-{k}",v,None) for k,v in d.items()]
 TABLES=[f"ockm-pat-{n}" for n,_ in SLOTS]+[f"ockm-pat-{n}-nudge" for n,_ in SLOTS]+[f"ockm-pat-{t}-{f}" for t in ("bass","lead") for f in MONO]+[f"ockm-pat-chord-{f}" for f in CHORD]
@@ -479,14 +538,30 @@ mix=p.add("#X obj 560 1000 *~ 0.3;"); fx=p.add("#X obj 560 1030 ockm-fx;"); dac=
 vol=p.add("#X obj 560 1048 *~;"); rvol=p.add("#X obj 700 1000 r ockm-volume;"); pvol=p.add("#X obj 700 1020 pack f 20;"); lvol=p.add("#X obj 700 1040 line~;")
 p.con(mix,0,fx,0); p.con(fx,0,vol,0); p.con(rvol,0,pvol,0); p.con(pvol,0,lvol,0); p.con(lvol,0,vol,1)
 p.con(vol,0,dac,0); p.con(vol,0,dac,1); p.con(vol,0,smaster,0)
+# the gap before a drop: no new hits for a beat, the synths let go, the effects ring on
+gsp=p.add("#X obj 250 340 spigot 1;"); p.con(pipe,0,gsp,0)
+rgp=p.add("#X obj 400 340 r ockm-gap;"); ngp=p.add("#X obj 400 365 == 0;"); p.con(rgp,0,ngp,0); p.con(ngp,0,gsp,1)
+sg1=p.add("#X obj 470 365 sel 1;"); p.con(rgp,0,sg1,0)
+gof=p.add("#X msg 470 390 off;")
+p.con(sg1,0,gof,0)
+# transition sounds into the mix (and a little reverb)
+tfx=p.add("#X obj 400 1000 ockm-transfx;"); p.con(tfx,0,mix,0)
+tfs=p.add("#X obj 480 1030 *~ 0.35;"); p.con(tfx,0,tfs,0); p.con(tfs,0,p.add("#X obj 480 1055 throw~ ockm-revbus;"),0)
+# sidechain pump: each kick ducks the synths, by ockm-pump (0 off, 1 deep), and they swell back over an eighth note
+rkh=p.add("#X obj 900 1000 r ockm-kick-hit;"); rpm=p.add("#X obj 1000 1000 r ockm-pump;")
+pmx=p.add(f"#X obj 900 1030 expr if(ockm_pumpv>0.001 \\, 1-0.75*ockm_pumpv*min({D}f1\\,1) \\, 1) \\; ockm_stepms*2;")
+vpm=p.add("#X obj 1000 1025 v ockm_pumpv;"); p.con(rpm,0,vpm,0)
+pkp=p.add("#X obj 900 1060 pack f f;"); mpm=p.add(f"#X msg 900 1085 {D}1 4 \\, 1 {D}2 12;"); vlp=p.add("#X obj 900 1110 vline~;"); sdk=p.add("#X obj 900 1135 s~ ockm-duck;")
+lbd=p.add("#X obj 1100 1060 loadbang;"); one_d=p.add("#X msg 1100 1085 1;"); p.con(lbd,0,one_d,0); p.con(one_d,0,vlp,0)
+for c in [(rkh,0,pmx,0),(pmx,1,pkp,1),(pmx,0,pkp,0),(pkp,0,mpm,0),(mpm,0,vlp,0),(vlp,0,sdk,0)]: p.con(*c)
 lbv=p.add("#X obj 820 1000 loadbang;"); onev=p.add("#X msg 820 1020 1;"); p.con(lbv,0,onev,0); p.con(onev,0,pvol,0)
 for r,(nm,snd) in enumerate(SLOTS):
     y=380+r*40
     p.add(f"#X text 20 {y+2} {nm} {SOUND_NAMES[snd].replace(' ','-')};")
     row=p.add(f"#X obj 110 {y} ockm-row {nm};"); v=p.add(f"#X obj 560 {y+2} ockm-drum {nm};")
-    if r==0: p.add(f"#X obj 1200 {y} ockm-samplelib;"); p.add(f"#X obj 1200 {y+25} ockm-recorder;")
+    if r==0: p.add(f"#X obj 1200 {y} ockm-samplelib;"); p.add(f"#X obj 1200 {y+25} ockm-recorder;"); p.add(f"#X obj 1200 {y+50} ockm-transitions;")
     gt=p.add(f"#X obj 660 {y+2} ockm-gate {nm} nolevel;")
-    p.con(pipe,0,row,0); p.con(row,0,v,0); p.con(v,0,gt,0); p.con(gt,0,mix,0); v=gt
+    p.con(gsp,0,row,0); p.con(row,0,v,0); p.con(v,0,gt,0); p.con(gt,0,mix,0); v=gt
     p.con(gt,0,p.add(f"#X obj 700 {y+22} throw~ ockm-stem-drums;"),0)
     vs=p.add(f"#X obj 760 {y+2} *~ 0;"); vt=p.add(f"#X obj 830 {y+2} throw~ ockm-revbus;"); vr=p.add(f"#X obj 760 {y-18} r ockm-{nm}-verb;")
     p.con(v,0,vs,0); p.con(vs,0,vt,0); p.con(vr,0,vs,1)
@@ -537,14 +612,15 @@ for r,(nm,seqo,voi) in enumerate(SYN):
     y=by+r*40
     p.add(f"#X text 20 {y+2} {nm};")
     sq=p.add(f"#X obj 110 {y} {seqo};"); vo=p.add(f"#X obj 560 {y} {voi};")
-    gt=p.add(f"#X obj 660 {y} ockm-gate {nm} level;")
+    gt0=p.add(f"#X obj 660 {y} ockm-gate {nm} level;"); gt=p.add(f"#X obj 660 {y+14} *~;"); p.con(gt0,0,gt,0)
+    p.con(p.add(f"#X obj 740 {y+14} r~ ockm-duck;"),0,gt,1)
     # a quarter step late, like the drums on time, so drum steps can be nudged early
-    lq=p.add(f"#X obj 300 {y} pipe 0;"); p.con(pipe,0,lq,0); p.con(lq4,0,lq,1)
+    lq=p.add(f"#X obj 300 {y} pipe 0;"); p.con(gsp,0,lq,0); p.con(lq4,0,lq,1)
     # this part on or off in this pattern (ockm-<part>-on): off stops its steps and silences it
     pon=p.add(f"#X obj 360 {y} spigot 1;"); ron=p.add(f"#X obj 420 {y-18} r ockm-{nm}-on;"); ton=p.add(f"#X obj 420 {y+6} t f f;")
     s0n=p.add(f"#X obj 480 {y+6} sel 0;"); ofn=p.add(f"#X msg 480 {y+24} off;")
     for c in [(lq,0,pon,0),(pon,0,sq,0),(ron,0,ton,0),(ton,1,pon,1),(ton,0,s0n,0),(s0n,0,ofn,0),(ofn,0,vo,0)]: p.con(*c)
-    p.con(sq,0,vo,0); p.con(vo,0,gt,0); p.con(gt,0,mix,0)
+    p.con(sq,0,vo,0); p.con(vo,0,gt0,0); p.con(gt,0,mix,0)
     p.con(gt,0,p.add(f"#X obj 700 {y+22} throw~ ockm-stem-{nm};"),0)
     vs=p.add(f"#X obj 760 {y} *~ 0;"); vt=p.add(f"#X obj 830 {y} throw~ ockm-revbus;"); vr=p.add(f"#X obj 760 {y-18} r ockm-{nm}-verb;")
     p.con(gt,0,vs,0); p.con(vs,0,vt,0); p.con(vr,0,vs,1)
@@ -554,7 +630,7 @@ for r,(nm,seqo,voi) in enumerate(SYN):
 s0b=p.add("#X obj 400 80 sel 0;"); offm=p.add("#X msg 400 105 off;")
 p.con(ttg,1,s0b,0); p.con(s0b,0,offm,0)
 p.con(s0b,0,p.add("#X msg 460 105 \\; ockm-rise-now 0;"),0)
-for nm in ("bass","lead","chord"): p.con(offm,0,synth_voice[nm],0)
+for nm in ("bass","lead","chord"): p.con(offm,0,synth_voice[nm],0); p.con(gof,0,synth_voice[nm],0)
 # generators and shared presets
 gy=by+3*40+20
 p.add(f"#X obj 110 {gy} ockm-presets;")

@@ -435,6 +435,17 @@ On the song tab, **arrange...** turns pattern 1 (your groove) into a whole track
 
 **Surprise me** picks the options at random. If patterns 2 to 8 already have something in, arrange says so first; back to last save undoes it.
 
+### Transitions
+
+In song mode, each pattern can hand over to the next one instead of just cutting. On the song tab, for the pattern you're on:
+
+- **Ends with** (its last bar before the song moves on): nothing, a fill, a riser (white noise sweeping up), riser + gap (the riser, then a beat of silence with only the effects ringing, so the next downbeat lands harder), or dub out (the last beat thrown into the delay)
+- **Impact on the 1**: a crash and a sub boom on its first downbeat
+
+**Pump** (on perform, by the filter: off, light, deep) is sidechain: every kick ducks the bass, lead and chords, and they swell back over an eighth note. It's per pattern.
+
+Arrange sets all of these: builds end with riser + gap, drops land with an impact and pump, sections that thin out end with a dub out, and grooves end with fills.
+
 Two settings it uses are useful by hand too: **part on/off** (on each synth tab: the part plays in this pattern or doesn't) and **rise** (on perform, by the filter: the high-pass climbs across this pattern and drops back on the next).
 
 ## Export

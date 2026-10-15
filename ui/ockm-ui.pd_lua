@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.41"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.42"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
@@ -137,7 +137,7 @@ function ui:defaults()
   v["ockm-volume"] = 1; v["ockm-verb-mix"] = 0.5; v["ockm-delay-mix"] = 0.5
   v["ockm-drive"] = 0; v["ockm-delay-fb"] = 0.4; v["ockm-delay-steps"] = 3; v["ockm-verb-size"] = 0.6; v["ockm-verb-tone"] = 0.5
   for _, t in ipairs(SYNTHS) do v["ockm-"..t.."-level"] = 1 end
-  v["ockm-bass-on"] = 1; v["ockm-lead-on"] = 1; v["ockm-chord-on"] = 1; v["ockm-rise"] = 0
+  v["ockm-bass-on"] = 1; v["ockm-lead-on"] = 1; v["ockm-chord-on"] = 1; v["ockm-rise"] = 0; v["ockm-end"] = 0; v["ockm-impact"] = 0; v["ockm-pump"] = 0
   v["ockm-bass-mode"] = 0; v["ockm-lead-mode"] = 0; v["ockm-chord-mode"] = 0   -- 0 auto, 1 manual
   v["ockm-bass-sync"] = 1; v["ockm-lead-sync"] = 1; v["ockm-leader"] = 0; v["ockm-drum-groove"] = -1
   v["ockm-drum-loop"] = 0; v["ockm-fill-every"] = 0; v["ockm-fill-style"] = 0; v["ockm-swing"] = 56; v["ockm-accent"] = 0.3; v["ockm-sync"] = 0; v["ockm-song-mode"] = 0; v["ockm-song-loop"] = 1; v["ockm-volume"] = 1
@@ -166,7 +166,7 @@ function ui:hooks()
   for _, t in ipairs(TRACKS) do h[#h+1] = "ockm-"..t.."-mute"; h[#h+1] = "ockm-"..t.."-solo" end
   for _, t in ipairs(SYNTHS) do h[#h+1] = "ockm-"..t.."-level"; h[#h+1] = "ockm-"..t.."-mode" end
   for _, t in ipairs(SYNTHS) do h[#h+1] = "ockm-"..t.."-on" end
-  h[#h+1] = "ockm-rise"
+  h[#h+1] = "ockm-rise"; h[#h+1] = "ockm-end"; h[#h+1] = "ockm-impact"; h[#h+1] = "ockm-pump"
   h[#h+1] = "ockm-bass-sync"; h[#h+1] = "ockm-lead-sync"; h[#h+1] = "ockm-leader"; h[#h+1] = "ockm-drum-groove"
   for _, p in ipairs({ "bass", "lead" }) do
     for _, k in ipairs({ "lock", "density", "seed" }) do h[#h+1] = "ockm-"..p.."-"..k end
@@ -505,6 +505,13 @@ function ui:layout_perform(add)
   end }
   -- build rise (this pattern): the high-pass climbs across the pattern and drops back on the next one
   local rise = (self.v["ockm-rise"] or 0) > 0
+  local pump = self.v["ockm-pump"] or 0
+  local plab = (pump <= 0) and "pump" or ((pump < 0.75) and "pump ·" or "pump ··")
+  add{ kind="choice", x=rx + 54, y=460, w=62, h=22, label=plab, small=true, sel=(pump > 0), accent=true, tap=function()
+    local nx = (pump <= 0) and 0.5 or ((pump < 0.75) and 1 or 0)
+    self:send("ockm-pump", nx)
+    self:say((nx == 0) and "pump off" or ((nx < 0.75) and "pump: the kick ducks the synths, lightly" or "pump: deep, house-style"))
+  end }
   add{ kind="choice", x=rx + 4, y=460, w=46, h=22, label="rise", small=true, sel=rise, accent=true, tap=function()
     self:send("ockm-rise", rise and 0 or 1)
     self:say(rise and "rise off" or "rise on: the filter climbs across this pattern, then drops on the next")
@@ -1084,6 +1091,7 @@ end
 -- "8 and generate": your groove in pattern 1 becomes a whole track. Arrange writes variations of it into
 -- patterns 2-8 (intro, build, breakdown and so on) and a song chain that strings them together.
 -- Everything it makes is ordinary patterns and an ordinary song: change anything afterwards.
+local ENDINGS = { "nothing", "a fill", "a riser", "riser + gap", "dub out" }
 local ARR_SECTIONS = { { "intro", "intro" }, { "groove", "groove" }, { "build", "build" }, { "breakdown", "breakdown" },
                        { "dropb", "drop B" }, { "lift", "key lift" }, { "outro", "outro" } }
 local ARR_STYLES = {
@@ -1099,10 +1107,11 @@ local ARR_BUILDS = { "snare roll", "filter rise", "both" }
 local ARR_BREAKS = { "pads", "drums only", "no kick" }
 local ARR_LIFTS = { 1, 2, 5 }
 local ARR_VARS = { "subtle", "bold" }
+local ARR_PUMP = { "pump on the drops", "no pump" }
 
 function ui:arr_opts()
   if not self.arr then
-    self.arr = { style = 1, len = 2, build = 3, brk = 1, lift = 2, var = 1, on = {} }
+    self.arr = { style = 1, len = 2, build = 3, brk = 1, lift = 2, var = 1, pump = 1, on = {} }
     for k, v in pairs(ARR_STYLES[1].on) do self.arr.on[k] = v end
   end
   return self.arr
@@ -1214,6 +1223,27 @@ function ui:arr_apply(sec)
   psend("ockm-drums-changed", "bang", {}); psend("ockm-refresh", "bang", {})
 end
 
+-- how each section hands over to the next: its ending (by what follows), an impact if it's a big arrival, and the pump
+local BIG = { main = 1, dropb = 1, lift = 1 }
+function ui:arr_transitions(sec, nxt)
+  local a = self:arr_opts()
+  local e
+  if sec == "build" then e = 3
+  elseif not nxt then e = 0
+  elseif BIG[nxt] and (sec == "breakdown" or sec == "intro" or sec == "groove") then e = 3
+  elseif BIG[nxt] then e = 1
+  elseif nxt == "build" then e = 1
+  elseif nxt == "breakdown" or nxt == "outro" then e = 4
+  else e = 2 end
+  psend("ockm-end", "float", { e })
+  psend("ockm-impact", "float", { (BIG[sec] or sec == "breakdown") and 1 or 0 })
+  if sec ~= "main" or (a.pump or 1) == 1 then
+    local pump = 0
+    if (a.pump or 1) == 1 then pump = BIG[sec] and 1 or ((sec == "groove" or sec == "outro") and 0.5 or 0) end
+    psend("ockm-pump", "float", { pump })
+  end
+end
+
 -- run the whole job as a short queue, so generators settle before the next pattern opens
 function ui:job_step()
   local f = table.remove(self.jobs or {}, 1)
@@ -1226,12 +1256,19 @@ function ui:arrange()
   local jobs = {}
   local order = {}
   for _, sc in ipairs(ARR_SECTIONS) do if slots[sc[1]] then order[#order + 1] = sc[1] end end
-  jobs[#jobs + 1] = function() psend("ockm-want", "float", { 0 }) end
+  local secof = { [0] = "main" }
+  for sec, n in pairs(slots) do secof[n] = sec end
+  local nextof = {}
+  for i, c in ipairs(chain) do
+    local here = secof[c[1]]
+    if chain[i + 1] and not nextof[here] then nextof[here] = secof[chain[i + 1][1]] end
+  end
+  jobs[#jobs + 1] = function() psend("ockm-want", "float", { 0 }); self:arr_transitions("main", nextof.main) end
   for _, sec in ipairs(order) do
     local n = slots[sec]
     local from = (sec == "lift" and slots.dropb) and slots.dropb or 0
     jobs[#jobs + 1] = function() psend("ockm-pattern-copy", "list", { from, n }); self:set_used(n, true); psend("ockm-want", "float", { n }) end
-    jobs[#jobs + 1] = function() self:arr_apply(sec) end
+    jobs[#jobs + 1] = function() self:arr_apply(sec); self:arr_transitions(sec, nextof[sec]) end
   end
   jobs[#jobs + 1] = function()
     psend("ockm-want", "float", { 0 })
@@ -1278,6 +1315,9 @@ function ui:layout_arrange(add)
   local lifts = {}; for i, l in ipairs(ARR_LIFTS) do lifts[i] = "up " .. l .. ((l == 1) and " semitone" or " semitones") end
   row(y + 276, "key lift", lifts, a.lift, function(i) a.lift = i end, 140)
   row(y + 316, "variation", ARR_VARS, a.var, function(i) a.var = i end)
+  for i, it in ipairs(ARR_PUMP) do
+    add{ kind="choice", x=cx + 2 * 126 + 24 + (i - 1) * 166, y=y + 316, w=160, h=32, small=true, label=it, sel=((a.pump or 1) == i), tap=function() a.pump = i end }
+  end
   -- what you'll get
   local secs = math.floor(bars * 4 * 60 / (self.v["ockm-bpm"] or 124) + 0.5)
   local busy = false
@@ -1585,6 +1625,7 @@ function ui:layout_song(add)
   if #song == 0 then
     add{ kind="text", x=24, y=150, w=LW, h=16, label="Empty. Tap a pattern on the right to add the first step.", size=14, col="txt" }
     add{ kind="text", x=24, y=176, w=LW, h=14, label="Each step plays one pattern, as many times as you set. Then the next step.", size=12 }
+    add{ kind="text", x=24, y=200, w=LW, h=14, label="Or tap arrange (bottom left) to build a whole track from pattern 1.", size=12, col="acc" }
   end
   for k = 1, per do
     local i = self.song_page * per + k
@@ -1618,10 +1659,6 @@ function ui:layout_song(add)
     add{ kind="arrow", x=200, y=550, w=60, h=40, dir=1, on=self.song_page < pages - 1, tap=function() self.song_page = self.song_page + 1 end }
   end
   add{ kind="btn", x=268, y=550, w=160, h=40, accent=true, label="arrange...", tap=function() self.sheet = "arrange" end }
-  if #song == 0 then
-    add{ kind="text", x=16, y=170, w=LW, h=14, size=13, col="txt", label="No song yet." }
-    add{ kind="text", x=16, y=194, w=LW, h=12, size=11, label="Add steps on the right, or tap arrange to build a whole track from pattern 1." }
-  end
   if #song > 0 then
     add{ kind="btn", x=LW - 124, y=550, w=140, h=40, label=self.confirm == "song" and "tap again to clear" or "clear the song", quiet=self.confirm ~= "song", tap=function()
       if self.confirm == "song" then self.confirm = nil; self.song_sel = 0; self:song_edit(function(l) for j = #l, 1, -1 do l[j] = nil end end)
@@ -1645,18 +1682,29 @@ function ui:layout_song(add)
          psend("ockm-song-start", "float", { sel })
        end }
   add{ kind="text", x=rx, y=244, w=rw, h=12, label=(#song > 0) and ("add a step after step " .. (sel + 1) .. ": tap a pattern") or "add a step: tap a pattern", size=10 }
-  local pw = (rw - 3 * 6) / 4
+  local pw = (rw - 7 * 4) / 8
   local made = {}
   for n = 0, 7 do if self:is_used(n) then made[#made + 1] = n end end
   for k, n in ipairs(made) do
-    local col, row = (k - 1) % 4, math.floor((k - 1) / 4)
-    add{ kind="btn", x=rx + col * (pw + 6), y=260 + row * 50, w=pw, h=44, label=tostring(n + 1), tap=function()
+    add{ kind="btn", x=rx + (k - 1) * (pw + 4), y=258, w=pw, h=40, label=tostring(n + 1), tap=function()
       local at = (#song == 0) and 1 or (sel + 2)
       self:song_edit(function(l) table.insert(l, at, { n, 1 }) end)
       self.song_sel = at - 1
       if self.song_sel >= (self.song_page + 1) * per then self.song_page = math.floor(self.song_sel / per) end
     end }
   end
+  -- how the pattern you're on ends when the song moves on, and whether it starts with an impact
+  local ec = math.floor(self.v["ockm-end"] or 0)
+  add{ kind="text", x=rx, y=308, w=rw, h=12, label="in the song, pattern " .. ((self.cur or 0) + 1) .. " (the one you're on):", size=10 }
+  add{ kind="btn", x=rx, y=322, w=hw, h=36, small=true, accent=(ec > 0), label="ends with: " .. ENDINGS[ec + 1], tap=function()
+    local n = (ec + 1) % #ENDINGS
+    self:send("ockm-end", n); self:say("pattern " .. ((self.cur or 0) + 1) .. " ends with " .. ENDINGS[n + 1] .. " when the song moves on")
+  end }
+  local imp = (self.v["ockm-impact"] or 0) > 0
+  add{ kind="choice", x=rx + hw + 8, y=322, w=hw, h=36, small=true, accent=true, sel=imp, label="impact on the 1", tap=function()
+    self:send("ockm-impact", imp and 0 or 1)
+    self:say(imp and "no impact" or ("pattern " .. ((self.cur or 0) + 1) .. " starts with a crash and a sub boom in the song"))
+  end }
   add{ kind="btn", x=rx, y=366, w=hw, h=40, small=true, label="move step up", tap=function()
     if sel > 0 then self:song_edit(function(l) l[sel], l[sel + 1] = l[sel + 1], l[sel] end); self.song_sel = sel - 1 end
   end }

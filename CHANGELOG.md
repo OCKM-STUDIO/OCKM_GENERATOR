@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.42 (15 October 2026)
+
+- **Transitions** between song sections: each pattern can end with a fill, a riser, riser + gap or a dub out, and start with an impact (crash and sub boom). Set on the song tab
+- **Sidechain pump**: the kick ducks the synths. Off, light or deep, per pattern, on perform
+- **Arrange uses them**: builds end with riser + gap into drops that land with an impact and pump; breakdowns start with a crash; sections that thin out echo away
+- Arrange has a "pump on the drops" option
+
 ## v0.41 (15 October 2026)
 
 - **Export** (project screen): the song or a pattern as a stereo mix, stems (drums, bass, lead, chords, effects) and/or a MIDI file

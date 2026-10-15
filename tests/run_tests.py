@@ -745,8 +745,8 @@ def touchscreen_builds_and_plays_a_song(work):
     tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
     h.at(100, "ockm-bpm 190")
     tap(150, 759, 36)                    # song tab
-    tap(200, 727, 282)                   # add pattern 2
-    tap(250, 640, 282)                   # add pattern 1 after it
+    tap(200, 663, 278)                   # add pattern 2
+    tap(250, 620, 278)                   # add pattern 1 after it
     tap(300, 300, 153)                   # select step 1
     tap(350, 380, 153)                   # step 1: one more repeat
     tap(400, 856, 156)                   # play button plays: the song
@@ -1029,6 +1029,50 @@ def part_off_and_build_rise(work):
     assert rise[-1] == 0, f"the rise should drop to 0 when switched off: {rise[-3:]}"
 
 @test
+def song_transitions_gap_riser_impact(work):
+    """Song: pattern 1 twice, ending with riser + gap, then pattern 2, which starts with an impact. At 120 bpm a bar is 2 s.
+    The riser starts on the last bar, the gap mutes the last beat, the impact lands on the downbeat of pattern 2."""
+    h = Harness(); h.record(os.path.join(work, "trans.wav"))
+    h.show("ockm-song-pos", "ockm-gap", "ockm-riser-go", "ockm-impact-go")
+    h.at(100, "ockm-bpm 120 ; ockm-length 16 ; ockm-verb-mix 0 ; ockm-delay-mix 0 ; ockm-swing 50 ; ockm-fill-every 0")
+    h.at(150, "ockm-pat-d4 const 0 ; ockm-edit d4 0 1 ; ockm-edit d4 2 1 ; ockm-edit d4 4 1 ; ockm-edit d4 6 1 ; ockm-edit d4 8 1 ; ockm-edit d4 10 1 ; ockm-edit d4 12 1 ; ockm-edit d4 14 1")
+    h.at(170, "ockm-end 3 ; ockm-impact 0 ; ockm-pattern-copy 0 1")
+    h.at(250, "ockm-want 1"); h.at(300, "ockm-end 0 ; ockm-impact 1"); h.at(350, "ockm-want 0")
+    h.at(400, "ockm-song-list 0 2 1 1"); h.at(500, "ockm-song-start 0"); h.at(6800, "ockm-play 0")
+    out, (x, sr) = play(work, h, "t_trans", ms=6800)
+    t = lambda name: [l for l in out.splitlines() if l.startswith(name + ":")]
+    assert t("ockm-riser-go") and t("ockm-impact-go"), f"riser and impact should fire: {t('ockm-riser-go')} {t('ockm-impact-go')}"
+    gaps = [v.split(":")[1].strip() for v in t("ockm-gap")]
+    assert gaps[:2] == ["1", "0"], f"the gap should open and close: {gaps}"
+    # bar 2 runs 2.5-4.5 s (play at 0.5 s); its last beat (4.0-4.5 s) is the gap: only the effects and riser are left
+    def pk(a, b): return peak(x[int(a * sr):int(b * sr)])
+    hats = pk(2.6, 3.9); gap = pk(4.12, 4.45)
+    assert hats > 0.02, "the hats should play in bar 2"
+    imp = pk(4.52, 4.9)
+    assert imp > hats, f"the impact on the downbeat should hit harder than the hats ({imp:.3f} vs {hats:.3f})"
+
+@test
+def sidechain_pump_ducks_the_synths(work):
+    """Held organ chords, a kick on every beat (muted, so only the chords are heard). Pump 1: the chords dip just after each kick
+    and swell back. Pump 0: they don't."""
+    res = {}
+    for pump in (0, 1):
+        h = Harness(); h.record(os.path.join(work, f"pump{pump}.wav"))
+        mutes = " ; ".join(f"ockm-{t}-mute 1" for t in ["d1","d2","d3","d4","d5","d6","d7","d8","bass","lead"])
+        h.at(100, f"ockm-bpm 120 ; ockm-length 16 ; ockm-verb-mix 0 ; ockm-delay-mix 0 ; ockm-swing 50 ; ockm-chord-engine 1 ; ockm-chord-mode 1 ; {mutes}")
+        h.at(150, "ockm-pat-chord-on const 0 ; ockm-pat-chord-deg const 0 ; ockm-chord-edit 0 1 0 ; ockm-chord-k3 0 ; ockm-chord-k4 1")
+        h.at(170, "ockm-pat-d1 const 0 ; ockm-d1-sound 0 ; ockm-edit d1 0 2 ; ockm-edit d1 4 2 ; ockm-edit d1 8 2 ; ockm-edit d1 12 2 ; ockm-pump " + str(pump))
+        h.at(300, "ockm-play 1"); h.at(2400, "ockm-play 0")
+        _, (x, sr) = play(work, h, f"t_pump{pump}", ms=2400)
+        rms = lambda a, b: math.sqrt(sum(v * v for v in x[int(a * sr):int(b * sr)]) / max(1, int((b - a) * sr)))
+        # beat 2 of the bar: kick at 0.3 + 0.5 + 0.0625 (quarter-step lag) s
+        k = 0.3 + 0.5 + 0.0625
+        res[pump] = (rms(k + 0.01, k + 0.06), rms(k + 0.35, k + 0.45))
+    d0, d1 = res[0][0] / res[0][1], res[1][0] / res[1][1]
+    assert d0 > 0.85, f"no pump: the pads should hold steady ({d0:.2f})"
+    assert d1 < 0.55, f"pump on: the pads should dip after the kick ({d1:.2f})"
+
+@test
 def projects_new_open_saveas_list_delete(work):
     """Projects are folders: save as copies, new starts blank, open brings one back, delete moves it to the trash."""
     h = Harness()
@@ -1177,7 +1221,7 @@ def touchscreen_arranges_a_track(work):
     h = Harness(); h.show("ockm-song-list", "ockm-patterns-exist", "ockm-load")
     g = h.add("#X obj 10 300 r test-get;"); a1 = h.add("#X obj 10 350 array get ockm-pat-d2 0 16;"); p1 = h.add("#X obj 10 375 print SNARE;")
     h.con(g, a1); h.con(a1, p1)
-    keys = ["ockm-bass-on", "ockm-lead-on", "ockm-chord-on", "ockm-rise", "ockm-root"]
+    keys = ["ockm-bass-on", "ockm-lead-on", "ockm-chord-on", "ockm-rise", "ockm-root", "ockm-end", "ockm-impact", "ockm-pump"]
     for k in keys:
         r_ = h.add(f"#X obj 300 300 r {k};"); l_ = h.add(f"#X obj 300 325 r ockm-load;"); pk = h.add("#X obj 300 350 pack f f;")
         pr = h.add(f"#X obj 300 375 print {k.upper()};")
@@ -1204,6 +1248,12 @@ def touchscreen_arranges_a_track(work):
     assert last("ockm-rise", 3) == 1, "the build (pattern 4) rises"
     assert last("ockm-lead-on", 4) == 1 and last("ockm-bass-on", 4) == 0, "the breakdown (pattern 5): lead over pads, no bass"
     assert last("ockm-root", 6) == 11, f"the key lift (pattern 7) is 2 semitones up from A: {last('ockm-root', 6)}"
+    assert last("ockm-end", 3) == 3, "the build ends with a riser and a gap"
+    assert last("ockm-impact", 5) == 1 and last("ockm-pump", 5) == 1, "drop B lands with an impact and pumps"
+    assert last("ockm-impact", 4) == 1, "the breakdown starts with a crash"
+    assert last("ockm-end", 4) == 1, "the breakdown leads into the second build with a fill"
+    assert last("ockm-end", 7) == 0, "the outro ends the song: no ending"
+    assert last("ockm-end", 0) == 1 and last("ockm-impact", 0) == 1, "pattern 1 (main) lands with an impact and ends with a fill into the build"
     sn = printed(out, "SNARE")
     assert sn[0] == sn[-1], f"pattern 1 should be untouched: {sn[0]} then {sn[-1]}"
 
