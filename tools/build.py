@@ -366,7 +366,7 @@ for nm,snd in SLOTS:
 SYNTH_DEFAULTS={"bass":dict(engine=0,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.37,k2=0.9,k3=0.31,k4=0.55,drive=0,verb=0,delay=0,rhythm=3,notes=3),
                 "lead":dict(engine=4,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0.2,delay=0.25,rhythm=8,notes=12),
                 "chord":dict(engine=0,mode=0,level=1,k1=0.45,k2=0.5,k3=0.4,k4=0.3,type=0,smooth=1,verb=0.3,delay=0.35,rhythm=0,prog=0)}
-PATTERN_KEYS=[("ockm-drum-loop",0,None),("ockm-len",64,None),("ockm-len-max",64,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None),("ockm-leader",0,None),("ockm-drum-groove",-1,None),("ockm-fill-every",0,None),("ockm-fill-style",0,None)]
+PATTERN_KEYS=[("ockm-bass-on",1,None),("ockm-lead-on",1,None),("ockm-chord-on",1,None),("ockm-rise",0,None),("ockm-drum-loop",0,None),("ockm-len",64,None),("ockm-len-max",64,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None),("ockm-leader",0,None),("ockm-drum-groove",-1,None),("ockm-fill-every",0,None),("ockm-fill-style",0,None)]
 for t,d in SYNTH_DEFAULTS.items():
     PATTERN_KEYS+=[(f"ockm-{t}-{k}",v,None) for k,v in d.items()]
 TABLES=[f"ockm-pat-{n}" for n,_ in SLOTS]+[f"ockm-pat-{n}-nudge" for n,_ in SLOTS]+[f"ockm-pat-{t}-{f}" for t in ("bass","lead") for f in MONO]+[f"ockm-pat-chord-{f}" for f in CHORD]
@@ -464,6 +464,12 @@ for r,(nm,snd) in enumerate(SLOTS):
 # ockm-drum-double copies the loop into the steps after it and doubles the loop (back to the whole pattern once it fills it)
 rdl=p.add("#X obj 1300 380 r ockm-drum-loop;"); vdl=p.add("#X obj 1300 405 v ockm_dloop;"); p.con(rdl,0,vdl,0)
 rsm=p.add("#X obj 1600 380 r ockm-stepms;"); vsm=p.add("#X obj 1600 405 v ockm_stepms;"); p.con(rsm,0,vsm,0)
+# build rise: with ockm-rise above 0, the high-pass climbs over the pattern (slowly at first) and drops back when the pattern changes
+rri=p.add("#X obj 1750 380 r ockm-rise;"); vri=p.add("#X obj 1750 405 v ockm_rise;"); tri=p.add("#X obj 1750 430 t b f;"); p.con(rri,0,tri,0); p.con(tri,1,vri,0)
+rstp=p.add("#X obj 1900 380 r ockm-step;")
+rex=p.add(f"#X obj 1900 455 expr if(ockm_rise>0 \\, ockm_rise*0.75*pow(({D}f1+1)/max(ockm_plen\\,1)\\,2) \\, 0);"); srn=p.add("#X obj 1900 480 s ockm-rise-now;")
+z0r=p.add("#X msg 1750 455 0;")
+for c in [(rstp,0,rex,0),(rex,0,srn,0),(tri,0,z0r,0),(z0r,0,srn,0)]: p.con(*c)
 rpl=p.add("#X obj 1450 380 r ockm-len;"); vpl=p.add("#X obj 1450 405 v ockm_plen;"); p.con(rpl,0,vpl,0)
 rdd=p.add("#X obj 1300 440 r ockm-drum-double;"); tdd=p.add("#X obj 1300 465 t b;"); gdl=p.add("#X obj 1300 490 v ockm_dloop;")
 mdl=p.add("#X obj 1300 515 moses 1;"); tdl=p.add("#X obj 1300 540 t b f f;"); sdlen=p.add("#X obj 1340 570 sel 16 32 64;")
@@ -501,7 +507,11 @@ for r,(nm,seqo,voi) in enumerate(SYN):
     sq=p.add(f"#X obj 110 {y} {seqo};"); vo=p.add(f"#X obj 560 {y} {voi};")
     gt=p.add(f"#X obj 660 {y} ockm-gate {nm} level;")
     # a quarter step late, like the drums on time, so drum steps can be nudged early
-    lq=p.add(f"#X obj 300 {y} pipe 0;"); p.con(pipe,0,lq,0); p.con(lq,0,sq,0); p.con(lq4,0,lq,1)
+    lq=p.add(f"#X obj 300 {y} pipe 0;"); p.con(pipe,0,lq,0); p.con(lq4,0,lq,1)
+    # this part on or off in this pattern (ockm-<part>-on): off stops its steps and silences it
+    pon=p.add(f"#X obj 360 {y} spigot 1;"); ron=p.add(f"#X obj 420 {y-18} r ockm-{nm}-on;"); ton=p.add(f"#X obj 420 {y+6} t f f;")
+    s0n=p.add(f"#X obj 480 {y+6} sel 0;"); ofn=p.add(f"#X msg 480 {y+24} off;")
+    for c in [(lq,0,pon,0),(pon,0,sq,0),(ron,0,ton,0),(ton,1,pon,1),(ton,0,s0n,0),(s0n,0,ofn,0),(ofn,0,vo,0)]: p.con(*c)
     p.con(sq,0,vo,0); p.con(vo,0,gt,0); p.con(gt,0,mix,0)
     vs=p.add(f"#X obj 760 {y} *~ 0;"); vt=p.add(f"#X obj 830 {y} throw~ ockm-revbus;"); vr=p.add(f"#X obj 760 {y-18} r ockm-{nm}-verb;")
     p.con(gt,0,vs,0); p.con(vs,0,vt,0); p.con(vr,0,vs,1)
@@ -510,6 +520,7 @@ for r,(nm,seqo,voi) in enumerate(SYN):
     synth_voice[nm]=vo
 s0b=p.add("#X obj 400 80 sel 0;"); offm=p.add("#X msg 400 105 off;")
 p.con(ttg,1,s0b,0); p.con(s0b,0,offm,0)
+p.con(s0b,0,p.add("#X msg 460 105 \\; ockm-rise-now 0;"),0)
 for nm in ("bass","lead","chord"): p.con(offm,0,synth_voice[nm],0)
 # generators and shared presets
 gy=by+3*40+20
@@ -943,6 +954,10 @@ h1=q.add("#X obj 30 90 hip~ 10;"); h2=q.add("#X obj 30 115 hip~ 10;"); l1=q.add(
 rf0=q.add("#X obj 300 20 r ockm-filter;"); pkf=q.add("#X obj 300 40 pack f 25;"); rgl=q.add("#X obj 400 20 r ockm-filter-glide;")
 rf=q.add("#X obj 300 60 line 0 5;"); tfn=q.add("#X obj 300 70 t f f;"); sfn=q.add("#X obj 420 70 s ockm-filter-now;")
 q.con(rf0,0,pkf,0); q.con(pkf,0,rf,0); q.con(rgl,0,rf,0); q.con(rf,0,tfn,0); q.con(tfn,1,sfn,0)
+# build rise: ockm-rise-now (0 to 1) lifts the high-pass, never lower than the filter setting already has it
+rrn=q.add("#X obj 520 20 r ockm-rise-now;"); prn=q.add("#X obj 520 40 pack f 100;"); lrn=q.add("#X obj 520 60 line 0 10;"); trn=q.add("#X obj 520 80 t b f;")
+rmx_=q.add(f"#X obj 300 75 expr if({D}f2>0.001 \\, max({D}f1 \\, {D}f2) \\, {D}f1);")
+for c in [(rrn,0,prn,0),(prn,0,lrn,0),(lrn,0,trn,0),(trn,1,rmx_,1),(trn,0,rmx_,0)]: q.con(*c)
 fx=q.add(f"#X obj 300 80 expr if({D}f1>0 \\, 20*pow(2\\,{D}f1*9.6) \\, 10) \; if({D}f1<0 \\, 20000*pow(2\\,{D}f1*9.6) \\, 20000);")
 rdv=q.add("#X obj 300 200 r ockm-drive;"); dvx=q.add(f"#X obj 300 230 expr 1+{D}f1*9;")
 th=q.add(f"#X obj 30 230 expr~ if({D}f2>1.001 \\, tanh({D}v1*{D}f2)/sqrt({D}f2) \\, {D}v1);")   # drive 0 is clean
@@ -952,7 +967,7 @@ rst=q.add("#X obj 500 250 r ockm-stepms;"); rsteps=q.add("#X obj 620 250 r ockm-
 rfb=q.add("#X obj 500 330 r ockm-delay-fb;"); rmx=q.add("#X obj 500 380 r ockm-delay-mix;")
 tff=q.add("#X obj 620 280 t b f;"); fs=q.add("#X obj 500 220 f 121;")
 sm=q.add("#X obj 30 440 +~;"); lim=q.add(f"#X obj 30 470 expr~ if(abs({D}v1)<0.8 \\, {D}v1 \\, (0.8+0.2*tanh((abs({D}v1)-0.8)/0.2))*({D}v1/abs({D}v1)));"); out=q.add("#X obj 30 510 outlet~;")   # limiter: clean below 0.8
-for c in [(inl,0,inl2,0),(inl2,0,h1,0),(h1,0,h2,0),(h2,0,l1,0),(l1,0,l2,0),(tfn,0,fx,0),(fx,0,h1,1),(fx,0,h2,1),(fx,1,l1,1),(fx,1,l2,1),
+for c in [(inl,0,inl2,0),(inl2,0,h1,0),(h1,0,h2,0),(h2,0,l1,0),(l1,0,l2,0),(tfn,0,rmx_,0),(rmx_,0,fx,0),(fx,0,h1,1),(fx,0,h2,1),(fx,1,l1,1),(fx,1,l2,1),
           (rdv,0,dvx,0),(dvx,0,th,1),(l2,0,th,0),(dcat,0,dw,0),(dr,0,fb,0),(fb,0,dw,0),(dr,0,mx,0),(mx,0,inl,1),
           (rst,0,fs,0),(fs,0,dtm,0),(rsteps,0,tff,0),(tff,1,dtm,1),(tff,0,fs,0),(dtm,0,dr,0),(rfb,0,fb,1),(rmx,0,mx,1),
           (th,0,lim,0),(lim,0,out,0)]: q.con(*c)

@@ -118,6 +118,7 @@ Everything is remembered: drum kit, synth sounds, effects, tempo, swing, key and
 3. **Plain Pure Data.** Stick to standard objects so it runs the same in plugdata and on the Pi.
 4. **Every sound is a swappable box.** Sequencers say "go". Voices make sound. Either can change without touching the other.
 5. **Musical by default.** Presets and starter patterns that sound good the moment you press play.
+6. **Help, don't take over.** You can do everything by hand, or let the machine do it. Whatever it makes is ordinary patterns and songs you can change. Not a one-button song generator
 
 ## Hardware (planned)
 
@@ -146,7 +147,7 @@ Everything is remembered: drum kit, synth sounds, effects, tempo, swing, key and
 11. ~~8 drum slots, chord and lead synth tracks~~ (v0.10)
 12. ~~One central settings store: projects, patterns and the drum kit, saved and restored~~ (v0.11)
 13. ~~Your drum samples, chosen per slot~~ (v0.36). Later: load sample folders from a USB stick or SD card on the Pi
-14. ~~Song mode, MPC style~~ (v0.26). Next: a song generator that writes a starting chain (intro, build, drop, break, outro) for you to tweak
+14. ~~Song mode, MPC style~~ (v0.26). ~~Arrange: turn pattern 1 into a whole track~~ (v0.40). Next: export
 15. ~~A usability pass~~ (v0.26). Keep going after each round of playing
 16. ~~A setup screen for tempo, swing, accents, volume and MIDI clock~~ (v0.26)
 
@@ -417,6 +418,24 @@ Reverb and delay work like a mixing desk: each track has a **send** that sets ho
 - **Follower** (sync 1). OCKM_GENERATOR waits for MIDI start, then steps in time with incoming clock. The BPM box shows the measured tempo. Stop on the other gear stops it too.
 
 Pick the MIDI port in plugdata's audio and MIDI settings. On the Pi, the iRig Pro Duo's MIDI ports should work for this.
+
+## Arrange
+
+On the song tab, **arrange...** turns pattern 1 (your groove) into a whole track. It writes variations into patterns 2 to 8 and a song chain that plays them, and switches the play button to the song. Everything it makes is ordinary patterns and an ordinary song.
+
+| Option | Choices |
+|---|---|
+| Style | club (long, with builds and a key lift), short (radio edit), slow burn (long intro, gradual layers, no builds) |
+| Length | shorter, standard, longer |
+| Sections | intro, groove, build, breakdown, drop B, key lift, outro (pattern 1 is always the main section) |
+| Builds | snare roll, filter rise, or both |
+| Breakdown | pads (no kick, chords as long pads, a new lead melody), drums only, no kick |
+| Key lift | up 1, 2 or 5 semitones |
+| Variation | subtle or bold (bold thins more and changes the chord rhythm) |
+
+**Surprise me** picks the options at random. If patterns 2 to 8 already have something in, arrange says so first; back to last save undoes it.
+
+Two settings it uses are useful by hand too: **part on/off** (on each synth tab: the part plays in this pattern or doesn't) and **rise** (on perform, by the filter: the high-pass climbs across this pattern and drops back on the next).
 
 ## Generators
 

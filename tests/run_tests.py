@@ -643,7 +643,7 @@ def touchscreen_screens_draw(work):
         raise Skip("Pillow not installed")
     p = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_preview.py"), os.path.join(work, "preview")], capture_output=True, text=True)
     assert p.returncode == 0, p.stderr[-800:]
-    assert len(os.listdir(os.path.join(work, "preview"))) == 19, "expected nineteen screen pictures"
+    assert len(os.listdir(os.path.join(work, "preview"))) == 20, "expected twenty screen pictures"
 
 @test
 def mute_solo_and_levels(work):
@@ -1013,6 +1013,22 @@ def blank_project_synths_start_and_sound(work):
         assert peak(snd) > 0.05, f"{part} on a blank project should be heard once started: peak {peak(snd):.3f}"
 
 @test
+def part_off_and_build_rise(work):
+    """A part switched off in a pattern goes silent; the build rise climbs over the pattern, and drops back to 0 when switched off."""
+    h = Harness(); h.record(os.path.join(work, "partoff.wav")); h.show("ockm-rise-now")
+    others = " ; ".join(f"ockm-{t}-mute 1" for t in ["d1","d2","d3","d4","d5","d6","d7","d8","lead","chord"])
+    h.at(100, f"ockm-bass-gen bang ; {others} ; ockm-length 16 ; ockm-bpm 120 ; ockm-rise 1 ; ockm-play 1")
+    h.at(1300, "ockm-bass-on 0 ; ockm-rise 0")
+    h.at(2600, "ockm-play 0")
+    out, (x, sr) = play(work, h, "t_partoff", ms=2600)
+    on, off = peak(x[int(0.3 * sr):int(1.2 * sr)]), peak(x[int(1.5 * sr):int(2.5 * sr)])
+    assert on > 0.05 and off < 0.005, f"the bass should play, then stop when switched off ({on:.3f} then {off:.4f})"
+    rise = [float(v) for v in printed(out, "ockm-rise-now")]
+    first = rise[:8]
+    assert len(first) >= 8 and all(b > a for a, b in zip(first, first[1:])) and first[-1] > first[0], f"the rise should climb step by step: {first}"
+    assert rise[-1] == 0, f"the rise should drop to 0 when switched off: {rise[-3:]}"
+
+@test
 def projects_new_open_saveas_list_delete(work):
     """Projects are folders: save as copies, new starts blank, open brings one back, delete moves it to the trash."""
     h = Harness()
@@ -1151,6 +1167,45 @@ def touchscreen_velocity_timing_loop_and_banks(work):
     loops = [int(float(v)) for v in printed(out, "ockm-drum-loop")]
     assert 16 in loops and loops[-1] == 32, f"1-bar loop then double should give 2 bars: {loops}"
     assert printed(out, "ockm-drum-groove")[-1:] == ["13"], f"bank 2's first groove is number 13: {printed(out, 'ockm-drum-groove')}"
+
+@test
+def touchscreen_arranges_a_track(work):
+    """Song tab, arrange, club style: patterns 2-8 become intro, groove, build, breakdown, drop B, key lift and outro,
+    with the right parts on and off, the build rising and the lift in a new key; a song chains them; pattern 1 is untouched."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness(); h.show("ockm-song-list", "ockm-patterns-exist", "ockm-load")
+    g = h.add("#X obj 10 300 r test-get;"); a1 = h.add("#X obj 10 350 array get ockm-pat-d2 0 16;"); p1 = h.add("#X obj 10 375 print SNARE;")
+    h.con(g, a1); h.con(a1, p1)
+    keys = ["ockm-bass-on", "ockm-lead-on", "ockm-chord-on", "ockm-rise", "ockm-root"]
+    for k in keys:
+        r_ = h.add(f"#X obj 300 300 r {k};"); l_ = h.add(f"#X obj 300 325 r ockm-load;"); pk = h.add("#X obj 300 350 pack f f;")
+        pr = h.add(f"#X obj 300 375 print {k.upper()};")
+        h.con(r_, pk, 0, 0); h.con(l_, pk, 0, 1); h.con(pk, pr)
+    h.at(100, "ockm-edit d2 4 1 ; ockm-edit d2 12 1 ; ockm-root 9 ; test-get bang")
+    h.at(200, "ockm-ui-test tap 759 36")      # song tab
+    h.at(300, "ockm-ui-test tap 348 570")     # arrange...
+    h.at(400, "ockm-ui-test tap 624 544")     # replace and arrange (club, everything on)
+    h.at(3500, "test-get bang")
+    f = os.path.join(work, "t_arrange.pd"); h.finish(3700, f)
+    out = run(work, f, timeout=60)
+    song = printed(out, "ockm-song-list")
+    assert song, "arrange should write a song"
+    steps = [int(float(v)) for v in song[-1].split()]
+    pats = steps[0::2]
+    assert pats == [1, 2, 0, 3, 4, 3, 5, 6, 7], f"song chain should be intro, groove, main, build, breakdown, build, drop B, lift, outro: {pats}"
+    loads = {int(float(v)) for v in printed(out, "ockm-load")}
+    assert set(range(1, 8)) <= loads, f"arrange should write patterns 2 to 8: {sorted(loads)}"
+    def last(k, pat):
+        v = [l.split() for l in printed(out, k.upper()) if l.split()[1] == str(pat)]
+        return float(v[-1][0]) if v else None
+    assert last("ockm-bass-on", 1) == 0 and last("ockm-chord-on", 1) == 0, "the intro (pattern 2) has no bass or chords"
+    assert last("ockm-bass-on", 2) == 1, "the groove (pattern 3) brings the bass in"
+    assert last("ockm-rise", 3) == 1, "the build (pattern 4) rises"
+    assert last("ockm-lead-on", 4) == 1 and last("ockm-bass-on", 4) == 0, "the breakdown (pattern 5): lead over pads, no bass"
+    assert last("ockm-root", 6) == 11, f"the key lift (pattern 7) is 2 semitones up from A: {last('ockm-root', 6)}"
+    sn = printed(out, "SNARE")
+    assert sn[0] == sn[-1], f"pattern 1 should be untouched: {sn[0]} then {sn[-1]}"
 
 def write_tone(path, hz, secs, sr=44100, channels=1):
     w = wave.open(path, "w"); w.setnchannels(channels); w.setsampwidth(2); w.setframerate(sr)

@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.39"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.40"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
@@ -136,6 +136,7 @@ function ui:defaults()
   v["ockm-volume"] = 1; v["ockm-verb-mix"] = 0.5; v["ockm-delay-mix"] = 0.5
   v["ockm-drive"] = 0; v["ockm-delay-fb"] = 0.4; v["ockm-delay-steps"] = 3; v["ockm-verb-size"] = 0.6; v["ockm-verb-tone"] = 0.5
   for _, t in ipairs(SYNTHS) do v["ockm-"..t.."-level"] = 1 end
+  v["ockm-bass-on"] = 1; v["ockm-lead-on"] = 1; v["ockm-chord-on"] = 1; v["ockm-rise"] = 0
   v["ockm-bass-mode"] = 0; v["ockm-lead-mode"] = 0; v["ockm-chord-mode"] = 0   -- 0 auto, 1 manual
   v["ockm-bass-sync"] = 1; v["ockm-lead-sync"] = 1; v["ockm-leader"] = 0; v["ockm-drum-groove"] = -1
   v["ockm-drum-loop"] = 0; v["ockm-fill-every"] = 0; v["ockm-fill-style"] = 0; v["ockm-swing"] = 56; v["ockm-accent"] = 0.3; v["ockm-sync"] = 0; v["ockm-song-mode"] = 0; v["ockm-song-loop"] = 1; v["ockm-volume"] = 1
@@ -163,6 +164,8 @@ function ui:hooks()
   for _, k in ipairs({"engine","k1","k2","k3","k4","type","smooth","verb","delay","rhythm","prog"}) do h[#h+1] = "ockm-chord-"..k end
   for _, t in ipairs(TRACKS) do h[#h+1] = "ockm-"..t.."-mute"; h[#h+1] = "ockm-"..t.."-solo" end
   for _, t in ipairs(SYNTHS) do h[#h+1] = "ockm-"..t.."-level"; h[#h+1] = "ockm-"..t.."-mode" end
+  for _, t in ipairs(SYNTHS) do h[#h+1] = "ockm-"..t.."-on" end
+  h[#h+1] = "ockm-rise"
   h[#h+1] = "ockm-bass-sync"; h[#h+1] = "ockm-lead-sync"; h[#h+1] = "ockm-leader"; h[#h+1] = "ockm-drum-groove"
   for _, p in ipairs({ "bass", "lead" }) do
     for _, k in ipairs({ "lock", "density", "seed" }) do h[#h+1] = "ockm-"..p.."-"..k end
@@ -242,6 +245,7 @@ function ui:postinitialize()
   self.clock = pd.Clock:new():register(self, "redraw")
   self.msgclock = pd.Clock:new():register(self, "clear_msg")
   self.audclock = pd.Clock:new():register(self, "audition")
+  self.jobclock = pd.Clock:new():register(self, "job_step")
 end
 
 -- play a drum slot once. After a sample change it waits a moment, so the new file is loaded first
@@ -274,6 +278,7 @@ function ui:finalize()
   if self.clock then self.clock:destruct() end
   if self.msgclock then self.msgclock:destruct() end
   if self.audclock then self.audclock:destruct() end
+  if self.jobclock then self.jobclock:destruct() end
   for _, t in pairs(self.tables) do if t.destruct then t:destruct() end end
 end
 
@@ -354,6 +359,7 @@ function ui:layout()
   elseif self.screen == "setup" then self:layout_setup(add)
   else self:layout_synth(add) end
   if self.sheet == "newpat" then self:layout_newpat(add) end
+  if self.sheet == "arrange" then self:layout_arrange(add) end
   -- messages on screens that have no message line of their own
   if self.msg and (self.screen == "perform" or self.screen == "compose" or self.screen == "mixer" or self.screen == "song" or self.screen == "setup" or self.screen == "drums") then
     add{ kind="toast", x=W / 2 - 330, y=H - 50, w=660, h=38, label=self.msg }
@@ -473,6 +479,12 @@ function ui:layout_perform(add)
   add{ kind="choice", x=rx + 2 * mw + 6 - 50, y=460, w=46, h=22, label="hold", small=true, sel=hold, tap=function()
     self.filter_hold = not hold
     if hold then psend("ockm-filter-glide", "list", { 0, 180 }) end
+  end }
+  -- build rise (this pattern): the high-pass climbs across the pattern and drops back on the next one
+  local rise = (self.v["ockm-rise"] or 0) > 0
+  add{ kind="choice", x=rx + 4, y=460, w=46, h=22, label="rise", small=true, sel=rise, accent=true, tap=function()
+    self:send("ockm-rise", rise and 0 or 1)
+    self:say(rise and "rise off" or "rise on: the filter climbs across this pattern, then drops on the next")
   end }
   add{ kind="pad", x=rx + 2 * (mw + 6), y=456, w=mw, h=60, hook="ockm-delay-throw", label="throw", sub="hold" }
   add{ kind="hbar", x=rx + 3 * (mw + 6), y=456, w=mw, h=60, hook="ockm-drive", lo=0, hi=1, label="drive", bold=true }
@@ -687,7 +699,15 @@ function ui:layout_synth(add)
   end
   -- what's in charge, and the camera switch
   local info = self.msg or (auto and self:auto_summary(part) or ("yours: " .. self:step_info()))
-  add{ kind="text", x=16, y=276, w=W - 300, h=12, label=info, size=11, col=self.msg and "acc" or nil }
+  add{ kind="text", x=16, y=276, w=W - 440, h=12, label=info, size=11, col=self.msg and "acc" or nil }
+  -- this part on or off in this pattern (an intro without bass, say)
+  local onk = "ockm-"..part.."-on"
+  local on = (self.v[onk] or 1) > 0
+  add{ kind="choice", x=W - 16 - 180 - 6 - 100 - 6 - 96, y=266, w=96, h=34, small=true, accent=true, sel=on,
+       label=on and (part .. " on") or (part .. " off"), tap=function()
+         self:send(onk, on and 0 or 1)
+         self:say(on and (part .. " is off in this pattern") or (part .. " plays in this pattern"))
+       end }
   if mono and not auto then
     add{ kind="choice", x=W - 16 - 280, y=266, w=86, h=34, label="slide", accent=true, small=true, sel=self:mono_get(self.sel_step, "slide") > 0,
          tap=function() self:mono_toggle_slide() end }
@@ -1037,6 +1057,220 @@ function ui:song_edit(fn, row)
   self:send_song()
 end
 
+-- ------------------------------------------------------------------ arrange
+-- "8 and generate": your groove in pattern 1 becomes a whole track. Arrange writes variations of it into
+-- patterns 2-8 (intro, build, breakdown and so on) and a song chain that strings them together.
+-- Everything it makes is ordinary patterns and an ordinary song: change anything afterwards.
+local ARR_SECTIONS = { { "intro", "intro" }, { "groove", "groove" }, { "build", "build" }, { "breakdown", "breakdown" },
+                       { "dropb", "drop B" }, { "lift", "key lift" }, { "outro", "outro" } }
+local ARR_STYLES = {
+  { name = "club", on = { intro=1, groove=1, build=1, breakdown=1, dropb=1, lift=1, outro=1 }, build = 3,
+    bars = { intro=16, groove=16, main=32, breakdown=16, dropb=32, lift=16, outro=16 } },
+  { name = "short", on = { intro=1, groove=0, build=1, breakdown=1, dropb=1, lift=0, outro=1 }, build = 1,
+    bars = { intro=4, groove=4, main=8, breakdown=8, dropb=8, lift=8, outro=4 } },
+  { name = "slow burn", on = { intro=1, groove=1, build=0, breakdown=1, dropb=1, lift=0, outro=1 }, build = 2,
+    bars = { intro=32, groove=32, main=32, breakdown=16, dropb=32, lift=16, outro=32 } },
+}
+local ARR_LENGTHS = { { "shorter", 0.5 }, { "standard", 1 }, { "longer", 1.5 } }
+local ARR_BUILDS = { "snare roll", "filter rise", "both" }
+local ARR_BREAKS = { "pads", "drums only", "no kick" }
+local ARR_LIFTS = { 1, 2, 5 }
+local ARR_VARS = { "subtle", "bold" }
+
+function ui:arr_opts()
+  if not self.arr then
+    self.arr = { style = 1, len = 2, build = 3, brk = 1, lift = 2, var = 1, on = {} }
+    for k, v in pairs(ARR_STYLES[1].on) do self.arr.on[k] = v end
+  end
+  return self.arr
+end
+function ui:arr_style(n)
+  local a = self:arr_opts()
+  a.style = n; a.build = ARR_STYLES[n].build
+  for k, v in pairs(ARR_STYLES[n].on) do a.on[k] = v end
+end
+function ui:arr_surprise()
+  local a = self:arr_opts()
+  self:arr_style(math.random(1, #ARR_STYLES))
+  a.len = math.random(1, 3); a.brk = math.random(1, 3); a.lift = math.random(1, 3); a.var = math.random(1, 2)
+  for _, sc in ipairs(ARR_SECTIONS) do if sc[1] ~= "intro" and sc[1] ~= "outro" and math.random() < 0.25 then a.on[sc[1]] = 1 - (a.on[sc[1]] or 0) end end
+end
+-- which patterns each section goes in, and the song chain (pattern, repeats)
+function ui:arr_plan()
+  local a = self:arr_opts()
+  local st = ARR_STYLES[a.style]
+  local slots, n = {}, 1
+  for _, sc in ipairs(ARR_SECTIONS) do
+    if (a.on[sc[1]] or 0) > 0 and n <= 7 then slots[sc[1]] = n; n = n + 1 end
+  end
+  local pbars = math.max(1, math.floor((self.v["ockm-len"] or 64) / 16))
+  local mult = ARR_LENGTHS[a.len][2]
+  local function rep(sec) return math.max(1, math.floor((st.bars[sec] or 8) * mult / pbars + 0.5)) end
+  local chain = {}
+  local function add(sec, r) local slot = (sec == "main") and 0 or slots[sec]; if slot then chain[#chain + 1] = { slot, r or rep(sec) } end end
+  add("intro"); add("groove"); add("main")
+  add("build", 1); add("breakdown"); add("build", 1)
+  if slots.dropb then add("dropb") else add("main") end
+  add("lift"); add("outro")
+  local bars = 0
+  for _, c in ipairs(chain) do bars = bars + c[2] * pbars end
+  return slots, chain, bars, n - 1
+end
+
+-- the slots of the drum kit by what they play: kick, snare (snare and clap), hat, ohat, perc, tom
+local KIND_OF = { [0] = "kick", [1] = "snare", [2] = "snare", [3] = "perc", [4] = "hat", [5] = "ohat", [6] = "tom", [7] = "perc" }
+function ui:drum_slots(kinds)
+  local out = {}
+  for i, nm in ipairs(SLOTS) do
+    if kinds[KIND_OF[math.floor(self.v["ockm-"..nm.."-sound"] or 0)]] then out[#out + 1] = nm end
+  end
+  return out
+end
+function ui:arr_keep_only(kinds)
+  for i, nm in ipairs(SLOTS) do
+    if not kinds[KIND_OF[math.floor(self.v["ockm-"..nm.."-sound"] or 0)]] then psend("ockm-pat-"..nm, "const", { 0 }) end
+  end
+end
+function ui:arr_clear(kinds) for _, nm in ipairs(self:drum_slots(kinds)) do psend("ockm-pat-"..nm, "const", { 0 }) end end
+
+-- reshape the pattern that's open into one section
+function ui:arr_apply(sec)
+  local a = self:arr_opts()
+  local len = math.floor(self.v["ockm-len"] or 64)
+  local bold = a.var == 2
+  for _ = 1, 3 do psend("ockm-drum-double", "bang", {}) end     -- a drums loop becomes real steps first
+  psend("ockm-fill-every", "float", { 0 })
+  local function parts(b, l, c)
+    psend("ockm-bass-on", "float", { b }); psend("ockm-lead-on", "float", { l }); psend("ockm-chord-on", "float", { c })
+  end
+  if sec == "intro" then
+    self:arr_keep_only(bold and { kick = 1, hat = 1 } or { kick = 1, hat = 1, perc = 1 }); parts(0, 0, 0)
+  elseif sec == "groove" then
+    self:arr_clear({ snare = 1 }); parts(1, 0, bold and 1 or 0)
+    if bold then psend("ockm-chord-rhythm", "float", { 3 }) end            -- dub stabs, sparse
+  elseif sec == "build" then
+    self:arr_clear({ snare = 1, ohat = 1, perc = 1, tom = 1 })
+    -- the kick drops out for the last bar (or the last beat of a 1-bar pattern)
+    local cut = (len > 16) and (len - 16) or (len - 4)
+    for _, nm in ipairs(self:drum_slots({ kick = 1 })) do for st = cut, len - 1 do psend("ockm-edit", nm, { st, 0 }) end end
+    if a.build ~= 2 then
+      -- snare roll: quarters, then eighths, then sixteenths, getting louder
+      local sn = self:drum_slots({ snare = 1 })[1]
+      if sn then
+        for st = 0, len - 1 do
+          local f = st / len
+          local every = (f < 0.5) and 4 or ((f < 0.75) and 2 or 1)
+          if st % every == 0 then
+            local v = 0.25 + 0.7 * f
+            psend("ockm-edit", sn, { st, (v >= 0.9) and 2 or math.floor(v * 100) / 100 })
+          end
+        end
+      end
+    end
+    psend("ockm-rise", "float", { (a.build ~= 1) and 1 or 0 })
+    parts(0, 0, 1)
+  elseif sec == "breakdown" then
+    if a.brk == 1 then
+      self:arr_keep_only({ hat = 1, perc = 1 }); parts(0, 1, 1)
+      psend("ockm-chord-rhythm", "float", { 0 })                               -- bar pads
+      psend("ockm-lead-seed", "float", { math.floor(self.v["ockm-lead-seed"] or 0) + 2 })
+    elseif a.brk == 2 then
+      parts(0, 0, 0)
+    else
+      self:arr_clear({ kick = 1 }); parts(0, 1, 1)
+    end
+  elseif sec == "dropb" then
+    psend("ockm-bass-seed", "float", { math.floor(self.v["ockm-bass-seed"] or 0) + 1 })
+    psend("ockm-lead-seed", "float", { math.floor(self.v["ockm-lead-seed"] or 0) + 1 })
+    if bold then psend("ockm-chord-rhythm", "float", { (math.floor(self.v["ockm-chord-rhythm"] or 0) + 1) % #CHORD_RHY }) end
+  elseif sec == "lift" then
+    psend("ockm-root", "float", { (math.floor(self.v["ockm-root"] or 9) + ARR_LIFTS[a.lift]) % 12 })
+  elseif sec == "outro" then
+    self:arr_keep_only(bold and { kick = 1, hat = 1 } or { kick = 1, hat = 1, perc = 1, ohat = 1 }); parts(0, 0, 0)
+  end
+  psend("ockm-drums-changed", "bang", {}); psend("ockm-refresh", "bang", {})
+end
+
+-- run the whole job as a short queue, so generators settle before the next pattern opens
+function ui:job_step()
+  local f = table.remove(self.jobs or {}, 1)
+  if f then f() end
+  if self.jobs and #self.jobs > 0 then self.jobclock:delay(80) else self.jobs = nil; self:dirty() end
+end
+function ui:arrange()
+  local slots, chain, bars = self:arr_plan()
+  if self.playing ~= 0 then psend("ockm-play", "float", { 0 }) end
+  local jobs = {}
+  local order = {}
+  for _, sc in ipairs(ARR_SECTIONS) do if slots[sc[1]] then order[#order + 1] = sc[1] end end
+  jobs[#jobs + 1] = function() psend("ockm-want", "float", { 0 }) end
+  for _, sec in ipairs(order) do
+    local n = slots[sec]
+    local from = (sec == "lift" and slots.dropb) and slots.dropb or 0
+    jobs[#jobs + 1] = function() psend("ockm-pattern-copy", "list", { from, n }); self:set_used(n, true); psend("ockm-want", "float", { n }) end
+    jobs[#jobs + 1] = function() self:arr_apply(sec) end
+  end
+  jobs[#jobs + 1] = function()
+    psend("ockm-want", "float", { 0 })
+    self.song = chain; self.song_sel = 0; self:send_song()
+    self:send("ockm-song-mode", 1)
+    local secs = math.floor(bars * 4 * 60 / (self.v["ockm-bpm"] or 124) + 0.5)
+    self:say(string.format("arranged: %d sections, about %d:%02d. Press play. Save to keep it", #order + 1, math.floor(secs / 60), secs % 60))
+  end
+  self.jobs = jobs
+  self.jobclock:delay(10)
+end
+
+function ui:layout_arrange(add)
+  local a = self:arr_opts()
+  local slots, chain, bars, used = self:arr_plan()
+  add{ kind="zone", x=0, y=0, w=W, h=H, tap=function() end }
+  local x, y, w, h = 24, 56, W - 48, H - 72
+  add{ kind="sheet", x=x, y=y, w=w, h=h }
+  add{ kind="text", x=x + 20, y=y + 16, w=w - 40, h=20, label="Arrange: turn pattern 1 into a whole track", size=18, col="txt" }
+  add{ kind="text", x=x + 20, y=y + 42, w=w - 40, h=12, size=11,
+       label="Writes variations of pattern 1 into patterns 2-" .. (used + 1) .. " and a song to play them. Everything stays editable." }
+  local lx, cx = x + 20, x + 150
+  local function row(yy, label, list, cur, fn, wd)
+    add{ kind="text", x=lx, y=yy + 10, w=120, h=12, label=label, size=11 }
+    local bw = wd or 120
+    for i, it in ipairs(list) do
+      add{ kind="choice", x=cx + (i - 1) * (bw + 6), y=yy, w=bw, h=32, small=true, label=it, sel=(cur == i), tap=function() fn(i) end }
+    end
+  end
+  local names = {}; for i, st in ipairs(ARR_STYLES) do names[i] = st.name end
+  row(y + 66, "style", names, a.style, function(i) self:arr_style(i) end)
+  local lens = {}; for i, l in ipairs(ARR_LENGTHS) do lens[i] = l[1] end
+  row(y + 106, "length", lens, a.len, function(i) a.len = i end)
+  -- sections: toggles (pattern 1, your groove, is always the main section)
+  add{ kind="text", x=lx, y=y + 156, w=120, h=12, label="sections", size=11 }
+  local sw = (w - 170 - 6 * 6) / 7
+  for i, sc in ipairs(ARR_SECTIONS) do
+    local on = (a.on[sc[1]] or 0) > 0
+    add{ kind="choice", x=cx + (i - 1) * (sw + 6), y=y + 146, w=sw, h=32, small=true, accent=true, label=sc[2], sel=on,
+         tap=function() a.on[sc[1]] = on and 0 or 1 end }
+  end
+  row(y + 196, "builds", ARR_BUILDS, a.build, function(i) a.build = i end)
+  row(y + 236, "breakdown", ARR_BREAKS, a.brk, function(i) a.brk = i end)
+  local lifts = {}; for i, l in ipairs(ARR_LIFTS) do lifts[i] = "up " .. l .. ((l == 1) and " semitone" or " semitones") end
+  row(y + 276, "key lift", lifts, a.lift, function(i) a.lift = i end, 140)
+  row(y + 316, "variation", ARR_VARS, a.var, function(i) a.var = i end)
+  -- what you'll get
+  local secs = math.floor(bars * 4 * 60 / (self.v["ockm-bpm"] or 124) + 0.5)
+  local busy = false
+  for nn = 1, 7 do if self:is_used(nn) then busy = true end end
+  add{ kind="text", x=lx, y=y + 368, w=w - 40, h=12, size=11, col="txt",
+       label=string.format("%d sections in %d patterns, a %d-step song, about %d:%02d at %d bpm", used + 1, used + 1, #chain,
+                           math.floor(secs / 60), secs % 60, math.floor(self.v["ockm-bpm"] or 124)) }
+  if busy then add{ kind="text", x=lx, y=y + 388, w=w - 40, h=12, size=11, col="acc",
+                    label="Patterns 2-8 already have something in: arrange replaces them (back to last save undoes it)" } end
+  local by = y + h - 64
+  add{ kind="btn", x=lx, y=by, w=160, h=48, label="surprise me", tap=function() self:arr_surprise() end }
+  add{ kind="btn", x=x + w - 20 - 160, y=by, w=160, h=48, label="cancel", quiet=true, tap=function() self.sheet = nil end }
+  add{ kind="btn", x=x + w - 20 - 160 - 12 - 240, y=by, w=240, h=48, accent=true, label=busy and "replace and arrange" or "arrange",
+       tap=function() self.sheet = nil; self:arrange() end }
+end
+
 function ui:layout_song(add)
   local song = self.song or {}
   local sel = clamp(self.song_sel or 0, 0, math.max(0, #song - 1))
@@ -1080,6 +1314,11 @@ function ui:layout_song(add)
     add{ kind="arrow", x=16, y=550, w=60, h=40, dir=-1, on=self.song_page > 0, tap=function() self.song_page = self.song_page - 1 end }
     add{ kind="text", x=84, y=564, w=120, h=14, label="page " .. (self.song_page + 1) .. " of " .. pages, size=11 }
     add{ kind="arrow", x=200, y=550, w=60, h=40, dir=1, on=self.song_page < pages - 1, tap=function() self.song_page = self.song_page + 1 end }
+  end
+  add{ kind="btn", x=268, y=550, w=160, h=40, accent=true, label="arrange...", tap=function() self.sheet = "arrange" end }
+  if #song == 0 then
+    add{ kind="text", x=16, y=170, w=LW, h=14, size=13, col="txt", label="No song yet." }
+    add{ kind="text", x=16, y=194, w=LW, h=12, size=11, label="Add steps on the right, or tap arrange to build a whole track from pattern 1." }
   end
   if #song > 0 then
     add{ kind="btn", x=LW - 124, y=550, w=140, h=40, label=self.confirm == "song" and "tap again to clear" or "clear the song", quiet=self.confirm ~= "song", tap=function()

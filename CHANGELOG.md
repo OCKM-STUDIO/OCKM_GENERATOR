@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.40 (15 October 2026)
+
+- **Arrange**: on the song tab, turn pattern 1 into a whole track. Writes intro, groove, build, breakdown, drop B, key lift and outro variations into patterns 2-8, plus the song chain. Options for style, length, sections, builds, breakdowns, key lift and variation, and a surprise me button
+- **Part on/off per pattern** on each synth tab
+- **Rise**: a per-pattern build where the high-pass climbs across the pattern (on perform, by the filter)
+
 ## v0.39 (15 October 2026)
 
 - Three new chord sounds: **piano** (M1-style house piano), **rhodes** (electric piano with bark and tremolo) and **strings** (string machine with an ensemble chorus)
