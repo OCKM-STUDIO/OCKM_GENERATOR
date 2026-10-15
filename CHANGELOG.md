@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.45 (15 October 2026)
+
+- **Per-track EQ** on the mixer: low cut, low shelf, a movable mid bell and high shelf for every track, with a response curve. Saved with the project
+- **See each track's spectrum** behind the EQ curve while it plays (8 octave bands, 60 Hz to 8 kHz). The analyser only runs while you look, to save CPU
+- **De-mud** listens to your mix for 4 seconds and sets low cuts track by track from what it hears, plus a low-mid scoop if the mix is crowded there. The kick and bass keep their low end
+
 ## v0.44 (15 October 2026)
 
 - **Three synth sounds per drum: 909, 808 and industrial**, before your samples in the drum picker

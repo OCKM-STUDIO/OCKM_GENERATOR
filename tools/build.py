@@ -388,6 +388,76 @@ stp=p.add("#X msg 600 120 stop;"); lr=p.add("#X msg 680 120 -1;")
 for c in [(rpl,0,sp0,0),(sp0,0,rst,0),(sp0,0,fz,0),(fz,0,vfz,0),(sp0,0,stp,0),(stp,0,dgap,0),(stp,0,dgo,0),(stp,0,dd,0),(stp,0,dd2,0),(stp,0,dq,0),(sp0,0,lr,0),(lr,0,lst,1)]: p.con(*c)
 p.save("seq/ockm-transitions.pd","#N canvas 120 120 900 500 12;")
 
+# ---------------- per-track EQ: a low cut and three bands ----------------
+# Hooks per track: ockm-<t>-lowcut (Hz, 20 = off), -eqlow (dB at 100 Hz, shelf), -eqmid (dB), -eqmidf (Hz), -eqhigh (dB at 8 kHz, shelf).
+# The bands are biquads with RBJ cookbook coefficients, worked out when a knob moves (so nothing heavy runs per sample).
+EQ_DEF={"lowcut":20,"eqlow":0,"eqmid":0,"eqmidf":400,"eqhigh":0}
+SR="max(ockm_sr\\,22050)"
+def eq_band(p,kind,x,db_hook,fdef,f_hook=None):
+    """one biquad band; returns the biquad~ object"""
+    rdb=p.add(f"#X obj {x} 60 r {db_hook};"); pk=p.add(f"#X obj {x} 110 pack f {fdef};"); p.con(rdb,0,pk,0)
+    if f_hook:
+        rf=p.add(f"#X obj {x+90} 60 r {f_hook};"); tf=p.add(f"#X obj {x+90} 85 t b f;"); p.con(rf,0,tf,0); p.con(tf,1,pk,1); p.con(tf,0,pk,0)
+    ac=p.add(f"#X obj {x} 140 expr pow(10\\,{D}f1/40) \\; cos(6.283185*{D}f2/{SR}) \\; sin(6.283185*{D}f2/{SR});")
+    A,c,sn="$f1","$f2","$f3"
+    if kind=="low":
+        r_=f"2*sqrt({A})*{sn}*0.70711"
+        a0=f"(({A}+1)+({A}-1)*{c}+{r_})"
+        cf=[f"2*(({A}-1)+({A}+1)*{c})/{a0}", f"-(({A}+1)+({A}-1)*{c}-{r_})/{a0}",
+            f"{A}*(({A}+1)-({A}-1)*{c}+{r_})/{a0}", f"2*{A}*(({A}-1)-({A}+1)*{c})/{a0}", f"{A}*(({A}+1)-({A}-1)*{c}-{r_})/{a0}"]
+    elif kind=="high":
+        r_=f"2*sqrt({A})*{sn}*0.70711"
+        a0=f"(({A}+1)-({A}-1)*{c}+{r_})"
+        cf=[f"-2*(({A}-1)-({A}+1)*{c})/{a0}", f"-(({A}+1)-({A}-1)*{c}-{r_})/{a0}",
+            f"{A}*(({A}+1)+({A}-1)*{c}+{r_})/{a0}", f"-2*{A}*(({A}-1)+({A}+1)*{c})/{a0}", f"{A}*(({A}+1)+({A}-1)*{c}-{r_})/{a0}"]
+    else:   # peak, Q about 1
+        al=f"({sn}/2)"
+        a0=f"(1+{al}/{A})"
+        cf=[f"2*{c}/{a0}", f"-(1-{al}/{A})/{a0}", f"(1+{al}*{A})/{a0}", f"-2*{c}/{a0}", f"(1-{al}*{A})/{a0}"]
+    ex=" \\; ".join(cf).replace("$",D).replace(",","\\,")
+    co=p.add(f"#X obj {x} 170 expr {ex};"); pk5=p.add(f"#X obj {x} 200 pack f f f f f;"); bq=p.add(f"#X obj {x} 230 biquad~;")
+    p.con(pk,0,ac,0); p.con(ac,0,co,0); p.con(ac,1,co,1); p.con(ac,2,co,2)
+    for k in range(5): p.con(co,k,pk5,k)
+    p.con(pk5,0,bq,0)
+    return bq,rdb
+p=P(); header_text(p,"Track EQ: low cut \\, then low shelf (100 Hz) \\, mid bell (ockm-<t>-eqmidf) and high shelf (8 kHz) \\, each -12 to +12 dB. Flat when all are 0.")
+inl=p.add("#X obj 30 300 inlet~;"); out=p.add("#X obj 30 520 outlet~;")
+lb=p.add("#X obj 30 20 loadbang;"); tl=p.add("#X obj 30 40 t b b;"); srm=p.add("#X obj 120 40 samplerate~;"); vsr=p.add("#X obj 120 60 v ockm_sr;")
+p.con(lb,0,tl,0); p.con(tl,1,srm,0); p.con(srm,0,vsr,0)
+rlc=p.add(f"#X obj 30 330 r ockm-{D}1-lowcut;"); h1=p.add("#X obj 30 360 hip~ 20;"); h2=p.add("#X obj 30 385 hip~ 20;")
+b1,r1=eq_band(p,"low",250,f"ockm-{D}1-eqlow",100)
+b2,r2=eq_band(p,"peak",500,f"ockm-{D}1-eqmid",400,f_hook=f"ockm-{D}1-eqmidf")
+b3,r3=eq_band(p,"high",800,f"ockm-{D}1-eqhigh",8000)
+for bnd in (b1,b2,b3):
+    pass
+# once the sample rate is known, work every band out again from the values it already has (flat unless the project set them)
+for rr_,x in ((r1,250),(r2,500),(r3,800)):
+    tgt=[c for c in p.C if c[0]==rr_][0]
+    p.con(tl,0,tgt[2],0)
+for c in [(rlc,0,h1,1),(rlc,0,h2,1),(inl,0,h1,0),(h1,0,h2,0),(h2,0,b1,0),(b1,0,b2,0),(b2,0,b3,0),(b3,0,out,0)]: p.con(*c)
+# analyser: 8 octave bands (60 Hz to 8 kHz), level in dB (100 = full scale), sent as ockm-spec <track> <band> <dB>.
+# It only runs while asked: ockm-spec-<track> 1 (the EQ sheet) or ockm-spec-all 1 (de-mud listening)
+sp=P()
+si=sp.add("#X obj 20 20 inlet~;"); sw=sp.add("#X obj 600 20 switch~;"); z0=sp.add("#X msg 600 0 0;")
+lb2=sp.add("#X obj 600 -20 loadbang;"); sp.con(lb2,0,z0,0); sp.con(z0,0,sw,0)
+r1=sp.add(f"#X obj 700 -20 r ockm-spec-{D}1;"); r2=sp.add("#X obj 800 -20 r ockm-spec-all;"); onb=sp.add("#X obj 700 -50 bang;")
+for rr in (r1,r2): sp.con(rr,0,sw,0); sp.con(rr,0,onb,0)
+ss=sp.add("#X obj 20 300 s ockm-spec;")
+for b,fq in enumerate([60,120,250,500,1000,2000,4000,8000]):
+    x=20+b*90
+    # a true octave-wide band (RBJ band-pass, 0 dB at the centre): Pd's bp~ and vcf~ barely filter up high
+    W=f"(6.28319*{fq}/max(ockm_sr\\,22050))"; AL=f"(sin({W})/2.82)"
+    cx=sp.add(f"#X obj {x} -80 expr 2*cos({W})/(1+{AL}) \\; -(1-{AL})/(1+{AL}) \\; {AL}/(1+{AL}) \\; -{AL}/(1+{AL});")
+    pk=sp.add(f"#X obj {x} -50 pack f f f f;"); cm=sp.add(f"#X msg {x} -20 \\$1 \\$2 \\$3 0 \\$4;")
+    for o in range(4): sp.con(cx,o,pk,o)
+    sp.con(pk,0,cm,0); sp.con(lb2,0,cx,0); sp.con(onb,0,cx,0)
+    bp_=sp.add(f"#X obj {x} 60 biquad~;"); sp.con(cm,0,bp_,0); ev=sp.add(f"#X obj {x} 90 env~ 4096 2048;")
+    l1=sp.add(f"#X obj {x} 120 list prepend {b};"); l2=sp.add(f"#X obj {x} 150 list prepend {D}1;"); lt=sp.add(f"#X obj {x} 180 list trim;")
+    for c in [(si,0,bp_,0),(bp_,0,ev,0),(ev,0,l1,0),(l1,0,l2,0),(l2,0,lt,0),(lt,0,ss,0)]: sp.con(*c)
+p.L.append(sp.text("#N canvas 0 0 900 340 spectrum 0;").rstrip("\n"))
+spo=p.add("#X restore 30 470 pd spectrum;"); p.con(b3,0,spo,0)
+p.save("voices/ockm-eq.pd","#N canvas 120 120 1000 560 12;")
+
 # ---------------- recorder: the mix and stems to WAV files ----------------
 STEMS=["drums","bass","lead","chord","fx"]
 p=P(); header_text(p,"Recorder. ockm-rec-<name>-open <path> then ockm-rec-<name>-start for mix (stereo) and the stems "+" ".join(STEMS)+" (mono). ockm-rec-stop stops them all. 24-bit WAV. Also: ockm-exports-dir on load \\, ockm-usb-scan finds USB sticks \\, ockm-mkdir <path>.")
@@ -570,6 +640,8 @@ for nm,snd in SLOTS:
     PROJECT_KEYS+=[(f"ockm-{nm}-sound",snd,None),(f"ockm-{nm}-sample",0,None),(f"ockm-{nm}-synth",0,None),(f"ockm-{nm}-tone",0,None),
                    (f"ockm-{nm}-drive",0,None),(f"ockm-{nm}-start",0,None),(f"ockm-{nm}-tune",0,None),(f"ockm-{nm}-decay",100,None),
                    (f"ockm-{nm}-level",1,None),(f"ockm-{nm}-verb",VERB[snd],None),(f"ockm-{nm}-delay",DLY[snd],None)]
+for _t in [n for n,_ in SLOTS]+["bass","lead","chord"]:
+    PROJECT_KEYS+=[(f"ockm-{_t}-{k}",v,None) for k,v in EQ_DEF.items()]
 SYNTH_DEFAULTS={"bass":dict(engine=0,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.37,k2=0.9,k3=0.31,k4=0.55,drive=0,verb=0,delay=0,rhythm=3,notes=3),
                 "lead":dict(engine=4,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0.2,delay=0.25,rhythm=8,notes=12),
                 "chord":dict(engine=0,mode=0,level=1,k1=0.45,k2=0.5,k3=0.4,k4=0.3,type=0,smooth=1,verb=0.3,delay=0.35,rhythm=0,prog=0)}
@@ -581,6 +653,7 @@ PROJ_DIR="projects/default"
 p=P()
 p.raw("#X declare -path voices -path seq;")
 p.add("#X text 30 10 OCKM_GENERATOR engine: clock \\, swing \\, pattern switching \\, voices and mixer. The screens only talk to it through the named ockm- hooks.;")
+p.add("#X obj 1500 50 v ockm_sr;")   # the sample rate, for the track EQs (they fill it in on load)
 lb=p.add("#X obj 30 50 loadbang;"); lbt=p.add("#X obj 30 75 t b b b;")
 dsp=p.add("#X msg 1100 760 \; pd dsp 1;")
 bpmm=p.add("#X obj 30 160 s ockm-tempo;"); bpm=p.add("#X floatatom 30 135 5 40 200 0 - - -;"); p.con(p.add("#X obj 120 105 r ockm-bpm;"),0,bpm,0); p.add("#X text 85 135 BPM;")
@@ -678,8 +751,9 @@ for r,(nm,snd) in enumerate(SLOTS):
     row=p.add(f"#X obj 110 {y} ockm-row {nm};"); v=p.add(f"#X obj 560 {y+2} ockm-drum {nm};")
     if r==0: p.add(f"#X obj 1200 {y} ockm-samplelib;"); p.add(f"#X obj 1200 {y+25} ockm-recorder;"); p.add(f"#X obj 1200 {y+50} ockm-transitions;")
     gt=p.add(f"#X obj 660 {y+2} ockm-gate {nm} nolevel;")
-    p.con(gsp,0,row,0); p.con(row,0,v,0); p.con(v,0,gt,0); p.con(gt,0,mix,0); v=gt
-    p.con(gt,0,p.add(f"#X obj 700 {y+22} throw~ ockm-stem-drums;"),0)
+    eqd=p.add(f"#X obj 710 {y+2} ockm-eq {nm};")
+    p.con(gsp,0,row,0); p.con(row,0,v,0); p.con(v,0,gt,0); p.con(gt,0,eqd,0); p.con(eqd,0,mix,0); v=eqd
+    p.con(eqd,0,p.add(f"#X obj 700 {y+22} throw~ ockm-stem-drums;"),0)
     vs=p.add(f"#X obj 760 {y+2} *~ 0;"); vt=p.add(f"#X obj 830 {y+2} throw~ ockm-revbus;"); vr=p.add(f"#X obj 760 {y-18} r ockm-{nm}-verb;")
     p.con(v,0,vs,0); p.con(vs,0,vt,0); p.con(vr,0,vs,1)
     ds=p.add(f"#X obj 990 {y+2} *~ 0;"); dt_=p.add(f"#X obj 1060 {y+2} throw~ ockm-dlybus;"); dr_=p.add(f"#X obj 990 {y-18} r ockm-{nm}-delay;")
@@ -729,8 +803,9 @@ for r,(nm,seqo,voi) in enumerate(SYN):
     y=by+r*40
     p.add(f"#X text 20 {y+2} {nm};")
     sq=p.add(f"#X obj 110 {y} {seqo};"); vo=p.add(f"#X obj 560 {y} {voi};")
-    gt0=p.add(f"#X obj 660 {y} ockm-gate {nm} level;"); gt=p.add(f"#X obj 660 {y+14} *~;"); p.con(gt0,0,gt,0)
-    p.con(p.add(f"#X obj 740 {y+14} r~ ockm-duck;"),0,gt,1)
+    gt0=p.add(f"#X obj 660 {y} ockm-gate {nm} level;"); gdk=p.add(f"#X obj 660 {y+14} *~;"); p.con(gt0,0,gdk,0)
+    p.con(p.add(f"#X obj 740 {y+14} r~ ockm-duck;"),0,gdk,1)
+    gt=p.add(f"#X obj 710 {y+14} ockm-eq {nm};"); p.con(gdk,0,gt,0)
     # a quarter step late, like the drums on time, so drum steps can be nudged early
     lq=p.add(f"#X obj 300 {y} pipe 0;"); p.con(gsp,0,lq,0); p.con(lq4,0,lq,1)
     # this part on or off in this pattern (ockm-<part>-on): off stops its steps and silences it

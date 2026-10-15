@@ -484,6 +484,36 @@ def chord_engines_sound_and_sit_together(work):
     assert hi / lo < 3, "chord engines are too far apart in level: " + ", ".join(f"{k} {v:.3f}" for k, v in levels.items())
 
 @test
+def track_eq_cuts_and_boosts(work):
+    """White noise through a track EQ: flat by default; the low cut and low shelf change the lows, the high shelf the highs,
+    and the mid bell the middle, each in the right direction."""
+    def lows(x):    # energy below ~250 Hz: average over 2 ms
+        k = 96; out = []; acc = 0.0
+        for i, v in enumerate(x):
+            acc += v
+            if i >= k: acc -= x[i - k]
+            out.append(acc / k)
+        return math.sqrt(sum(v * v for v in out) / len(out))
+    def highs(x):   # energy of fast change: mostly above a few kHz
+        d = [x[i] - x[i - 1] for i in range(1, len(x))]
+        return math.sqrt(sum(v * v for v in d) / len(d))
+    res = {}
+    for name, msg in [("flat", ""), ("lowcut", "ockm-zz-lowcut 400"), ("lowboost", "ockm-zz-eqlow 12"),
+                      ("highcut", "ockm-zz-eqhigh -12"), ("highboost", "ockm-zz-eqhigh 12")]:
+        h = Harness(dut="ockm-eq zz")
+        nz = h.add("#X obj 500 70 noise~;"); g = h.add("#X obj 500 95 *~ 0.2;"); h.con(nz, g); h.con(g, h.dut)
+        h.record(os.path.join(work, f"eq_{name}.wav"), source="dut")
+        if msg: h.at(50, msg)
+        _, (x, sr) = play(work, h, f"t_eq_{name}", with_main=False, ms=700)
+        seg = x[int(0.2 * sr):int(0.6 * sr)]
+        res[name] = (lows(seg), highs(seg))
+    f = res["flat"]
+    assert res["lowcut"][0] < f[0] * 0.6, f"low cut 400 Hz should take the lows down: {res['lowcut'][0]:.4f} vs {f[0]:.4f}"
+    assert res["lowboost"][0] > f[0] * 2, f"+12 dB low shelf should lift the lows: {res['lowboost'][0]:.4f} vs {f[0]:.4f}"
+    assert res["highcut"][1] < f[1] * 0.5 and res["highboost"][1] > f[1] * 1.8, f"high shelf -12 / +12: {res['highcut'][1]:.4f} {f[1]:.4f} {res['highboost'][1]:.4f}"
+    assert abs(res["lowboost"][1] / f[1] - 1) < 0.2, "a low boost shouldn't change the highs much"
+
+@test
 def delay_echoes_on_time(work):
     h = Harness(dut="ockm-fx")
     h.add("#X obj 500 10 r test-click;"); click = len([o for o in h.objs if not o[1]]) - 1
@@ -608,7 +638,7 @@ def touchscreen_drives_the_engine(work):
     tap(345, 281, 36); tap(348, 126, 137)  # perform tab, mute the kick lane
     tap(349, 192 + 47 * 1 + 20, 165)     # perform: snare lane, step 2
     tap(350, 690, 36)                    # mixer tab
-    tap(355, 673, 341)                   # bass fader, halfway
+    tap(355, 673, 361)                   # bass fader, halfway (below the EQ button)
     tap(360, 130, 505)                   # mute on strip 2
     f = os.path.join(work, "t_touch.pd"); h.finish(600, f)
     out = run(work, f)
@@ -644,7 +674,7 @@ def touchscreen_screens_draw(work):
         raise Skip("Pillow not installed")
     p = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_preview.py"), os.path.join(work, "preview")], capture_output=True, text=True)
     assert p.returncode == 0, p.stderr[-800:]
-    assert len(os.listdir(os.path.join(work, "preview"))) == 21, "expected twenty-one screen pictures"
+    assert len(os.listdir(os.path.join(work, "preview"))) == 22, "expected twenty-two screen pictures"
 
 @test
 def mute_solo_and_levels(work):
@@ -1343,6 +1373,25 @@ def drum_slot_909_808_industrial_tone_drive(work):
     assert bright(segs[3]) < bright(segs[0]) < bright(segs[4]), f"tone should darken then brighten: {bright(segs[3]):.3f} {bright(segs[0]):.3f} {bright(segs[4]):.3f}"
     rms = lambda sg: math.sqrt(sum(v * v for v in sg) / len(sg))
     assert rms(segs[5]) > rms(segs[0]) * 1.1, "drive should make it denser"
+
+@test
+def touchscreen_demud_listens_and_cuts(work):
+    """Mixer, while the demo groove plays: de-mud listens for 4 seconds, then sets low cuts from what it heard.
+    The hats get a real low cut; the kick and bass are left alone."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness(); h.show("ockm-d1-lowcut", "ockm-d4-lowcut", "ockm-bass-lowcut", "ockm-spec-all")
+    h.at(100, "ockm-bass-gen bang ; ockm-chord-gen bang ; ockm-play 1")
+    h.at(600, "ockm-ui-test tap 690 36")      # mixer
+    h.at(700, "ockm-ui-test tap 905 232")     # de-mud (master strip)
+    h.at(5200, "ockm-play 0")
+    f = os.path.join(work, "t_demud.pd"); h.finish(5400, f)
+    out = run(work, f, timeout=60)
+    spec = [int(float(v)) for v in printed(out, "ockm-spec-all")]
+    assert spec[:2] == [1, 0], f"the analysers should switch on to listen, then off: {spec}"
+    hat = [float(v) for v in printed(out, "ockm-d4-lowcut")]
+    assert hat and hat[-1] >= 120, f"the hats should get a low cut of 120 Hz or more: {hat}"
+    assert not printed(out, "ockm-d1-lowcut") and not printed(out, "ockm-bass-lowcut"), "the kick and bass keep their low end"
 
 def write_tone(path, hz, secs, sr=44100, channels=1):
     w = wave.open(path, "w"); w.setnchannels(channels); w.setsampwidth(2); w.setframerate(sr)

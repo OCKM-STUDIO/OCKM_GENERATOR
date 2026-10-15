@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.44"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.45"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
@@ -146,6 +146,9 @@ function ui:defaults()
   v["ockm-volume"] = 1; v["ockm-verb-mix"] = 0.5; v["ockm-delay-mix"] = 0.5
   v["ockm-drive"] = 0; v["ockm-delay-fb"] = 0.4; v["ockm-delay-steps"] = 3; v["ockm-verb-size"] = 0.6; v["ockm-verb-tone"] = 0.5
   for _, t in ipairs(SYNTHS) do v["ockm-"..t.."-level"] = 1 end
+  for _, t in ipairs(TRACKS) do
+    v["ockm-"..t.."-lowcut"] = 20; v["ockm-"..t.."-eqlow"] = 0; v["ockm-"..t.."-eqmid"] = 0; v["ockm-"..t.."-eqmidf"] = 400; v["ockm-"..t.."-eqhigh"] = 0
+  end
   v["ockm-bass-on"] = 1; v["ockm-lead-on"] = 1; v["ockm-chord-on"] = 1; v["ockm-rise"] = 0; v["ockm-end"] = 0; v["ockm-impact"] = 0; v["ockm-pump"] = 0
   v["ockm-bass-mode"] = 0; v["ockm-lead-mode"] = 0; v["ockm-chord-mode"] = 0   -- 0 auto, 1 manual
   v["ockm-bass-sync"] = 1; v["ockm-lead-sync"] = 1; v["ockm-leader"] = 0; v["ockm-drum-groove"] = -1
@@ -176,6 +179,7 @@ function ui:hooks()
   for _, t in ipairs(TRACKS) do h[#h+1] = "ockm-"..t.."-mute"; h[#h+1] = "ockm-"..t.."-solo" end
   for _, t in ipairs(SYNTHS) do h[#h+1] = "ockm-"..t.."-level"; h[#h+1] = "ockm-"..t.."-mode" end
   for _, t in ipairs(SYNTHS) do h[#h+1] = "ockm-"..t.."-on" end
+  for _, t in ipairs(TRACKS) do for _, k in ipairs({ "lowcut", "eqlow", "eqmid", "eqmidf", "eqhigh" }) do h[#h+1] = "ockm-"..t.."-"..k end end
   h[#h+1] = "ockm-rise"; h[#h+1] = "ockm-end"; h[#h+1] = "ockm-impact"; h[#h+1] = "ockm-pump"
   h[#h+1] = "ockm-bass-sync"; h[#h+1] = "ockm-lead-sync"; h[#h+1] = "ockm-leader"; h[#h+1] = "ockm-drum-groove"
   for _, p in ipairs({ "bass", "lead" }) do
@@ -218,6 +222,17 @@ function ui:postinitialize()
     o.scount = {}
     for k = 1, #FOLDERS do o.scount[k] = math.floor(tonumber(a[k]) or 0) end
     o:dirty()
+  end)
+  listen("ockm-spec", function(o, sel, a)
+    -- "d4 7 63.5" arrives with the track name as the selector
+    local t, b, db = tostring(sel), math.floor(tonumber(a[1]) or 0), tonumber(a[2]) or 0
+    o.spec = o.spec or {}; o.spec[t] = o.spec[t] or {}
+    o.spec[t][b] = 0.7 * (o.spec[t][b] or db) + 0.3 * db
+    if o.listening then
+      local acc = o.listening[t] or {}; o.listening[t] = acc
+      acc[b] = (acc[b] or 0) + 10 ^ (db / 10); acc["n" .. b] = (acc["n" .. b] or 0) + 1
+    end
+    if b == 7 and o.sheet == "eq" then o:dirty() end
   end)
   listen("ockm-exports-dir", function(o, sel, a) o.exports_dir = tostring(a[1]) end)
   listen("ockm-usb-list-start", function(o) o.usb_in = {} end)
@@ -269,6 +284,7 @@ function ui:postinitialize()
   self.jobclock = pd.Clock:new():register(self, "job_step")
   self.expclock = pd.Clock:new():register(self, "export_end")
   self.tickclock = pd.Clock:new():register(self, "tick")
+  self.demudclock = pd.Clock:new():register(self, "demud_finish")
 end
 
 -- play a drum slot once. After a sample change it waits a moment, so the new file is loaded first
@@ -320,6 +336,7 @@ function ui:finalize()
   if self.jobclock then self.jobclock:destruct() end
   if self.expclock then self.expclock:destruct() end
   if self.tickclock then self.tickclock:destruct() end
+  if self.demudclock then self.demudclock:destruct() end
   for _, t in pairs(self.tables) do if t.destruct then t:destruct() end end
 end
 
@@ -402,6 +419,7 @@ function ui:layout()
   if self.sheet == "newpat" then self:layout_newpat(add) end
   if self.sheet == "arrange" then self:layout_arrange(add) end
   if self.sheet == "export" then self:layout_export(add) end
+  if self.sheet == "eq" then self:layout_eq(add) end
   -- messages on screens that have no message line of their own
   if self.msg and (self.screen == "perform" or self.screen == "compose" or self.screen == "mixer" or self.screen == "song" or self.screen == "setup" or self.screen == "drums") then
     add{ kind="toast", x=W / 2 - 330, y=H - 50, w=660, h=38, label=self.msg }
@@ -1903,14 +1921,17 @@ function ui:layout_mixer(add)
            tap=function() if i <= 8 then self.slot = i; self:open("drums") else self.part = i - 8; self:open("synth") end end }
       add{ kind="hbar", x=cx, y=top + 34, w=cw, h=26, hook="ockm-"..t.."-verb", lo=0, hi=1, label="rev" }
       add{ kind="hbar", x=cx, y=top + 66, w=cw, h=26, hook="ockm-"..t.."-delay", lo=0, hi=1, label="dly" }
-      add{ kind="vfader", x=cx, y=top + 100, w=cw, h=250, hook="ockm-"..t.."-level", lo=0, hi=1 }
+      add{ kind="choice", x=cx, y=top + 100, w=cw, h=32, small=true, label="EQ", sel=not self:eq_flat(t), accent=true,
+           tap=function() self:eq_open(i) end }
+      add{ kind="vfader", x=cx, y=top + 140, w=cw, h=210, hook="ockm-"..t.."-level", lo=0, hi=1 }
       add{ kind="ms", x=cx, y=top + 364, w=cw, h=50, label="M", hook="ockm-"..t.."-mute" }
       add{ kind="ms", x=cx, y=top + 420, w=cw, h=50, label="S", hook="ockm-"..t.."-solo" }
     else
       add{ kind="strip", x=x, y=top, w=sw - 2, h=H - top - 8, label="master", master=true }
       add{ kind="hbar", x=cx, y=top + 34, w=cw, h=26, hook="ockm-verb-mix", lo=0, hi=1, label="rev" }
       add{ kind="hbar", x=cx, y=top + 66, w=cw, h=26, hook="ockm-delay-mix", lo=0, hi=1, label="dly" }
-      add{ kind="vfader", x=cx, y=top + 100, w=cw, h=250, hook="ockm-volume", lo=0, hi=1, master=true }
+      add{ kind="btn", x=cx, y=top + 100, w=cw, h=32, small=true, label="de-mud", tap=function() self:demud() end }
+      add{ kind="vfader", x=cx, y=top + 140, w=cw, h=210, hook="ockm-volume", lo=0, hi=1, master=true }
       add{ kind="btn", x=cx, y=top + 364, w=cw, h=106, label="clear", quiet=true, tap=function()
         for _, t in ipairs(TRACKS) do
           if (self.v["ockm-"..t.."-mute"] or 0) > 0 then self:send("ockm-"..t.."-mute", 0) end
@@ -1918,6 +1939,149 @@ function ui:layout_mixer(add)
         end
       end }
     end
+  end
+end
+
+-- ------------------------------------------------------------------ track EQ
+-- low cut, then a low shelf at 100 Hz, a mid bell and a high shelf at 8 kHz (each -12 to +12 dB). Same maths as the engine
+local EQ_DEF = { lowcut = 20, eqlow = 0, eqmid = 0, eqmidf = 400, eqhigh = 0 }
+local EQ_SLIDERS = { { "lowcut", 20, 800, "low cut", true }, { "eqlow", -12, 12, "low" }, { "eqmid", -12, 12, "mid" },
+                     { "eqmidf", 150, 6000, "mid freq", true }, { "eqhigh", -12, 12, "high" } }
+function ui:eq_flat(t)
+  for k, d in pairs(EQ_DEF) do if math.abs((self.v["ockm-"..t.."-"..k] or d) - d) > 0.01 then return false end end
+  return true
+end
+local function biquad_db(kind, db, f0, f, sr)
+  local A = 10 ^ (db / 40)
+  local w0 = 2 * math.pi * f0 / sr
+  local c, sn = math.cos(w0), math.sin(w0)
+  local b0, b1, b2, a0, a1, a2
+  if kind == "peak" then
+    local al = sn / 2
+    b0, b1, b2, a0, a1, a2 = 1 + al * A, -2 * c, 1 - al * A, 1 + al / A, -2 * c, 1 - al / A
+  else
+    local r = 2 * math.sqrt(A) * sn * 0.70711
+    if kind == "low" then
+      b0, b1, b2 = A * ((A + 1) - (A - 1) * c + r), 2 * A * ((A - 1) - (A + 1) * c), A * ((A + 1) - (A - 1) * c - r)
+      a0, a1, a2 = (A + 1) + (A - 1) * c + r, -2 * ((A - 1) + (A + 1) * c), (A + 1) + (A - 1) * c - r
+    else
+      b0, b1, b2 = A * ((A + 1) + (A - 1) * c + r), -2 * A * ((A - 1) + (A + 1) * c), A * ((A + 1) + (A - 1) * c - r)
+      a0, a1, a2 = (A + 1) - (A - 1) * c + r, 2 * ((A - 1) - (A + 1) * c), (A + 1) - (A - 1) * c - r
+    end
+  end
+  local w = 2 * math.pi * f / sr
+  local cw, sw, c2, s2 = math.cos(w), math.sin(w), math.cos(2 * w), math.sin(2 * w)
+  local nr, ni = b0 + b1 * cw + b2 * c2, -(b1 * sw + b2 * s2)
+  local dr, di = a0 + a1 * cw + a2 * c2, -(a1 * sw + a2 * s2)
+  return 10 * math.log((nr * nr + ni * ni) / (dr * dr + di * di), 10)
+end
+function ui:eq_response(t, f)
+  local function g(k) return self.v["ockm-"..t.."-"..k] or EQ_DEF[k] end
+  local sr = 48000
+  local lc = g("lowcut")
+  local x = (f / lc) ^ 2
+  local db = 2 * 10 * math.log(x / (1 + x), 10)       -- two one-pole high-passes
+  db = db + biquad_db("low", g("eqlow"), 100, f, sr) + biquad_db("peak", g("eqmid"), g("eqmidf"), f, sr) + biquad_db("high", g("eqhigh"), 8000, f, sr)
+  return db
+end
+-- one tap to clear the low-mid fog: low cuts on everything except the kick and bass, a scoop on the chords
+local DEMUD = { kick = { 30 }, snare = { 120, -2, 400 }, perc = { 200 }, hat = { 300 }, ohat = { 250 }, tom = { 60 },
+                bass = { 30 }, lead = { 180 }, chord = { 160, -3, 300 } }
+local SPEC_F = { 60, 120, 250, 500, 1000, 2000, 4000, 8000 }
+function ui:demud()
+  if self.playing ~= 0 then
+    self.listening = {}
+    psend("ockm-spec-all", "float", { 1 })
+    self.demudclock:delay(4000)
+    self:say("de-mud is listening to the mix for 4 seconds...")
+    return
+  end
+  self:demud_fixed()
+end
+-- after listening: each track's low cut goes an octave below where its own energy starts, and if the mix piles up
+-- at 250-500 Hz, the chords, lead and snare get a scoop there
+function ui:demud_finish()
+  psend("ockm-spec-all", "float", { 0 })
+  local L = self.listening or {}
+  self.listening = nil
+  if self.sheet == "eq" and self.eq_track then psend("ockm-spec-" .. TRACKS[self.eq_track], "float", { 1 }) end
+  local avg, mix, changed = {}, {}, {}
+  for i, t in ipairs(TRACKS) do
+    local acc = L[t]
+    if acc then
+      avg[t] = {}
+      for b = 0, 7 do
+        local p = (acc[b] or 0) / math.max(1, acc["n" .. b] or 1)
+        avg[t][b] = (p > 0) and 10 * math.log(p, 10) or 0
+        mix[b] = (mix[b] or 0) + p
+      end
+    end
+  end
+  local mud = false
+  if mix[2] and mix[1] and mix[4] and mix[5] then
+    mud = (mix[2] + mix[3]) / 2 > 2 * (mix[1] + mix[4] + mix[5]) / 3
+  end
+  for i, t in ipairs(TRACKS) do
+    local kind = (i <= 8) and KIND_OF[math.floor(self.v["ockm-"..t.."-sound"] or 0)] or t
+    local a = avg[t]
+    if a and kind ~= "kick" and kind ~= "bass" then
+      local peak = 0
+      for b = 0, 7 do peak = math.max(peak, a[b]) end
+      if peak > 25 then
+        local from = 7
+        for b = 7, 0, -1 do if a[b] >= peak - 15 then from = b end end
+        local lc = clamp(math.floor(SPEC_F[from + 1] / 2 / 10 + 0.5) * 10, 30, 400)
+        self:send("ockm-"..t.."-lowcut", lc); changed[#changed + 1] = self:track_name(i) .. " " .. lc
+        if mud and (kind == "chord" or kind == "lead" or kind == "snare") and math.max(a[2], a[3]) >= peak - 6 then
+          self:send("ockm-"..t.."-eqmid", -3); self:send("ockm-"..t.."-eqmidf", 320)
+          changed[#changed] = changed[#changed] .. " and a scoop"
+        end
+      end
+    end
+  end
+  if #changed == 0 then self:say("de-mud heard nothing to fix: play a busier part and try again")
+  else self:say("de-mud set low cuts: " .. table.concat(changed, ", ") .. " Hz. Back to last save undoes it") end
+end
+function ui:demud_fixed()
+  for i, t in ipairs(TRACKS) do
+    local kind
+    if i <= 8 then kind = KIND_OF[math.floor(self.v["ockm-"..t.."-sound"] or 0)] else kind = t end
+    local d = DEMUD[kind]
+    if d then
+      self:send("ockm-"..t.."-lowcut", d[1])
+      if d[2] then self:send("ockm-"..t.."-eqmid", d[2]); self:send("ockm-"..t.."-eqmidf", d[3]) end
+    end
+  end
+  self:say("de-mud: starting low cuts on everything but the kick and bass. Press play first and it listens to your mix instead")
+end
+function ui:eq_open(i)
+  if self.eq_track and self.sheet == "eq" then psend("ockm-spec-" .. TRACKS[self.eq_track], "float", { 0 }) end
+  self.eq_track = i; self.sheet = "eq"
+  psend("ockm-spec-" .. TRACKS[i], "float", { 1 })
+end
+function ui:eq_close()
+  if self.eq_track then psend("ockm-spec-" .. TRACKS[self.eq_track], "float", { 0 }) end
+  self.sheet = nil
+end
+function ui:layout_eq(add)
+  local i = clamp(self.eq_track or 1, 1, #TRACKS)
+  local t = TRACKS[i]
+  add{ kind="zone", x=0, y=0, w=W, h=H, tap=function() end }
+  local x, y, w, h = 110, 64, W - 220, H - 80
+  add{ kind="sheet", x=x, y=y, w=w, h=h }
+  add{ kind="arrow", x=x + 16, y=y + 12, w=44, h=36, dir=-1, on=(i > 1), tap=function() if i > 1 then self:eq_open(i - 1) end end }
+  add{ kind="text", x=x + 70, y=y + 20, w=300, h=20, label="EQ: " .. self:track_name(i), size=18, col="txt" }
+  add{ kind="arrow", x=x + w - 60, y=y + 12, w=44, h=36, dir=1, on=(i < #TRACKS), tap=function() if i < #TRACKS then self:eq_open(i + 1) end end }
+  add{ kind="eqcurve", x=x + 20, y=y + 60, w=w - 40, h=130, track=t }
+  for j, sl in ipairs(EQ_SLIDERS) do
+    add{ kind="slider", x=x + 20, y=y + 204 + (j - 1) * 40, w=w - 40, h=32, hook="ockm-"..t.."-"..sl[1], lo=sl[2], hi=sl[3], label=sl[4], log=sl[5] }
+  end
+  add{ kind="btn", x=x + 20, y=y + h - 60, w=140, h=44, label="flat", quiet=true, tap=function()
+    for k, d in pairs(EQ_DEF) do self:send("ockm-"..t.."-"..k, d) end
+  end }
+  add{ kind="btn", x=x + w - 20 - 160, y=y + h - 60, w=160, h=44, label="done", accent=true, tap=function() self:eq_close() end }
+  if self.playing == 0 then
+    add{ kind="text", x=x + 180, y=y + h - 46, w=300, h=12, size=11, label="press play to see this track's spectrum" }
   end
 end
 
@@ -2053,6 +2217,7 @@ function ui:slide(w, x, y)
   elseif w.kind == "hbar" then f = clamp((x - w.x) / w.w, 0, 1)
   else f = clamp((x - (w.x + 110)) / (w.w - 180), 0, 1) end
   local v = w.lo + f * (w.hi - w.lo)
+  if w.log then v = math.floor(w.lo * (w.hi / w.lo) ^ f + 0.5) end
   if w.hi - w.lo > 4 then v = math.floor(v + 0.5) else v = math.floor(v * 100 + 0.5) / 100 end
   self:send(w.hook, v)
 end
@@ -2420,12 +2585,48 @@ function ui:draw(g, w)
   elseif k == "slider" then
     local v = self.v[w.hook] or w.lo
     local f = clamp((v - w.lo) / (w.hi - w.lo), 0, 1)
+    if w.log then f = clamp(math.log(math.max(v, w.lo) / w.lo) / math.log(w.hi / w.lo), 0, 1) end
     self:text(g, w.label, w.x, w.y + w.h / 2 - 7, 13, "txt", 100)
     local sx, sw = w.x + 110, w.w - 180
     self:col(g, "off"); g:fill_rounded_rect(sx, w.y + w.h / 2 - 5, sw, 10, 5)
     self:col(g, "acc"); g:fill_rounded_rect(sx, w.y + w.h / 2 - 5, math.max(10, sw * f), 10, 5)
     g:fill_ellipse(sx + sw * f - 10, w.y + w.h / 2 - 10, 20, 20)
-    self:text(g, fmt(v), w.x + w.w - 56, w.y + w.h / 2 - 7, 13, "mute", 56)
+    self:text(g, fmt(v) .. (w.log and " Hz" or ""), w.x + w.w - 56, w.y + w.h / 2 - 7, 13, "mute", 70)
+  elseif k == "eqcurve" then
+    -- the response from 20 Hz to 20 kHz, +-15 dB, as thin columns from the 0 dB line
+    self:col(g, "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
+    local mid = w.y + w.h / 2
+    self:col(g, "dim"); g:fill_rect(w.x, mid, w.w, 1)
+    for _, hz in ipairs({ 100, 1000, 10000 }) do
+      local fx = w.x + w.w * math.log(hz / 20) / math.log(1000)
+      g:fill_rect(fx, w.y + 4, 1, w.h - 8)
+    end
+    -- the track's spectrum (while it plays): one bar per octave band, behind the curve
+    local sp = self.spec and self.spec[w.track]
+    if sp and self.playing ~= 0 then
+      self:col(g, "dim")
+      for b, f in ipairs(SPEC_F) do
+        local db = sp[b - 1]
+        if db then
+          local x0 = w.x + w.w * math.log(f / 1.41 / 20) / math.log(1000)
+          local x1 = w.x + w.w * math.log(f * 1.41 / 20) / math.log(1000)
+          local hh = clamp((db - 30) / 70, 0, 1) * (w.h - 8)
+          g:fill_rect(x0 + 1, w.y + w.h - 4 - hh, x1 - x0 - 2, hh)
+        end
+      end
+    end
+    self:col(g, "acc")
+    local cols = 90
+    for c = 0, cols - 1 do
+      local f = 20 * 1000 ^ ((c + 0.5) / cols)
+      local db = clamp(self:eq_response(w.track, f), -15, 15)
+      local hh = db / 15 * (w.h / 2 - 4)
+      local cx = w.x + c * w.w / cols
+      if hh >= 0 then g:fill_rect(cx, mid - hh, w.w / cols - 1, math.max(hh, 1)) else g:fill_rect(cx, mid, w.w / cols - 1, -hh) end
+    end
+    self:text(g, "100", w.x + w.w * math.log(5) / math.log(1000) + 3, w.y + w.h - 16, 10, "mute", 40)
+    self:text(g, "1k", w.x + w.w * math.log(50) / math.log(1000) + 3, w.y + w.h - 16, 10, "mute", 40)
+    self:text(g, "10k", w.x + w.w * math.log(500) / math.log(1000) + 3, w.y + w.h - 16, 10, "mute", 40)
   end
 end
 

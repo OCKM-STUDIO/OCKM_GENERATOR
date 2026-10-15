@@ -2,7 +2,7 @@
 
 A drum machine and easy-to-program synths in one box. Built in Pure Data, designed to run on a Raspberry Pi with a touchscreen and a few knobs.
 
-Current version: **v0.21**
+Current version: **v0.45**
 
 ## How to open it
 
@@ -89,6 +89,8 @@ Tap a track's name on perform or the mixer to jump straight to it.
 **Mixer**
 - One strip per track: reverb and delay sends at the top, a level fader, then **M** and **S**. Tap a strip's name to open that track
 - **Master** on the right: the reverb and delay return levels, the master volume, and **clear** to undo every mute and solo
+- **EQ** on every strip opens that track's EQ: low cut, a low shelf at 100 Hz, a mid bell you can move, and a high shelf at 8 kHz (each ±12 dB). A curve shows what you've set. While the song plays, bars behind the curve show where that track's sound sits, so you can see what to cut. The EQ button lights when it isn't flat. EQ belongs to the project
+- **De-mud** on the master strip clears low-mid fog. Press it while playing and it listens to the mix for 4 seconds, then gives each track (except the kick and bass) a low cut just below where its own sound starts. If the mix piles up around 250 to 500 Hz, the chords, lead and snare get a small scoop there too. Stopped, it sets safe starting low cuts instead. Back to last save undoes it
 - Drum levels belong to the kit (the project). Bass, lead and chord levels belong to each pattern, like the rest of their sound
 
 Everything is on the screens now, so `pd test-panel` is only for testing.
