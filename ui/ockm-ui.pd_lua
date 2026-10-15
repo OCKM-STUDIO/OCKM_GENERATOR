@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.43"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.44"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
@@ -84,9 +84,18 @@ local PROG_SHAPES = { { { 0, 16 } }, { { 0, 16 }, { 3, 16 } }, { { 0, 48 }, { 6,
 local ROMAN = { "i","ii","iii","iv","v","vi","vii" }
 local OCT_OFFSET = { bass = 0, lead = 24 }   -- matches ockm-monogen args
 
+-- every drum slot setting the screen listens to; the sliders shown depend on synth or sample
 local DRUM_PARAMS = {
   { "level", 0, 1 }, { "tune", -12, 12 }, { "decay", 10, 400 }, { "verb", 0, 1, "reverb" }, { "delay", 0, 1 },
+  { "tone", -1, 1 }, { "drive", 0, 1 }, { "start", 0, 1 }, { "synth", 0, 2 },
 }
+local SYNTH_SLIDERS  = { { "level", 0, 1 }, { "tune", -12, 12 }, { "decay", 10, 400 }, { "tone", -1, 1 }, { "drive", 0, 1 } }
+local SAMPLE_SLIDERS = { { "level", 0, 1 }, { "tune", -12, 12, "pitch" }, { "decay", 10, 100, "length" }, { "tone", -1, 1 }, { "start", 0, 1 } }
+-- the three built-in sounds for each drum: 909, 808 and industrial (by sound number, what each one is)
+local SYNTH_SETS = { "909", "808", "industrial" }
+local SYNTH_AB = { [0] = { "kick", "boom", "rumble" }, [1] = { "snare", "snare", "blast" }, [2] = { "clap", "clap", "big room" },
+                   [3] = { "rim", "clave", "clank" }, [4] = { "hat", "metal hat", "harsh hat" }, [5] = { "open hat", "metal hat", "trash ride" },
+                   [6] = { "tom", "tom", "dirty tom" }, [7] = { "rimshot", "cowbell", "zap" } }
 
 -- ------------------------------------------------------------------ helpers
 local function hex(c)
@@ -146,7 +155,8 @@ function ui:defaults()
   for i, nm in ipairs(SLOTS) do
     v["ockm-"..nm.."-sound"] = ({0,1,2,4,5,7,3,6})[i]
     v["ockm-"..nm.."-level"] = 1; v["ockm-"..nm.."-tune"] = 0; v["ockm-"..nm.."-decay"] = 100
-    v["ockm-"..nm.."-verb"] = 0; v["ockm-"..nm.."-delay"] = 0; v["ockm-"..nm.."-sample"] = 0
+    v["ockm-"..nm.."-verb"] = 0; v["ockm-"..nm.."-delay"] = 0; v["ockm-"..nm.."-sample"] = 0; v["ockm-"..nm.."-synth"] = 0
+    v["ockm-"..nm.."-tone"] = 0; v["ockm-"..nm.."-drive"] = 0; v["ockm-"..nm.."-start"] = 0
   end
   for _, t in ipairs(SYNTHS) do
     for _, k in ipairs({"engine","k1","k2","k3","k4","drive","verb","delay","rhythm","notes","type","prog"}) do v["ockm-"..t.."-"..k] = 0 end
@@ -270,6 +280,22 @@ function ui:audition_soon(slot) self.aud_slot = slot; if self.audclock then self
 function ui:sample_count(slot)
   local snd = math.floor(self.v["ockm-"..SLOTS[slot].."-sound"] or 0)
   return (self.scount or {})[SOUND_DIR[snd + 1]] or 0
+end
+-- where a slot is in its list: 0 909, 1 808, 2 industrial, 3 and up = sample 1 and up
+function ui:drum_pos(slot)
+  local nm = SLOTS[slot]
+  local smp = math.floor(self.v["ockm-"..nm.."-sample"] or 0)
+  if smp > 0 then return smp + 2 end
+  return clamp(math.floor(self.v["ockm-"..nm.."-synth"] or 0), 0, 2)
+end
+function ui:set_drum_pos(slot, pos)
+  local nm = SLOTS[slot]
+  if pos <= 2 then
+    self:send("ockm-"..nm.."-sample", 0); self:send("ockm-"..nm.."-synth", pos)
+  else
+    self:send("ockm-"..nm.."-sample", pos - 2)
+  end
+  self:audition_soon(slot)
 end
 function ui:set_sample(slot, n)
   self:send("ockm-"..SLOTS[slot].."-sample", n)
@@ -567,7 +593,7 @@ function ui:layout_drums(add)
   for i = 1, 8 do
     local smp = math.floor(self.v["ockm-"..SLOTS[i].."-sample"] or 0)
     add{ kind="choice", x=16 + (i - 1) * (tw + 8), y=114, w=tw, h=40,
-         label=SHORT[(self.v["ockm-"..SLOTS[i].."-sound"] or 0) + 1] .. (smp > 0 and string.format(" %02d", smp) or ""),
+         label=SHORT[(self.v["ockm-"..SLOTS[i].."-sound"] or 0) + 1] .. (smp > 0 and string.format(" %02d", smp) or ({ "", " 808", " ind" })[clamp(math.floor(self.v["ockm-"..SLOTS[i].."-synth"] or 0), 0, 2) + 1]),
          sel=(i == self.slot), tap=function() self.slot = i end }
   end
   self:step_row(add, D_STEP_Y, D_STEP_H, "dstep")
@@ -607,17 +633,21 @@ function ui:layout_drums(add)
   local half = (W - 48) / 2
   -- sample: 0 is the built-in synth sound, then the files in this sound's folder. Tap the box to hear it
   local slot, smp, cnt = self.slot, math.floor(self.v["ockm-"..nm.."-sample"] or 0), self:sample_count(self.slot)
-  local folder = FOLDERS[SOUND_DIR[math.floor(self.v["ockm-"..nm.."-sound"] or 0) + 1]]
+  local snd = math.floor(self.v["ockm-"..nm.."-sound"] or 0)
+  local folder = FOLDERS[SOUND_DIR[snd + 1]]
+  local pos = self:drum_pos(slot)
   add{ kind="text", x=16, y=346, w=half, h=12, size=10,
-       label=(cnt == 0) and ("no samples in the " .. folder .. " folder yet: playing the synth sound") or "sample: tap to hear it, arrows to change" }
+       label=(cnt == 0) and ("909, 808 and industrial synths; no samples in the " .. folder .. " folder yet") or "sound: tap to hear it, arrows to change (909, 808, industrial, then your samples)" }
   local bw = half - 44 * 2 - 12 - 84
-  add{ kind="arrow", x=16, y=362, w=44, h=36, dir=-1, on=(smp > 0), tap=function() if smp > 0 then self:set_sample(slot, smp - 1) end end }
-  add{ kind="preset", x=66, y=362, w=bw, h=36, inline=true, sel=(smp > 0),
-       num=(smp > 0) and string.format("%02d", smp) or "synth", label=(smp > 0) and ("of " .. cnt .. "  " .. folder) or "built-in sound",
+  local names = SYNTH_AB[snd] or { "", "", "" }
+  add{ kind="arrow", x=16, y=362, w=44, h=36, dir=-1, on=(pos > 0), tap=function() if pos > 0 then self:set_drum_pos(slot, pos - 1) end end }
+  add{ kind="preset", x=66, y=362, w=bw, h=36, inline=true, sel=(pos > 2),
+       num=(pos <= 2) and SYNTH_SETS[pos + 1] or string.format("%02d", smp),
+       label=(pos <= 2) and names[pos + 1] or ("of " .. cnt .. "  " .. folder),
        tap=function() self:audition(slot) end }
-  add{ kind="arrow", x=66 + bw + 6, y=362, w=44, h=36, dir=1, on=(smp < cnt), tap=function() if smp < cnt then self:set_sample(slot, smp + 1) end end }
+  add{ kind="arrow", x=66 + bw + 6, y=362, w=44, h=36, dir=1, on=(pos < cnt + 2), tap=function() if pos < cnt + 2 then self:set_drum_pos(slot, pos + 1) end end }
   add{ kind="btn", x=16 + half - 84, y=362, w=84, h=36, label="new kit", small=true, tap=function() self:random_kit() end }
-  for j, p in ipairs(DRUM_PARAMS) do
+  for j, p in ipairs((smp > 0) and SAMPLE_SLIDERS or SYNTH_SLIDERS) do
     add{ kind="slider", x=16, y=406 + (j - 1) * 36, w=half, h=30, hook="ockm-"..nm.."-"..p[1], lo=p[2], hi=p[3], label=p[4] or p[1] }
   end
   local gx = 16 + half + 16

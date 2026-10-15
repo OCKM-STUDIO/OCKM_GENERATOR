@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.44 (15 October 2026)
+
+- **Three synth sounds per drum: 909, 808 and industrial**, before your samples in the drum picker
+- The 909 kick and clap rebuilt: a faster drop, a click and saturation on the kick; four hard-edged bursts, two noise bands and crunch on the clap. Snappier snare
+- New 808 set: boom kick, tonal snare, loose clap, clave, metallic hats, round tom, cowbell
+- New industrial set: distorted rumble kick, noise-blast snare, big-room clap, clank, harsh hats, trash ride, dirty tom, zap
+- Different sliders for synth (tune, decay, tone, drive) and samples (pitch, length, tone, start). Reverb and delay sends live on the mixer
+
 ## v0.43 (15 October 2026)
 
 - Arrange is labelled **beta**: a starting point while transitions and drops get more work

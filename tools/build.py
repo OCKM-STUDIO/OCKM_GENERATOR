@@ -135,15 +135,120 @@ def tonal_voice(fn,title,freqs,dec,base,square=False,filt=None,noise=None):
     p.add("#X text 600 150 tune (semitones) / decay (% \\, 100 = normal) / level (0-1);")
     p.save(fn,"#N canvas 200 200 1000 430 12;")
 
-kick_like("voices/ockm-kick.pd","Kick: a sine wave that sweeps down fast. Input is hit strength (0-1).",150,45,80,300,1)
+def kick909(fn,title,f0,fm,f1,t1,t2,dec,click,sat,base=1):
+    """sine kick: pitch f0 -> fm in t1 ms -> f1 in t2 more, a noise click on the front, tanh saturation (sat 1 = clean)"""
+    p=P(); header_text(p,title)
+    inl=p.add("#X obj 30 50 inlet;"); tbf=p.add("#X obj 30 80 t b f;"); lev=p.add("#X obj 140 110 * 1;")
+    one=p.add("#X msg 200 110 1;"); pk,va=env(p,200,140,one,base,dec)
+    post=p.add("#X obj 300 390 *~ 0;"); p.con(lev,0,post,1)   # hit strength after the saturation, so soft hits stay soft
+    fs=p.add(f"#X obj 300 140 f {f0};"); fmid=p.add(f"#X obj 360 140 f {fm};"); fe=p.add(f"#X obj 420 140 f {f1};")
+    tb3=p.add("#X obj 30 120 t b b b b;")
+    pp=p.add("#X obj 300 180 pack f f f;"); pm=p.add(f"#X msg 300 210 {D}1 \\, {D}2 {t1} \\, {D}3 {t2} {t1};"); pv=p.add("#X obj 300 240 vline~;")
+    osc=p.add("#X obj 300 270 osc~;"); z=p.add("#X msg 30 270 0;"); mul=p.add("#X obj 300 310 *~;")
+    # click: a few ms of bright noise
+    cm=p.add("#X msg 520 180 1 \\, 0 4;"); cv=p.add("#X obj 520 210 vline~;"); cn=p.add("#X obj 620 180 noise~;"); ch=p.add("#X obj 620 210 hip~ 1500;")
+    cg=p.add("#X obj 520 240 *~;"); cl=p.add(f"#X obj 520 270 *~ {click};"); cvl=p.add("#X obj 520 295 *~;")
+    sm=p.add("#X obj 300 340 +~;")
+    sx=p.add(f"#X obj 300 370 expr~ tanh({D}v1*{sat})/tanh({sat});") if sat>1.01 else None
+    out=p.add("#X obj 300 410 outlet~;")
+    p.con(tbf,0,one,0)
+    for c in [(inl,0,tbf,0),(tbf,1,lev,0),(tbf,0,tb3,0),(tb3,3,fe,0),(fe,0,pp,2),(tb3,2,fmid,0),(fmid,0,pp,1),(tb3,1,fs,0),(fs,0,pp,0),(tb3,0,z,0),
+              (pp,0,pm,0),(pm,0,pv,0),(pv,0,osc,0),(z,0,osc,1),(osc,0,mul,0),(va,0,mul,1),(mul,0,sm,0),
+              (tbf,0,cm,0),(cm,0,cv,0),(cn,0,ch,0),(ch,0,cg,0),(cv,0,cg,1),(cg,0,cl,0),(cl,0,cvl,0),(cvl,0,sm,1)]: p.con(*c)
+    p.con(one,0,cvl,1)
+    if sx: p.con(sm,0,sx,0); p.con(sx,0,post,0)
+    else: p.con(sm,0,post,0)
+    p.con(post,0,out,0)
+    t,d,l=hooks(p,700,50)
+    tx=p.add(f"#X obj 700 80 expr {f0}*pow(2\\,{D}f1/12) \\; {fm}*pow(2\\,{D}f1/12) \\; {f1}*pow(2\\,{D}f1/12);")
+    dx=p.add(f"#X obj 870 110 * {dec/100};")
+    p.con(t,0,tx,0); p.con(tx,0,fs,1); p.con(tx,1,fmid,1); p.con(tx,2,fe,1); p.con(d,0,dx,0); p.con(dx,0,pk,1); p.con(l,0,lev,1)
+    p.save(fn,"#N canvas 200 200 1000 460 12;")
+
+def crunch_noise(fn,title,bands,msg,dec,base,drive,tones=None):
+    """noise through band-passes (freq, q, gain), shaped by a burst envelope message, then driven for crunch. Optional tones [(hz, gain)]"""
+    p=P(); header_text(p,title)
+    inl=p.add("#X obj 30 50 inlet;"); lev=p.add("#X obj 30 80 * 1;"); tbf=p.add("#X obj 30 65 t b f;"); one=p.add("#X msg 100 80 1;")
+    pk,va=env(p,100,110,one,base,dec,msg)
+    post=p.add("#X obj 250 285 *~ 0;"); p.con(inl,0,tbf,0); p.con(tbf,1,lev,0); p.con(tbf,0,one,0); p.con(lev,0,post,1)
+    nz=p.add("#X obj 250 80 noise~;"); summ=None; fls=[]
+    for i,(fq,q,g) in enumerate(bands):
+        f=p.add(f"#X obj {250+i*120} 110 bp~ {fq} {q};"); gg=p.add(f"#X obj {250+i*120} 140 *~ {g};"); p.con(nz,0,f,0); p.con(f,0,gg,0); fls.append((f,fq))
+        if summ is None: summ=gg
+        else:
+            sm=p.add(f"#X obj 250 {170+i*4} +~;"); p.con(summ,0,sm,0); p.con(gg,0,sm,1); summ=sm
+    if tones:
+        for j,(hz,g) in enumerate(tones):
+            o=p.add(f"#X obj {600+j*90} 110 osc~ {hz};"); og=p.add(f"#X obj {600+j*90} 140 *~ {g};"); p.con(o,0,og,0)
+            sm=p.add(f"#X obj 250 {190+j*4} +~;"); p.con(summ,0,sm,0); p.con(og,0,sm,1); summ=sm
+    mul=p.add("#X obj 250 230 *~;"); dr=p.add(f"#X obj 250 260 expr~ tanh({D}v1*{drive})/tanh({drive});"); out=p.add("#X obj 250 300 outlet~;")
+    for c in [(summ,0,mul,0),(va,0,mul,1),(mul,0,dr,0),(dr,0,post,0),(post,0,out,0)]: p.con(*c)
+    t,d,l=hooks(p,700,50)
+    if fls:
+        ex="expr "+" \\; ".join(f"{fq}*pow(2\\,{D}f1/12)" for _,fq in fls)
+        tx=p.add(f"#X obj 700 80 {ex};"); p.con(t,0,tx,0)
+        for i,(f,_) in enumerate(fls): p.con(tx,i,f,1)
+    dx=p.add(f"#X obj 870 110 * {dec/100};"); p.con(d,0,dx,0); p.con(dx,0,pk,1); p.con(l,0,lev,1)
+    p.save(fn,"#N canvas 200 200 1000 360 12;")
+
+kick909("voices/ockm-kick.pd","909 kick: a fast drop from high up \\, a click on the front and a little saturation. Input is hit strength (0-1).",280,95,52,10,70,320,0.5,1.6)
 kick_like("voices/ockm-tom.pd","Tom: like the kick but higher and longer. Input is hit strength (0-1).",200,120,100,350,0.8)
 noise_voice("voices/ockm-hat.pd","Closed hat: high-passed noise \\, very short.","hip~",7000,None,50,0.3)
 noise_voice("voices/ockm-ohat.pd","Open hat: high-passed noise \\, longer tail.","hip~",6000,None,300,0.25)
-noise_voice("voices/ockm-clap.pd","Clap: band-passed noise \\, three quick bursts then a tail.","bp~",1200,3,150,1,
-            "{D}1 \\, 0 10 0 \\, {D}1 0 12 \\, 0 10 12 \\, {D}1 0 24 \\, 0 {D}2 24")
-tonal_voice("voices/ockm-snare.pd","Snare: two tuned tones for the body plus filtered noise for the rattle.",[185,330],110,0.6,noise=("hip~",1500,180,0.5))
+crunch_noise("voices/ockm-clap.pd","909 clap: four hard-edged bursts of two noise bands \\, then a tail \\, driven for crunch.",[(1100,2.5,1),(2600,3,0.6)],
+             "{D}1 \\, 0 9 0 \\, {D}1 0 11 \\, 0 9 11 \\, {D}1 0 22 \\, 0 9 22 \\, {D}1 0 33 \\, 0 {D}2 33",200,1.6,3)
+tonal_voice("voices/ockm-snare.pd","909 snare: two tuned tones for the body plus bright noise for the snap.",[185,330],100,0.55,noise=("hip~",2200,190,0.75))
 tonal_voice("voices/ockm-rim.pd","Rim: two high tones \\, very short.",[500,1720],30,0.6,filt="hip~ 400")
 tonal_voice("voices/ockm-perc.pd","Perc: a 909-style rimshot. Two woody tones plus a sharp noise snap.",[330,820],60,0.4,filt="hip~ 200",noise=("hip~",3000,15,0.35))
+
+# ---------------- synth B: the 808-style alternative for each drum ----------------
+def metal_voice(fn,title,freqs,ffreq,dec,base,hp=None):
+    """square waves at odd ratios summed, through a band-pass: the 808's metallic hats and cowbell"""
+    p=P(); header_text(p,title)
+    inl=p.add("#X obj 30 50 inlet;"); lev=p.add("#X obj 30 80 * 1;")
+    pk,va=env(p,30,110,lev,base,dec)
+    summ=None; oscs=[]
+    for i,fq in enumerate(freqs):
+        o=p.add(f"#X obj {250+i*80} 80 osc~ {fq};"); a=p.add(f"#X obj {250+i*80} 105 *~ 1000;"); c=p.add(f"#X obj {250+i*80} 130 clip~ -1 1;")
+        p.con(o,0,a,0); p.con(a,0,c,0); oscs.append(o)
+        if summ is None: summ=c
+        else:
+            sm=p.add(f"#X obj 250 {160+i*4} +~;"); p.con(summ,0,sm,0); p.con(c,0,sm,1); summ=sm
+    sc=p.add(f"#X obj 250 200 *~ {round(1/len(freqs),3)};"); p.con(summ,0,sc,0)
+    bp=p.add(f"#X obj 250 230 bp~ {ffreq} 3;"); p.con(sc,0,bp,0); last=bp
+    if hp:
+        h=p.add(f"#X obj 250 255 hip~ {hp};"); p.con(last,0,h,0); last=h
+    g=p.add("#X obj 250 280 *~ 2.5;"); mul=p.add("#X obj 250 305 *~;"); out=p.add("#X obj 250 340 outlet~;")
+    for c in [(inl,0,lev,0),(last,0,g,0),(g,0,mul,0),(va,0,mul,1),(mul,0,out,0)]: p.con(*c)
+    t,d,l=hooks(p,700,50)
+    ex="expr "+" \\; ".join(f"{fq}*pow(2\\,{D}f1/12)" for fq in freqs)
+    tx=p.add(f"#X obj 700 80 {ex};")
+    for i,o in enumerate(oscs): p.con(tx,i,o,0)
+    dx=p.add(f"#X obj 870 110 * {dec/100};"); p.con(d,0,dx,0); p.con(dx,0,pk,1); p.con(l,0,lev,1); p.con(t,0,tx,0)
+    p.save(fn,"#N canvas 200 200 1100 400 12;")
+
+HAT808=[205.3,304.4,369.6,522.7,540,800]
+kick_like("voices/ockm-kickb.pd","808 kick: a long deep boom with a gentle sweep. Input is hit strength (0-1).",120,46,40,900,1)
+tonal_voice("voices/ockm-snareb.pd","808 snare: two tones a little higher \\, more tone than rattle.",[238,476],120,0.7,noise=("hip~",2500,150,0.3))
+noise_voice("voices/ockm-clapb.pd","Loose clap: wider bursts and a longer \\, roomier tail.","bp~",1000,2,280,1,
+            "{D}1 \\, 0 14 0 \\, {D}1 0 18 \\, 0 14 18 \\, {D}1 0 36 \\, 0 14 36 \\, {D}1 0 52 \\, 0 {D}2 52")
+tonal_voice("voices/ockm-rimb.pd","Clave: one bright wooden ping.",[2500],25,0.5)
+metal_voice("voices/ockm-hatb.pd","808 closed hat: six square waves through a band-pass.",HAT808,10000,45,0.45,hp=7000)
+metal_voice("voices/ockm-ohatb.pd","808 open hat: the same metal with a long tail.",HAT808,10000,380,0.4,hp=7000)
+kick_like("voices/ockm-tomb.pd","808 tom: a round tom with a slow pitch fall. Input is hit strength (0-1).",190,120,250,450,0.8)
+metal_voice("voices/ockm-percb.pd","808 cowbell: two square waves through a band-pass.",[540,800],2640,180,0.5)
+
+# ---------------- synth C: industrial and techno ----------------
+kick909("voices/ockm-kickc.pd","Industrial kick: a hard click and a distorted rumble with a long tail. Input is hit strength (0-1).",320,90,42,8,90,650,0.8,5)
+crunch_noise("voices/ockm-snarec.pd","Industrial snare: a distorted noise blast with a low tone in it.",[(1800,1,1),(5000,2,0.6)],"{D}1 \\, 0 {D}2",210,1.4,5,tones=[(190,0.4)])
+crunch_noise("voices/ockm-clapc.pd","Industrial clap: wide gritty bursts and a big room.",[(900,2,1),(3000,3,0.7)],
+             "{D}1 \\, 0 12 0 \\, {D}1 0 16 \\, 0 12 16 \\, {D}1 0 32 \\, 0 {D}2 32",420,1.5,6)
+metal_voice("voices/ockm-rimc.pd","Clank: three inharmonic squares \\, a short metallic hit.",[400,1150,1800],2000,60,0.6)
+metal_voice("voices/ockm-hatc.pd","Industrial hat: higher \\, harsher metal.",[f*1.5 for f in HAT808],12000,30,0.5,hp=9000)
+crunch_noise("voices/ockm-ohatc.pd","Trash ride: a long \\, driven wash of high noise.",[(8000,1,1),(12000,2,0.5)],"{D}1 \\, 0 {D}2",550,0.6,3)
+kick909("voices/ockm-tomc.pd","Distorted tom: low and dirty. Input is hit strength (0-1).",230,110,72,15,80,480,0.3,4,0.8)
+kick909("voices/ockm-percc.pd","Zap: a fast laser sweep. Input is hit strength (0-1).",2400,400,110,15,60,140,0,2,0.5)
+
 
 # ---------------- samples ----------------
 # One folder per drum sound. Perc 1 and perc 2 share the perc folder. Files are numbered in name order (01, 02...).
@@ -193,16 +298,17 @@ lat=p.add(f"#X obj 600 680 list append {D}0-smp;"); lpr=p.add("#X obj 600 705 li
 sf=p.add("#X obj 600 755 soundfiler;"); ui_=p.add("#X obj 700 780 unpack f;"); p.add(f"#X obj 900 700 table {D}0-smp;")
 for c in [(hp2,0,lat,0),(lat,0,lpr,0),(lpr,0,ltr,0),(ltr,0,sf,0)]: p.con(*c)
 # hit: vel -> (length ms at this speed, amplitude, when to fade, sample count)
-ex=p.add(f"#X obj 30 120 expr {D}f2/max({D}f3\\,1)*1000/pow(2\\,{D}f4/12) \\; {D}f1*{D}f6*0.8 \\; {D}f2/max({D}f3\\,1)*1000/pow(2\\,{D}f4/12)*min({D}f5\\,100)/100 \\; {D}f2;")
+ex=p.add(f"#X obj 30 120 expr {D}f2*(1-0.4*{D}f7)/max({D}f3\\,1)*1000/pow(2\\,{D}f4/12) \\; {D}f1*{D}f6*0.8 \\; {D}f2*(1-0.4*{D}f7)/max({D}f3\\,1)*1000/pow(2\\,{D}f4/12)*min({D}f5\\,100)/100 \\; {D}f2 \\; 1+{D}f2*0.4*{D}f7;")
 init=p.add("#X msg 200 75 44100;"); p.con(tlb,1,init,0); p.con(init,0,ex,2)
 il=p.add("#X msg 260 75 1;"); p.con(tlb,1,il,0); p.con(il,0,ex,5)
 idc=p.add("#X msg 300 75 100;"); p.con(tlb,1,idc,0); p.con(idc,0,ex,4)
 p.con(z0,0,ex,1); p.con(sf,0,ex,1); p.con(sf,1,ui_,0); p.con(ui_,0,ex,2)
 t_,d_,l_=hooks(p,200,20); p.con(t_,0,ex,3); p.con(d_,0,ex,4); p.con(l_,0,ex,5)
 p.con(inl,0,ex,0)
-pk=p.add("#X obj 30 160 pack f f f f;")
-for k in range(4): p.con(ex,k,pk,k)
-tll=p.add("#X obj 30 185 t l l;"); mph=p.add(f"#X msg 150 210 1 \\, {D}4 {D}1;"); mam=p.add(f"#X msg 30 210 {D}2 \\, 0 4 {D}3;")
+pk=p.add("#X obj 30 160 pack f f f f f;")
+for k in range(5): p.con(ex,k,pk,k)
+rstt=p.add(f"#X obj 400 20 r ockm-{D}1-start;"); p.con(rstt,0,ex,6)
+tll=p.add("#X obj 30 185 t l l;"); mph=p.add(f"#X msg 150 210 {D}5 \\, {D}4 {D}1;"); mam=p.add(f"#X msg 30 210 {D}2 \\, 0 4 {D}3;")
 vph=p.add("#X obj 150 240 vline~;"); trd=p.add(f"#X obj 150 270 tabread4~ {D}0-smp;"); vam=p.add("#X obj 30 240 vline~;")
 mul=p.add("#X obj 30 300 *~;"); out=p.add("#X obj 30 340 outlet~;")
 for c in [(pk,0,tll,0),(tll,1,mph,0),(tll,0,mam,0),(mph,0,vph,0),(vph,0,trd,0),(mam,0,vam,0),(trd,0,mul,0),(vam,0,mul,1),(mul,0,out,0)]: p.con(*c)
@@ -315,6 +421,8 @@ p.save("seq/ockm-recorder.pd","#N canvas 120 120 1300 640 12;")
 
 # ---------------- drum slot: any of the 8 drum sounds ----------------
 SOUNDS=["ockm-kick","ockm-snare","ockm-clap","ockm-rim","ockm-hat","ockm-ohat","ockm-tom","ockm-perc"]
+SOUNDS_B=["ockm-kickb","ockm-snareb","ockm-clapb","ockm-rimb","ockm-hatb","ockm-ohatb","ockm-tomb","ockm-percb"]
+SOUNDS_C=["ockm-kickc","ockm-snarec","ockm-clapc","ockm-rimc","ockm-hatc","ockm-ohatc","ockm-tomc","ockm-percc"]
 SOUND_NAMES=["kick","snare","clap","perc 1","closed hat","open hat","tom","perc 2"]
 p=P()
 p.add("#X text 20 10 Drum slot: plays one of the 8 drum sounds (ockm-<slot>-sound 0-7) \, or a sample when ockm-<slot>-sample is 1 or more. Only the one in use runs. ockm-<slot>-audition plays it once.;")
@@ -322,11 +430,13 @@ inl=p.add("#X obj 30 50 inlet;")
 aud=p.add(f"#X obj 130 50 r ockm-{D}1-audition;")
 # which one runs: 8 = the sample player, otherwise the sound number
 ars=p.add(f"#X obj 500 20 r ockm-{D}1-sound;"); arn=p.add(f"#X obj 650 20 r ockm-{D}1-sample;"); atn=p.add("#X obj 650 45 t b f;")
-aex=p.add(f"#X obj 500 70 expr if({D}f2>0 \, 8 \, {D}f1);"); p.con(aex,0,p.add(f"#X obj 500 95 s {D}0-act;"),0)
-for c in [(ars,0,aex,0),(arn,0,atn,0),(atn,1,aex,1),(atn,0,aex,0)]: p.con(*c)
+# which one runs: 24 = the sample player, 16-23 = synth C, 8-15 = synth B, 0-7 = synth A (the sound number)
+ary=p.add(f"#X obj 800 20 r ockm-{D}1-synth;"); aty=p.add("#X obj 800 45 t b f;")
+aex=p.add(f"#X obj 500 70 expr if({D}f2>0 \\, 24 \\, {D}f1+8*min(max(int({D}f3)\\,0)\\,2));"); p.con(aex,0,p.add(f"#X obj 500 95 s {D}0-act;"),0)
+for c in [(ars,0,aex,0),(arn,0,atn,0),(atn,1,aex,1),(atn,0,aex,0),(ary,0,aty,0),(aty,1,aex,2),(aty,0,aex,0)]: p.con(*c)
 summ=None
 outs=[]
-for k,v in enumerate(SOUNDS+["ockm-sampler"]):
+for k,v in enumerate(SOUNDS+SOUNDS_B+SOUNDS_C+["ockm-sampler"]):
     sp=P()
     si=sp.add("#X obj 20 20 inlet;"); sg=sp.add("#X obj 20 50 spigot;"); vo=sp.add(f"#X obj 20 80 {v} {D}1;"); so=sp.add("#X obj 20 110 outlet~;")
     rs=sp.add(f"#X obj 200 20 r {D}0-act;"); eq=sp.add(f"#X obj 200 50 == {k};"); tf=sp.add("#X obj 200 80 t f f;"); sw=sp.add("#X obj 200 110 switch~;")
@@ -334,12 +444,18 @@ for k,v in enumerate(SOUNDS+["ockm-sampler"]):
     p.L.append(sp.text(f"#N canvas 0 0 420 160 s{k} 0;").rstrip("\n"))
     o=p.add(f"#X restore {30+k*90} 100 pd s{k};")
     p.con(inl,0,o,0); p.con(aud,0,o,0); outs.append(o)
-    p.add(f"#X text {30+k*90} 125 {k} {(SOUND_NAMES+['sample'])[k].split()[0]};")
+    p.add(f"#X text {30+k*90} 125 {k} {(SOUND_NAMES+[n+'-B' for n in SOUND_NAMES]+[n+'-C' for n in SOUND_NAMES]+['sample'])[k].split()[0]};")
 prev=outs[0]
 for o in outs[1:]:
     a=p.add("#X obj 30 200 +~;"); p.con(prev,0,a,0); p.con(o,0,a,1); prev=a
-out=p.add("#X obj 30 260 outlet~;"); p.con(prev,0,out,0)
-p.save("voices/ockm-drum.pd","#N canvas 180 180 900 300 12;")
+# tone (-1 darker \, 0 as it is \, 1 brighter) and drive (0 clean \, 1 gritty), on synth and sample alike
+rtn=p.add(f"#X obj 300 160 r ockm-{D}1-tone;"); tnx=p.add(f"#X obj 300 185 expr if({D}f1<0 \\, 18000*pow(2\\,{D}f1*7) \\, 20000) \\; if({D}f1>0 \\, 20*pow(2\\,{D}f1*8) \\, 5);")
+lpf=p.add("#X obj 30 215 lop~ 20000;"); hpf=p.add("#X obj 30 235 hip~ 5;")
+rdr=p.add(f"#X obj 500 160 r ockm-{D}1-drive;"); drx=p.add(f"#X obj 500 185 expr 1+{D}f1*6;")
+drv=p.add(f"#X obj 30 255 expr~ if({D}f2>1.001 \\, tanh({D}v1*{D}f2)/tanh({D}f2) \\, {D}v1);")
+out=p.add("#X obj 30 290 outlet~;")
+for c in [(prev,0,lpf,0),(lpf,0,hpf,0),(hpf,0,drv,0),(drv,0,out,0),(rtn,0,tnx,0),(tnx,0,lpf,1),(tnx,1,hpf,1),(rdr,0,drx,0),(drx,0,drv,1)]: p.con(*c)
+p.save("voices/ockm-drum.pd","#N canvas 180 180 1600 320 12;")
 
 # ---------------- drum row (up to 128 steps, shown 16 at a time) ----------------
 p=P()
@@ -451,7 +567,8 @@ PROJECT_KEYS=[("ockm-bpm",124,"ockm-tempo"),("ockm-volume",1,None),("ockm-accent
     ("ockm-verb-size",0.6,None),("ockm-verb-tone",0.5,None),("ockm-sync",0,None),("ockm-clock-out",1,None),
     ("ockm-song-mode",0,None),("ockm-song-loop",1,None)]
 for nm,snd in SLOTS:
-    PROJECT_KEYS+=[(f"ockm-{nm}-sound",snd,None),(f"ockm-{nm}-sample",0,None),(f"ockm-{nm}-tune",0,None),(f"ockm-{nm}-decay",100,None),
+    PROJECT_KEYS+=[(f"ockm-{nm}-sound",snd,None),(f"ockm-{nm}-sample",0,None),(f"ockm-{nm}-synth",0,None),(f"ockm-{nm}-tone",0,None),
+                   (f"ockm-{nm}-drive",0,None),(f"ockm-{nm}-start",0,None),(f"ockm-{nm}-tune",0,None),(f"ockm-{nm}-decay",100,None),
                    (f"ockm-{nm}-level",1,None),(f"ockm-{nm}-verb",VERB[snd],None),(f"ockm-{nm}-delay",DLY[snd],None)]
 SYNTH_DEFAULTS={"bass":dict(engine=0,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.37,k2=0.9,k3=0.31,k4=0.55,drive=0,verb=0,delay=0,rhythm=3,notes=3),
                 "lead":dict(engine=4,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0.2,delay=0.25,rhythm=8,notes=12),

@@ -164,13 +164,14 @@ def loads_clean(work):
 
 @test
 def drum_voices_sound_and_respond(work):
-    for v in ["kick", "snare", "clap", "rim", "hat", "ohat", "tom", "perc"]:
+    for v in ["kick", "snare", "clap", "rim", "hat", "ohat", "tom", "perc"] + [n + sfx for sfx in ("b", "c") for n in ["kick", "snare", "clap", "rim", "hat", "ohat", "tom", "perc"]]:
         h = Harness(dut=f"ockm-{v} x")
         h.record(os.path.join(work, f"v_{v}.wav"), source="dut")
         h.at(50, "test-in 1"); h.at(650, "test-in 0.5")
         _, (s, sr) = play(work, h, f"t_voice_{v}", with_main=False, ms=1250)
-        a, b = peak(s[int(0.05 * sr):int(0.6 * sr)]), peak(s[int(0.65 * sr):int(1.2 * sr)])
-        assert a > 0.05, f"{v} is silent"
+        A, B = s[int(0.05 * sr):int(0.6 * sr)], s[int(0.65 * sr):int(1.2 * sr)]
+        assert peak(A) > 0.05, f"{v} is silent"
+        a, b = math.sqrt(sum(x * x for x in A) / len(A)), math.sqrt(sum(x * x for x in B) / len(B))   # average level: metal voices beat, peaks jump about
         assert 0.35 < b / a < 0.65, f"{v}: half-strength hit should be about half as loud ({b / a:.2f})"
     h = Harness(dut="ockm-kick x"); h.record(os.path.join(work, "v_tune.wav"), source="dut")
     h.at(50, "test-in 1"); h.at(600, "ockm-x-tune 12"); h.at(610, "test-in 1")
@@ -943,7 +944,7 @@ def drum_velocity_timing_and_loop(work):
     step 12 drawn at velocity 0.4. The drums loop is 1 bar under a 2-bar pattern, so bar 2 repeats bar 1, nudges and all."""
     h = Harness(); h.record(os.path.join(work, "nudge.wav"))
     mutes = " ; ".join(f"ockm-{t}-mute 1" for t in ["d2","d3","d4","d5","d6","d7","d8","bass","lead","chord"])
-    h.at(100, f"ockm-bpm 120 ; ockm-verb-mix 0 ; ockm-delay-mix 0 ; ockm-swing 50 ; ockm-length 32 ; ockm-fill-every 0 ; ockm-d1-sample 0 ; ockm-d1-sound 0 ; {mutes}")
+    h.at(100, f"ockm-bpm 120 ; ockm-verb-mix 0 ; ockm-delay-mix 0 ; ockm-swing 50 ; ockm-length 32 ; ockm-fill-every 0 ; ockm-d1-sample 0 ; ockm-d1-sound 0 ; ockm-d1-synth 0 ; ockm-d1-decay 40 ; {mutes}")
     h.at(150, "ockm-pat-d1 const 0 ; ockm-pat-d1-nudge const 0 ; ockm-drum-loop 16")
     h.at(170, "ockm-edit d1 0 2 ; ockm-edit d1 4 2 ; ockm-edit d1 8 2 ; ockm-edit d1 12 0.4 ; ockm-nudge d1 4 -0.2 ; ockm-nudge d1 8 0.2")
     h.at(300, "ockm-play 1"); h.at(4500, "ockm-play 0")
@@ -1320,6 +1321,29 @@ def touchscreen_exports_a_song_and_records_live(work):
     w = wave.open(os.path.join(ex, live[0])); secs = w.getnframes() / w.getframerate(); w.close()
     assert 1.2 < secs < 2.2, f"the live recording should be about 1.6 s: {secs:.1f} s"
 
+@test
+def drum_slot_909_808_industrial_tone_drive(work):
+    """A slot switches between its 909, 808 and industrial sounds (ockm-<slot>-synth 0, 1, 2), each different;
+    tone darkens or brightens it and drive makes it louder and grittier."""
+    h = Harness(); h.record(os.path.join(work, "abc.wav"))
+    others = " ; ".join(f"ockm-{t}-mute 1" for t in ["d2","d3","d4","d5","d6","d7","d8","bass","lead","chord"])
+    h.at(100, f"ockm-verb-mix 0 ; ockm-delay-mix 0 ; ockm-d1-sound 0 ; ockm-d1-sample 0 ; ockm-d1-verb 0 ; ockm-d1-delay 0 ; {others}")
+    for i, (syn, tone, drive) in enumerate([(0, 0, 0), (1, 0, 0), (2, 0, 0), (0, -0.8, 0), (0, 0.8, 0), (0, 0, 1)]):
+        t0 = 300 + i * 900
+        h.at(t0, f"ockm-d1-synth {syn} ; ockm-d1-tone {tone} ; ockm-d1-drive {drive}")
+        h.at(t0 + 50, "ockm-d1-audition 1")
+    out, (x, sr) = play(work, h, "t_abc", ms=300 + 6 * 900 + 200)
+    segs = [x[int((0.35 + i * 0.9) * sr):int((0.35 + i * 0.9 + 0.6) * sr)] for i in range(6)]
+    pk = [peak(sg) for sg in segs]
+    assert min(pk) > 0.05, f"every version should sound: {[round(p, 3) for p in pk]}"
+    lens = [sum(1 for v in sg if abs(v) > 0.02) / sr for sg in segs[:3]]
+    assert lens[1] > lens[0] * 1.3, f"the 808 kick should ring longer than the 909 ({lens[0]:.2f} vs {lens[1]:.2f} s)"
+    # brightness: share of the signal that is fast change (a simple high-frequency measure)
+    def bright(sg): return sum(abs(sg[i] - sg[i - 1]) for i in range(1, len(sg))) / (sum(abs(v) for v in sg) + 1e-9)
+    assert bright(segs[3]) < bright(segs[0]) < bright(segs[4]), f"tone should darken then brighten: {bright(segs[3]):.3f} {bright(segs[0]):.3f} {bright(segs[4]):.3f}"
+    rms = lambda sg: math.sqrt(sum(v * v for v in sg) / len(sg))
+    assert rms(segs[5]) > rms(segs[0]) * 1.1, "drive should make it denser"
+
 def write_tone(path, hz, secs, sr=44100, channels=1):
     w = wave.open(path, "w"); w.setnchannels(channels); w.setsampwidth(2); w.setframerate(sr)
     n = int(secs * sr)
@@ -1353,7 +1377,9 @@ def samples_load_and_play_on_drum_slots(work):
     h.at(3200, "ockm-d1-audition 1")           # back to the synth kick
     h.at(3800, "ockm-d1-sample 3")             # no third kick: silent, not the old sample
     h.at(3900, "ockm-d1-audition 1")
-    out, (x, sr) = play(work, h, "t_samples", ms=4500)
+    h.at(4400, "ockm-d1-sample 1 ; ockm-d1-start 1")   # start 1: skip 40% in
+    h.at(4500, "ockm-d1-audition 1")
+    out, (x, sr) = play(work, h, "t_samples", ms=5100)
     counts = printed(out, "ockm-sample-counts")
     assert counts and counts[-1].split()[:4] == ["2", "0", "0", "1"], f"sample counts wrong: {counts}"
     t0 = 0.2   # recording starts at 200 ms
@@ -1366,6 +1392,9 @@ def samples_load_and_play_on_drum_slots(work):
     assert full > 0.05 and cut < full * 0.2, f"decay 25 should cut the tail ({full:.2f} vs {cut:.2f})"
     k = seg(3.22, 3.4); assert peak(k) > 0.05 and cycles_per_second(k, sr) < 200, "sample 0 should give the synth kick back"
     assert peak(seg(3.92, 4.3)) < 0.01, "a missing sample should be silent"
+    def audible(a, b): return sum(1 for v in seg(a, b) if abs(v) > 0.01) / sr
+    full, cut = audible(0.4, 0.95), audible(4.5, 5.05)
+    assert 0.5 < cut / full < 0.7, f"start 1 should skip 40% of the sample ({full:.2f} s vs {cut:.2f} s)"
 
 @test
 def touchscreen_picks_samples_and_kits(work):
@@ -1377,7 +1406,9 @@ def touchscreen_picks_samples_and_kits(work):
     write_tone(os.path.join(work, "samples", "perc", "01.wav"), 330, 0.2)
     h = Harness(); h.show("ockm-d1-sample", "ockm-d1-audition", "ockm-d6-sample", "ockm-d7-sample", "ockm-d1-sound")
     h.at(100, "ockm-ui-test tap 414 36")      # drums tab: counts the folders
-    h.at(300, "ockm-ui-test tap 366 380")     # next sample: 1
+    h.at(300, "ockm-ui-test tap 366 380")     # 909 -> 808
+    h.at(350, "ockm-ui-test tap 366 380")     # -> industrial
+    h.at(400, "ockm-ui-test tap 366 380")     # -> sample 1
     h.at(500, "ockm-ui-test tap 366 380")     # 2
     h.at(700, "ockm-ui-test tap 366 380")     # only 2 kicks: stays put
     h.at(900, "ockm-ui-test tap 200 380")     # tap the box: hear it
@@ -1385,7 +1416,8 @@ def touchscreen_picks_samples_and_kits(work):
     f = os.path.join(work, "t_samples_ui.pd"); h.finish(1500, f)
     out = run(work, f)
     d1 = [int(float(v)) for v in printed(out, "ockm-d1-sample")]
-    assert d1[:2] == [1, 2] and len(d1) <= 3, f"sample steps wrong (the last one is new kit's pick): {d1}"
+    picked = [v for v in d1 if v > 0]
+    assert picked[:2] == [1, 2] and len(picked) <= 3, f"sample steps wrong (the last one is new kit's pick): {d1}"
     assert len(printed(out, "ockm-d1-audition")) >= 3, f"should play on each change and on tapping the box: {printed(out, 'ockm-d1-audition')}"
     assert printed(out, "ockm-d6-sample") == ["1"] and printed(out, "ockm-d7-sample") == ["1"], "new kit should give both perc slots a sample"
 

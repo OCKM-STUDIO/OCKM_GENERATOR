@@ -313,7 +313,9 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 | `ockm-verb-size` | Reverb size, 0 (small room, about 0.4s) to 1 (big hall, about 3s) |
 | `ockm-verb-tone` | Reverb tone, 0 dark to 1 bright |
 | `ockm-<slot>-sound` | Which sound a drum slot plays: 0 kick, 1 snare, 2 clap, 3 perc 1, 4 closed hat, 5 open hat, 6 tom, 7 perc 2 |
-| `ockm-<slot>-sample` | 0 = the synth sound, n = the nth file in that sound's sample folder. Saved with the project |
+| `ockm-<slot>-sample` | 0 = a synth sound, n = the nth file in that sound's sample folder. Saved with the project |
+| `ockm-<slot>-synth` | Which synth sound: 0 909, 1 808, 2 industrial |
+| `ockm-<slot>-tone`, `-drive`, `-start` | Tone -1 (darker) to 1 (brighter); drive 0 to 1; start 0 to 1 (samples: skip up to 40% in) |
 | `ockm-<slot>-audition` | Play the slot once (the screen uses it when you pick a sound or sample) |
 | `ockm-samples-scan` | Count the files in each sample folder again. Answer: `ockm-sample-counts` with 7 numbers, in the order kick snare clap perc hat open-hat tom |
 | `ockm-<slot>-verb` | How much of that slot goes to the reverb, 0 to 1 |
@@ -355,7 +357,19 @@ Slot sounds, samples, tune, decay, level and sends are part of the drum kit, whi
 
 ### Samples
 
-Each slot plays either its built-in synth sound or a sample from that sound's folder in `samples/` (perc 1 and perc 2 share `perc`). On the drums tab, the sample box under the steps picks it: the arrows step through the folder (the first step back is "synth"), each change plays the new sound, and tapping the box plays it again. **New kit** picks a random sample for every slot that has some.
+Each slot has three built-in synth sounds, then the samples in its folder in `samples/` (perc 1 and perc 2 share `perc`). On the drums tab, the sound box picks it: the arrows step through **909 → 808 → industrial → your samples**, each change plays the new sound, and tapping the box plays it again.
+
+| Slot | 909 | 808 | Industrial |
+|---|---|---|---|
+| kick | fast drop, click, a little saturation | long deep boom | hard click, distorted rumble |
+| snare | tuned body, bright snap | more tone, less rattle | distorted noise blast |
+| clap | four hard bursts, two noise bands, crunch | loose and roomy | wide gritty bursts, big room |
+| perc 1 | rim | clave | metallic clank |
+| hat / open hat | bright noise | six square waves, the 808 metal | harsh metal / trash ride |
+| tom | sweep tom | round 808 tom | dirty tom |
+| perc 2 | rimshot | 808 cowbell | laser zap |
+
+The sliders change with the source. **Synth:** level, tune, decay, tone (darker to brighter), drive. **Sample:** level, pitch, length, tone, start (skips up to 40% into the sample, to trim a slow attack). Reverb and delay sends are on the mixer. **New kit** picks a random sample for every slot that has some.
 
 - Samples are numbered in file-name order, so `01.wav` is sample 1. WAV and AIFF, mono or stereo (only the left channel plays), any sample rate
 - Tune changes the playback speed, like an MPC: +12 is an octave up and twice as short. Decay below 100 fades the tail early; at 100 or more the whole sample plays
