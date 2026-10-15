@@ -27,7 +27,8 @@ args=ap.parse_args()
 R=args.out
 for d in ("voices","seq"): os.makedirs(os.path.join(R,d),exist_ok=True)
 STEPS=128   # longest pattern
-SLOTN=8     # pattern slots
+SLOTN=1     # one loop per project (the store still speaks in slots, so this stays a number)
+LOOP_FILE="loop.txt"
 D="\\$"   # Pd dollar as written in a file
 class P:
     def __init__(s): s.L=[]; s.C=[]; s.n=0
@@ -352,7 +353,7 @@ p.save("voices/ockm-transfx.pd","#N canvas 120 120 700 600 12;")
 
 # ---------------- transitions: what happens where song sections meet ----------------
 # Per pattern: ockm-end (how its last bar in the song plays: 0 nothing, 1 fill, 2 riser, 3 riser + gap, 4 dub out)
-# and ockm-impact (1: a crash and sub boom on its first downbeat). Song mode only: it listens to ockm-song-pos <step> <bars left>.
+# and ockm-impact (1: a crash and sub boom on its first downbeat). Listens to ockm-song-pos <step> <bars left>: song mode is gone, so this waits for arrangements (step 5) to drive it.
 p=P(); header_text(p,"Transitions (song mode). On a section's last bar: its ending (ockm-end: 1 fill \\, 2 riser \\, 3 riser + a one-beat gap \\, 4 dub out). On a new section's first downbeat: an impact if that pattern has ockm-impact 1.")
 re_=p.add("#X obj 30 40 r ockm-end;"); ve=p.add("#X obj 30 65 v ockm_end;"); p.con(re_,0,ve,0)
 ri=p.add("#X obj 150 40 r ockm-impact;"); vi=p.add("#X obj 150 65 v ockm_impact;"); p.con(ri,0,vi,0)
@@ -634,8 +635,7 @@ def show(h): return "ockm-show-"+h[5:]
 # Settings registry: (hook, default, hook the store listens to if different)
 PROJECT_KEYS=[("ockm-bpm",124,"ockm-tempo"),("ockm-volume",1,None),("ockm-accent",0.3,None),("ockm-filter",0,"ockm-filter-now"),("ockm-drive",0,None),
     ("ockm-delay-mix",0.5,None),("ockm-delay-fb",0.4,None),("ockm-delay-steps",3,None),("ockm-verb-mix",0.5,None),
-    ("ockm-verb-size",0.6,None),("ockm-verb-tone",0.5,None),("ockm-sync",0,None),("ockm-clock-out",1,None),
-    ("ockm-song-mode",0,None),("ockm-song-loop",1,None)]
+    ("ockm-verb-size",0.6,None),("ockm-verb-tone",0.5,None),("ockm-sync",0,None),("ockm-clock-out",1,None)]
 for nm,snd in SLOTS:
     PROJECT_KEYS+=[(f"ockm-{nm}-sound",snd,None),(f"ockm-{nm}-sample",0,None),(f"ockm-{nm}-synth",0,None),(f"ockm-{nm}-tone",0,None),
                    (f"ockm-{nm}-drive",0,None),(f"ockm-{nm}-start",0,None),(f"ockm-{nm}-tune",0,None),(f"ockm-{nm}-decay",100,None),
@@ -830,7 +830,6 @@ p.add(f"#X obj 230 {gy} ockm-monogen bass 0 3 3 0 1;")
 p.add(f"#X obj 400 {gy} ockm-monogen lead 24 8 12 0 1;")
 p.add(f"#X obj 530 {gy} ockm-chordgen chord 0;")
 p.add(f"#X obj 700 {gy} ockm-grooves;")
-p.add(f"#X obj 820 {gy} ockm-song;")
 for i,(nm,snd) in enumerate(SLOTS): p.add(f"#X obj {110+i*120} {gy+30} ockm-drumgen {nm} {snd};")
 # synth settings subpatch: key, engines, knobs, generator choices
 sub=P()
@@ -1700,85 +1699,6 @@ for c in [(t,0,tb,0),(tb,1,z,0),(z,0,fi,1),(tb,0,ln,0),(rl,0,ln,1),(ln,0,un,0),(
           (ti,1,tw,1),(ti,0,md,0),(md,0,rd,0),(rd,0,tw,0)]: p.con(*c)
 p.save("seq/ockm-drumgen.pd","#N canvas 140 140 700 500 12;")
 
-# ================= song mode =================
-# One song per project: a chain of steps, each a pattern and how many times it repeats.
-# The song is one line of text: "pattern repeats pattern repeats ..." (patterns 0-7), saved as song.txt.
-p=P()
-p.add("#X text 20 10 Song player. ockm-song-list <p r p r ...> sets the chain \\, ockm-song-start <step> plays from a step \\, ockm-song-loop 0/1. Counts bars: at the start of a step's last bar it queues the next pattern \\, so it switches right on the pattern's end. Sends ockm-song-show <list> and ockm-song-pos <step> <bars left>.;")
-T=f"{D}0-song"
-tdef=p.add(f"#X obj 900 60 text define {T};")
-for nm,v in (("sg_n",0),("sg_pos",0),("sg_pend",-1),("sg_left",0),("sg_len",16),("sg_loop",1),("sg_on",0),("sg_gp",0),("sg_gr",1),("sg_tmp",0),("sg_stepms",121)):
-    pass
-lb=p.add("#X obj 700 40 loadbang;"); ini=p.add("#X msg 700 65 \\; sg_stepms 121 \\; sg_pend -1 \\; sg_loop 1 \\; sg_len 16;")
-p.con(lb,0,ini,0)
-# values can't be set by a message box send, so mirror them through receivers
-for nm in ("sg_stepms","sg_pend","sg_loop","sg_len"):
-    rr=p.add(f"#X obj 700 {100+20*['sg_stepms','sg_pend','sg_loop','sg_len'].index(nm)} r {nm};"); vv=p.add(f"#X obj 780 {100+20*['sg_stepms','sg_pend','sg_loop','sg_len'].index(nm)} v {nm};"); p.con(rr,0,vv,0)
-p.con(p.add("#X obj 560 40 r ockm-stepms;"),0,p.add("#X obj 560 65 v sg_stepms;"),0)
-p.con(p.add("#X obj 560 100 r ockm-len;"),0,p.add("#X obj 560 125 v sg_len;"),0)
-p.con(p.add("#X obj 560 160 r ockm-song-loop;"),0,p.add("#X obj 560 185 v sg_loop;"),0)
-# file and clear messages for the song text, then tell everyone
-rf=p.add("#X obj 900 20 r ockm-song-file;"); tfa=p.add("#X obj 900 40 t b a;"); p.con(rf,0,tfa,0); p.con(tfa,1,tdef,0)
-supd=p.add(f"#X obj 980 60 s {D}0-upd;"); p.con(tfa,0,supd,0)
-# set the chain from the screen
-rl=p.add("#X obj 20 60 r ockm-song-list;"); tl=p.add("#X obj 20 85 t b a a b;"); clr=p.add("#X msg 200 110 clear;")
-lln=p.add("#X obj 120 110 list length;"); gt0=p.add("#X obj 120 135 > 0;"); spg=p.add("#X obj 20 160 spigot;"); ins=p.add(f"#X obj 20 185 text insert {T} 0;")
-for c in [(rl,0,tl,0),(tl,3,clr,0),(clr,0,tdef,0),(tl,2,lln,0),(lln,0,gt0,0),(gt0,0,spg,1),(tl,1,spg,0),(spg,0,ins,0),(tl,0,supd,0)]: p.con(*c)
-# after any change: count the steps and show the chain
-ru=p.add(f"#X obj 20 240 r {D}0-upd;"); tsz=p.add(f"#X obj 20 265 text size {T};"); s0=p.add("#X obj 20 290 sel 0;")
-z0=p.add("#X msg 20 315 0;"); vn0=p.add("#X obj 20 340 v sg_n;"); emp=p.add("#X msg 80 340 \\; ockm-song-show bang;")
-g0=p.add("#X msg 150 315 0;"); tg=p.add(f"#X obj 150 340 text get {T};"); tga=p.add("#X obj 150 365 t a a;")
-ll2=p.add("#X obj 250 390 list length;"); dv=p.add("#X obj 250 415 / 2;"); vn=p.add("#X obj 250 440 v sg_n;")
-lpr=p.add("#X obj 150 390 list prepend list;"); ltr=p.add("#X obj 150 415 list trim;"); ssh=p.add("#X obj 150 440 s ockm-song-show;")
-for c in [(ru,0,tsz,0),(tsz,0,s0,0),(s0,0,z0,0),(z0,0,vn0,0),(s0,0,emp,0),(s0,1,g0,0),(g0,0,tg,0),(tg,0,tga,0),(tga,1,ll2,0),(ll2,0,dv,0),(dv,0,vn,0),
-          (tga,0,ssh,0)]: p.con(*c)
-# get step i -> sg_gp, sg_gr
-rgt=p.add(f"#X obj 400 240 r {D}0-get;"); tgf=p.add("#X obj 400 265 t b f;"); m2=p.add("#X obj 460 290 * 2;")
-g1=p.add("#X msg 400 290 0;"); tg2=p.add(f"#X obj 400 315 text get {T};"); lsp=p.add("#X obj 400 340 list split 0;"); ls2=p.add("#X obj 400 365 list split 2;")
-upk=p.add("#X obj 400 390 unpack f f;"); vgp=p.add("#X obj 400 415 v sg_gp;"); vgr=p.add("#X obj 480 415 v sg_gr;")
-for c in [(rgt,0,tgf,0),(tgf,1,m2,0),(m2,0,lsp,1),(tgf,0,g1,0),(g1,0,tg2,0),(tg2,0,lsp,0),(lsp,1,ls2,0),(ls2,0,upk,0),(upk,1,vgr,0),(upk,0,vgp,0)]: p.con(*c)
-sget=lambda x,y: p.add(f"#X obj {x} {y} s {D}0-get;")
-# bars in a step = repeats x the pattern's bars
-def bars_expr(x,y): return p.add(f"#X obj {x} {y} expr sg_gr*max(1\\, int(sg_len/16));")
-# start: load the step's pattern straight away, count its bars, play
-rst=p.add("#X obj 20 520 r ockm-song-start;"); tst=p.add("#X obj 20 545 t b f;"); vtmp=p.add("#X obj 120 570 v sg_tmp;")
-idx=p.add("#X obj 20 570 expr if(sg_n<1\\, -1\\, min(max(int(sg_tmp)\\, 0)\\, sg_n-1));"); mo=p.add("#X obj 20 595 moses 0;")
-ts4=p.add("#X obj 60 620 t b b b b b f;"); vpos=p.add("#X obj 300 645 v sg_pos;")
-gp=p.add("#X obj 220 670 v sg_gp;"); swant=p.add("#X obj 220 695 s ockm-want;")
-bx=bars_expr(160,720); vleft=p.add("#X obj 160 745 v sg_left;")
-m1=p.add("#X msg 120 770 -1;"); vpend=p.add("#X obj 120 795 v sg_pend;")
-on1=p.add("#X msg 60 820 1;"); von=p.add("#X obj 60 845 v sg_on;")
-go=p.add("#X msg 60 870 \\; ockm-play 1;"); ts2=p.add("#X obj 60 650 t b b;")
-posx=p.add("#X obj 300 870 expr sg_pos\\; sg_left;"); pk=p.add("#X obj 300 895 pack 0 0;"); spos=p.add("#X obj 300 920 s ockm-song-pos;")
-for c in [(rst,0,tst,0),(tst,1,vtmp,0),(tst,0,idx,0),(idx,0,mo,0),(mo,1,ts4,0),
-          (ts4,5,vpos,0),(ts4,5,sget(300,620),0),(ts4,4,gp,0),(gp,0,swant,0),(ts4,3,bx,0),(bx,0,vleft,0),(ts4,2,m1,0),(m1,0,vpend,0),
-          (ts4,1,posx,0),(posx,1,pk,1),(posx,0,pk,0),(pk,0,spos,0),(ts4,0,on1,0),(on1,0,von,0),(on1,0,go,0)]: p.con(*c)
-# every bar while the song plays
-rb=p.add("#X obj 600 520 r ockm-bar;"); onx=p.add("#X obj 600 545 expr sg_on;"); son=p.add("#X obj 600 570 sel 1;"); tb3=p.add("#X obj 600 595 t b b b;")
-# (a) a queued step has just loaded: it becomes the current step
-pdx=p.add("#X obj 760 620 expr sg_pend;"); mp=p.add("#X obj 760 645 moses 0;"); tpf=p.add("#X obj 800 670 t b b f;")
-tff2=p.add("#X obj 900 695 t f f;"); vpos2=p.add("#X obj 960 720 v sg_pos;")
-bx2=bars_expr(850,720); vleft2=p.add("#X obj 850 745 v sg_left;"); m12=p.add("#X msg 800 745 -1;"); vpend2=p.add("#X obj 800 770 v sg_pend;")
-for c in [(rb,0,onx,0),(onx,0,son,0),(son,0,tb3,0),(tb3,2,pdx,0),(pdx,0,mp,0),(mp,1,tpf,0),(tpf,2,tff2,0),(tff2,1,vpos2,0),(tff2,0,sget(900,745),0),
-          (tpf,1,bx2,0),(bx2,0,vleft2,0),(tpf,0,m12,0),(m12,0,vpend2,0)]: p.con(*c)
-# (b) one bar gone: tell the screens
-dec=p.add("#X obj 640 820 expr sg_left-1;"); vleft3=p.add("#X obj 640 845 v sg_left;"); tdec=p.add("#X obj 640 820 t b;")
-pos2=p.add("#X obj 640 870 expr sg_pos\\; sg_left;"); pk2=p.add("#X obj 640 895 pack 0 0;")
-tdf=p.add("#X obj 600 845 t b f;")
-for c in [(tb3,1,dec,0),(dec,0,tdf,0),(tdf,1,vleft3,0),(tdf,0,pos2,0),(pos2,1,pk2,1),(pos2,0,pk2,0),(pk2,0,spos,0)]: p.con(*c)
-# (c) last bar of this step: queue the next one (or loop, or stop at the end of the bar)
-lft=p.add("#X obj 600 950 expr sg_left;"); s00=p.add("#X obj 600 975 sel 0;")
-nx=p.add("#X obj 600 1000 expr if(sg_pos+1<sg_n\\, sg_pos+1\\, if(sg_loop\\, 0\\, -1));"); mo2=p.add("#X obj 600 1025 moses 0;")
-tq=p.add("#X obj 700 1050 t b f;"); tq2=p.add("#X obj 800 1075 t f f;"); vpend3=p.add("#X obj 860 1100 v sg_pend;")
-gp2=p.add("#X obj 700 1100 v sg_gp;"); swant2=p.add("#X obj 700 1125 s ockm-want;")
-stx=p.add("#X obj 600 1050 expr sg_stepms*16-2;"); dl=p.add("#X obj 600 1075 delay;"); stp=p.add("#X msg 600 1100 \\; ockm-play 0;")
-for c in [(tb3,0,lft,0),(lft,0,s00,0),(s00,0,nx,0),(nx,0,mo2,0),(mo2,1,tq,0),(tq,1,tq2,0),(tq2,1,vpend3,0),(tq2,0,sget(800,1100),0),
-          (tq,0,gp2,0),(gp2,0,swant2,0),(mo2,0,stx,0),(stx,0,dl,0),(dl,0,stp,0)]: p.con(*c)
-# stop: the song is no longer playing
-rpl=p.add("#X obj 1000 520 r ockm-play;"); sp0=p.add("#X obj 1000 545 sel 0;"); tsp=p.add("#X obj 1000 570 t b b b;")
-z1=p.add("#X msg 1000 595 0;"); von2=p.add("#X obj 1000 620 v sg_on;"); m13=p.add("#X msg 1060 595 -1;"); vpend4=p.add("#X obj 1060 620 v sg_pend;"); stopm=p.add("#X msg 1120 595 stop;")
-for c in [(rpl,0,sp0,0),(sp0,0,tsp,0),(tsp,2,z1,0),(z1,0,von2,0),(tsp,1,m13,0),(m13,0,vpend4,0),(tsp,0,stopm,0),(stopm,0,dl,0)]: p.con(*c)
-p.save("seq/ockm-song.pd","#N canvas 100 100 1300 1200 12;")
 
 # ================= chord sound: 3 engines x 4 voices =================
 def chord_voice(sp,kind):
@@ -2001,23 +1921,16 @@ pj=joined(tr9,SLOTN,"project.txt",20,Y0+100); tpj=q.add(f"#X obj 20 {Y0+150} t b
 dfj=q.add(f"#X msg 400 {Y0+175} "+" \\, ".join(["clear"]+[f"add {h} {_fmtv(d)}" for h,d,_ in PROJECT_KEYS])+" \\, rewind \\, bang;"); q.con(tpj,2,dfj,0); q.con(dfj,0,saj,0)
 cmd(tpj,1,"read",80,Y0+175,saj); rwb=q.add(f"#X msg 20 {Y0+225} rewind \\, bang;"); q.con(pj,0,tpj,0); q.con(tpj,0,rwb,0); q.con(rwb,0,saj,0)
 for n in range(SLOTN):
-    x=240+n*140; pf=joined(tr9,SLOTN-1-n,f"p{n+1}.txt",x,Y0+100)
+    x=240+n*140; pf=joined(tr9,SLOTN-1-n,LOOP_FILE,x,Y0+100)
     a=q.add(f"#X obj {x} {Y0+150} list prepend read;"); b=q.add(f"#X obj {x} {Y0+175} list prepend {n};")
     q.con(pf,0,a,0); q.con(a,0,b,0); q.con(b,0,sq,0)
-# the song: read with the rest (or cleared when there's no song.txt yet)
-rra2=q.add(f"#X obj 1500 {Y0} r {D}0-readall;"); dr2=holder("dir",1500,Y0+50); q.con(rra2,0,dr2,0)
-sj=joined(dr2,0,"song.txt",1500,Y0+75); tsj=q.add(f"#X obj 1500 {Y0+125} t s s;"); isj=q.add(f"#X obj 1650 {Y0+150} file isfile;")
-spj=q.add(f"#X obj 1500 {Y0+175} spigot;"); z8=q.add(f"#X msg 1750 {Y0+175} 0;"); clj=q.add(f"#X msg 1650 {Y0+200} clear;")
-ssf=q.add(f"#X obj 1500 {Y0+250} s ockm-song-file;")
-for c in [(sj,0,tsj,0),(tsj,1,isj,0),(isj,0,spj,1),(isj,1,z8,0),(z8,0,spj,1),(isj,1,clj,0),(clj,0,ssf,0),(tsj,0,spj,0)]: q.con(*c)
-cmd(spj,0,"read",1500,Y0+200,ssf)
 # which patterns exist (made, even if empty): pattern 1 always; others when their file is more than one line
 rra3=q.add(f"#X obj 1500 {Y0+300} r {D}0-readall;"); dr3=holder("dir",1500,Y0+350); q.con(rra3,0,dr3,0)
 tx=q.add(f"#X obj 1500 {Y0+375} t b "+" ".join(["s"]*SLOTN)+";"); q.con(dr3,0,tx,0)
 for n in range(SLOTN):
     x=1500+n*150; yy=Y0+400
     txd=q.add(f"#X obj {x+150} {yy+250} text define {D}0-px{n};")
-    pf=joined(tx,SLOTN-n,f"p{n+1}.txt",x,yy); tf2=q.add(f"#X obj {x} {yy+50} t s s b;")
+    pf=joined(tx,SLOTN-n,LOOP_FILE,x,yy); tf2=q.add(f"#X obj {x} {yy+50} t s s b;")
     z=q.add(f"#X msg {x+100} {yy+75} 0;"); vz=q.add(f"#X obj {x+100} {yy+100} v ockm_px{n};"); q.con(tf2,2,z,0); q.con(z,0,vz,0)
     isf=q.add(f"#X obj {x+60} {yy+75} file isfile;"); spf=q.add(f"#X obj {x} {yy+100} spigot;"); z2=q.add(f"#X msg {x+120} {yy+125} 0;")
     q.con(pf,0,tf2,0); q.con(tf2,1,isf,0); q.con(isf,0,spf,1); q.con(isf,1,z2,0); q.con(z2,0,spf,1); q.con(tf2,0,spf,0)
@@ -2025,18 +1938,17 @@ for n in range(SLOTN):
     sz=q.add(f"#X obj {x} {yy+200} text size {D}0-px{n};"); gt=q.add(f"#X obj {x} {yy+225} > 1;"); vv=q.add(f"#X obj {x} {yy+250} v ockm_px{n};")
     tdef=q.add(f"#X obj {x+80} {yy+200} r {D}0-px{n}-cmd;"); q.con(tdef,0,txd,0)
     q.con(spf,0,rdm,0); q.con(rdm,0,rdt,0); q.con(rdt,0,td,0); q.con(td,1,q.add(f"#X obj {x+80} {yy+175} s {D}0-px{n}-cmd;"),0); q.con(td,0,sz,0); q.con(sz,0,gt,0); q.con(gt,0,vv,0)
-ex=q.add(f"#X obj 1500 {Y0+700} expr 1 + "+" + ".join(f"{2**n}*ockm_px{n}" for n in range(1,SLOTN))+";")
+ex=q.add(f"#X obj 1500 {Y0+700} expr 1"+"".join(f" + {2**n}*ockm_px{n}" for n in range(1,SLOTN))+";")
 q.con(tx,0,ex,0); q.con(ex,0,q.add(f"#X obj 1500 {Y0+725} s ockm-patterns-exist;"),0)
 # write every buffer into the open project folder (save captures the live pattern first)
 Y1=Y0+300
 rwa=q.add(f"#X obj 20 {Y1} r {D}0-writeall;"); dw=holder("dir",20,Y1+50); q.con(rwa,0,dw,0)
 tw9=q.add(f"#X obj 20 {Y1+75} t b "+" ".join(["s"]*(SLOTN+1))+";"); q.con(dw,0,tw9,0)
 for n in range(SLOTN):
-    x=240+n*140; pf=joined(tw9,SLOTN+1-1-n,f"p{n+1}.txt",x,Y1+100)
+    x=240+n*140; pf=joined(tw9,SLOTN+1-1-n,LOOP_FILE,x,Y1+100)
     a=q.add(f"#X obj {x} {Y1+150} list prepend write;"); b=q.add(f"#X obj {x} {Y1+175} list prepend {n};")
     q.con(pf,0,a,0); q.con(a,0,b,0); q.con(b,0,sq,0)
 pw=joined(tw9,SLOTN+1,"project.txt",20,Y1+100); tjw=q.add(f"#X obj 20 {Y1+150} t s b b;")
-swj=joined(tw9,SLOTN+1,"song.txt",1500,Y1+100); cmd(swj,0,"write",1500,Y1+150,q.add(f"#X obj 1500 {Y1+200} s ockm-song-file;"))
 cj=q.add(f"#X msg 160 {Y1+175} clear;"); scj=sender("cap-j",100,Y1+200)
 q.con(pw,0,tjw,0); q.con(tjw,2,cj,0); q.con(cj,0,saj,0); q.con(tjw,1,scj,0); cmd(tjw,0,"write",20,Y1+225,saj)
 sgq=q.add(f"#X obj 20 {Y1+250} spigot 1;"); q.con(tw9,0,sgq,0); q.con(q.add(f"#X obj 120 {Y1+225} r {D}0-announce;"),0,sgq,1)
@@ -2075,7 +1987,7 @@ for c in [(rrv,0,trv,0),(trv,1,sender("readall",500,Y4+50),0),(trv,0,fc4,0),(tl,
 # ockm-do-save: capture the live pattern, write everything
 rsv=q.add(f"#X obj 700 {Y4} r ockm-do-save;"); tsv=q.add(f"#X obj 700 {Y4+25} t b b;")
 for c in [(rsv,0,tsv,0),(tsv,1,scap,0),(tsv,0,sender("writeall",700,Y4+50),0)]: q.con(*c)
-# one-step undo. ockm-snapshot: everything (all 8 patterns, the project, the song) is written to undo/ beside projects/,
+# one-step undo. ockm-snapshot: everything (the loop and the project) is written to undo/ beside projects/,
 # without counting as a save. ockm-undo: read it all back and reload the pattern on screen. undo/ holds one snapshot only.
 YU=Y4+120
 def undo_dir(src,outlet,x,y):
@@ -2103,7 +2015,6 @@ mkdir_of(tn,6,700,Y5)
 blankp=q.add(f"#X msg 300 {Y5+75} "+" \\, ".join(["0 clear"]+[f"0 add {h} {_fmtv(d)}" for h,d,_ in PATTERN_KEYS]+["0 add ockm-empty 1"]
                                                +[x for n in range(1,SLOTN) for x in (f"{n} clear",f"{n} add ockm-empty 1")])+";")
 blankj=q.add(f"#X msg 250 {Y5+100} "+" \\, ".join(["clear"]+[f"add {h} {_fmtv(d)}" for h,d,_ in PROJECT_KEYS])+" \\, rewind \\, bang;")
-q.con(tn,4,q.add(f"#X msg 450 {Y5+100} \\; ockm-song-file clear;"),0)
 for c in [(rn,0,tn,0),(tn,5,sender("setname",400,Y5+50),0),(tn,4,blankp,0),(blankp,0,sq,0),(tn,3,blankj,0),(blankj,0,saj,0),
           (tn,2,sender("writeall",200,Y5+125),0)]: q.con(*c)
 z1=q.add(f"#X msg 100 {Y5+150} 0;"); q.con(tn,1,z1,0); q.con(z1,0,sender("loadpat",100,Y5+175),0); q.con(tn,0,sender("remember",20,Y5+200),0)
@@ -2114,7 +2025,7 @@ mkdir_of(tsa,4,700,Y6)
 for c in [(rsa,0,tsa,0),(tsa,3,sender("setname",300,Y6+50),0),(tsa,2,scap,0),(tsa,1,sender("writeall",200,Y6+75),0),(tsa,0,sender("remember",20,Y6+100),0)]: q.con(*c)
 # ockm-project-delete <name>: its files move to trash/<name> (next to projects/), then the empty folder goes
 Y7=Y6+150
-DEL_FILES=["project.txt","song.txt"]+[f"p{n+1}.txt" for n in range(SLOTN)]+[".DS_Store"]
+DEL_FILES=["project.txt",LOOP_FILE,"song.txt"]+[f"p{n+1}.txt" for n in range(8)]+[".DS_Store"]
 rdl=q.add(f"#X obj 20 {Y7} r ockm-project-delete;"); tdl=q.add(f"#X obj 20 {Y7+25} t b s;"); q.con(rdl,0,tdl,0)
 nmd=q.add(f"#X obj 100 {Y7+50} symbol;"); q.con(tdl,1,nmd,1)
 nf=len(DEL_FILES)
@@ -2243,15 +2154,15 @@ def build_project(reset=False, demo=False):
     pad=lambda v:" ".join(str(x) for x in v+[0]*(STEPS-16))
     for k in range(SLOTN):
         if k==0 and not demo:  # pattern 1 of a blank project: the default sounds and settings, no steps
-            write("p1.txt",[f"{h} {fmt(d)}" for h,d,_ in PATTERN_KEYS]+["ockm-empty 1"]); continue
+            write(LOOP_FILE,[f"{h} {fmt(d)}" for h,d,_ in PATTERN_KEYS]+["ockm-empty 1"]); continue
         if k>=4 or not demo:   # empty: no steps, and it takes on the sounds you're already using
-            write(f"p{k+1}.txt",["ockm-empty 1"]); continue
+            write(LOOP_FILE,["ockm-empty 1"]); continue
         lines=[f"{h} {fmt(d)}" if h not in ("ockm-len","ockm-len-max") else f"{h} 16" for h,d,_ in PATTERN_KEYS]
         lines+=[f"ockm-pat-{nm} 0 {pad(drums[nm][k])}" for nm,_ in SLOTS]
         lines+=[f"ockm-pat-bass-{f} 0 {pad(bass[k][f])}" for f in MONO]
         lines+=[f"ockm-pat-lead-{f} 0 {pad(lead[k][f])}" for f in MONO]
         lines+=[f"ockm-pat-chord-on 0 {pad(chord_on[k])}", f"ockm-pat-chord-deg 0 {pad(E)}"]
-        write(f"p{k+1}.txt",lines)
+        write(LOOP_FILE,lines)
 
 
 build_project(reset=args.reset_patterns, demo=args.demo)

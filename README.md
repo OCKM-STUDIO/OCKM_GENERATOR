@@ -2,7 +2,7 @@
 
 A drum machine and easy-to-program synths in one box. Built in Pure Data, designed to run on a Raspberry Pi with a touchscreen and a few knobs.
 
-Current version: **v0.46**
+Current version: **v0.47**
 
 ## How to open it
 
@@ -11,8 +11,8 @@ Open `OCKM_GENERATOR.pd` in plugdata. Keep the folder together: the main patch f
 The window is the instrument: three touch screens, drawn in Lua (plugdata has Lua built in). Click with the mouse on the Mac, tap with a finger on the Pi. If clicks do nothing, the patch is in edit mode: press Cmd+E.
 
 **How every screen is laid out**, top to bottom:
-1. **Top bar:** play, tempo, then the screens as tabs: **perform, compose, drums, bass, lead, chord, mixer, song**. Save and **project** on the right. The version number sits next to the tempo
-2. **Navigation strip:** on the left, right above the steps, the **steps** navigator: back and forward arrows either side of the steps you're looking at (for example "17-32"). The dots show every block of 16: white is the one on screen, orange is the one playing. You can also swipe the step row sideways. In the middle, **pattern**: just the patterns you've made, then **+** for a new one. On the right, **length** in bars (1, 2, 4, 8). New patterns are 8 bars. **Shorter** keeps the start; nothing is deleted, so going longer again brings your bars back. **Longer** repeats what you've written to fill the new bars, and following parts are rebuilt to fit (a 4-bar progression fills out properly instead of repeating its first chord)
+1. **Top bar:** play, tempo, then the screens as tabs: **perform, compose, drums, bass, lead, chord, mixer, arrange**. Save and **project** on the right. The version number sits next to the tempo
+2. **Navigation strip:** on the left, right above the steps, the **steps** navigator: back and forward arrows either side of the steps you're looking at (for example "17-32"). The dots show every block of 16: white is the one on screen, orange is the one playing. You can also swipe the step row sideways. On the right, **length** of the loop in bars (1, 2, 4, 8). New loops are 8 bars. **Shorter** keeps the start; nothing is deleted, so going longer again brings your bars back. **Longer** repeats what you've written to fill the new bars, and following parts are rebuilt to fit (a 4-bar progression fills out properly instead of repeating its first chord)
 3. **What you're editing:** the steps (and, on the drums screen, which of the 8 drum slots)
 4. **Sound shaping** at the bottom
 
@@ -20,9 +20,7 @@ Tap a track's name on perform or the mixer to jump straight to it.
 
 **Perform** (home)
 - **Play** and **tempo** top left. Drag the tempo number up or down
-- Patterns are in the navigation strip: tap to switch. While playing it waits for the end of the bar; the queued one gets an orange outline. Only the patterns you've made are shown
-- **+** makes the next pattern (2, then 3, and so on): **copy of** the one you're on (best for variations) or **start empty** (keeps your sounds). Then it switches to it
-- Switching keeps your work in memory. **Save** keeps all 8 patterns, the song and the kit. It turns orange with a dot when there's something unsaved
+- One loop per project: everything you play live works on it. **Save** keeps the loop and the kit. It turns orange with a dot when there's something unsaved
 - **Now**: all 11 tracks for the 16 steps on screen, with the playhead running above them. **Tap a drum lane's steps to edit them** (empty, hit, accent), just like the drums screen. The bass, lead and chord lanes are a picture: edit those on their own tabs
 - Tap a track's **name** to open it
 - **M** mutes a track and **S** solos it (several can be soloed at once). Silent tracks go dim. Mutes and solos are for playing live, so they aren't saved
@@ -32,7 +30,7 @@ Tap a track's name on perform or the mixer to jump straight to it.
   - **Throw** (hold the pad): sends the whole mix into its own echo line. Let go and the echoes ring out and fade, at the delay time and feedback you've set. The dub throw
   - **Drive**; then delay level, **feedback** and **time** (in steps); reverb level and **size**. Reverb tone is in setup
 - These are bars: drag along them. The orange line shows the value
-- **Length** is in the navigation strip. Making a pattern longer repeats what's there
+- **Length** is in the navigation strip. Making the loop longer repeats what's there
 - **Save** and **project**, top right
 
 **Drum** (one slot at a time)
@@ -76,14 +74,6 @@ Tap a track's name on perform or the mixer to jump straight to it.
 - **Sound** (bottom right): engine, its four knobs (named for the engine), drive, reverb and delay sends, level
 - On manual: the note (or chord) picker for the selected step, and slide
 
-**Song** (the last tab). MPC style: one song per project, a chain of steps, each a pattern and how many times it plays.
-- **Add a step:** tap a pattern number on the right. It goes in after the selected step
-- **Each row:** the arrows change the step's pattern, **-** and **+** set how many times it plays, **x** removes it. Tap a row to select it
-- **Play button plays:** **one pattern** (as before) or **the song**. In song mode the play button says "song", and while it plays it shows which step you're on, like "song 2/5"
-- **Loop at the end**, or stop when the song finishes. **Play from step** starts at the selected step, handy for practising one section
-- Patterns switch exactly on the bar line, so a 32-step pattern played twice lasts 4 bars
-- **Copy pattern** copies the pattern you're on to another slot, to make variations (a breakdown without drums, a busier drop). **Clear pattern** empties it (tap twice)
-
 **Setup** (tap the tempo). Tempo with -5, -1, +1, +5 and a slider, swing for this pattern, how strong accents are, master volume, and MIDI clock: lead (send clock out) or follow (play to incoming clock). Dragging the tempo up or down still changes it directly.
 
 **Mixer**
@@ -95,16 +85,18 @@ Tap a track's name on perform or the mixer to jump straight to it.
 
 Everything is on the screens now, so `pd test-panel` is only for testing.
 
+**Arrange** (the last tab) is being rebuilt: your loop will become a track as a row of 16-bar units, with a transition at every joint. For now the tab says so. Song mode, the 8 pattern slots and the old Arrange were removed in v0.47.
+
 **Under the screen:** `pd engine` is the sound and sequencer (open it only if you're curious). `pd test-panel` is the old v0.12 panel with every control on one sheet, kept for testing.
 
-**Projects** (the **project** button, top right). A project is 8 patterns plus the drum kit, tempo and effects. It opens on the one you used last.
-- **Save** writes all 8 patterns and the project. **Back to last save** throws away everything since
-- **Undo** (one step): arrange, a groove, clear, new kit and de-mud each put an **undo** button in the message that follows. It takes everything (patterns, song, kit, EQ) back to just before. Only the last one can be undone, and opening another project or going back to last save forgets it. The copy lives in `undo/` beside `projects/`
-- **New blank project** starts from nothing: every pattern empty, the default kit and sounds. It's named for you with two random words and the date, like "velvet heron · 14 Oct"
+**Projects** (the **project** button, top right). A project is one loop plus the drum kit, tempo and effects. It opens on the one you used last.
+- **Save** writes the loop and the project. **Back to last save** throws away everything since
+- **Undo** (one step): arrange, a groove, clear, new kit and de-mud each put an **undo** button in the message that follows. It takes everything (the loop, kit, EQ, tempo) back to just before. Only the last one can be undone, and opening another project or going back to last save forgets it. The copy lives in `undo/` beside `projects/`
+- **New blank project** starts from nothing: an empty loop, the default kit and sounds. It's named for you with two random words and the date, like "velvet heron · 14 Oct"
 - **Save as a copy** keeps the project you were in as it was last saved, and carries on in a copy
 - **Your projects**, newest first. Tap one, then **save mine, then open**, **open without saving**, or **delete** (tap twice). Deleting moves the files to a `trash` folder next to `projects/`, so nothing is lost by accident
 
-Everything is remembered: drum kit, synth sounds, effects, tempo, swing, key and the steps. Switching patterns keeps unsaved edits in memory until you save.
+Everything is remembered: drum kit, synth sounds, effects, tempo, swing, key and the steps.
 
 **Light or dark, Mac or Pi.** Rebuild with `python3 tools/build.py --theme light` for the light version. `--ui-scale 2` sizes the screens for the 10" Pi display (1920 x 1200). The defaults are dark and Mac size (960 x 600).
 
@@ -121,7 +113,7 @@ Everything is remembered: drum kit, synth sounds, effects, tempo, swing, key and
 3. **Plain Pure Data.** Stick to standard objects so it runs the same in plugdata and on the Pi.
 4. **Every sound is a swappable box.** Sequencers say "go". Voices make sound. Either can change without touching the other.
 5. **Musical by default.** Presets and starter patterns that sound good the moment you press play.
-6. **Help, don't take over.** You can do everything by hand, or let the machine do it. Whatever it makes is ordinary patterns and songs you can change. Not a one-button song generator
+6. **Help, don't take over.** You can do everything by hand, or let the machine do it. Whatever it makes you can change. Not a one-button song generator
 
 ## Hardware (planned)
 
@@ -170,14 +162,13 @@ Everything is remembered: drum kit, synth sounds, effects, tempo, swing, key and
 - **Three screens, one level deep.** Perform is home. Drum and synth screens go deep on one part at a time. See `docs/architecture-and-ui-brief.md`.
 - **Synthesised drums for now.** Samples can be swapped in later, one voice at a time.
 - **Projects and patterns saved as readable text files** in `projects/`, so saving works on the Pi without a keyboard.
-- **The drum kit belongs to the project; synth sounds belong to each pattern.** See "How it's organised".
+- **The drum kit belongs to the project; synth sounds belong to the loop.** See "How it's organised".
 - **V1 is touchscreen only** (decided October 2026). The Pi box works like a dedicated iPad app: everything is reachable on the screen, landscape only. A hardware controller and MIDI mapping come in V2. An iPad app is a likely phase two: same Pd engine (via libpd), screens rebuilt natively.
-- **Song mode works like the MPC: one song per project** (decided October 2026). A song is a chain of steps, each a pattern plus how many times it repeats. A song/pattern switch sits by play.
+- **One loop, many arrangements** (decided October 2026, replacing song mode and the 8 pattern slots). Every project is one loop of 8 or 16 bars. An arrangement is a row of 16-bar units, each a state of the loop, with a transition from a toolkit at every joint. See the design doc, "One loop, many arrangements".
 
 ## Parked ideas
 
 - **No sample chopping** (decided October 2026). SP-404 style slicing of loops would make this a different instrument. Samples are one-shots on drum slots only
-- **Patterns stay at 8 bars maximum** (decided October 2026). Longer sections are built in song mode. Revisit only if a long melody or slow progression feels cramped
 
 - FM drum and bass voices (likely to come back with the bass engines)
 - Probability, ratchets and Euclidean patterns
@@ -198,7 +189,7 @@ Everything is remembered: drum kit, synth sounds, effects, tempo, swing, key and
 | `ui/` | The touchscreen: `ockm-ui.pd_lua` (all three screens) |
 | `docs/` | The architecture review and the brief for the screens |
 | `seq/` | The old test panel (`ockm-panel`), plus sequencers and generators: drum row, mono pattern and generator (bass and lead), chord pattern and generator, the shared presets (`ockm-presets`) and MIDI clock |
-| `projects/` | One folder per project, named like `2026-10-14-velvet-heron`, each holding `project.txt` (tempo, effects, MIDI, accent, drum kit) and `p1.txt` to `p8.txt`. Each also holds `song.txt`, the song. `current.txt` names the one that opens at start-up. `default` is the blank starter |
+| `projects/` | One folder per project, named like `2026-10-14-velvet-heron`, each holding `project.txt` (tempo, effects, MIDI, accent, drum kit) and `loop.txt`, the loop. `current.txt` names the one that opens at start-up. `default` is the blank starter |
 | `trash/` | Deleted projects. Empty it by hand when you're sure |
 | `samples/` | One folder per drum sound (kick, snare, clap, perc, hat, open-hat, tom) for your own samples. Perc 1 and perc 2 share the perc folder. Not saved to git |
 | `sketches/` | Early experiments, kept for reference |
@@ -226,20 +217,19 @@ The data model, smallest first:
 2. **Track:** one lane. 8 drum slots, plus bass, lead and chord.
 3. **Sound:** what a track plays. A drum slot: its sound, tune, decay, level and sends. A synth: engine, k1 to k4, drive (bass and lead), chord type (chord) and sends.
 4. **Kit:** the 8 drum sounds together.
-5. **Pattern:** a loop. The steps for all 11 tracks, plus length (1 to 128), swing, key and scale, generator choices and **the three synth sounds**.
-6. **Project:** a whole set. 8 patterns, **the drum kit**, tempo, master effects, MIDI settings and accent amount.
+5. **Loop:** the steps for all 11 tracks, plus length (1 to 128), swing, key and scale, generator choices and **the three synth sounds**.
+6. **Project:** a whole set. The loop, **the drum kit**, tempo, master effects, MIDI settings and accent amount.
 
 | Setting | Lives in |
 |---|---|
-| Drum kit (all 8 drum slots) | Project, shared by every pattern |
+| Drum kit (all 8 drum slots) | Project |
 | Tempo, master effects, MIDI sync, accent | Project |
-| Steps, length, swing, key and scale | Pattern |
-| Synth sounds (bass, lead, chord) | Pattern |
-| Generator choices | Pattern |
+| Steps, length, swing, key and scale | Loop |
+| Synth sounds (bass, lead, chord) | Loop |
+| Generator choices | Loop |
 
 **Rules**
-- A new, empty pattern starts with blank steps but keeps the synth sounds, key and swing of the pattern you came from.
-- Switching patterns keeps unsaved edits in memory, so you can go back and forth. **Save** writes all 8 patterns and the project to disk. **Revert** reloads the whole project from disk. Closing without saving loses unsaved changes.
+- **Save** writes the loop and the project to disk. **Revert** reloads the whole project from disk. Closing without saving loses unsaved changes.
 - Files are plain text, one setting or one track per line, so they're easy to read, copy and back up.
 
 ## Named hooks
@@ -250,7 +240,7 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 |---|---|
 | `ockm-play` | 1 to start, 0 to stop |
 | `ockm-want` | Pick a pattern slot, 0 to 7 |
-| `ockm-save` | Save all 8 patterns and the project to disk |
+| `ockm-save` | Save the loop and the project to disk |
 | `ockm-revert` | Throw away unsaved changes: reload the whole project from disk |
 | `ockm-project-new <name>` | Make a blank project in `projects/<name>` and open it |
 | `ockm-project-open <name>` | Open a project (unsaved changes in the current one are dropped) |
@@ -280,11 +270,6 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 | `ockm-bass-mode`, `ockm-lead-mode`, `ockm-chord-mode` | 0 auto (generated), 1 manual (your notes) |
 | `ockm-bass-sync`, `ockm-lead-sync` | 1 follow the chords, 0 follow the key only |
 | `ockm-leader` | The mode: 0 chord priority, 1 melody priority, 2 bass priority, 3 manual |
-| `ockm-song-list <p r p r ...>` | Set the song: pattern (0-7) and repeats for each step. Empty clears it |
-| `ockm-song-start <step>` | Play the song from a step (0 is the first) |
-| `ockm-song-mode` | 0 the play button plays one pattern, 1 it plays the song (the screen decides) |
-| `ockm-song-loop` | 1 go round again at the end, 0 stop |
-| `ockm-song-show`, `ockm-song-pos` | Sent by the engine: the song, and the step playing plus bars left |
 | `ockm-pattern-copy <from> <to>` | Copy a pattern (0-7) to another slot |
 | `ockm-pattern-clear <n>` | Empty a pattern |
 | `ockm-bar` | Sent by the clock at the start of every bar |
@@ -437,42 +422,19 @@ Reverb and delay work like a mixing desk: each track has a **send** that sets ho
 
 Pick the MIDI port in plugdata's audio and MIDI settings. On the Pi, the iRig Pro Duo's MIDI ports should work for this.
 
-## Arrange (beta)
+## Transitions
 
-**Beta** (decided October 2026): it works, but making arrangements sound properly musical is a long job, so treat what it makes as a starting point.
+The engine still has the transitions song mode used (fill, riser, riser + gap, dub out, impact on the 1). They're waiting for the new arrangements to drive them again.
 
-On the song tab, **arrange (beta)** turns pattern 1 (your groove) into a whole track. It writes variations into patterns 2 to 8 and a song chain that plays them, and switches the play button to the song. Everything it makes is ordinary patterns and an ordinary song.
+**Pump** (on perform, by the filter: off, light, deep) is sidechain: every kick ducks the bass, lead and chords, and they swell back over an eighth note. It's saved with the loop.
 
-| Option | Choices |
-|---|---|
-| Style | club (long, with builds and a key lift), short (radio edit), slow burn (long intro, gradual layers, no builds) |
-| Length | shorter, standard, longer |
-| Sections | intro, groove, build, breakdown, drop B, key lift, outro (pattern 1 is always the main section) |
-| Builds | snare roll, filter rise, or both |
-| Breakdown | pads (no kick, chords as long pads, a new lead melody), drums only, no kick |
-| Key lift | up 1, 2 or 5 semitones |
-| Variation | subtle or bold (bold thins more and changes the chord rhythm) |
-
-**Surprise me** picks the options at random. If patterns 2 to 8 already have something in, arrange says so first; **undo** takes it back.
-
-### Transitions
-
-In song mode, each pattern can hand over to the next one instead of just cutting. On the song tab, for the pattern you're on:
-
-- **Ends with** (its last bar before the song moves on): nothing, a fill, a riser (white noise sweeping up), riser + gap (the riser, then a beat of silence with only the effects ringing, so the next downbeat lands harder), or dub out (the last beat thrown into the delay)
-- **Impact on the 1**: a crash and a sub boom on its first downbeat
-
-**Pump** (on perform, by the filter: off, light, deep) is sidechain: every kick ducks the bass, lead and chords, and they swell back over an eighth note. It's per pattern.
-
-Arrange sets all of these: builds end with riser + gap, drops land with an impact and pump, sections that thin out end with a dub out, and grooves end with fills.
-
-Two settings it uses are useful by hand too: **part on/off** (on each synth tab: the part plays in this pattern or doesn't) and **rise** (on perform, by the filter: the high-pass climbs across this pattern and drops back on the next).
+Two settings it uses are useful by hand too: **part on/off** (on each synth tab: the part plays or doesn't) and **rise** (on perform, by the filter: the high-pass climbs across the loop and drops back as it starts again).
 
 ## Export
 
 On the project screen, **export...** opens the export sheet.
 
-- **What:** the song, or this pattern played once, 2, 4 or 8 times
+- **What:** the loop, played once, 2, 4 or 8 times (exporting an arrangement comes with arrangements)
 - **Files:** a stereo mix (24-bit WAV), stems (drums, bass, lead, chords and the effects returns, each its own WAV, before the master filter and drive), and a MIDI file (type 1: drums on channel 10 with General MIDI drum notes, bass on 1, lead on 2, chords on 3; velocity and micro timing included)
 - **Save to:** the `exports` folder (on the Pi, that's on its SD card), or a USB stick when one is plugged in (into an `OCKM_EXPORTS` folder on it)
 

@@ -200,11 +200,12 @@ def accents_and_step_edits(work):
     assert printed(out, "BASSNOTE")[0] == "40", "ockm-bass-edit did not set bass step 1"
 
 @test
-def pattern_save_and_reload(work):
+def loop_save_and_reload(work):
+    """Save writes the loop to loop.txt; after a change, back to last save reads it back."""
     h = Harness()
-    h.at(100, "ockm-want 7")
     h.at(200, "ockm-pat-d1 0 1 0 1 1 0 0 0 0 0 0 1 0 0 0 0 1 ; ockm-save bang")
-    h.at(300, "ockm-want 0"); h.at(400, "ockm-want 7")
+    h.at(300, "ockm-pat-d1 const 0")
+    h.at(400, "ockm-revert bang")
     g = h.add("#X obj 10 300 r test-get;"); a = h.add("#X obj 10 330 array get ockm-pat-d1 0 16;"); p = h.add("#X obj 10 360 print RELOADED;")
     h.con(g, a); h.con(a, p)
     h.at(500, "test-get bang")
@@ -212,8 +213,8 @@ def pattern_save_and_reload(work):
     out = run(work, f)
     want = "1 0 1 1 0 0 0 0 0 0 1 0 0 0 0 1"
     assert printed(out, "RELOADED") == [want], f"reload gave {printed(out, 'RELOADED')}"
-    line = [l for l in open(os.path.join(work, "projects", "default", "p8.txt")).read().split(";") if "ockm-pat-d1 " in l][0]
-    assert " ".join(line.split()[2:18]) == want, "pattern 8 not written to disk"
+    line = [l for l in open(os.path.join(work, "projects", "default", "loop.txt")).read().split(";") if "ockm-pat-d1 " in l][0]
+    assert " ".join(line.split()[2:18]) == want, "the loop wasn't written to loop.txt"
 
 def show_values(h, names, label):
     """Print the on-screen value of each setting (via its ockm-show-... hook) as label-name: value."""
@@ -223,30 +224,6 @@ def show_values(h, names, label):
 def last(out, name):
     v = printed(out, name)
     return v[-1].replace("set ", "") if v else None
-
-@test
-def kit_stays_synths_follow_pattern(work):
-    h = Harness()
-    keys = ["bass-engine", "d1-tune", "lead-engine"]
-    show_values(h, keys, "V")
-    r = h.add("#X obj 900 300 r ockm-snap;"); pr = h.add("#X obj 900 330 print SNAP;"); h.con(r, pr)
-    tb = h.add("#X obj 900 360 t b;"); a = h.add("#X obj 900 390 array get ockm-pat-d1 0 16;"); pa = h.add("#X obj 900 420 print D1;")
-    h.con(r, tb); h.con(tb, a); h.con(a, pa)
-    h.at(200, "ockm-bass-engine 2 ; ockm-d1-tune 3")
-    h.at(300, "ockm-want 1"); h.at(350, "ockm-snap a")                       # pattern 2: own synth sounds, same kit
-    h.at(400, "ockm-want 0"); h.at(450, "ockm-snap b")                       # back to pattern 1: edits kept
-    h.at(500, "ockm-lead-engine 1 ; ockm-want 5"); h.at(550, "ockm-snap c")  # empty pattern 6 inherits synth sounds
-    f = os.path.join(work, "t_kit.pd"); h.finish(650, f)
-    lines = run(work, f).splitlines()
-    def at_snap(lab, key):
-        i = next(i for i, l in enumerate(lines) if l.startswith(f"SNAP: {lab}"))
-        vals = [l for l in lines[:i] if l.startswith(f"V-{key}:")]
-        return vals[-1].split("set ")[-1].strip() if vals else None
-    assert at_snap("a", "bass-engine") == "0" and at_snap("a", "d1-tune") == "3", f"pattern 2 should have its own bass sound but the same kit ({at_snap('a','bass-engine')}, {at_snap('a','d1-tune')})"
-    assert at_snap("b", "bass-engine") == "2", "pattern 1's bass sound should be kept after switching away and back"
-    assert at_snap("c", "lead-engine") == "1" and at_snap("c", "bass-engine") == "2", "a new empty pattern should keep the current synth sounds"
-    d1 = [l for l in lines if l.startswith("D1:")]
-    assert d1[-1].split(":", 1)[1].split() == ["0"] * 16, "a new empty pattern should start with blank steps"
 
 @test
 def save_quit_and_reopen(work):
@@ -302,29 +279,6 @@ def longer_patterns_and_pages(work):
     assert pat[0:16] == [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0], "editing page 2 changed page 1"
     steps = [int(float(x)) for x in printed(out, "ockm-step")]
     assert steps[:33] == list(range(32)) + [0], f"a 32-step pattern should count 1-32 then wrap: {steps[:34]}"
-
-@test
-def swing_and_bar_quantised_switching(work):
-    h = Harness()
-    t = h.add("#X obj 300 300 r ockm-step;"); tr = h.add("#X obj 300 330 t f b;")
-    tm = h.add("#X obj 300 360 timer;"); pk = h.add("#X obj 300 390 pack f f;"); pr = h.add("#X obj 300 420 print STEPAT;")
-    st = h.add("#X obj 400 300 r test-t0;")
-    h.con(t, tr); h.con(tr, tm, 1, 1); h.con(tm, pk, 0, 1); h.con(tr, pk, 0, 0); h.con(pk, pr); h.con(st, tm)
-    h.show("ockm-load")
-    h.at(100, "test-t0 bang ; ockm-play 1")
-    h.at(1000, "ockm-want 2")
-    f = os.path.join(work, "t_swing.pd"); h.finish(2300, f)
-    out = run(work, f)
-    pairs = [tuple(map(float, v.split())) for v in printed(out, "STEPAT")]
-    step = 15000 / 124
-    for s_, t_ in pairs[:16]:
-        expect = s_ * step + (step * 0.12 if int(s_) % 2 else 0)
-        assert abs(t_ - expect) < 1.5, f"step {int(s_)} at {t_:.1f}ms, expected {expect:.1f}ms (56% swing)"
-    loads = printed(out, "ockm-load")
-    assert loads[-1] == "2", "pattern switch did not happen"
-    i = next(i for i, l in enumerate(out.splitlines()) if l.startswith("ockm-load: 2"))
-    after = [l for l in out.splitlines()[i:] if l.startswith("STEPAT")]
-    assert after and after[0].split()[1] == "0", "pattern switched mid-bar instead of at the start of the bar"
 
 @test
 def bass_generator(work):
@@ -570,7 +524,7 @@ def midi_clock_follower(work):
 @test
 def full_mix_does_not_clip(work):
     h = Harness(); h.record(os.path.join(work, "mix.wav"))
-    h.at(100, "ockm-want 1 ; ockm-play 1"); h.at(4000, "ockm-want 2"); h.at(8000, "ockm-play 0")
+    h.at(100, "ockm-bass-gen bang ; ockm-chord-gen bang ; ockm-lead-gen bang ; ockm-play 1"); h.at(8000, "ockm-play 0")
     _, (s, sr) = play(work, h, "t_mix", ms=8000)
     assert 0.1 < peak(s) < 0.99, f"mix peak {peak(s):.2f}"
 
@@ -589,7 +543,7 @@ def front_panel_drives_the_engine(work):
         h.con(t, a, 2 - i); h.con(a, p)
     h.con(g, t)
     h.at(300, "test-get bang")
-    h.at(350, "ockm-page 0 ; ockm-ui-slot 2")             # pattern button 3
+    h.at(350, "ockm-page 0")
     h.at(500, "ockm-play 1"); h.at(500 + 3 * 15000 / 124 + 20, "ockm-play 0")
     f = os.path.join(work, "t_panel.pd"); h.finish(1200, f)
     out = run(work, f)
@@ -598,7 +552,6 @@ def front_panel_drives_the_engine(work):
     assert pat["d3"][1] == 2, f"accent-mode click should set an accent: {pat['d3'][:16]}"
     assert "32" in printed(out, "ockm-len"), "length button didn't set 32 steps"
     assert pat["d1"][17] == 1, f"page 2 click should set step 18: {pat['d1'][16:32]}"
-    assert "2" in printed(out, "ockm-load"), "pattern button didn't load pattern 3"
     ui = printed(out, "ockm-ui-d2-5")
     assert any(x.startswith("set 1") for x in ui) and any(x.startswith(("color #ededed", "color #1a1a1a")) for x in ui), f"square wasn't redrawn as a hit: {ui}"
     assert any(x.startswith(("color #ff5a24", "color #ff4f1a")) for x in printed(out, "ockm-ui-ph-2")), "playhead didn't light step 3"
@@ -629,7 +582,6 @@ def touchscreen_drives_the_engine(work):
     tap(270, 45, 158)                    # now bass step 1 edits
     tap(280, 600, 236)                   # note picker: third note of the scale
     tap(290, 281, 36)                    # perform tab
-    tap(300, 373, 88)                    # pattern 3 (navigation strip)
     tap(310, 600, 486)                   # master fx: filter, middle
     tap(320, 345, 36)                    # compose tab
     tap(330, 71, 154)                    # mode: chord priority again (chords are yours)
@@ -650,7 +602,6 @@ def touchscreen_drives_the_engine(work):
     assert any(e.startswith("d1 16 ") for e in edits), f"tap after the swipe should edit step 17: {edits}"
     be = printed(out, "ockm-bass-edit")
     assert len(be) >= 2 and be[-1].split()[:2] == ["0", "36"], f"bass step 1 should become C (A minor, third step): {be}"
-    assert "2" in printed(out, "ockm-load"), "pattern 3 button didn't load pattern 3"
     lk = [float(x) for x in printed(out, "ockm-lead-k1")]
     assert any(0.4 < x < 0.6 for x in lk), f"perform strip: lead knob 1 should be about halfway: {lk}"
     assert any(abs(float(x)) < 0.1 for x in printed(out, "ockm-filter")), "perform strip: filter in the middle should be about 0"
@@ -674,7 +625,7 @@ def touchscreen_screens_draw(work):
         raise Skip("Pillow not installed")
     p = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_preview.py"), os.path.join(work, "preview")], capture_output=True, text=True)
     assert p.returncode == 0, p.stderr[-800:]
-    assert len(os.listdir(os.path.join(work, "preview"))) == 22, "expected twenty-two screen pictures"
+    assert len(os.listdir(os.path.join(work, "preview"))) == 20, "expected twenty screen pictures"
 
 @test
 def mute_solo_and_levels(work):
@@ -747,77 +698,6 @@ def bass_lock_density_and_mutate(work):
     assert notes[5] == notes[0] and on[5] == on[0], "seed 0 should bring back the original"
 
 @test
-def song_mode_plays_the_chain(work):
-    """A song of pattern 1 x2 then pattern 2 x1 plays 3 bars, switching on the bar line, then stops. With loop on it goes round again."""
-    h = Harness(); h.show("ockm-load", "ockm-song-pos", "ockm-play", "ockm-song-show")
-    h.at(100, "ockm-bpm 240 ; ockm-song-loop 0 ; ockm-song-list 0 2 1 1")
-    h.at(200, "ockm-song-start 0")
-    h.at(3800, "ockm-song-loop 1 ; ockm-song-start 0")     # 3 bars at 240 bpm = 3 s
-    h.at(9000, "ockm-play 0")
-    f = os.path.join(work, "t_song.pd"); h.finish(9200, f)
-    out = run(work, f)
-    lines = [l for l in out.splitlines() if l.startswith(("ockm-load:", "ockm-play:", "ockm-song-pos:"))]
-    first = lines[:lines.index(next(l for l in lines if l.startswith("ockm-play:") and l.split()[-1].startswith("0")))+1]
-    loads = [int(float(l.split()[-1])) for l in first if l.startswith("ockm-load")]
-    assert loads == [0, 1], f"song should load pattern 1 then pattern 2: {first}"
-    pos = [tuple(int(float(x)) for x in l.split()[-2:]) for l in first if l.startswith("ockm-song-pos")]
-    assert pos[:4] == [(0, 2), (0, 1), (0, 0), (1, 0)], f"bars left should count down per step: {pos}"
-    rest = lines[len(first):]
-    loads2 = [int(float(l.split()[-1])) for l in rest if l.startswith("ockm-load")]
-    assert loads2[:4] == [0, 1, 0, 1], f"with loop on the song should go round again: {loads2}"
-    assert printed(out, "ockm-song-show")[0].split()[-4:] == ["0", "2", "1", "1"], printed(out, "ockm-song-show")
-
-@test
-def touchscreen_builds_and_plays_a_song(work):
-    """On the song tab: add pattern 2 then pattern 1, give the first step 2 repeats, switch to song mode, press play."""
-    if not PDLUA:
-        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
-    h = Harness(); h.show("ockm-song-list", "ockm-song-start", "ockm-load", "ockm-song-mode", "ockm-bpm")
-    tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
-    h.at(100, "ockm-bpm 190")
-    tap(150, 759, 36)                    # song tab
-    tap(200, 663, 278)                   # add pattern 2
-    tap(250, 620, 278)                   # add pattern 1 after it
-    tap(300, 300, 153)                   # select step 1
-    tap(350, 380, 153)                   # step 1: one more repeat
-    tap(400, 856, 156)                   # play button plays: the song
-    tap(450, 48, 36)                     # play
-    h.at(3500, "ockm-play 0")
-    tap(3600, 150, 36)                   # tap the tempo: setup
-    tap(3650, 433, 118)                  # +1 bpm
-    f = os.path.join(work, "t_touchsong.pd"); h.finish(3800, f)
-    out = run(work, f)
-    lists = printed(out, "ockm-song-list")
-    assert lists and lists[-1].split()[-4:] == ["1", "2", "0", "1"], f"song should be pattern 2 x2 then pattern 1 x1: {lists}"
-    assert printed(out, "ockm-song-mode")[-1].split()[-1].startswith("1"), "song mode should be on"
-    assert printed(out, "ockm-song-start"), "play in song mode should start the song"
-    loads = [int(float(v.split()[-1])) for v in printed(out, "ockm-load")]
-    assert loads[-2:] == [1, 0], f"the song should play pattern 2, then pattern 1: {loads} {printed(out, 'ockm-song-start')} {lists}"
-    assert printed(out, "ockm-bpm")[-1].split()[-1].startswith("191"), f"setup +1 should nudge the tempo: {printed(out, 'ockm-bpm')}"
-
-@test
-def touchscreen_new_pattern_from_a_copy(work):
-    """The demo has patterns 1-4, so + makes pattern 5. 'copy of 1' copies and opens it; after a save and a reload, 5 is still there."""
-    if not PDLUA:
-        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
-    h = Harness(); h.show("ockm-pattern-copy", "ockm-load", "ockm-patterns-exist")
-    tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
-    tap(150, 441, 88)                   # + (after patterns 1-4)
-    tap(200, 306, 302)                  # copy of 1
-    h.at(300, "ockm-save bang")
-    h.at(350, "ockm-revert bang")       # read everything back from disk
-    f = os.path.join(work, "t_newpat.pd"); h.finish(450, f)
-    out = run(work, f)
-    cp = printed(out, "ockm-pattern-copy")
-    assert cp and [int(float(x)) for x in cp[-1].split()[-2:]] == [0, 4], f"+ should copy pattern 1 into slot 5: {cp}"
-    assert 4 in [int(float(v.split()[-1])) for v in printed(out, "ockm-load")], "the new pattern should open"
-    ex = printed(out, "ockm-patterns-exist")
-    assert ex and int(float(ex[-1].split()[-1])) == 31, f"after saving, patterns 1-5 should exist: {ex}"
-    p1 = [l for l in open(os.path.join(work, "projects", "default", "p1.txt")).read().split(";") if "ockm-pat-d1 " in l]
-    p5 = [l for l in open(os.path.join(work, "projects", "default", "p5.txt")).read().split(";") if "ockm-pat-d1 " in l]
-    assert p1 == p5, "pattern 5 should be a copy of pattern 1"
-
-@test
 def touchscreen_mode_dial(work):
     """Compose's mode dial: melody priority makes the melody yours and the bass follow; manual makes every part yours; chord priority hands bass and melody back to the generators."""
     if not PDLUA:
@@ -843,25 +723,6 @@ def touchscreen_mode_dial(work):
     assert m["ockm-leader"] == 1 and m["ockm-lead-sync"] == 0 and m["ockm-bass-sync"] == 1 and m["ockm-bass-mode"] == 0, f"melody priority: {m}"
     assert man["ockm-leader"] == 3 and man["ockm-bass-mode"] == 1 and man["ockm-lead-mode"] == 1 and man["ockm-chord-mode"] == 1, f"manual: {man}"
     assert ch["ockm-leader"] == 0 and ch["ockm-bass-mode"] == 0 and ch["ockm-lead-mode"] == 0 and ch["ockm-bass-sync"] == 1, f"chord priority: {ch}"
-
-@test
-def song_saved_with_the_project_and_patterns_copy(work):
-    """The song is saved with the project; copying a pattern makes an exact copy; clear empties it."""
-    h = Harness()
-    h.at(100, "ockm-song-list 2 4 0 8 ; ockm-pattern-copy 0 5 ; ockm-save bang")
-    f = os.path.join(work, "t_song1.pd"); h.finish(300, f); run(work, f)
-    song = open(os.path.join(work, "projects", "default", "song.txt")).read().replace(";", " ").split()
-    assert song[:4] == ["2", "4", "0", "8"], f"song.txt should hold the chain: {song}"
-    p1 = [l for l in open(os.path.join(work, "projects", "default", "p1.txt")).read().split(";") if "ockm-pat-d1 " in l]
-    p6 = [l for l in open(os.path.join(work, "projects", "default", "p6.txt")).read().split(";") if "ockm-pat-d1 " in l]
-    assert p1 and p1 == p6, "pattern 6 should be an exact copy of pattern 1"
-    h = Harness(); h.show("ockm-song-show")
-    g = h.add("#X obj 10 300 r test-get;"); a = h.add("#X obj 10 325 array get ockm-pat-d1 0 16;"); pa = h.add("#X obj 10 350 print D1;"); h.con(g, a); h.con(a, pa)
-    h.at(150, "ockm-revert bang"); h.at(200, "ockm-want 5"); h.at(300, "test-get bang"); h.at(400, "ockm-pattern-clear 5"); h.at(500, "test-get bang")
-    f = os.path.join(work, "t_song2.pd"); h.finish(600, f); out = run(work, f)
-    assert printed(out, "ockm-song-show") and printed(out, "ockm-song-show")[-1].split()[-4:] == ["2", "4", "0", "8"], f"the song should come back on reopening: {printed(out, 'ockm-song-show')} {open(os.path.join(work, 'projects', 'default', 'song.txt')).read()}"
-    d1 = [[int(float(x)) for x in v.split()] for v in printed(out, "D1")]
-    assert sum(d1[0]) > 0 and sum(d1[1]) == 0, f"copied pattern should play; clearing the playing pattern should empty it: {d1}"
 
 @test
 def dub_throw_rings_out_and_filter_springs_back(work):
@@ -1060,29 +921,6 @@ def part_off_and_build_rise(work):
     assert rise[-1] == 0, f"the rise should drop to 0 when switched off: {rise[-3:]}"
 
 @test
-def song_transitions_gap_riser_impact(work):
-    """Song: pattern 1 twice, ending with riser + gap, then pattern 2, which starts with an impact. At 120 bpm a bar is 2 s.
-    The riser starts on the last bar, the gap mutes the last beat, the impact lands on the downbeat of pattern 2."""
-    h = Harness(); h.record(os.path.join(work, "trans.wav"))
-    h.show("ockm-song-pos", "ockm-gap", "ockm-riser-go", "ockm-impact-go")
-    h.at(100, "ockm-bpm 120 ; ockm-length 16 ; ockm-verb-mix 0 ; ockm-delay-mix 0 ; ockm-swing 50 ; ockm-fill-every 0")
-    h.at(150, "ockm-pat-d4 const 0 ; ockm-edit d4 0 1 ; ockm-edit d4 2 1 ; ockm-edit d4 4 1 ; ockm-edit d4 6 1 ; ockm-edit d4 8 1 ; ockm-edit d4 10 1 ; ockm-edit d4 12 1 ; ockm-edit d4 14 1")
-    h.at(170, "ockm-end 3 ; ockm-impact 0 ; ockm-pattern-copy 0 1")
-    h.at(250, "ockm-want 1"); h.at(300, "ockm-end 0 ; ockm-impact 1"); h.at(350, "ockm-want 0")
-    h.at(400, "ockm-song-list 0 2 1 1"); h.at(500, "ockm-song-start 0"); h.at(6800, "ockm-play 0")
-    out, (x, sr) = play(work, h, "t_trans", ms=6800)
-    t = lambda name: [l for l in out.splitlines() if l.startswith(name + ":")]
-    assert t("ockm-riser-go") and t("ockm-impact-go"), f"riser and impact should fire: {t('ockm-riser-go')} {t('ockm-impact-go')}"
-    gaps = [v.split(":")[1].strip() for v in t("ockm-gap")]
-    assert gaps[:2] == ["1", "0"], f"the gap should open and close: {gaps}"
-    # bar 2 runs 2.5-4.5 s (play at 0.5 s); its last beat (4.0-4.5 s) is the gap: only the effects and riser are left
-    def pk(a, b): return peak(x[int(a * sr):int(b * sr)])
-    hats = pk(2.6, 3.9); gap = pk(4.12, 4.45)
-    assert hats > 0.02, "the hats should play in bar 2"
-    imp = pk(4.52, 4.9)
-    assert imp > hats, f"the impact on the downbeat should hit harder than the hats ({imp:.3f} vs {hats:.3f})"
-
-@test
 def sidechain_pump_ducks_the_synths(work):
     """Held organ chords, a kick on every beat (muted, so only the chords are heard). Pump 1: the chords dip just after each kick
     and swell back. Pump 0: they don't."""
@@ -1132,7 +970,7 @@ def projects_new_open_saveas_list_delete(work):
     for want in ("default", "2026-10-14-copy-one", "2026-10-14-fresh-two"):
         assert want in items, f"{want} missing from the project list: {items}"
     P = os.path.join(work, "projects")
-    assert os.path.exists(os.path.join(P, "2026-10-14-copy-one", "p8.txt")), "save as should write all 8 patterns"
+    assert os.path.exists(os.path.join(P, "2026-10-14-copy-one", "loop.txt")), "save as should write the loop"
     assert not os.path.exists(os.path.join(P, "2026-10-14-fresh-two")), "delete should move the project out of projects/"
     assert os.path.exists(os.path.join(work, "trash", "2026-10-14-fresh-two", "project.txt")), "deleted projects go to the trash folder"
     assert open(os.path.join(P, "current.txt")).read().strip() == "2026-10-14-copy-one;", "the open project should be remembered"
@@ -1152,7 +990,7 @@ def touchscreen_makes_and_opens_projects(work):
     errs = [l for l in out.splitlines() if "error" in l.lower() and "current.txt" not in l]
     made = [d for d in os.listdir(os.path.join(work, "projects")) if re.match(r"\d{4}-\d\d-\d\d-[a-z]+-[a-z]+$", d)]
     assert made, f"no new project folder: {os.listdir(os.path.join(work, 'projects'))} {errs[:3]}"
-    assert os.path.exists(os.path.join(work, "projects", made[0], "p8.txt")), "the new project should be written straight away"
+    assert os.path.exists(os.path.join(work, "projects", made[0], "loop.txt")), "the new project should be written straight away"
     assert open(os.path.join(work, "projects", "current.txt")).read().strip() == made[0] + ";"
 
 @test
@@ -1244,53 +1082,8 @@ def touchscreen_velocity_timing_loop_and_banks(work):
     assert printed(out, "ockm-drum-groove")[-1:] == ["13"], f"bank 2's first groove is number 13: {printed(out, 'ockm-drum-groove')}"
 
 @test
-def touchscreen_arranges_a_track(work):
-    """Song tab, arrange, club style: patterns 2-8 become intro, groove, build, breakdown, drop B, key lift and outro,
-    with the right parts on and off, the build rising and the lift in a new key; a song chains them; pattern 1 is untouched."""
-    if not PDLUA:
-        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
-    h = Harness(); h.show("ockm-song-list", "ockm-patterns-exist", "ockm-load")
-    g = h.add("#X obj 10 300 r test-get;"); a1 = h.add("#X obj 10 350 array get ockm-pat-d2 0 16;"); p1 = h.add("#X obj 10 375 print SNARE;")
-    h.con(g, a1); h.con(a1, p1)
-    keys = ["ockm-bass-on", "ockm-lead-on", "ockm-chord-on", "ockm-rise", "ockm-root", "ockm-end", "ockm-impact", "ockm-pump"]
-    for k in keys:
-        r_ = h.add(f"#X obj 300 300 r {k};"); l_ = h.add(f"#X obj 300 325 r ockm-load;"); pk = h.add("#X obj 300 350 pack f f;")
-        pr = h.add(f"#X obj 300 375 print {k.upper()};")
-        h.con(r_, pk, 0, 0); h.con(l_, pk, 0, 1); h.con(pk, pr)
-    h.at(100, "ockm-edit d2 4 1 ; ockm-edit d2 12 1 ; ockm-root 9 ; test-get bang")
-    h.at(200, "ockm-ui-test tap 759 36")      # song tab
-    h.at(300, "ockm-ui-test tap 348 570")     # arrange...
-    h.at(400, "ockm-ui-test tap 624 544")     # replace and arrange (club, everything on)
-    h.at(3500, "test-get bang")
-    f = os.path.join(work, "t_arrange.pd"); h.finish(3700, f)
-    out = run(work, f, timeout=60)
-    song = printed(out, "ockm-song-list")
-    assert song, "arrange should write a song"
-    steps = [int(float(v)) for v in song[-1].split()]
-    pats = steps[0::2]
-    assert pats == [1, 2, 0, 3, 4, 3, 5, 6, 7], f"song chain should be intro, groove, main, build, breakdown, build, drop B, lift, outro: {pats}"
-    loads = {int(float(v)) for v in printed(out, "ockm-load")}
-    assert set(range(1, 8)) <= loads, f"arrange should write patterns 2 to 8: {sorted(loads)}"
-    def last(k, pat):
-        v = [l.split() for l in printed(out, k.upper()) if l.split()[1] == str(pat)]
-        return float(v[-1][0]) if v else None
-    assert last("ockm-bass-on", 1) == 0 and last("ockm-chord-on", 1) == 0, "the intro (pattern 2) has no bass or chords"
-    assert last("ockm-bass-on", 2) == 1, "the groove (pattern 3) brings the bass in"
-    assert last("ockm-rise", 3) == 1, "the build (pattern 4) rises"
-    assert last("ockm-lead-on", 4) == 1 and last("ockm-bass-on", 4) == 0, "the breakdown (pattern 5): lead over pads, no bass"
-    assert last("ockm-root", 6) == 11, f"the key lift (pattern 7) is 2 semitones up from A: {last('ockm-root', 6)}"
-    assert last("ockm-end", 3) == 3, "the build ends with a riser and a gap"
-    assert last("ockm-impact", 5) == 1 and last("ockm-pump", 5) == 1, "drop B lands with an impact and pumps"
-    assert last("ockm-impact", 4) == 1, "the breakdown starts with a crash"
-    assert last("ockm-end", 4) == 1, "the breakdown leads into the second build with a fill"
-    assert last("ockm-end", 7) == 0, "the outro ends the song: no ending"
-    assert last("ockm-end", 0) == 1 and last("ockm-impact", 0) == 1, "pattern 1 (main) lands with an impact and ends with a fill into the build"
-    sn = printed(out, "SNARE")
-    assert sn[0] == sn[-1], f"pattern 1 should be untouched: {sn[0]} then {sn[-1]}"
-
-@test
 def touchscreen_exports_audio_stems_and_midi(work):
-    """Project screen, export: this pattern once, with the mix, stems and MIDI. The WAVs have sound in them,
+    """Project screen, export: the loop once, with the mix, stems and MIDI. The WAVs have sound in them,
     and the MIDI file is a proper type 1 file with drums on channel 10 and notes for each part."""
     if not PDLUA:
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
@@ -1298,8 +1091,7 @@ def touchscreen_exports_audio_stems_and_midi(work):
     h.at(100, "ockm-bass-gen bang ; ockm-chord-gen bang ; ockm-bpm 160")
     h.at(300, "ockm-ui-test tap 910 36")      # project
     h.at(400, "ockm-ui-test tap 854 178")     # export...
-    h.at(500, "ockm-ui-test tap 450 142")     # this pattern
-    h.at(600, "ockm-ui-test tap 224 182")     # once
+    h.at(600, "ockm-ui-test tap 224 162")     # the loop plays once
     h.at(700, "ockm-ui-test tap 510 222")     # stems on
     h.at(800, "ockm-ui-test tap 736 222")     # MIDI on
     h.at(900, "ockm-ui-test tap 644 544")     # export
@@ -1325,15 +1117,15 @@ def touchscreen_exports_audio_stems_and_midi(work):
     assert b"\x90" in m and b"\x92" in m, "bass (channel 1) and chords (channel 3) notes"
 
 @test
-def touchscreen_exports_a_song_and_records_live(work):
-    """Export the song (2 bars at 160 bpm): it stops by itself at the end and lets the effects ring out.
+def touchscreen_exports_the_loop_and_records_live(work):
+    """Export the loop once (1 bar at 160 bpm): it stops by itself at the end and lets the effects ring out.
     Then 'record what I play': recording runs until the red stop button."""
     if not PDLUA:
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness()
-    h.at(100, "ockm-bass-gen bang ; ockm-bpm 160 ; ockm-song-list 0 1 1 1")
+    h.at(100, "ockm-bass-gen bang ; ockm-bpm 160")
     h.at(300, "ockm-ui-test tap 910 36"); h.at(400, "ockm-ui-test tap 854 178")   # project, export...
-    h.at(500, "ockm-ui-test tap 264 142")     # the song
+    h.at(500, "ockm-ui-test tap 224 162")     # the loop plays once
     h.at(600, "ockm-ui-test tap 644 544")     # export (stereo mix)
     h.at(8000, "ockm-ui-test tap 910 36"); h.at(8100, "ockm-ui-test tap 854 178")
     h.at(8200, "ockm-ui-test tap 154 544")    # record what I play
@@ -1343,11 +1135,11 @@ def touchscreen_exports_a_song_and_records_live(work):
     run(work, f, timeout=60)
     ex = os.path.join(work, "exports")
     files = sorted(os.listdir(ex)) if os.path.isdir(ex) else []
-    song = [n for n in files if "-song-" in n and n.endswith(".wav")]
+    song = [n for n in files if "-loop-" in n and n.endswith(".wav")]
     live = [n for n in files if "-live-" in n and n.endswith(".wav")]
-    assert len(song) == 1 and len(live) == 1, f"expected a song mix and a live recording: {files}"
+    assert len(song) == 1 and len(live) == 1, f"expected a loop mix and a live recording: {files}"
     w = wave.open(os.path.join(ex, song[0])); secs = w.getnframes() / w.getframerate(); w.close()
-    assert 4.5 < secs < 7, f"2 bars at 160 bpm (3 s) plus a 2.5 s tail: {secs:.1f} s"
+    assert 3.2 < secs < 5, f"1 bar at 160 bpm (1.5 s) plus a 2.5 s tail: {secs:.1f} s"
     w = wave.open(os.path.join(ex, live[0])); secs = w.getnframes() / w.getframerate(); w.close()
     assert 1.2 < secs < 2.2, f"the live recording should be about 1.6 s: {secs:.1f} s"
 
@@ -1395,16 +1187,16 @@ def touchscreen_demud_listens_and_cuts(work):
 
 @test
 def undo_takes_back_the_last_big_change(work):
-    """A snapshot goes to undo/ without counting as a save; undo brings back the drums and the song.
+    """A snapshot goes to undo/ without counting as a save; undo brings back the drums.
     On the screen: de-mud offers an undo button, and tapping it puts the low cuts back."""
     if not PDLUA:
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
-    h = Harness(); h.show("ockm-saved", "ockm-song-show", "ockm-d4-lowcut")
+    h = Harness(); h.show("ockm-saved", "ockm-d4-lowcut")
     g = h.add("#X obj 10 300 r test-get;"); a = h.add("#X obj 10 350 array get ockm-pat-d1 0 16;"); pr = h.add("#X obj 10 375 print D1;")
     h.con(g, a); h.con(a, pr)
-    h.at(100, "ockm-song-list 0 2 ; test-get bang")
+    h.at(100, "test-get bang")
     h.at(200, "ockm-snapshot bang")
-    h.at(250, "ockm-drum-groove 12 ; ockm-song-list 0 4 0 1")
+    h.at(250, "ockm-drum-groove 12")
     h.at(300, "test-get bang")
     h.at(350, "ockm-undo bang")
     h.at(450, "test-get bang")
@@ -1416,11 +1208,9 @@ def undo_takes_back_the_last_big_change(work):
     d1 = [[int(float(x)) for x in v.split()] for v in printed(out, "D1")]
     assert len(d1) == 3 and any(d1[0]) and not any(d1[1]), f"the groove should be there, then cleared: {d1}"
     assert d1[2] == d1[0], f"undo should bring the drums back: {d1}"
-    assert os.path.exists(os.path.join(work, "undo", "p1.txt")) and os.path.exists(os.path.join(work, "undo", "song.txt")), "the snapshot lives in undo/"
+    assert os.path.exists(os.path.join(work, "undo", "loop.txt")) and os.path.exists(os.path.join(work, "undo", "project.txt")), "the snapshot lives in undo/"
     assert not os.path.exists(os.path.join(work, "projects", "undo")), "undo/ sits beside projects/, never inside it"
     assert not printed(out, "ockm-saved"), "a snapshot isn't a save"
-    songs = printed(out, "ockm-song-show")
-    assert songs and songs[-1].split()[:2] == ["0", "2"] and len(songs[-1].split()) == 2, f"undo should bring back the song: {songs}"
     lc = [float(v) for v in printed(out, "ockm-d4-lowcut")]
     hi = [i for i, v in enumerate(lc) if v >= 100]
     assert hi and lc[-1] == 20 and hi[-1] < len(lc) - 1, f"de-mud sets the hat's low cut, undo puts it back to 20: {lc}"

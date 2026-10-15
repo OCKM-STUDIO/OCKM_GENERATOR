@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.47 (15 October 2026)
+
+- **One loop per project.** Pattern slots 2-8, song mode, the song tab and the old Arrange are gone. Projects save `loop.txt` instead of `p1.txt` to `p8.txt` and `song.txt`
+- **Arrange tab** in place of song: it says what's coming while arrangements are rebuilt (row of 16-bar units, a transition at every joint)
+- Export plays the loop 1, 2, 4 or 8 times
+- Live play is unchanged: mutes, solos, filter, throw, drive, delay, reverb, rise, pump and fills all work on the loop
+- Screen previews after the EQ sheet no longer show it by mistake
+
 ## v0.46 (15 October 2026)
 
 - **Undo**: arrange, grooves, clear, new kit and de-mud now offer an undo button straight after. One step, and it takes patterns, song, kit and EQ back to just before

@@ -93,7 +93,8 @@ SHOTS = [
     ("compose", ["test tap 345 36"]),
     ("perform-mutes", ["test tap 281 36", "test tap 126 137", "test tap 166 369"]),   # mute kick, solo bass
     ("mixer", ["test tap 690 36"]),
-    ("drums-long", ["test tap 414 36", "test tap 861 88", "test tap 194 88"]),        # 64 steps, forward to the second block
+    ("mixer-eq", ["send ockm-d4-lowcut float 300", "send ockm-d4-eqmid float -6", "send ockm-d4-eqmidf float 500", "send ockm-d4-eqhigh float 5", "test tap 690 36", "test tap 288 232"]),
+    ("drums-long", ["test tap 750 546", "test tap 414 36", "test tap 861 88", "test tap 194 88"]),        # 64 steps, forward to the second block
     ("compose-melody", ["test tap 345 36", "test tap 186 154", "test tap 400 540"]),   # melody leads, ask for chords, then mutate the bass
     ("drums-samples", ["test tap 414 36", "test tap 366 380", "test tap 366 380", "test tap 366 380"]),   # drums tab, step to sample 3
     ("drums-velocity", ["array ockm-pat-d1 2 0 0 0 1 0 0.5 0 2 0 0 0 1 0 0.3 0", "test tap 414 36"]),
@@ -101,11 +102,9 @@ SHOTS = [
                       "test tap 414 36", "test tap 145 282", "send ockm-drum-loop float 32"]),
     ("drums-groove", ["test tap 414 36", "test tap 660 445"]),                         # drums tab, tap a groove
     ("project", ["test tap 910 36", "test tap 600 261"]),                              # project screen, pick an older project
-    ("song", ["test tap 759 36", "test tap 620 278", "test tap 663 278", "test tap 663 278", "test tap 620 278", "test tap 380 199", "test tap 380 199", "test tap 380 199"]),
     ("setup", ["test tap 150 36"]),
-    ("arrange", ["test tap 759 36", "test tap 348 570"]),                                   # song tab, open arrange
+    ("arrange", ["test tap 759 36"]),                                                     # arrange tab (being rebuilt)
     ("export", ["test tap 910 36", "test tap 854 178"]),                                    # project screen, export...
-    ("new-pattern", ["test tap 276 36", "test tap 441 88"]),             # perform, then + next to the patterns
     ("bass-manual", ["test tap 483 36", "test tap 900 283", "test tap 89 158"]),      # switch to manual, then edit step 2
 ]
 
