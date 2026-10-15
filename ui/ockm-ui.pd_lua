@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.42"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.43"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
@@ -1287,7 +1287,7 @@ function ui:layout_arrange(add)
   add{ kind="zone", x=0, y=0, w=W, h=H, tap=function() end }
   local x, y, w, h = 24, 56, W - 48, H - 72
   add{ kind="sheet", x=x, y=y, w=w, h=h }
-  add{ kind="text", x=x + 20, y=y + 16, w=w - 40, h=20, label="Arrange: turn pattern 1 into a whole track", size=18, col="txt" }
+  add{ kind="text", x=x + 20, y=y + 16, w=w - 40, h=20, label="Arrange (beta): turn pattern 1 into a whole track", size=18, col="txt" }
   add{ kind="text", x=x + 20, y=y + 42, w=w - 40, h=12, size=11,
        label="Writes variations of pattern 1 into patterns 2-" .. (used + 1) .. " and a song to play them. Everything stays editable." }
   local lx, cx = x + 20, x + 150
@@ -1625,7 +1625,7 @@ function ui:layout_song(add)
   if #song == 0 then
     add{ kind="text", x=24, y=150, w=LW, h=16, label="Empty. Tap a pattern on the right to add the first step.", size=14, col="txt" }
     add{ kind="text", x=24, y=176, w=LW, h=14, label="Each step plays one pattern, as many times as you set. Then the next step.", size=12 }
-    add{ kind="text", x=24, y=200, w=LW, h=14, label="Or tap arrange (bottom left) to build a whole track from pattern 1.", size=12, col="acc" }
+    add{ kind="text", x=24, y=200, w=LW, h=14, label="Or try arrange (beta, bottom left) to build a whole track from pattern 1.", size=12, col="acc" }
   end
   for k = 1, per do
     local i = self.song_page * per + k
@@ -1658,7 +1658,7 @@ function ui:layout_song(add)
     add{ kind="text", x=84, y=564, w=120, h=14, label="page " .. (self.song_page + 1) .. " of " .. pages, size=11 }
     add{ kind="arrow", x=200, y=550, w=60, h=40, dir=1, on=self.song_page < pages - 1, tap=function() self.song_page = self.song_page + 1 end }
   end
-  add{ kind="btn", x=268, y=550, w=160, h=40, accent=true, label="arrange...", tap=function() self.sheet = "arrange" end }
+  add{ kind="btn", x=268, y=550, w=160, h=40, accent=true, label="arrange (beta)", tap=function() self.sheet = "arrange" end }
   if #song > 0 then
     add{ kind="btn", x=LW - 124, y=550, w=140, h=40, label=self.confirm == "song" and "tap again to clear" or "clear the song", quiet=self.confirm ~= "song", tap=function()
       if self.confirm == "song" then self.confirm = nil; self.song_sel = 0; self:song_edit(function(l) for j = #l, 1, -1 do l[j] = nil end end)

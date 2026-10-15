@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.43 (15 October 2026)
+
+- Arrange is labelled **beta**: a starting point while transitions and drops get more work
+
 ## v0.42 (15 October 2026)
 
 - **Transitions** between song sections: each pattern can end with a fill, a riser, riser + gap or a dub out, and start with an impact (crash and sub boom). Set on the song tab

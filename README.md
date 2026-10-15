@@ -147,12 +147,13 @@ Everything is remembered: drum kit, synth sounds, effects, tempo, swing, key and
 11. ~~8 drum slots, chord and lead synth tracks~~ (v0.10)
 12. ~~One central settings store: projects, patterns and the drum kit, saved and restored~~ (v0.11)
 13. ~~Your drum samples, chosen per slot~~ (v0.36). Later: load sample folders from a USB stick or SD card on the Pi
-14. ~~Song mode, MPC style~~ (v0.26). ~~Arrange: turn pattern 1 into a whole track~~ (v0.40). ~~Export: mix, stems, MIDI and live recording~~ (v0.41)
+14. ~~Song mode, MPC style~~ (v0.26). ~~Arrange: turn pattern 1 into a whole track~~ (v0.40, beta: needs more work on transitions and drops). ~~Export: mix, stems, MIDI and live recording~~ (v0.41)
 15. ~~A usability pass~~ (v0.26). Keep going after each round of playing
 16. ~~A setup screen for tempo, swing, accents, volume and MIDI clock~~ (v0.26)
 
 ## Decisions made
 
+- **Arrange is a beta feature** (decided October 2026). It's useful as a starting point; making transitions and drops properly musical will take a lot more work, so it's parked as beta rather than polished now.
 - **Raspberry Pi, not Daisy or Arduino.** No hardware skills needed, and it runs full Pd, so nothing has to be rewritten.
 - **11 tracks: 8 drum slots plus 3 synths (bass, lead, chord).** Between a TR-6S and a TR-8. More would make the screen too busy without making the music better.
 - **8 pattern slots, each up to 128 steps.** One length per pattern, shown 16 steps at a time.
@@ -419,9 +420,11 @@ Reverb and delay work like a mixing desk: each track has a **send** that sets ho
 
 Pick the MIDI port in plugdata's audio and MIDI settings. On the Pi, the iRig Pro Duo's MIDI ports should work for this.
 
-## Arrange
+## Arrange (beta)
 
-On the song tab, **arrange...** turns pattern 1 (your groove) into a whole track. It writes variations into patterns 2 to 8 and a song chain that plays them, and switches the play button to the song. Everything it makes is ordinary patterns and an ordinary song.
+**Beta** (decided October 2026): it works, but making arrangements sound properly musical is a long job, so treat what it makes as a starting point.
+
+On the song tab, **arrange (beta)** turns pattern 1 (your groove) into a whole track. It writes variations into patterns 2 to 8 and a song chain that plays them, and switches the play button to the song. Everything it makes is ordinary patterns and an ordinary song.
 
 | Option | Choices |
 |---|---|
