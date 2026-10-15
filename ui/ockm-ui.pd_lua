@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.45"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.46"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
@@ -105,7 +105,7 @@ end
 local UI_NOW
 local NOT_CHANGES = { ["ockm-play"]=1, ["ockm-want"]=1, ["ockm-page"]=1, ["ockm-save"]=1, ["ockm-revert"]=1, ["ockm-song-start"]=1,
   ["ockm-project-list"]=1, ["ockm-project-open"]=1, ["ockm-project-new"]=1, ["ockm-project-saveas"]=1, ["ockm-project-delete"]=1,
-  ["ockm-resync"]=1, ["ockm-usb-scan"]=1, ["ockm-exports-ask"]=1, ["ockm-mkdir"]=1, ["ockm-rec-stop"]=1, ["ockm-filter"]=1, ["ockm-filter-glide"]=1, ["ockm-delay-throw"]=1 }
+  ["ockm-resync"]=1, ["ockm-snapshot"]=1, ["ockm-usb-scan"]=1, ["ockm-exports-ask"]=1, ["ockm-mkdir"]=1, ["ockm-rec-stop"]=1, ["ockm-filter"]=1, ["ockm-filter-glide"]=1, ["ockm-delay-throw"]=1 }
 local function psend(name, sel, atoms)
   if UI_NOW and not NOT_CHANGES[name] and not name:match("^ockm%-rec%-") and not name:match("%-mute$") and not name:match("%-solo$") and not name:match("%-audition$")
      and name ~= "ockm-samples-scan" then UI_NOW.unsaved = true end
@@ -154,7 +154,7 @@ function ui:defaults()
   v["ockm-bass-sync"] = 1; v["ockm-lead-sync"] = 1; v["ockm-leader"] = 0; v["ockm-drum-groove"] = -1
   v["ockm-drum-loop"] = 0; v["ockm-fill-every"] = 0; v["ockm-fill-style"] = 0; v["ockm-swing"] = 56; v["ockm-accent"] = 0.3; v["ockm-sync"] = 0; v["ockm-song-mode"] = 0; v["ockm-song-loop"] = 1; v["ockm-volume"] = 1
   for _, p in ipairs({ "bass", "lead" }) do v["ockm-"..p.."-lock"] = 0; v["ockm-"..p.."-density"] = 1; v["ockm-"..p.."-seed"] = 0 end
-  v["ockm-bpm"] = 124; v["ockm-len"] = 64; v["ockm-filter"] = 0; v["ockm-root"] = 9; v["ockm-scale"] = 0
+  v["ockm-bpm"] = 124; v["ockm-len"] = 128; v["ockm-filter"] = 0; v["ockm-root"] = 9; v["ockm-scale"] = 0
   for i, nm in ipairs(SLOTS) do
     v["ockm-"..nm.."-sound"] = ({0,1,2,4,5,7,3,6})[i]
     v["ockm-"..nm.."-level"] = 1; v["ockm-"..nm.."-tune"] = 0; v["ockm-"..nm.."-decay"] = 100
@@ -246,6 +246,7 @@ function ui:postinitialize()
   end)
   listen("ockm-patterns-exist", function(o, sel, a) o.exists = math.floor(tonumber(a[1]) or 1); o:dirty() end)
   for _, n in ipairs({ "ockm-saved", "ockm-revert", "ockm-project-name" }) do listen(n, function(o) o.unsaved = false; o:dirty() end) end
+  for _, n in ipairs({ "ockm-revert", "ockm-project-name" }) do listen(n, function(o) o.undo_label = nil end) end
   listen("ockm-song-show", function(o, sel, a)
     local l = {}
     for k = 1, #a - 1, 2 do l[#l + 1] = { math.floor(tonumber(a[k]) or 0), math.floor(tonumber(a[k + 1]) or 1) } end
@@ -319,13 +320,14 @@ function ui:set_sample(slot, n)
 end
 -- a fresh kit: a random sample for every slot whose folder has any
 function ui:random_kit()
+  self:snapshot("new kit")
   local n = 0
   for i = 1, 8 do
     local c = self:sample_count(i)
     if c > 0 then self:send("ockm-"..SLOTS[i].."-sample", math.random(1, c)); n = n + 1 end
   end
   if n == 0 then self:say("no samples yet: add some to the samples folder")
-  else self:say("new kit: " .. n .. " samples picked (back to last save undoes it)") end
+  else self:say_undo("new kit: " .. n .. " samples picked") end
 end
 
 function ui:finalize()
@@ -343,8 +345,23 @@ end
 -- one repaint for a burst of changes
 function ui:dirty() if self.clock then self.clock:delay(5) end end
 -- a short message under the steps, gone after a few seconds
-function ui:say(text) self.msg = text; if self.msgclock then self.msgclock:delay(4000) end; self:dirty() end
-function ui:clear_msg() self.msg = nil; self:repaint() end
+function ui:say(text) self.msg = text; self.msg_undo = nil; if self.msgclock then self.msgclock:delay(4000) end; self:dirty() end
+function ui:clear_msg() self.msg = nil; self.msg_undo = nil; self:repaint() end
+-- one-step undo: before a big change, the engine copies everything (patterns, project, song) aside.
+-- say_undo shows the message with an undo button for 8 seconds
+function ui:snapshot(label) psend("ockm-snapshot", "bang", {}); self.undo_label = label end
+function ui:say_undo(text)
+  self.msg = text; self.msg_undo = true
+  if self.msgclock then self.msgclock:delay(8000) end
+  self:dirty()
+end
+function ui:undo()
+  if not self.undo_label then return end
+  local label = self.undo_label
+  self.undo_label = nil
+  psend("ockm-undo", "bang", {})
+  self:say("undone: " .. label)
+end
 function ui:redraw() self:repaint() end
 
 function ui:on_step(n)
@@ -422,7 +439,12 @@ function ui:layout()
   if self.sheet == "eq" then self:layout_eq(add) end
   -- messages on screens that have no message line of their own
   if self.msg and (self.screen == "perform" or self.screen == "compose" or self.screen == "mixer" or self.screen == "song" or self.screen == "setup" or self.screen == "drums") then
-    add{ kind="toast", x=W / 2 - 330, y=H - 50, w=660, h=38, label=self.msg }
+    if self.msg_undo and self.undo_label then
+      add{ kind="toast", x=W / 2 - 330, y=H - 50, w=556, h=38, label=self.msg }
+      add{ kind="btn", x=W / 2 + 232, y=H - 50, w=98, h=38, label="undo", accent=true, tap=function() self:undo() end }
+    else
+      add{ kind="toast", x=W / 2 - 330, y=H - 50, w=660, h=38, label=self.msg }
+    end
   end
   return L
 end
@@ -690,8 +712,9 @@ function ui:layout_drums(add)
     local clear = (name == "clear")
     add{ kind=clear and "btn" or "choice", x=gx + col * (gw + 6), y=372 + row * 40, w=gw, h=34, label=name, small=true, quiet=clear,
          sel=(not clear) and (cur == n) or nil, tap=function()
+           self:snapshot(clear and "clear" or name)
            self:send("ockm-drum-groove", n)
-           self:say(clear and "drums cleared" or (name .. ": all 8 drums rewritten (back to last save undoes it)"))
+           self:say_undo(clear and "drums cleared" or (name .. ": all 8 drums rewritten"))
          end }
   end
   -- fills: the last bar of every 4, 8 or 16 bars plays a fill instead (your steps aren't changed)
@@ -1301,6 +1324,7 @@ end
 function ui:arrange()
   local slots, chain, bars = self:arr_plan()
   if self.playing ~= 0 then psend("ockm-play", "float", { 0 }) end
+  self:snapshot("arrange")
   local jobs = {}
   local order = {}
   for _, sc in ipairs(ARR_SECTIONS) do if slots[sc[1]] then order[#order + 1] = sc[1] end end
@@ -1323,7 +1347,7 @@ function ui:arrange()
     self.song = chain; self.song_sel = 0; self:send_song()
     self:send("ockm-song-mode", 1)
     local secs = math.floor(bars * 4 * 60 / (self.v["ockm-bpm"] or 124) + 0.5)
-    self:say(string.format("arranged: %d sections, about %d:%02d. Press play. Save to keep it", #order + 1, math.floor(secs / 60), secs % 60))
+    self:say_undo(string.format("arranged: %d sections, about %d:%02d. Press play", #order + 1, math.floor(secs / 60), secs % 60))
   end
   self.jobs = jobs
   self.jobclock:delay(10)
@@ -1374,7 +1398,7 @@ function ui:layout_arrange(add)
        label=string.format("%d sections in %d patterns, a %d-step song, about %d:%02d at %d bpm", used + 1, used + 1, #chain,
                            math.floor(secs / 60), secs % 60, math.floor(self.v["ockm-bpm"] or 124)) }
   if busy then add{ kind="text", x=lx, y=y + 388, w=w - 40, h=12, size=11, col="acc",
-                    label="Patterns 2-8 already have something in: arrange replaces them (back to last save undoes it)" } end
+                    label="Patterns 2-8 already have something in: arrange replaces them (undo takes it back)" } end
   local by = y + h - 64
   add{ kind="btn", x=lx, y=by, w=160, h=48, label="surprise me", tap=function() self:arr_surprise() end }
   add{ kind="btn", x=x + w - 20 - 160, y=by, w=160, h=48, label="cancel", quiet=true, tap=function() self.sheet = nil end }
@@ -2002,6 +2026,7 @@ end
 -- at 250-500 Hz, the chords, lead and snare get a scoop there
 function ui:demud_finish()
   psend("ockm-spec-all", "float", { 0 })
+  self:snapshot("de-mud")
   local L = self.listening or {}
   self.listening = nil
   if self.sheet == "eq" and self.eq_track then psend("ockm-spec-" .. TRACKS[self.eq_track], "float", { 1 }) end
@@ -2040,9 +2065,10 @@ function ui:demud_finish()
     end
   end
   if #changed == 0 then self:say("de-mud heard nothing to fix: play a busier part and try again")
-  else self:say("de-mud set low cuts: " .. table.concat(changed, ", ") .. " Hz. Back to last save undoes it") end
+  else self:say_undo("de-mud: " .. table.concat(changed, ", ") .. " Hz") end
 end
 function ui:demud_fixed()
+  self:snapshot("de-mud")
   for i, t in ipairs(TRACKS) do
     local kind
     if i <= 8 then kind = KIND_OF[math.floor(self.v["ockm-"..t.."-sound"] or 0)] else kind = t end
@@ -2052,7 +2078,7 @@ function ui:demud_fixed()
       if d[2] then self:send("ockm-"..t.."-eqmid", d[2]); self:send("ockm-"..t.."-eqmidf", d[3]) end
     end
   end
-  self:say("de-mud: starting low cuts on everything but the kick and bass. Press play first and it listens to your mix instead")
+  self:say_undo("de-mud: starting low cuts on all but the kick and bass. Play first and it listens instead")
 end
 function ui:eq_open(i)
   if self.eq_track and self.sheet == "eq" then psend("ockm-spec-" .. TRACKS[self.eq_track], "float", { 0 }) end

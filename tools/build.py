@@ -645,7 +645,7 @@ for _t in [n for n,_ in SLOTS]+["bass","lead","chord"]:
 SYNTH_DEFAULTS={"bass":dict(engine=0,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.37,k2=0.9,k3=0.31,k4=0.55,drive=0,verb=0,delay=0,rhythm=3,notes=3),
                 "lead":dict(engine=4,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0.2,delay=0.25,rhythm=8,notes=12),
                 "chord":dict(engine=0,mode=0,level=1,k1=0.45,k2=0.5,k3=0.4,k4=0.3,type=0,smooth=1,verb=0.3,delay=0.35,rhythm=0,prog=0)}
-PATTERN_KEYS=[("ockm-end",0,None),("ockm-impact",0,None),("ockm-pump",0,None),("ockm-bass-on",1,None),("ockm-lead-on",1,None),("ockm-chord-on",1,None),("ockm-rise",0,None),("ockm-drum-loop",0,None),("ockm-len",64,None),("ockm-len-max",64,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None),("ockm-leader",0,None),("ockm-drum-groove",-1,None),("ockm-fill-every",0,None),("ockm-fill-style",0,None)]
+PATTERN_KEYS=[("ockm-end",0,None),("ockm-impact",0,None),("ockm-pump",0,None),("ockm-bass-on",1,None),("ockm-lead-on",1,None),("ockm-chord-on",1,None),("ockm-rise",0,None),("ockm-drum-loop",0,None),("ockm-len",128,None),("ockm-len-max",128,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None),("ockm-leader",0,None),("ockm-drum-groove",-1,None),("ockm-fill-every",0,None),("ockm-fill-style",0,None)]
 for t,d in SYNTH_DEFAULTS.items():
     PATTERN_KEYS+=[(f"ockm-{t}-{k}",v,None) for k,v in d.items()]
 TABLES=[f"ockm-pat-{n}" for n,_ in SLOTS]+[f"ockm-pat-{n}-nudge" for n,_ in SLOTS]+[f"ockm-pat-{t}-{f}" for t in ("bass","lead") for f in MONO]+[f"ockm-pat-chord-{f}" for f in CHORD]
@@ -2039,7 +2039,8 @@ pw=joined(tw9,SLOTN+1,"project.txt",20,Y1+100); tjw=q.add(f"#X obj 20 {Y1+150} t
 swj=joined(tw9,SLOTN+1,"song.txt",1500,Y1+100); cmd(swj,0,"write",1500,Y1+150,q.add(f"#X obj 1500 {Y1+200} s ockm-song-file;"))
 cj=q.add(f"#X msg 160 {Y1+175} clear;"); scj=sender("cap-j",100,Y1+200)
 q.con(pw,0,tjw,0); q.con(tjw,2,cj,0); q.con(cj,0,saj,0); q.con(tjw,1,scj,0); cmd(tjw,0,"write",20,Y1+225,saj)
-q.con(tw9,0,q.add(f"#X msg 20 {Y1+275} \; ockm-saved bang;"),0)
+sgq=q.add(f"#X obj 20 {Y1+250} spigot 1;"); q.con(tw9,0,sgq,0); q.con(q.add(f"#X obj 120 {Y1+225} r {D}0-announce;"),0,sgq,1)
+q.con(sgq,0,q.add(f"#X msg 20 {Y1+275} \; ockm-saved bang;"),0)
 # remember the open project in projects/current.txt, and tell the screens its name
 Y2=Y1+350
 tcur=q.add(f"#X obj 700 {Y2+50} text define {D}0-cur;"); rcc=q.add(f"#X obj 700 {Y2+25} r {D}0-curcmd;"); q.con(rcc,0,tcur,0)
@@ -2074,6 +2075,27 @@ for c in [(rrv,0,trv,0),(trv,1,sender("readall",500,Y4+50),0),(trv,0,fc4,0),(tl,
 # ockm-do-save: capture the live pattern, write everything
 rsv=q.add(f"#X obj 700 {Y4} r ockm-do-save;"); tsv=q.add(f"#X obj 700 {Y4+25} t b b;")
 for c in [(rsv,0,tsv,0),(tsv,1,scap,0),(tsv,0,sender("writeall",700,Y4+50),0)]: q.con(*c)
+# one-step undo. ockm-snapshot: everything (all 8 patterns, the project, the song) is written to undo/ beside projects/,
+# without counting as a save. ockm-undo: read it all back and reload the pattern on screen. undo/ holds one snapshot only.
+YU=Y4+120
+def undo_dir(src,outlet,x,y):
+    """bang -> the undo folder's path (made if missing)"""
+    bu=holder("base",x,y); q.con(src,outlet,bu,0); ud=joined(bu,0,"../undo",x,y+25)
+    t=q.add(f"#X obj {x} {y+75} t s s;"); q.con(ud,0,t,0); q.con(t,1,q.add(f"#X obj {x+150} {y+100} file mkdir;"),0); return t
+rsn2=q.add(f"#X obj 1100 {YU} r ockm-snapshot;"); tsn2=q.add(f"#X obj 1100 {YU+25} t b b b b b b;"); q.con(rsn2,0,tsn2,0)
+keep=q.add(f"#X obj 1100 {YU+250} symbol;"); dk=holder("dir",1300,YU+50); q.con(tsn2,5,dk,0); q.con(dk,0,keep,1)   # 1. remember the project folder
+tu=undo_dir(tsn2,4,1450,YU+50); q.con(tu,0,sender("dir",1450,YU+150),0)                                               # 2. point at undo/
+m0=q.add(f"#X msg 1250 {YU+100} 0;"); q.con(tsn2,3,m0,0); q.con(m0,0,sender("announce",1250,YU+125),0)                 # 3. quietly
+q.con(tsn2,2,scap,0)                                                                                                    # 4. capture the live pattern
+q.con(tsn2,1,sender("writeall",1200,YU+175),0)                                                                          # 5. write it all
+tz=q.add(f"#X obj 1100 {YU+200} t b b;"); q.con(tsn2,0,tz,0); m1=q.add(f"#X msg 1250 {YU+225} 1;")                     # 6. back to normal
+q.con(tz,1,m1,0); q.con(m1,0,sender("announce",1250,YU+250),0); q.con(tz,0,keep,0); q.con(keep,0,sender("dir",1100,YU+275),0)
+rud=q.add(f"#X obj 1700 {YU} r ockm-undo;"); tud2=q.add(f"#X obj 1700 {YU+25} t b b b b;"); q.con(rud,0,tud2,0)
+keep2=q.add(f"#X obj 1700 {YU+250} symbol;"); dk2=holder("dir",1900,YU+50); q.con(tud2,3,dk2,0); q.con(dk2,0,keep2,1)
+tu2=undo_dir(tud2,2,2050,YU+50); q.con(tu2,0,sender("dir",2050,YU+150),0)
+q.con(tud2,1,sender("readall",1800,YU+175),0)
+tz2=q.add(f"#X obj 1700 {YU+200} t b b;"); q.con(tud2,0,tz2,0); q.con(tz2,1,keep2,0); q.con(keep2,0,sender("dir",1700,YU+275),0)
+q.con(tz2,0,fc4,0)   # reload the pattern on screen from its restored buffer (as revert does)
 # ockm-project-new <name>: a blank project (every pattern empty, default kit, tempo and sounds)
 Y5=Y4+250
 rn=q.add(f"#X obj 20 {Y5} r ockm-project-new;"); tn=q.add(f"#X obj 20 {Y5+25} t b b b b b s s;")

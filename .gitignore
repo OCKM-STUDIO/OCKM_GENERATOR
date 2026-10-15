@@ -8,3 +8,4 @@ samples/**/*.aif
 samples/**/*.aiff
 samples/sources.csv
 exports/
+undo/

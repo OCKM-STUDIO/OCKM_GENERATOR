@@ -2,7 +2,7 @@
 
 A drum machine and easy-to-program synths in one box. Built in Pure Data, designed to run on a Raspberry Pi with a touchscreen and a few knobs.
 
-Current version: **v0.45**
+Current version: **v0.46**
 
 ## How to open it
 
@@ -12,7 +12,7 @@ The window is the instrument: three touch screens, drawn in Lua (plugdata has Lu
 
 **How every screen is laid out**, top to bottom:
 1. **Top bar:** play, tempo, then the screens as tabs: **perform, compose, drums, bass, lead, chord, mixer, song**. Save and **project** on the right. The version number sits next to the tempo
-2. **Navigation strip:** on the left, right above the steps, the **steps** navigator: back and forward arrows either side of the steps you're looking at (for example "17-32"). The dots show every block of 16: white is the one on screen, orange is the one playing. You can also swipe the step row sideways. In the middle, **pattern**: just the patterns you've made, then **+** for a new one. On the right, **length** in bars (1, 2, 4, 8). New patterns are 4 bars. **Shorter** keeps the start; nothing is deleted, so going longer again brings your bars back. **Longer** repeats what you've written to fill the new bars, and following parts are rebuilt to fit (a 4-bar progression fills out properly instead of repeating its first chord)
+2. **Navigation strip:** on the left, right above the steps, the **steps** navigator: back and forward arrows either side of the steps you're looking at (for example "17-32"). The dots show every block of 16: white is the one on screen, orange is the one playing. You can also swipe the step row sideways. In the middle, **pattern**: just the patterns you've made, then **+** for a new one. On the right, **length** in bars (1, 2, 4, 8). New patterns are 8 bars. **Shorter** keeps the start; nothing is deleted, so going longer again brings your bars back. **Longer** repeats what you've written to fill the new bars, and following parts are rebuilt to fit (a 4-bar progression fills out properly instead of repeating its first chord)
 3. **What you're editing:** the steps (and, on the drums screen, which of the 8 drum slots)
 4. **Sound shaping** at the bottom
 
@@ -41,7 +41,7 @@ Tap a track's name on perform or the mixer to jump straight to it.
 - **Steps**: tap cycles empty, hit (white), accent (orange)
 - Move between blocks of 16 with the **steps** arrows in the navigation strip, or swipe the step row sideways
 - **Level, tune, decay, reverb, delay** for this slot. These belong to the kit, so they stay when you change pattern
-- **Grooves** (right of the sliders): tap one to fill all 8 drums at once. Each slot gets the part for the sound it plays, so a groove's hats land on whichever slot is your hat. It fills the whole pattern length and sets a swing to suit. Twelve to pick from: four floor, house, deep house, tech house, minimal, techno, dub techno, garage, breakbeat, boom bap, trip hop, electro. **Clear** empties the drums. A groove replaces your drum steps, so **back to last save** (on the project screen) is your undo
+- **Grooves** (right of the sliders): tap one to fill all 8 drums at once. Each slot gets the part for the sound it plays, so a groove's hats land on whichever slot is your hat. It fills the whole pattern length and sets a swing to suit. Twelve to pick from: four floor, house, deep house, tech house, minimal, techno, dub techno, garage, breakbeat, boom bap, trip hop, electro. **Clear** empties the drums. A groove replaces your drum steps, so the message that pops up has an **undo** button
 - **Fills** (under the grooves): **fill on the last bar of every** 4, 8 or 16 bars, counted from when you press play. Styles: **snare roll** (builds through the second half of the bar), **tom run**, **drop** (kick and claps out for the last half bar, hats out for the last beat, so the next downbeat lands harder), **build** (snare 16ths rising over the whole bar). A fill only replaces the drums it uses; everything else keeps playing your pattern, and your steps are never changed. Saved with each pattern, so a breakdown can have fills off
 
 **Compose** (next to perform): how the pattern is put together.
@@ -90,7 +90,7 @@ Tap a track's name on perform or the mixer to jump straight to it.
 - One strip per track: reverb and delay sends at the top, a level fader, then **M** and **S**. Tap a strip's name to open that track
 - **Master** on the right: the reverb and delay return levels, the master volume, and **clear** to undo every mute and solo
 - **EQ** on every strip opens that track's EQ: low cut, a low shelf at 100 Hz, a mid bell you can move, and a high shelf at 8 kHz (each ±12 dB). A curve shows what you've set. While the song plays, bars behind the curve show where that track's sound sits, so you can see what to cut. The EQ button lights when it isn't flat. EQ belongs to the project
-- **De-mud** on the master strip clears low-mid fog. Press it while playing and it listens to the mix for 4 seconds, then gives each track (except the kick and bass) a low cut just below where its own sound starts. If the mix piles up around 250 to 500 Hz, the chords, lead and snare get a small scoop there too. Stopped, it sets safe starting low cuts instead. Back to last save undoes it
+- **De-mud** on the master strip clears low-mid fog. Press it while playing and it listens to the mix for 4 seconds, then gives each track (except the kick and bass) a low cut just below where its own sound starts. If the mix piles up around 250 to 500 Hz, the chords, lead and snare get a small scoop there too. Stopped, it sets safe starting low cuts instead. **Undo** takes it back
 - Drum levels belong to the kit (the project). Bass, lead and chord levels belong to each pattern, like the rest of their sound
 
 Everything is on the screens now, so `pd test-panel` is only for testing.
@@ -99,6 +99,7 @@ Everything is on the screens now, so `pd test-panel` is only for testing.
 
 **Projects** (the **project** button, top right). A project is 8 patterns plus the drum kit, tempo and effects. It opens on the one you used last.
 - **Save** writes all 8 patterns and the project. **Back to last save** throws away everything since
+- **Undo** (one step): arrange, a groove, clear, new kit and de-mud each put an **undo** button in the message that follows. It takes everything (patterns, song, kit, EQ) back to just before. Only the last one can be undone, and opening another project or going back to last save forgets it. The copy lives in `undo/` beside `projects/`
 - **New blank project** starts from nothing: every pattern empty, the default kit and sounds. It's named for you with two random words and the date, like "velvet heron · 14 Oct"
 - **Save as a copy** keeps the project you were in as it was last saved, and carries on in a copy
 - **Your projects**, newest first. Tap one, then **save mine, then open**, **open without saving**, or **delete** (tap twice). Deleting moves the files to a `trash` folder next to `projects/`, so nothing is lost by accident
@@ -353,7 +354,7 @@ Sketch the drums on 1 or 2 bars under a longer pattern: pick **1 bar** or **2 ba
 
 ### Grooves
 
-Three banks of 12: classics, house + garage, and techno + breaks. A groove rewrites all 8 drums and sets the swing; back to last save undoes it.
+Three banks of 12: classics, house + garage, and techno + breaks. A groove rewrites all 8 drums and sets the swing; **undo** takes it back.
 
 Slot sounds, samples, tune, decay, level and sends are part of the drum kit, which is saved with the project and shared by every pattern.
 
@@ -452,7 +453,7 @@ On the song tab, **arrange (beta)** turns pattern 1 (your groove) into a whole t
 | Key lift | up 1, 2 or 5 semitones |
 | Variation | subtle or bold (bold thins more and changes the chord rhythm) |
 
-**Surprise me** picks the options at random. If patterns 2 to 8 already have something in, arrange says so first; back to last save undoes it.
+**Surprise me** picks the options at random. If patterns 2 to 8 already have something in, arrange says so first; **undo** takes it back.
 
 ### Transitions
 

@@ -1393,6 +1393,38 @@ def touchscreen_demud_listens_and_cuts(work):
     assert hat and hat[-1] >= 120, f"the hats should get a low cut of 120 Hz or more: {hat}"
     assert not printed(out, "ockm-d1-lowcut") and not printed(out, "ockm-bass-lowcut"), "the kick and bass keep their low end"
 
+@test
+def undo_takes_back_the_last_big_change(work):
+    """A snapshot goes to undo/ without counting as a save; undo brings back the drums and the song.
+    On the screen: de-mud offers an undo button, and tapping it puts the low cuts back."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness(); h.show("ockm-saved", "ockm-song-show", "ockm-d4-lowcut")
+    g = h.add("#X obj 10 300 r test-get;"); a = h.add("#X obj 10 350 array get ockm-pat-d1 0 16;"); pr = h.add("#X obj 10 375 print D1;")
+    h.con(g, a); h.con(a, pr)
+    h.at(100, "ockm-song-list 0 2 ; test-get bang")
+    h.at(200, "ockm-snapshot bang")
+    h.at(250, "ockm-drum-groove 12 ; ockm-song-list 0 4 0 1")
+    h.at(300, "test-get bang")
+    h.at(350, "ockm-undo bang")
+    h.at(450, "test-get bang")
+    h.at(500, "ockm-ui-test tap 690 36")      # mixer
+    h.at(550, "ockm-ui-test tap 905 232")     # de-mud while stopped: fixed low cuts, with an undo button
+    h.at(600, "ockm-ui-test tap 761 569")     # undo
+    f = os.path.join(work, "t_undo.pd"); h.finish(800, f)
+    out = run(work, f)
+    d1 = [[int(float(x)) for x in v.split()] for v in printed(out, "D1")]
+    assert len(d1) == 3 and any(d1[0]) and not any(d1[1]), f"the groove should be there, then cleared: {d1}"
+    assert d1[2] == d1[0], f"undo should bring the drums back: {d1}"
+    assert os.path.exists(os.path.join(work, "undo", "p1.txt")) and os.path.exists(os.path.join(work, "undo", "song.txt")), "the snapshot lives in undo/"
+    assert not os.path.exists(os.path.join(work, "projects", "undo")), "undo/ sits beside projects/, never inside it"
+    assert not printed(out, "ockm-saved"), "a snapshot isn't a save"
+    songs = printed(out, "ockm-song-show")
+    assert songs and songs[-1].split()[:2] == ["0", "2"] and len(songs[-1].split()) == 2, f"undo should bring back the song: {songs}"
+    lc = [float(v) for v in printed(out, "ockm-d4-lowcut")]
+    hi = [i for i, v in enumerate(lc) if v >= 100]
+    assert hi and lc[-1] == 20 and hi[-1] < len(lc) - 1, f"de-mud sets the hat's low cut, undo puts it back to 20: {lc}"
+
 def write_tone(path, hz, secs, sr=44100, channels=1):
     w = wave.open(path, "w"); w.setnchannels(channels); w.setsampwidth(2); w.setframerate(sr)
     n = int(secs * sr)

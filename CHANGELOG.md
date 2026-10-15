@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.46 (15 October 2026)
+
+- **Undo**: arrange, grooves, clear, new kit and de-mud now offer an undo button straight after. One step, and it takes patterns, song, kit and EQ back to just before
+- **New patterns are 8 bars** (128 steps), ready for the loop-to-track arranger
+- Step 1 of the new arranger (see the design doc)
+
 ## v0.45 (15 October 2026)
 
 - **Per-track EQ** on the mixer: low cut, low shelf, a movable mid bell and high shelf for every track, with a response curve. Saved with the project
