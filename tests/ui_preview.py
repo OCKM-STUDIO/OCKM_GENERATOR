@@ -88,6 +88,7 @@ SHOTS = [
     ("perform", ["send ockm-play float 1", "send ockm-step float 4"]),
     ("drums", ["test tap 50 137"]),                                   # tap the kick lane name
     ("bass", ["test tap 483 36", "test tap 89 158"]),                 # bass tab; tapping a step on auto just explains the lock
+    ("lead", ["test tap 552 36"]),
     ("chord", ["test tap 621 36"]),
     ("compose", ["test tap 345 36"]),
     ("perform-mutes", ["test tap 281 36", "test tap 126 137", "test tap 166 369"]),   # mute kick, solo bass

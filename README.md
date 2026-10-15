@@ -343,9 +343,9 @@ Each slot plays either its built-in synth sound or a sample from that sound's fo
 - Files added while it's running show up next time you open the drums tab
 - `tools/pick_samples.py` fills the folders from a big sample library: 20 per sound, grouped by source, with `samples/sources.csv` (kept out of git) saying where each came from
 
-## Bass and lead engines
+## Bass engines
 
-Bass and lead are the same mono synth, so each has the same seven engines (the lead plays two octaves higher). Only the chosen engine runs, so the others cost no processing power. Every engine uses the same four knobs, 0 to 1. k4 is always decay.
+The bass has seven engines. Only the chosen engine runs, so the others cost no processing power. Every engine uses the same four knobs, 0 to 1. k4 is always decay.
 
 | Engine | k1 | k2 | k3 | Character |
 |---|---|---|---|---|
@@ -357,7 +357,21 @@ Bass and lead are the same mono synth, so each has the same seven engines (the l
 | 5 saw | tone (1 = fully raw) | second saw detune (0 = single saw) | sub saw an octave down | Hard and buzzy. Notes play at full level for the decay time, then stop |
 | 6 house | tone | body (sub sine an octave down) | pluck (filter snap) | Deep house and garage: a clean square and a sub sine through a warm filter |
 
-The drive comes after the engine, so it works on all of them. At 0 it's completely clean; it only colours the sound as you turn it up. Defaults: bass on acid, lead on pluck.
+The drive comes after the engine, so it works on all of them. At 0 it's completely clean; it only colours the sound as you turn it up. The bass starts on acid.
+
+## Lead engines
+
+The lead has its own engines, made for melodies (it plays two octaves above the bass). Every lead engine glides on slide steps and adds a gentle vibrato that fades in on held notes, like easing in a mod wheel. k4 is decay, as on the bass. The screen shows them in the order mini, juno, dx, acid, sync.
+
+| Engine | k1 | k2 | k3 | Character |
+|---|---|---|---|---|
+| 0 acid | cutoff | resonance | envelope amount | The 303, voiced to cut through: more resonance and a little grit |
+| 1 juno | cutoff | pulse width movement | chorus: off, I, II | Saw, a slowly moving pulse and a sub through a soft filter, then the chorus. Dreamy |
+| 2 dx | brightness | character: tine, reed, bell, glass | detune | Two-operator FM. Notes ring and fade like an electric piano; accents hit brighter |
+| 3 sync | sync amount | tone | sweep | A hard-synced saw that sweeps with the envelope. Tech house and electro |
+| 4 mini | cutoff | emphasis | contour | Three oscillators driven into a ladder filter. Big and warm. The default |
+
+Five more are planned: whistle, supersaw, hoover, melodica and vox. Until then, a lead engine number past the last one plays mini.
 
 ## Chord synth
 

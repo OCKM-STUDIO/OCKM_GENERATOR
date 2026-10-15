@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.37 (15 October 2026)
+
+- **The lead has its own sounds**, separate from the bass: mini (Minimoog-style, the new default), juno (with chorus), dx (DX7-style FM: tine, reed, bell, glass), acid (voiced as a lead) and sync
+- Lead notes glide on slide steps and get a vibrato that fades in on held notes
+- Old projects keep sensible sounds: acid stays acid, FM becomes dx, and the old default (pluck) becomes mini
+- First of two batches. Next: whistle, supersaw, hoover, melodica, vox
+
 ## v0.36 (14 October 2026)
 
 - **Drum samples.** Each slot can play a sample from its sound's folder instead of the synth sound. Pick it on the drums tab: arrows step through the folder, each change plays it, tap the box to hear it again

@@ -440,6 +440,26 @@ def bass_engines_play_in_tune(work):
         assert 45 < f0 < 68, f"{name} engine plays {f0:.0f}Hz for A1, expected about 55Hz"
 
 @test
+def lead_engines_play_in_tune_and_level(work):
+    """Every lead engine sounds, plays A2 at about 110 Hz, and sits at a similar level to the others."""
+    levels = {}
+    for eng, name in enumerate(["acid", "juno", "dx", "sync", "mini"]):
+        h = Harness(dut="ockm-lead zz")
+        h.record(os.path.join(work, f"l_{name}.wav"), source="dut")
+        k1, k3 = (0, 0) if name == "sync" else (0.5, 0.3)   # sync: zero sync, so the pitch counter sees the fundamental
+        h.at(20, f"ockm-zz-engine {eng} ; ockm-zz-k1 {k1} ; ockm-zz-k2 0.1 ; ockm-zz-k3 {k3} ; ockm-zz-k4 0.9 ; ockm-zz-drive 0")
+        h.at(50, "test-in 45 0 0 1")
+        _, (x, sr) = play(work, h, f"t_lead_{name}", with_main=False, ms=650)
+        seg = x[int(0.1 * sr):int(0.35 * sr)]
+        assert peak(seg) > 0.05, f"{name} lead is silent"
+        f0 = cycles_per_second(seg, sr)
+        assert 95 < f0 < 128, f"{name} lead plays {f0:.0f} Hz for A2, expected about 110"
+        levels[name] = math.sqrt(sum(v * v for v in seg) / len(seg))
+    lo, hi = min(levels.values()), max(levels.values())
+    assert hi / lo < 4, "lead engines are too far apart in level: " + ", ".join(f"{k} {v:.2f}" for k, v in levels.items())
+    print("      lead levels (rms): " + ", ".join(f"{k} {v:.2f}" for k, v in levels.items()))
+
+@test
 def delay_echoes_on_time(work):
     h = Harness(dut="ockm-fx")
     h.add("#X obj 500 10 r test-click;"); click = len([o for o in h.objs if not o[1]]) - 1
@@ -602,7 +622,7 @@ def touchscreen_screens_draw(work):
         raise Skip("Pillow not installed")
     p = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_preview.py"), os.path.join(work, "preview")], capture_output=True, text=True)
     assert p.returncode == 0, p.stderr[-800:]
-    assert len(os.listdir(os.path.join(work, "preview"))) == 16, "expected sixteen screen pictures"
+    assert len(os.listdir(os.path.join(work, "preview"))) == 17, "expected seventeen screen pictures"
 
 @test
 def mute_solo_and_levels(work):

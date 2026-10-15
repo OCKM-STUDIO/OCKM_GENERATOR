@@ -418,7 +418,7 @@
 #X obj 990 692 r ockm-bass-delay;
 #X text 20 752 lead;
 #X obj 110 750 ockm-monoseq lead;
-#X obj 560 750 ockm-mono lead;
+#X obj 560 750 ockm-lead lead;
 #X obj 660 750 ockm-gate lead level;
 #X obj 760 750 *~ 0;
 #X obj 830 750 throw~ ockm-revbus;

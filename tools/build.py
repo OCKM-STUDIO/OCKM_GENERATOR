@@ -467,7 +467,7 @@ ds=p.add("#X restore 30 960 pd drum-settings;")
 p.add("#X text 30 985 sound \\, tune \\, decay \\, level and sends per drum slot;")
 # synth tracks: bass and lead (mono synth), chord
 by=380+len(SLOTS)*40+10
-SYN=[("bass","ockm-monoseq bass","ockm-mono bass"),("lead","ockm-monoseq lead","ockm-mono lead"),("chord","ockm-chordseq chord","ockm-chord chord")]
+SYN=[("bass","ockm-monoseq bass","ockm-mono bass"),("lead","ockm-monoseq lead","ockm-lead lead"),("chord","ockm-chordseq chord","ockm-chord chord")]
 synth_voice={}
 for r,(nm,seqo,voi) in enumerate(SYN):
     y=by+r*40
@@ -596,49 +596,60 @@ for kind in ("saw","square"):
     lb=q.add("#X obj 300 40 loadbang;"); sr=q.add("#X obj 300 65 samplerate~;"); dv=q.add("#X obj 200 130 /~ 44100;")
     sh=q.add("#X obj 120 130 +~ 0.5;"); wr=q.add("#X obj 120 160 wrap~;")
     if kind=="saw":
-        ex=q.add("#X obj 30 220 expr~ 2*"+D+"v1-1-("+BLEP.format(t=D+"v1",D=D)+");")
+        ex=q.add("#X obj 30 220 expr~ 2*"+D+"v1-1-("+BLEP.format(t=D+"v1",D=D)+")+0*"+D+"v2;")   # 0*v2: keeps the middle inlet a signal inlet
     else:
         ex=q.add("#X obj 30 220 expr~ if("+D+"v1<0.5 \\, 1 \\, -1)+("+BLEP.format(t=D+"v1",D=D)+")-("+BLEP.format(t=D+"v2",D=D)+");")
     for c in [(i_,0,ph,0),(i_,0,dv,0),(lb,0,sr,0),(sr,0,dv,1),(ph,0,sh,0),(sh,0,wr,0),(ph,0,ex,0),(wr,0,ex,1),(dv,0,ex,2),(ex,0,o,0)]: q.con(*c)
     q.save(f"voices/ockm-bl{kind}.pd","#N canvas 200 200 600 340 12;")
 
 # ================= bass core: shared note logic for every engine =================
-q=P()
-q.add("#X text 20 10 Bass core: turns notes into pitch \\, filter envelope and volume signals. Shared by every bass engine.;")
-inl=q.add("#X obj 30 50 inlet;")
-ro=q.add("#X obj 30 80 route off;")
-offm=q.add("#X msg 30 110 0 20;")
-up=q.add("#X obj 120 110 unpack f f f f;")
-eqh=q.add("#X obj 420 150 == 0;")
-eqg=q.add("#X obj 300 150 == 0;")
-ap1=q.add("#X obj 210 150 + 1;")
-lvx=q.add(f"#X obj 270 80 expr {D}f1*0.4+0.6;")
-tn=q.add("#X obj 120 220 t b b b f;")
-spG=q.add("#X obj 330 270 spigot;"); spN=q.add("#X obj 420 270 spigot;")
-mG=q.add(f"#X msg 330 300 {D}1 60;"); mN=q.add(f"#X msg 420 300 {D}1;")
-pv=q.add("#X obj 420 340 vline~;")
-fl=q.add("#X obj 210 270 f 0.6;"); ma=q.add(f"#X msg 210 300 {D}1 3;")
-spR=q.add("#X obj 160 270 spigot;"); mR=q.add("#X msg 160 300 0 20 75;")
-av=q.add("#X obj 30 400 vline~;")
-spF=q.add("#X obj 120 270 spigot;"); fd=q.add("#X obj 120 300 f 200;"); mF=q.add(f"#X msg 120 330 1 \\, 0 {D}1;")
-ev=q.add("#X obj 600 340 vline~;"); es=q.add("#X obj 600 380 *~ 1;")
-dec=q.add("#X obj 700 50 inlet;")
-o0=q.add("#X obj 100 460 outlet~;"); o1=q.add("#X obj 400 460 outlet~;"); o2=q.add("#X obj 700 460 outlet~;")
-q.add("#X text 100 490 outlets: pitch (MIDI) / filter envelope (x2 on accents) / volume;")
-for c in [(inl,0,ro,0),(ro,0,offm,0),(offm,0,av,0),(ro,1,up,0),(up,3,eqh,0),(eqh,0,spR,1),(up,2,eqg,0),(up,2,spG,1),(eqg,0,spN,1),(eqg,0,spF,1),
-          (up,1,ap1,0),(ap1,0,es,1),(up,1,lvx,0),(lvx,0,fl,1),(up,0,tn,0),(tn,3,spG,0),(tn,3,spN,0),(spG,0,mG,0),(spN,0,mN,0),(mG,0,pv,0),(mN,0,pv,0),
-          (tn,2,fl,0),(fl,0,ma,0),(ma,0,av,0),(tn,1,spR,0),(spR,0,mR,0),(mR,0,av,0),(tn,0,spF,0),(spF,0,fd,0),(fd,0,mF,0),(mF,0,ev,0),(ev,0,es,0),
-          (dec,0,fd,1),(pv,0,o0,0),(es,0,o1,0),(av,0,o2,0)]: q.con(*c)
-q.save("voices/ockm-mono-core.pd","#N canvas 150 150 900 520 12;")
+# lead=True: the lead's version. Slides glide a little slower, and held notes get a delayed vibrato
+def mono_core(fn,lead=False):
+  q=P()
+  q.add("#X text 20 10 Bass core: turns notes into pitch \\, filter envelope and volume signals. Shared by every bass engine.;")
+  inl=q.add("#X obj 30 50 inlet;")
+  ro=q.add("#X obj 30 80 route off;")
+  offm=q.add("#X msg 30 110 0 20;")
+  up=q.add("#X obj 120 110 unpack f f f f;")
+  eqh=q.add("#X obj 420 150 == 0;")
+  eqg=q.add("#X obj 300 150 == 0;")
+  ap1=q.add("#X obj 210 150 + 1;")
+  lvx=q.add(f"#X obj 270 80 expr {D}f1*0.4+0.6;")
+  tn=q.add("#X obj 120 220 t b b b f;")
+  spG=q.add("#X obj 330 270 spigot;"); spN=q.add("#X obj 420 270 spigot;")
+  mG=q.add(f"#X msg 330 300 {D}1 {90 if lead else 60};"); mN=q.add(f"#X msg 420 300 {D}1;")
+  pv=q.add("#X obj 420 340 vline~;")
+  fl=q.add("#X obj 210 270 f 0.6;"); ma=q.add(f"#X msg 210 300 {D}1 3;")
+  spR=q.add("#X obj 160 270 spigot;"); mR=q.add("#X msg 160 300 0 20 75;")
+  av=q.add("#X obj 30 400 vline~;")
+  spF=q.add("#X obj 120 270 spigot;"); fd=q.add("#X obj 120 300 f 200;"); mF=q.add(f"#X msg 120 330 1 \\, 0 {D}1;")
+  ev=q.add("#X obj 600 340 vline~;"); es=q.add("#X obj 600 380 *~ 1;")
+  dec=q.add("#X obj 700 50 inlet;")
+  o0=q.add("#X obj 100 460 outlet~;"); o1=q.add("#X obj 400 460 outlet~;"); o2=q.add("#X obj 700 460 outlet~;")
+  q.add("#X text 100 490 outlets: pitch (MIDI) / filter envelope (x2 on accents) / volume;")
+  for c in [(inl,0,ro,0),(ro,0,offm,0),(offm,0,av,0),(ro,1,up,0),(up,3,eqh,0),(eqh,0,spR,1),(up,2,eqg,0),(up,2,spG,1),(eqg,0,spN,1),(eqg,0,spF,1),
+            (up,1,ap1,0),(ap1,0,es,1),(up,1,lvx,0),(lvx,0,fl,1),(up,0,tn,0),(tn,3,spG,0),(tn,3,spN,0),(spG,0,mG,0),(spN,0,mN,0),(mG,0,pv,0),(mN,0,pv,0),
+            (tn,2,fl,0),(fl,0,ma,0),(ma,0,av,0),(tn,1,spR,0),(spR,0,mR,0),(mR,0,av,0),(tn,0,spF,0),(spF,0,fd,0),(fd,0,mF,0),(mF,0,ev,0),(ev,0,es,0),
+            (dec,0,fd,1),(pv,0,o0,0),(es,0,o1,0),(av,0,o2,0)]: q.con(*c)
+  if lead:
+      # vibrato: fades in after 350 ms on each fresh (non-slide) note, 5.5 Hz, about a fifth of a semitone
+      vm=q.add("#X msg 520 300 0 \\, 1 500 350;"); vv=q.add("#X obj 520 340 vline~;"); vo=q.add("#X obj 620 340 osc~ 5.5;")
+      vx=q.add("#X obj 520 370 *~;"); vd=q.add("#X obj 520 400 *~ 0.2;"); vp=q.add("#X obj 420 420 +~;")
+      tv=q.add("#X obj 420 320 t f b;")
+      q.C=[c for c in q.C if c!=(spN,0,mN,0) and c!=(pv,0,o0,0)]
+      for c in [(spN,0,tv,0),(tv,0,mN,0),(tv,1,vm,0),(vm,0,vv,0),(vv,0,vx,0),(vo,0,vx,1),(vx,0,vd,0),(pv,0,vp,0),(vd,0,vp,1),(vp,0,o0,0)]: q.con(*c)
+  q.save(fn,"#N canvas 150 150 900 520 12;")
+mono_core("voices/ockm-mono-core.pd")
+mono_core("voices/ockm-lead-core.pd",lead=True)
 
 # ================= engines =================
-def engine(fn,idx,title,build):
+def engine(fn,idx,title,build,core_name="ockm-mono-core",hook="engine"):
     q=P(); q.add(f"#X text 20 10 {title};")
     inl=q.add("#X obj 30 50 inlet;")
     sp=q.add("#X obj 30 80 spigot 1;")
-    core=q.add("#X obj 30 120 ockm-mono-core;")
+    core=q.add(f"#X obj 30 120 {core_name};")
     ks=[q.add(f"#X obj {200+i*110} 50 inlet;") for i in range(4)]
-    re=q.add(f"#X obj 700 50 r ockm-{D}1-engine;"); eq=q.add(f"#X obj 700 80 == {idx};"); tf=q.add("#X obj 700 110 t f f;")
+    re=q.add(f"#X obj 700 50 r ockm-{D}1-{hook};"); eq=q.add(f"#X obj 700 80 == {idx};"); tf=q.add("#X obj 700 110 t f f;")
     sw=q.add("#X obj 700 170 switch~;"); s0=q.add("#X obj 760 140 sel 0;"); om=q.add("#X msg 760 170 off;")
     for c in [(inl,0,sp,0),(sp,0,core,0),(re,0,eq,0),(eq,0,tf,0),(tf,1,sw,0),(tf,0,s0,0),(s0,0,om,0),(om,0,core,0),(tf,0,sp,1)]: q.con(*c)
     dx=q.add(f"#X obj 650 50 expr 20*pow(100\\,{D}f1);"); q.con(ks[3],0,dx,0); q.con(dx,0,core,1)
@@ -770,6 +781,127 @@ th=q.add(f"#X obj 30 260 expr~ if({D}f2>1.001 \\, tanh({D}v1*{D}f2)/sqrt({D}f2) 
 q.add("#X text 400 260 drive: 0 clean \\, 1 heavy;")
 for c in [(rd,0,dx,0),(dx,0,th,1),(sm,0,th,0),(th,0,out,0)]: q.con(*c)
 q.save("voices/ockm-mono.pd","#N canvas 140 140 900 340 12;")
+
+# ================= lead engines =================
+# The lead has its own engines (ockm-lead-engine). The order keeps old projects sensible: acid stays acid (0),
+# FM becomes DX (2), and the old default pluck (4) becomes Mini.
+LEAD_ENGINES=["acid","juno","dx","sync","mini"]
+def lead_engine(name,idx,title,build): engine(f"voices/ockm-lead-{name}.pd",idx,title,build,core_name="ockm-lead-core",hook="voice")
+
+def filt_env(q,core,ks,lo,span,x=450,y=200,kidx=2,cmin=30,cmax=14000,amt=3000):
+    """core's filter envelope -> cutoff in Hz: k1 sets the base (lo..lo*2^span), k3 the envelope amount. Returns the cutoff signal."""
+    em=q.add(f"#X obj {x} {y} *~ {amt};"); ad=q.add(f"#X obj {x} {y+30} +~ 300;"); cl=q.add(f"#X obj {x} {y+60} clip~ {cmin} {cmax};")
+    k1=q.add(f"#X obj 200 140 expr {lo}*pow(2\\,{span}*{D}f1);")
+    for c in [(core,1,em,0),(em,0,ad,0),(ad,0,cl,0),(ks[0],0,k1,0),(k1,0,ad,1)]: q.con(*c)
+    if kidx is not None:
+        k3=q.add("#X obj 420 140 * 7000;"); q.con(ks[kidx],0,k3,0); q.con(k3,0,em,1)
+    return cl
+
+def lead_acid(q,core,ks,out):
+    # the 303, voiced to cut through: more resonance and a little grit after the filter
+    mt=q.add("#X obj 30 200 mtof~;"); ph=q.add("#X obj 30 230 phasor~;"); m2=q.add("#X obj 30 260 *~ 2;"); s1=q.add("#X obj 30 290 -~ 1;")
+    cut=filt_env(q,core,ks,60,8)
+    bob=q.add("#X obj 30 340 bob~;"); k2=q.add(f"#X obj 310 140 expr 1+3*{D}f1;")
+    dr=q.add(f"#X obj 30 370 expr~ tanh({D}v1*1.8)/1.3;"); am=q.add("#X obj 30 400 *~;"); g=q.add("#X obj 30 430 *~ 1.1;")
+    for c in [(core,0,mt,0),(mt,0,ph,0),(ph,0,m2,0),(m2,0,s1,0),(s1,0,bob,0),(cut,0,bob,1),(ks[1],0,k2,0),(k2,0,bob,2),
+              (bob,0,dr,0),(dr,0,am,0),(core,2,am,1),(am,0,g,0),(g,0,out,0)]: q.con(*c)
+    q.add("#X text 200 110 k1 cutoff / k2 resonance / k3 envelope amount;")
+
+def lead_mini(q,core,ks,out):
+    # Minimoog-style: two saws a few cents apart plus a square an octave down, driven into a ladder filter
+    mt=q.add("#X obj 30 200 mtof~;"); o1=q.add("#X obj 30 230 ockm-blsaw;")
+    d2=q.add("#X obj 140 200 *~ 1.0035;"); o2=q.add("#X obj 140 230 ockm-blsaw;")
+    d3=q.add("#X obj 250 200 *~ 0.5;"); o3=q.add("#X obj 250 230 ockm-blsquare;"); g3=q.add("#X obj 250 260 *~ 0.6;")
+    m1=q.add("#X obj 30 270 +~;"); m2=q.add("#X obj 30 295 +~;")
+    pre=q.add(f"#X obj 30 320 expr~ tanh({D}v1*0.7);")
+    cut=filt_env(q,core,ks,50,8)
+    bob=q.add("#X obj 30 360 bob~;"); k2=q.add(f"#X obj 310 140 expr 0.2+3.4*{D}f1;")
+    am=q.add("#X obj 30 400 *~;"); g=q.add("#X obj 30 430 *~ 0.95;")
+    for c in [(core,0,mt,0),(mt,0,o1,0),(mt,0,d2,0),(d2,0,o2,0),(mt,0,d3,0),(d3,0,o3,0),(o3,0,g3,0),
+              (o1,0,m1,0),(o2,0,m1,1),(m1,0,m2,0),(g3,0,m2,1),(m2,0,pre,0),(pre,0,bob,0),(cut,0,bob,1),(ks[1],0,k2,0),(k2,0,bob,2),
+              (bob,0,am,0),(core,2,am,1),(am,0,g,0),(g,0,out,0)]: q.con(*c)
+    q.add("#X text 200 110 k1 cutoff / k2 emphasis / k3 contour (filter envelope);")
+
+def lead_juno(q,core,ks,out):
+    # Juno-style: saw plus a pulse whose width drifts slowly, a square sub, a soft filter, then the chorus
+    mt=q.add("#X obj 30 200 mtof~;"); sw=q.add("#X obj 30 230 ockm-blsaw;")
+    ph=q.add("#X obj 140 230 phasor~;"); lf=q.add("#X obj 260 170 osc~ 0.6;")
+    pwk=q.add(f"#X obj 310 140 expr 0.45*{D}f1;"); lfa=q.add("#X obj 260 200 *~ 0;"); wd=q.add("#X obj 260 230 +~ 0.5;")
+    pu=q.add(f"#X obj 140 260 expr~ ({D}v1<{D}v2)*2-1;")
+    sbh=q.add("#X obj 380 200 *~ 0.5;"); sb=q.add("#X obj 380 230 ockm-blsquare;"); sbg=q.add("#X obj 380 260 *~ 0.35;")
+    m1=q.add("#X obj 30 290 +~;"); m2=q.add("#X obj 30 315 +~;"); sc=q.add("#X obj 30 340 *~ 0.45;")
+    cut=filt_env(q,core,ks,80,7,x=600,kidx=None,amt=1800)   # k3 is the chorus here, so the envelope amount is fixed
+    bob=q.add("#X obj 30 370 bob~;"); rs=q.add("#X msg 500 330 0.5;"); lb=q.add("#X obj 500 300 loadbang;")
+    am=q.add("#X obj 30 400 *~;")
+    # chorus: two delay taps swept by slow sines, mixed with the dry sound. k3: 0 off, up to 0.5 = I, above = II (faster, deeper)
+    dw=q.add(f"#X obj 30 440 delwrite~ {D}0-ch 30;")
+    ck=q.add(f"#X obj 600 140 expr if({D}f1<0.05 \\, 0 \\, 1) \; if({D}f1<0.5 \\, 0.5 \\, 0.83) \; if({D}f1<0.5 \\, 1.8 \\, 2.6);")
+    cr=q.add("#X obj 700 400 osc~ 0.5;"); cd=q.add("#X obj 700 430 *~ 1.8;"); c1=q.add("#X obj 700 460 +~ 6;"); c2n=q.add("#X obj 820 430 *~ -1;"); c2=q.add("#X obj 820 460 +~ 6;")
+    v1=q.add(f"#X obj 700 490 vd~ {D}0-ch;"); v2=q.add(f"#X obj 820 490 vd~ {D}0-ch;"); wm=q.add("#X obj 700 520 +~;"); wg=q.add("#X obj 700 545 *~ 0;")
+    mix=q.add("#X obj 30 500 +~;"); g=q.add("#X obj 30 530 *~ 1.25;")
+    for c in [(core,0,mt,0),(mt,0,sw,0),(mt,0,ph,0),(lf,0,lfa,0),(ks[1],0,pwk,0),(pwk,0,lfa,1),(lfa,0,wd,0),(ph,0,pu,0),(wd,0,pu,1),
+              (mt,0,sbh,0),(sbh,0,sb,0),(sb,0,sbg,0),(sw,0,m1,0),(pu,0,m1,1),(m1,0,m2,0),(sbg,0,m2,1),(m2,0,sc,0),
+              (sc,0,bob,0),(cut,0,bob,1),(lb,0,rs,0),(rs,0,bob,2),(bob,0,am,0),(core,2,am,1),(am,0,dw,0),
+              (ks[2],0,ck,0),(ck,1,cr,0),(ck,2,cd,1),(cr,0,cd,0),(cd,0,c2n,0),(cd,0,c1,0),(c2n,0,c2,0),(c1,0,v1,0),(c2,0,v2,0),
+              (v1,0,wm,0),(v2,0,wm,1),(wm,0,wg,0),(ck,0,wg,1),(am,0,mix,0),(wg,0,mix,1),(mix,0,g,0),(g,0,out,0)]: q.con(*c)
+    q.add("#X text 200 110 k1 cutoff / k2 pulse width movement / k3 chorus: off \\, I \\, II;")
+
+def lead_dx(q,core,ks,out):
+    # DX7-style two-operator FM. Notes ring and fade (an electric piano / bell \\, not a held organ).
+    # k2 picks the character: tine (1:1) \\, reed (2:1) \\, bell (3.5:1) \\, glass (7:1). Accents hit brighter.
+    mt=q.add("#X obj 30 200 mtof~;")
+    ec=q.add("#X obj 450 200 clip~ 0 2;"); amp=q.add("#X obj 450 230 clip~ 0 1;")
+    rt=q.add(f"#X obj 310 140 expr if({D}f1<0.25 \\, 1 \\, if({D}f1<0.5 \\, 2 \\, if({D}f1<0.75 \\, 3.5 \\, 7)));")
+    rm=q.add("#X obj 160 230 *~ 1;"); mo=q.add("#X obj 160 260 osc~;")
+    bi=q.add(f"#X obj 200 170 expr 0.3+4*{D}f1;"); ix=q.add("#X obj 300 260 *~ 1;")
+    i1=q.add("#X obj 160 300 *~;"); i2=q.add("#X obj 160 330 *~;")
+    ad=q.add("#X obj 30 360 +~;"); car=q.add("#X obj 30 390 osc~;")
+    dt=q.add(f"#X obj 600 140 expr 1+0.006*{D}f1;"); mt2=q.add("#X obj 30 250 *~ 1;"); ad2=q.add("#X obj 130 360 +~;"); car2=q.add("#X obj 130 390 osc~;")
+    sm=q.add("#X obj 30 420 +~;"); sc=q.add("#X obj 30 445 *~ 0.5;")
+    am=q.add("#X obj 30 470 *~;"); am2=q.add("#X obj 30 495 *~;"); g=q.add("#X obj 30 520 *~ 0.65;")
+    for c in [(core,0,mt,0),(core,1,ec,0),(ec,0,amp,0),(ks[1],0,rt,0),(rt,0,rm,1),(mt,0,rm,0),(rm,0,mo,0),
+              (ks[0],0,bi,0),(bi,0,ix,1),(ec,0,ix,0),(mo,0,i1,0),(ix,0,i1,1),(i1,0,i2,0),(rm,0,i2,1),
+              (mt,0,ad,0),(i2,0,ad,1),(ad,0,car,0),(ks[2],0,dt,0),(dt,0,mt2,1),(mt,0,mt2,0),(mt2,0,ad2,0),(i2,0,ad2,1),(ad2,0,car2,0),
+              (car,0,sm,0),(car2,0,sm,1),(sm,0,sc,0),(sc,0,am,0),(amp,0,am,1),(am,0,am2,0),(core,2,am2,1),(am2,0,g,0),(g,0,out,0)]: q.con(*c)
+    q.add("#X text 200 110 k1 brightness / k2 character: tine \\, reed \\, bell \\, glass / k3 detune (a second voice beside it);")
+
+def lead_sync(q,core,ks,out):
+    # hard sync: a second saw restarts every cycle of the first, so its pitch shows up as a sweeping tone. The envelope sweeps it
+    mt=q.add("#X obj 30 200 mtof~;"); ph=q.add("#X obj 30 230 phasor~;")
+    sr=q.add(f"#X obj 200 170 expr 1+3*{D}f1;"); se=q.add("#X obj 300 230 *~ 4;"); sa=q.add("#X obj 300 260 +~ 1;")
+    sy=q.add(f"#X obj 30 290 expr~ fmod({D}v1*{D}v2 \\, 1)*2-1;")
+    lp=q.add("#X obj 30 330 lop~ 6000;"); k2=q.add(f"#X obj 310 140 expr 800*pow(2\\,4*{D}f1);")
+    k3=q.add("#X obj 420 140 * 6;"); am=q.add("#X obj 30 400 *~;"); g=q.add("#X obj 30 430 *~ 0.55;")
+    for c in [(core,0,mt,0),(mt,0,ph,0),(core,1,se,0),(ks[2],0,k3,0),(k3,0,se,1),(se,0,sa,0),(ks[0],0,sr,0),(sr,0,sa,1),
+              (ph,0,sy,0),(sa,0,sy,1),(sy,0,lp,0),(ks[1],0,k2,0),(k2,0,lp,1),(lp,0,am,0),(core,2,am,1),(am,0,g,0),(g,0,out,0)]: q.con(*c)
+    q.add("#X text 200 110 k1 sync amount / k2 tone / k3 sweep (envelope on the sync);")
+
+for i,(nm,fnb,title) in enumerate([
+        ("acid",lead_acid,"Lead acid: the 303 voiced to cut through. More resonance and a little grit"),
+        ("juno",lead_juno,"Juno lead: saw plus a moving pulse and a sub through a soft filter \\, then the chorus"),
+        ("dx",lead_dx,"DX lead: two-operator FM. Electric piano \\, reed \\, bell or glass"),
+        ("sync",lead_sync,"Sync lead: a hard-synced saw that sweeps with the envelope. Tech house and electro"),
+        ("mini",lead_mini,"Mini lead: three oscillators driven into a ladder filter. Big and warm")]):
+    lead_engine(nm,i,title,fnb)
+
+# ================= lead wrapper =================
+q=P()
+q.add("#X text 20 10 Lead synth: its own engines \\, one plays at a time (ockm-lead-engine: "+" ".join(f"{i} {n}" for i,n in enumerate(LEAD_ENGINES))+"). Glides on slide steps and adds vibrato to held notes.;")
+inl=q.add("#X obj 30 50 inlet;")
+ks=[q.add(f"#X obj {200+i*130} 50 r ockm-{D}1-k{i+1};") for i in range(4)]
+eng=[q.add(f"#X obj {30+i*130} 130 ockm-lead-{n} {D}1;") for i,n in enumerate(LEAD_ENGINES)]
+sm=q.add("#X obj 30 200 +~;")
+for i,e in enumerate(eng):
+    q.con(inl,0,e,0)
+    for j,k in enumerate(ks): q.con(k,0,e,j+1)
+    q.con(e,0,sm,0)
+# engine number -> the engines (anything past the last engine plays the last one)
+rv=q.add(f"#X obj 800 50 r ockm-{D}1-engine;"); mn=q.add(f"#X obj 800 80 min {len(LEAD_ENGINES)-1};"); sv=q.add(f"#X obj 800 110 s ockm-{D}1-voice;")
+q.con(rv,0,mn,0); q.con(mn,0,sv,0)
+rd=q.add(f"#X obj 400 200 r ockm-{D}1-drive;"); dx=q.add(f"#X obj 400 230 expr 1+{D}f1*9;")
+th=q.add(f"#X obj 30 260 expr~ if({D}f2>1.001 \\, tanh({D}v1*{D}f2)/sqrt({D}f2) \\, {D}v1);"); out=q.add("#X obj 30 300 outlet~;")
+for c in [(rd,0,dx,0),(dx,0,th,1),(sm,0,th,0),(th,0,out,0)]: q.con(*c)
+q.save("voices/ockm-lead.pd","#N canvas 140 140 900 340 12;")
 
 # ================= master effects =================
 q=P()

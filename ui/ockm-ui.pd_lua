@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.36"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.37"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
@@ -45,7 +45,11 @@ local NOTES   = { "C","C#","D","D#","E","F","F#","G","G#","A","A#","B" }
 local SCALES  = { {0,2,3,5,7,8,10}, {0,2,4,5,7,9,11}, {0,2,3,5,7,9,10}, {0,1,3,5,7,8,10}, {0,2,4,5,7,9,10}, {0,2,3,5,7,8,11} }
 local SCALE_NAMES = { "minor","major","dorian","phrygian","mixo","harm min" }
 local MONO_ENG  = { "acid","sub","fm","reese","pluck","saw","house" }
+-- the lead has its own engines. Numbers match ockm-lead-engine; LEAD_ORDER is the order they're shown in
+local LEAD_ENG  = { "acid","juno","dx","sync","mini" }
+local LEAD_ORDER = { 4, 1, 2, 0, 3 }
 local CHORD_ENG = { "stab","organ","pad" }
+local function engines_of(part) if part == "chord" then return CHORD_ENG elseif part == "lead" then return LEAD_ENG end return MONO_ENG end
 local KNOBS = {
   acid  = {"cutoff","resonance","env amount","decay"},
   sub   = {"tone","drive","pitch drop","decay"},
@@ -57,6 +61,10 @@ local KNOBS = {
   stab  = {"brightness","detune","snap","length"},
   organ = {"drawbars","click","sub","length"},
   pad   = {"brightness","detune","attack","length"},
+  mini  = {"cutoff","emphasis","contour","decay"},
+  juno  = {"cutoff","pulse width","chorus","decay"},
+  dx    = {"brightness","character","detune","decay"},
+  sync  = {"sync","tone","sweep","decay"},
 }
 -- BEGIN PRESETS (written by tools/build.py from its preset lists: edit them there, not here)
 local RHYTHMS = { { "offbeat" }, { "rolling" }, { "gallop" }, { "acid classic" }, { "sparse dub" }, { "tech bounce" }, { "acid 16ths" }, { "trip hop" }, { "hook" }, { "sparse melody" } }
@@ -476,7 +484,7 @@ function ui:layout_perform(add)
     add{ kind="choice", x=lx + (i - 1) * (tw + 6), y=452, w=tw, h=30, label=t, small=true, sel=((self.perf_part or 1) == i),
          tap=function() self.perf_part = i end }
   end
-  local eng = (part == "chord") and CHORD_ENG or MONO_ENG
+  local eng = engines_of(part)
   local kn = KNOBS[eng[(self.v["ockm-"..part.."-engine"] or 0) + 1]] or KNOBS.acid
   local kw = (half - 6) / 2
   for k = 1, 4 do
@@ -663,10 +671,11 @@ function ui:layout_synth_sound(add, part, mono)
   -- right: the sound
   local rx, rw = 16 + half + 16, half
   add{ kind="text", x=rx, y=314, w=200, h=12, label="sound", size=10 }
-  local eng = mono and MONO_ENG or CHORD_ENG
+  local eng = engines_of(part)
   local ew = rw / #eng
-  for e = 0, #eng - 1 do
-    add{ kind="choice", x=rx + e * ew, y=330, w=ew - 4, h=40, label=eng[e + 1], small=true, sel=(self.v["ockm-"..part.."-engine"] == e),
+  for i = 1, #eng do
+    local e = (part == "lead") and LEAD_ORDER[i] or (i - 1)
+    add{ kind="choice", x=rx + (i - 1) * ew, y=330, w=ew - 4, h=40, label=eng[e + 1], small=true, sel=(self.v["ockm-"..part.."-engine"] == e),
          tap=function() self:send("ockm-"..part.."-engine", e) end }
   end
   local kn = KNOBS[eng[(self.v["ockm-"..part.."-engine"] or 0) + 1]] or KNOBS.acid
