@@ -1232,6 +1232,25 @@ def touchscreen_compose_mutes_and_solos(work):
     assert printed(out, "ockm-lead-solo")[-1:] == ["1"], "lead S should solo the lead"
     assert printed(out, "ockm-chord-mute")[-1:] == ["1"], "chord M should mute the chords"
 
+@test
+def touchscreen_steps_act_on_press(work):
+    """A drum step changes the moment a finger lands (before it lifts), like a drum machine pad.
+    Pressing a step and swiping sideways puts the step back and turns the page instead."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness(); h.show("ockm-edit", "ockm-page")
+    h.at(50, "ockm-length 32")                        # 2 bars, so there's a second page to swipe to
+    h.at(100, "ockm-ui-test tap 414 36")              # drums
+    h.at(200, "ockm-ui-test press 105 212")           # step 2 of the kick: finger down only
+    h.at(300, "ockm-ui-test release 105 212")
+    h.at(400, "ockm-ui-test drag 400 212 100 212")    # press step 7, then swipe left
+    f = os.path.join(work, "t_press.pd"); h.finish(600, f)
+    out = run(work, f)
+    edits = printed(out, "ockm-edit")
+    assert edits[0] == "d1 1 1", f"the step should change as the finger lands: {edits}"
+    assert len(edits) >= 3 and edits[1].split()[:2] == ["d1", "6"] and edits[2] == "d1 6 0", f"a swipe should put the pressed step back: {edits}"
+    assert printed(out, "ockm-page")[-1:] == ["1"], f"the swipe should turn the page: {printed(out, 'ockm-page')}"
+
 def write_tone(path, hz, secs, sr=44100, channels=1):
     w = wave.open(path, "w"); w.setnchannels(channels); w.setsampwidth(2); w.setframerate(sr)
     n = int(secs * sr)
@@ -1317,9 +1336,13 @@ def main():
     passed = skipped = 0
     for t in chosen:
         work = tempfile.mkdtemp(prefix="ockm-test-")
-        for item in ["OCKM_GENERATOR.pd", "voices", "seq", "ui", "projects"]:
+        for item in ["OCKM_GENERATOR.pd", "voices", "seq", "ui"]:
             src = os.path.join(ROOT, item)
             (shutil.copytree if os.path.isdir(src) else shutil.copy)(src, os.path.join(work, item))
+        # only the blank starter project, opened at start-up: never your own projects (or whichever you used last)
+        os.makedirs(os.path.join(work, "projects"))
+        shutil.copytree(os.path.join(ROOT, "projects", "default"), os.path.join(work, "projects", "default"))
+        open(os.path.join(work, "projects", "current.txt"), "w").write("default;\n")
         # the tests play the demo grooves, not your saved project or the blank starter
         subprocess.run([sys.executable, os.path.join(ROOT, "tools", "build.py"), "--out", work, "--reset-patterns", "--demo"],
                        check=True, capture_output=True)

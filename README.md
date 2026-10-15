@@ -2,7 +2,7 @@
 
 A drum machine and easy-to-program synths in one box. Built in Pure Data, designed to run on a Raspberry Pi with a touchscreen and a few knobs.
 
-Current version: **v0.48**
+Current version: **v0.49**
 
 ## How to open it
 
@@ -115,17 +115,30 @@ Everything is remembered: drum kit, synth sounds, effects, tempo, swing, key and
 5. **Musical by default.** Presets and starter patterns that sound good the moment you press play.
 6. **Help, don't take over.** You can do everything by hand, or let the machine do it. Whatever it makes you can change. Not a one-button song generator
 
-## Hardware (planned)
+## Hardware
 
 | Part | Choice | Status |
 |---|---|---|
-| Computer | Raspberry Pi 5, 2GB (plenty: the patch uses about 11MB), with Active Cooler and the official 27W power supply | Not bought |
-| Screen | Official Raspberry Pi Touch Display 2, 10" (1920 x 1200, Pi 5 only). Decided: big enough for finger-sized steps | Not bought |
+| Computer | Raspberry Pi 5, 4GB, with Active Cooler and the official 27W power supply | Set up (October 2026) |
+| Screen | Official Raspberry Pi Touch Display 2, 10" (1200 x 1920 portrait, turned to landscape). Decided: big enough for finger-sized steps | Set up |
 | Audio | Raspberry Pi DAC Pro on the GPIO pins (the Pi 5 has no audio socket). RCA outputs, then a 2 x RCA to 2 x 1/4" TS lead into a stereo channel of the mixer (Zoom L6, channels 3/4 or 5/6). The iRig Pro Duo works for testing on the Mac | Not bought |
 | Screen power | Small USB power adapter for the screen, because the DAC Pro covers the GPIO pins the screen would normally take power from | Not bought |
 | Controller | Endless knobs with light rings. Front runners: Novation Launch Control 3 (16 knobs, screen) or Behringer X-Touch Mini (8 knobs, 16 buttons). Maybe a Launchpad Mini later for a hands-on step grid | To choose |
-| Storage | microSD card, 32GB | Not bought |
+| Storage | microSD card | Set up |
 | MIDI | USB only for now: the controller plugs straight into the Pi. If syncing with gear that only has 5-pin MIDI sockets is ever needed, add a Roland UM-ONE mk2 (avoid cheap unbranded cables) | Decided |
+
+## On the Pi
+
+The Pi runs the same app as the Mac, drawn at double size (`--ui-scale 2`), so the 960 x 600 layout fills the 1920 x 1200 screen exactly. It starts by itself when the Pi powers on.
+
+- **System:** Raspberry Pi OS (Debian 13, 64-bit) with the desktop. Hostname `ockm`, user `simon`. Pure Data 0.55 and pd-lua 0.12.23 from the Pi's own software catalogue (`sudo apt install puredata pd-lua lua5.4`)
+- **The app** lives in `~/OCKM_GENERATOR`. After copying a new version over, rebuild it there with `python3 tools/build.py --ui-scale 2`. Don't copy `projects/` over the Pi's own projects
+- **Start-up:** `~/.config/autostart/ockm.desktop` runs `tools/pi/ockm-start.sh`. That picks the DAC Pro for sound when it's fitted (otherwise it starts silent) and opens the patch full screen
+- **`tools/pi/ockm-kiosk-plugin.tcl`** only acts when started by that script: full screen, no menu bar, no scrollbars, Pd's console hidden. It also makes touch work: a finger jumps from place to place without the pointer moving, so the plugin reports a move before each press and after each lift. Without that, single taps get lost
+- **Drum steps, M and S act the moment a finger lands,** like pads on a drum machine. Everything else acts when the finger lifts. Swiping sideways after pressing a step puts the step back and turns the page
+- **Screen rotation** is in `~/.config/kanshi/config` (`transform 90`). Touch follows it automatically
+- **Remote access:** SSH (`ssh simon@ockm.local`) and Raspberry Pi Connect. Claude reaches it through your Mac with the key in `.pi/` (kept out of git)
+- **Tests run on the Pi too:** `PDLUA=/usr/lib/pd/extra/pdlua python3 tests/run_tests.py`. They only ever use a clean copy of the blank project, never yours
 
 ## Roadmap
 

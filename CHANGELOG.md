@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.49 (15 October 2026)
+
+- **Runs on the Raspberry Pi**, full screen on the 10" Touch Display 2, and starts by itself at power-on (`tools/pi/`)
+- **Touch fixed for the Pi:** single taps count first time
+- **Drum steps, M and S act the moment your finger lands**, and each tap redraws the screen once instead of twice
+- Tests use only a clean blank project, so they pass on a machine with your own projects on it (they didn't on the Pi)
+
 ## v0.48 (15 October 2026)
 
 - **M and S on compose**: mute and solo for chord, bass and lead, right on their cards

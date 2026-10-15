@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=OCKM_GENERATOR
+Comment=Start the groovebox full screen
+Exec=/home/simon/OCKM_GENERATOR/tools/pi/ockm-start.sh
+X-GNOME-Autostart-enabled=true

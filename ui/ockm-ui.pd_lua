@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.48"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.49"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
@@ -528,7 +528,8 @@ function ui:layout_perform(add)
       -- drum lanes are editable here too: tap cycles empty, hit, accent on the block on screen
       local cw = (W - LANE_X - 16) / 16
       for c = 0, 15 do
-        add{ kind="pcell", x=LANE_X + c * cw, y=y, w=cw, h=LANE_H, tap=function() self:drum_cycle(i, self:shown_block() * 16 + c) end }
+        add{ kind="pcell", x=LANE_X + c * cw, y=y, w=cw, h=LANE_H, slot=i, step=self:shown_block() * 16 + c,
+             tap=function() self:drum_cycle(i, self:shown_block() * 16 + c) end }
       end
     end
   end
@@ -1774,6 +1775,18 @@ function ui:press(x, y)
   elseif w.kind == "slider" or w.kind == "vfader" or w.kind == "hbar" then self.touch.mode = "slider"; self:slide(w, x, y)
   elseif w.kind == "bpm" then self.touch.v0 = self.v["ockm-bpm"] or 124
   elseif w.kind == "vlane" then self.touch.mode = "vlane"; self:lane_set(w, x, y)
+  elseif w.kind == "dstep" or w.kind == "pcell" or w.kind == "ms" then
+    -- drum steps, mute and solo act the moment a finger lands, like the pads on a drum machine
+    if w.kind == "ms" then
+      self:send(w.hook, ((self.v[w.hook] or 0) > 0) and 0 or 1)
+    else
+      local slot, step = w.slot, w.step
+      if w.kind == "dstep" then slot, step = self.slot, self:dabs(w.i) end
+      local nm = SLOTS[slot]
+      self.touch.undo = { nm, step, self:get("ockm-pat-"..nm, step) }   -- in case this turns into a swipe
+      self:drum_cycle(slot, step)
+    end
+    self.touch.mode = "pressed"
   elseif w.kind == "mstep" or w.kind == "cstep" then
     self.touch.v0 = (w.kind == "mstep") and self:midi_to_deg(SYNTHS[self.part], self:mono_note_or_default(w.i))
                                          or math.floor(self:chord_get(w.i, "deg"))
@@ -1800,6 +1813,11 @@ function ui:move(x, y)
   if t.mode == nil and t.w.kind == "bpm" and math.abs(dy) > 8 then t.mode = "bpm" end
   if t.mode == "bpm" then
     self:send("ockm-bpm", clamp(math.floor(t.v0 - dy / 3 + 0.5), 40, 200)); return
+  end
+  -- a step that was pressed, then swiped sideways: put the step back and turn the page instead
+  if t.mode == "pressed" and t.w.swipe and math.abs(dx) > 24 and math.abs(dx) > math.abs(dy) then
+    if t.undo then psend("ockm-edit", t.undo[1], { t.undo[2], t.undo[3] }) end
+    t.mode = "swipe"
   end
   if t.mode == nil and (math.abs(dx) > 24 or math.abs(dy) > 16) then
     if t.w.swipe and math.abs(dx) > math.abs(dy) then t.mode = "swipe"
@@ -1849,7 +1867,8 @@ function ui:release(x, y)
   self:dirty()
 end
 
-function ui:mouse_down(x, y) self:press(x / self.s, y / self.s); self:repaint() end
+-- redraw on a press only when the press itself changed something (most buttons act when the finger lifts)
+function ui:mouse_down(x, y) self:press(x / self.s, y / self.s); if self.touch and self.touch.mode then self:repaint() end end
 function ui:mouse_drag(x, y) self:move(x / self.s, y / self.s); self:repaint() end
 function ui:mouse_up(x, y) self:release(x / self.s, y / self.s); self:repaint() end
 
@@ -1860,6 +1879,8 @@ function ui:test(sel, a)
     self:press(a[1], a[2])
     for k = 1, 8 do self:move(a[1] + (a[3] - a[1]) * k / 8, a[2] + (a[4] - a[2]) * k / 8) end
     self:release(a[3], a[4])
+  elseif sel == "press" then self:press(a[1], a[2])
+  elseif sel == "release" then self:release(a[1], a[2])
   elseif sel == "screen" then self.screen = a[1]
   elseif sel == "dump" then
     local L = self:layout()
