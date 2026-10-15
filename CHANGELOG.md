@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.48 (15 October 2026)
+
+- **M and S on compose**: mute and solo for chord, bass and lead, right on their cards
+
 ## v0.47 (15 October 2026)
 
 - **One loop per project.** Pattern slots 2-8, song mode, the song tab and the old Arrange are gone. Projects save `loop.txt` instead of `p1.txt` to `p8.txt` and `song.txt`

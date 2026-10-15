@@ -1215,6 +1215,23 @@ def undo_takes_back_the_last_big_change(work):
     hi = [i for i, v in enumerate(lc) if v >= 100]
     assert hi and lc[-1] == 20 and hi[-1] < len(lc) - 1, f"de-mud sets the hat's low cut, undo puts it back to 20: {lc}"
 
+@test
+def touchscreen_compose_mutes_and_solos(work):
+    """Compose: each part's card has M and S, the same mute and solo as perform and the mixer."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness(); h.show("ockm-bass-mute", "ockm-lead-solo", "ockm-chord-mute")
+    h.at(100, "ockm-ui-test tap 345 36")      # compose
+    h.at(200, "ockm-ui-test tap 425 278")     # bass M
+    h.at(300, "ockm-ui-test tap 778 278")     # lead S
+    h.at(400, "ockm-ui-test tap 112 278")     # chord M
+    h.at(500, "ockm-ui-test tap 425 278")     # bass M again: unmute
+    f = os.path.join(work, "t_compose_ms.pd"); h.finish(700, f)
+    out = run(work, f)
+    assert [int(float(v)) for v in printed(out, "ockm-bass-mute")] == [1, 0], f"bass M should mute, then unmute: {printed(out, 'ockm-bass-mute')}"
+    assert printed(out, "ockm-lead-solo")[-1:] == ["1"], "lead S should solo the lead"
+    assert printed(out, "ockm-chord-mute")[-1:] == ["1"], "chord M should mute the chords"
+
 def write_tone(path, hz, secs, sr=44100, channels=1):
     w = wave.open(path, "w"); w.setnchannels(channels); w.setsampwidth(2); w.setframerate(sr)
     n = int(secs * sr)

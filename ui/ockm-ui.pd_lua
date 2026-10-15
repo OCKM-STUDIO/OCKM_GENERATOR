@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.47"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.48"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
@@ -979,7 +979,10 @@ function ui:layout_compose(add)
     add{ kind="card", x=cx, y=cy, w=colw, h=H - cy - 8 }
     add{ kind="text", x=cx + 12, y=cy + 14, w=120, h=16, label=p, size=15, col="txt" }
     local mine = not self:locked(p)
-    add{ kind="choice", x=cx + colw - 172, y=cy + 8, w=160, h=32, small=true, accent=mine, sel=mine,
+    -- mute and solo, the same ones as on perform and the mixer
+    add{ kind="ms", x=cx + 78, y=cy + 8, w=36, h=32, label="M", hook="ockm-"..p.."-mute" }
+    add{ kind="ms", x=cx + 118, y=cy + 8, w=36, h=32, label="S", hook="ockm-"..p.."-solo" }
+    add{ kind="choice", x=cx + colw - 136, y=cy + 8, w=124, h=32, small=true, accent=mine, sel=mine,
          label=mine and "yours" or self:follows_what(p) }
     self:gen_controls(add, p, cx + 12, cy, colw - 24)
   end
