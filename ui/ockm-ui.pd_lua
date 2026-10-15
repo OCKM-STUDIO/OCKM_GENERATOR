@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.38"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.39"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
@@ -48,7 +48,7 @@ local MONO_ENG  = { "acid","sub","fm","reese","pluck","saw","house" }
 -- the lead has its own engines. Numbers match ockm-lead-engine; LEAD_ORDER is the order they're shown in
 local LEAD_ENG  = { "acid","juno","dx","sync","mini" }
 local LEAD_ORDER = { 4, 1, 2, 0, 3 }
-local CHORD_ENG = { "stab","organ","pad" }
+local CHORD_ENG = { "stab","organ","pad","piano","rhodes","strings" }
 local function engines_of(part) if part == "chord" then return CHORD_ENG elseif part == "lead" then return LEAD_ENG end return MONO_ENG end
 local KNOBS = {
   acid  = {"cutoff","resonance","env amount","decay"},
@@ -65,6 +65,9 @@ local KNOBS = {
   juno  = {"cutoff","pulse width","chorus","decay"},
   dx    = {"brightness","character","detune","decay"},
   sync  = {"sync","tone","sweep","decay"},
+  piano = {"brightness","octave","snap","length"},
+  rhodes = {"tone","bark","tremolo","length"},
+  strings = {"tone","ensemble","attack","release"},
 }
 -- BEGIN PRESETS (written by tools/build.py from its preset lists: edit them there, not here)
 local RHYTHMS = { { "offbeat" }, { "rolling" }, { "gallop" }, { "acid classic" }, { "sparse dub" }, { "tech bounce" }, { "acid 16ths" }, { "trip hop" }, { "hook" }, { "sparse melody" } }

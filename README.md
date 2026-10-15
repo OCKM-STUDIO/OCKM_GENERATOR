@@ -403,6 +403,9 @@ Plays up to four notes at once, worked out as it plays from the step's chord roo
 | 0 stab | brightness | detune | filter snap | length | Dub techno stabs. Great with the delay |
 | 1 organ | upper drawbars | percussion click | sub drawbar | length | House organ |
 | 2 pad | brightness | detune (width) | attack | length | Slow, wide chords |
+| 3 piano | brightness | octave layer | snap (how fast the brightness falls) | length | M1-style house piano: a bright hit that mellows. 90s house and garage |
+| 4 rhodes | tone | bark (brighter when hit hard) | tremolo | length | Warm electric piano. Deep house and trip hop |
+| 5 strings | tone | ensemble depth | attack | release | String machine with an ensemble chorus. Dub techno and builds |
 
 ## Effects
 

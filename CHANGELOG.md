@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.39 (15 October 2026)
+
+- Three new chord sounds: **piano** (M1-style house piano), **rhodes** (electric piano with bark and tremolo) and **strings** (string machine with an ensemble chorus)
+- All six chord sounds sit at similar levels
+
 ## v0.38 (15 October 2026)
 
 - **Velocity**: a lane under the drum steps. Drag each bar up and down, or swipe across to draw

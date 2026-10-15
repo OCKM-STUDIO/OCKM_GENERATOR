@@ -536,10 +536,10 @@ row(140,"bass",[("engine",0,0,6,"ockm-bass-engine",True),("k1",0.37,0,1,"ockm-ba
                 ("k4",0.55,0,1,"ockm-bass-k4",True),("drive",0,0,1,"ockm-bass-drive",True),("rhythm",3,0,7,"ockm-bass-rhythm",False),("notes",3,0,11,"ockm-bass-notes",False)])
 row(200,"lead",[("engine",4,0,6,"ockm-lead-engine",True),("k1",0.55,0,1,"ockm-lead-k1",True),("k2",0.3,0,1,"ockm-lead-k2",True),("k3",0.4,0,1,"ockm-lead-k3",True),
                 ("k4",0.45,0,1,"ockm-lead-k4",True),("drive",0,0,1,"ockm-lead-drive",True),("rhythm",6,0,7,"ockm-lead-rhythm",False),("notes",8,0,11,"ockm-lead-notes",False)])
-row(260,"chord",[("engine",0,0,2,"ockm-chord-engine",True),("k1",0.45,0,1,"ockm-chord-k1",True),("k2",0.5,0,1,"ockm-chord-k2",True),("k3",0.4,0,1,"ockm-chord-k3",True),
+row(260,"chord",[("engine",0,0,5,"ockm-chord-engine",True),("k1",0.45,0,1,"ockm-chord-k1",True),("k2",0.5,0,1,"ockm-chord-k2",True),("k3",0.4,0,1,"ockm-chord-k3",True),
                  ("k4",0.3,0,1,"ockm-chord-k4",True),("type",0,0,7,"ockm-chord-type",True),("smooth",1,0,1,"ockm-chord-smooth",True),("rhythm",0,0,9,"ockm-chord-rhythm",False),("prog",0,0,9,"ockm-chord-prog",False)])
 sub.add("#X text 20 300 key root: 0 C ... 9 A ... 11 B. Scale: 0 minor 1 major 2 dorian 3 phrygian 4 mixolydian 5 harmonic minor;")
-sub.add("#X text 20 320 bass and lead engines: 0 acid 1 sub 2 FM 3 reese 4 pluck 5 saw 6 house. Chord engines: 0 stab 1 organ 2 pad. Chord type: 0 triad 1 seventh 2 sus2 3 power 4 sus4 5 sixth 6 ninth 7 eleventh;")
+sub.add("#X text 20 320 bass and lead engines: 0 acid 1 sub 2 FM 3 reese 4 pluck 5 saw 6 house. Chord engines: 0 stab 1 organ 2 pad 3 piano 4 rhodes 5 strings. Chord type: 0 triad 1 seventh 2 sus2 3 power 4 sus4 5 sixth 6 ninth 7 eleventh;")
 sub.add("#X text 20 340 bass/lead rhythm: 0 offbeat 1 rolling 2 gallop 3 acid 4 dub 5 bounce 6 acid16 7 trip-hop. Notes: 0 root 1 octaves 2 root-fifth 3 acid-riff 4 walk-up 5 stab 6 dub 7 pedal 8 arp-up 9 arp-updown 10 call 11 descend;")
 sub.add("#X text 20 360 chord rhythm 0-9 and progression 0-9: the names are on the synths screen and in tools/build.py (PRE and PROGS). Smooth 1 = chords move by small steps.;")
 p.L.append(sub.text("#N canvas 260 160 1000 400 synth-settings 0;").rstrip("\n"))
@@ -1498,6 +1498,50 @@ def chord_voice(sp,kind):
                   (o3,0,p3,0),(pe,0,pg,0),(pg,0,p3,1),(o1,0,s1,0),(g2,0,s1,1),(s1,0,s2,0),(g3,0,s2,1),(s2,0,s3,0),(g4,0,s3,1),(s3,0,am,0),(p3,0,am,0),
                   (tb,0,tbb,0),(tbb,1,fv,0),(fv,0,pa,0),(pa,0,ma,0),(ma,0,av,0),(tbb,0,pp,0),(pp,0,pe,0),
                   (k[0],0,x1,0),(x1,0,g2,1),(x1,1,g3,1),(k[1],0,x2,0),(x2,0,pg,1),(k[2],0,x3,0),(x3,0,g4,1),(k[3],0,x4,0),(x4,0,pa,1)]: sp.con(*c)
+    elif kind=="piano":
+        # M1-style house piano: FM with an index that falls fast (bright hit, mellow tail), plus an octave layer.
+        # Two-stage amp: a quick drop after the hit, then a longer fade
+        tf=sp.add("#X obj 80 140 t f f f;"); mo=sp.add("#X obj 80 170 osc~;"); ixv=sp.add("#X obj 300 200 vline~;")
+        m1=sp.add("#X obj 80 200 *~;"); m2=sp.add("#X obj 80 225 *~ 0;"); ad=sp.add("#X obj 80 250 +~ 0;"); car=sp.add("#X obj 80 275 osc~;")
+        h2=sp.add("#X obj 200 170 * 2;"); ad2=sp.add("#X obj 200 250 +~ 0;"); car2=sp.add("#X obj 200 275 osc~;"); g2=sp.add("#X obj 200 300 *~ 0.3;")
+        sm=sp.add("#X obj 80 305 +~;")
+        tbb=sp.add("#X obj 20 140 t b b;"); tv=sp.add("#X obj 400 80 t f f;"); v4=sp.add("#X obj 460 110 * 0.4;")
+        pa=sp.add("#X obj 400 140 pack f 900 0.4;"); ma=sp.add(f"#X msg 400 170 {D}1 2 \\, {D}3 120 2 \\, 0 {D}2 122;")
+        fk1=sp.add("#X obj 300 110 f 3;"); pk=sp.add("#X obj 300 140 pack f 150;"); mi=sp.add(f"#X msg 300 170 {D}1 \\, 0.15 {D}2;")
+        x1=sp.add(f"#X obj 600 140 expr 0.5+5*{D}f1;"); x2=sp.add("#X obj 690 140 * 0.6;"); x3=sp.add(f"#X obj 780 140 expr 40+{D}f1*500;"); x4=sp.add(f"#X obj 870 140 expr 200+{D}f1*2500;")
+        for c in [(mt,0,tf,0),(tf,2,mo,0),(tf,1,m2,1),(tf,1,ad,1),(tf,0,h2,0),(h2,0,ad2,1),
+                  (mo,0,m1,0),(ixv,0,m1,1),(m1,0,m2,0),(m2,0,ad,0),(ad,0,car,0),(m2,0,ad2,0),(ad2,0,car2,0),(car2,0,g2,0),
+                  (car,0,sm,0),(g2,0,sm,1),(sm,0,am,0),
+                  (tb,0,tbb,0),(tbb,1,fv,0),(fv,0,tv,0),(tv,1,v4,0),(v4,0,pa,2),(tv,0,pa,0),(pa,0,ma,0),(ma,0,av,0),
+                  (tbb,0,fk1,0),(fk1,0,pk,0),(pk,0,mi,0),(mi,0,ixv,0),
+                  (k[0],0,x1,0),(x1,0,fk1,1),(k[1],0,x2,0),(x2,0,g2,1),(k[2],0,x3,0),(x3,0,pk,1),(k[3],0,x4,0),(x4,0,pa,1)]: sp.con(*c)
+    elif kind=="rhodes":
+        # Rhodes-style electric piano: gentle FM that barks when hit hard, a soft decay to a held level, optional tremolo
+        tf=sp.add("#X obj 80 140 t f f f;"); mo=sp.add("#X obj 80 170 osc~;"); ixv=sp.add("#X obj 300 230 vline~;")
+        m1=sp.add("#X obj 80 200 *~;"); m2=sp.add("#X obj 80 225 *~ 0;"); ad=sp.add("#X obj 80 250 +~ 0;"); car=sp.add("#X obj 80 275 osc~;")
+        tro=sp.add("#X obj 200 200 osc~ 4.5;"); trd=sp.add("#X obj 200 225 *~ 0;"); tr1=sp.add("#X obj 200 250 +~ 1;"); trm=sp.add("#X obj 80 300 *~;")
+        tbb=sp.add("#X obj 20 140 t b b;"); tv=sp.add("#X obj 400 80 t f f f;"); v5=sp.add("#X obj 480 110 * 0.55;")
+        pa=sp.add("#X obj 400 140 pack f 900 0.5;"); ma=sp.add(f"#X msg 400 170 {D}1 3 \\, {D}3 {D}2 3;")
+        ix=sp.add(f"#X obj 300 140 expr 0.2+1.2*{D}f2+2.5*{D}f3*{D}f1 \; 0.2+1.2*{D}f2;"); pk=sp.add("#X obj 300 170 pack f f;"); mi=sp.add(f"#X msg 300 200 {D}1 \\, {D}2 250;")
+        x3=sp.add("#X obj 780 140 * 0.35;"); x4=sp.add(f"#X obj 870 140 expr 300+{D}f1*3000;")
+        for c in [(mt,0,tf,0),(tf,2,mo,0),(tf,1,m2,1),(tf,0,ad,1),
+                  (mo,0,m1,0),(ixv,0,m1,1),(m1,0,m2,0),(m2,0,ad,0),(ad,0,car,0),(tro,0,trd,0),(trd,0,tr1,0),(car,0,trm,0),(tr1,0,trm,1),(trm,0,am,0),
+                  (tb,0,tbb,0),(tbb,1,fv,0),(fv,0,tv,0),(tv,2,v5,0),(v5,0,pa,2),(tv,1,ix,0),(ix,1,pk,1),(ix,0,pk,0),(pk,0,mi,0),(mi,0,ixv,0),
+                  (tv,0,pa,0),(pa,0,ma,0),(ma,0,av,0),
+                  (k[0],0,ix,1),(k[1],0,ix,2),(k[2],0,x3,0),(x3,0,trd,1),(k[3],0,x4,0),(x4,0,pa,1)]: sp.con(*c)
+    elif kind=="strings":
+        # string machine: three detuned saws through a soft filter, slow swell, long release. The ensemble is added after the voices
+        tf=sp.add("#X obj 80 140 t f f f;"); du=sp.add("#X obj 160 170 * 1.004;"); dd=sp.add("#X obj 240 170 * 0.996;")
+        p1=sp.add("#X obj 80 200 phasor~;"); p2=sp.add("#X obj 160 200 phasor~;"); p3=sp.add("#X obj 240 200 phasor~;")
+        s1=sp.add("#X obj 80 230 +~;"); s2=sp.add("#X obj 80 250 +~;"); ce=sp.add("#X obj 80 270 -~ 1.5;")
+        l1=sp.add("#X obj 80 290 lop~ 2000;"); l2=sp.add("#X obj 80 310 lop~ 2000;")
+        pa=sp.add("#X obj 200 140 pack f 400;"); ma=sp.add(f"#X msg 200 170 {D}1 {D}2;")
+        frl=sp.add("#X obj 600 200 f 800;"); mrl=sp.add(f"#X msg 600 230 0 {D}1;")
+        x1=sp.add(f"#X obj 600 140 expr 300*pow(2\\,4.5*{D}f1);"); x3=sp.add(f"#X obj 780 140 expr 20+{D}f1*1500;"); x4=sp.add(f"#X obj 870 140 expr 100+{D}f1*3000;")
+        sp.C=[c for c in sp.C if c!=(roff,0,moff,0)]   # strings fade out over the release time instead
+        for c in [(mt,0,tf,0),(tf,2,p1,0),(tf,1,du,0),(du,0,p2,0),(tf,0,dd,0),(dd,0,p3,0),(p1,0,s1,0),(p2,0,s1,1),(s1,0,s2,0),(p3,0,s2,1),(s2,0,ce,0),
+                  (ce,0,l1,0),(l1,0,l2,0),(l2,0,am,0),(tb,0,fv,0),(fv,0,pa,0),(pa,0,ma,0),(ma,0,av,0),(roff,0,frl,0),(frl,0,mrl,0),(mrl,0,av,0),
+                  (k[0],0,x1,0),(x1,0,l1,1),(x1,0,l2,1),(k[2],0,x3,0),(x3,0,pa,1),(k[3],0,x4,0),(x4,0,frl,1)]: sp.con(*c)
     else:  # pad
         tf=sp.add("#X obj 80 140 t f f f;"); du=sp.add("#X obj 160 170 * 1.01;"); dd=sp.add("#X obj 240 170 * 0.99;")
         p1=sp.add("#X obj 80 200 phasor~;"); p2=sp.add("#X obj 160 200 phasor~;"); p3=sp.add("#X obj 240 200 phasor~;")
@@ -1512,10 +1556,13 @@ def chord_voice(sp,kind):
                   (k[0],0,x1,0),(x1,0,l1,1),(x1,0,l2,1),(k[1],0,x2,0),(x2,0,du,1),(x2,1,dd,1),
                   (k[2],0,x3,0),(x3,0,fa3,0),(fa3,1,ad,1),(fa3,0,pa,1),(k[3],0,x4,0),(x4,0,ad,0),(ad,0,pa,2)]: sp.con(*c)
 
-CHORD_GAIN={"stab":0.42,"organ":0.135,"pad":0.25}   # measured: stab was a third as loud as the bass, organ a little loud
+CHORD_GAIN={"stab":0.42,"organ":0.135,"pad":0.25,"piano":0.28,"rhodes":0.11,"strings":0.36}   # measured: stab was a third as loud as the bass, organ a little loud
 CHORD_ENGINES=[("stab","Stab: two detuned saws through a filter that snaps shut. Dub techno with the delay"),
                ("organ","Organ: sine drawbars plus a percussive click. House organ stabs"),
-               ("pad","Pad: three detuned saws with a slow attack. Long chords")]
+               ("pad","Pad: three detuned saws with a slow attack. Long chords"),
+               ("piano","House piano: an M1-style bright hit that mellows. 90s house and garage"),
+               ("rhodes","Rhodes: a warm electric piano that barks when hit hard \\, with tremolo. Deep house and trip hop"),
+               ("strings","Strings: a string machine with a slow swell and an ensemble chorus. Dub techno and builds")]
 for idx,(kind,title) in enumerate(CHORD_ENGINES):
     q=P(); q.add(f"#X text 20 10 Chord engine {idx}. {title}. k1-k4 0 to 1.;")
     inl=q.add("#X obj 30 50 inlet;"); sp_=q.add("#X obj 30 80 spigot 1;"); ro=q.add("#X obj 30 110 route off;")
@@ -1531,14 +1578,26 @@ for idx,(kind,title) in enumerate(CHORD_ENGINES):
         q.con(up,v,o,0); q.con(up,4,o,1)
     s1=q.add("#X obj 120 260 +~;"); s2=q.add("#X obj 120 280 +~;"); s3=q.add("#X obj 120 300 +~;"); g=q.add(f"#X obj 120 330 *~ {CHORD_GAIN[kind]};"); out=q.add("#X obj 120 370 outlet~;")
     for c in [(vs[0],0,s1,0),(vs[1],0,s1,1),(s1,0,s2,0),(vs[2],0,s2,1),(s2,0,s3,0),(vs[3],0,s3,1),(s3,0,g,0),(g,0,out,0)]: q.con(*c)
+    if kind=="strings":
+        # ensemble: three delay taps swept by slow sines a third of a cycle apart (k2 sets the depth)
+        q.C=[c for c in q.C if c!=(g,0,out,0)]
+        dw=q.add(f"#X obj 300 330 delwrite~ {D}0-ens 40;"); dry=q.add("#X obj 120 400 *~ 0.5;"); mix=q.add("#X obj 120 450 +~;")
+        lb=q.add("#X obj 500 250 loadbang;"); kd=q.add(f"#X obj 700 250 r ockm-{D}1-k2;"); kx=q.add(f"#X obj 700 275 expr 0.5+{D}f1*3;")
+        for c in [(g,0,dw,0),(g,0,dry,0),(dry,0,mix,0),(mix,0,out,0),(kd,0,kx,0)]: q.con(*c)
+        for j in range(3):
+            lo=q.add(f"#X obj {300+j*130} 360 osc~ 0.6;"); ph=q.add(f"#X msg {380+j*130} 335 {round(j/3,3)};"); dp=q.add(f"#X obj {300+j*130} 385 *~ 2;")
+            off=q.add(f"#X obj {300+j*130} 410 +~ 8;"); vd=q.add(f"#X obj {300+j*130} 435 vd~ {D}0-ens;"); vg=q.add(f"#X obj {300+j*130} 460 *~ 0.35;")
+            for c in [(lb,0,ph,0),(ph,0,lo,1),(lo,0,dp,0),(kx,0,dp,1),(dp,0,off,0),(off,0,vd,0),(vd,0,vg,0),(vg,0,mix,0)]: q.con(*c)
     q.save(f"voices/ockm-chord-{kind}.pd","#N canvas 160 160 900 420 12;")
 q=P()
-q.add("#X text 20 10 Chord synth: three engines \\, one plays at a time (ockm-<track>-engine 0 stab \\, 1 organ \\, 2 pad). Input: up to 4 MIDI notes plus a hit strength \\, or off.;")
+q.add("#X text 20 10 Chord synth: six engines \\, one plays at a time (ockm-<track>-engine 0 stab \\, 1 organ \\, 2 pad \\, 3 piano \\, 4 rhodes \\, 5 strings). Input: up to 4 MIDI notes plus a hit strength \\, or off.;")
 inl=q.add("#X obj 30 50 inlet;")
 eng=[q.add(f"#X obj {30+i*170} 100 ockm-chord-{k} {D}1;") for i,(k,_) in enumerate(CHORD_ENGINES)]
 s1=q.add("#X obj 30 160 +~;"); s2=q.add("#X obj 30 185 +~;"); out=q.add("#X obj 30 220 outlet~;")
 for e in eng: q.con(inl,0,e,0)
-for c in [(eng[0],0,s1,0),(eng[1],0,s1,1),(s1,0,s2,0),(eng[2],0,s2,1),(s2,0,out,0)]: q.con(*c)
+sm=q.add("#X obj 30 160 +~;"); q.C=[]
+for e in eng: q.con(inl,0,e,0); q.con(e,0,sm,0)   # an outlet~ into one inlet sums
+q.con(sm,0,out,0)
 q.save("voices/ockm-chord.pd","#N canvas 140 140 700 260 12;")
 
 # ================= settings store =================

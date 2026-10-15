@@ -460,6 +460,29 @@ def lead_engines_play_in_tune_and_level(work):
     print("      lead levels (rms): " + ", ".join(f"{k} {v:.2f}" for k, v in levels.items()))
 
 @test
+def chord_engines_sound_and_sit_together(work):
+    """Every chord engine sounds, the sine-based ones in tune (A3 = 220 Hz), and all at a similar level to each other."""
+    levels = {}
+    for eng, name in enumerate(["stab", "organ", "pad", "piano", "rhodes", "strings"]):
+        h = Harness(dut="ockm-chord zz")
+        h.record(os.path.join(work, f"c_{name}.wav"), source="dut")
+        h.at(20, f"ockm-zz-engine {eng} ; ockm-zz-k1 0.5 ; ockm-zz-k2 0.3 ; ockm-zz-k3 0.3 ; ockm-zz-k4 0.6")
+        h.at(50, "test-in 57 0 0 0 1")        # just the root, to check the pitch
+        h.at(700, "test-in off")
+        h.at(1000, "test-in 57 60 64 0 1")    # the chord, for the level
+        _, (x, sr) = play(work, h, f"t_chord_{name}", with_main=False, ms=1700)
+        root = x[int(0.25 * sr):int(0.55 * sr)]
+        assert peak(root) > 0.01, f"{name} is silent"
+        if name in ("piano", "rhodes"):   # FM pianos: the pitch counter reads them cleanly (saws and the organ's sub drawbar fool it)
+            f0 = cycles_per_second(root, sr)
+            assert 195 < f0 < 245, f"{name} plays {f0:.0f} Hz for A3, expected about 220"
+        ch = x[int(1.05 * sr):int(1.6 * sr)]
+        levels[name] = math.sqrt(sum(v * v for v in ch) / len(ch))
+    lo, hi = min(levels.values()), max(levels.values())
+    print("      chord levels (rms): " + ", ".join(f"{k} {v:.3f}" for k, v in levels.items()))
+    assert hi / lo < 3, "chord engines are too far apart in level: " + ", ".join(f"{k} {v:.3f}" for k, v in levels.items())
+
+@test
 def delay_echoes_on_time(work):
     h = Harness(dut="ockm-fx")
     h.add("#X obj 500 10 r test-click;"); click = len([o for o in h.objs if not o[1]]) - 1
