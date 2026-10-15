@@ -257,16 +257,19 @@ p=P()
 inl=p.add("#X obj 30 120 inlet;")
 tr=p.add(f"#X obj 30 160 tabread ockm-pat-{D}1;")
 sel=p.add("#X obj 30 190 sel 0;")
-vel=p.add(f"#X obj 70 220 expr if({D}f1>1 \\, 1 \\, 1-{D}f2);")
+vel=p.add(f"#X obj 70 220 expr if({D}f1>1 \\, 1 \\, if({D}f1>0.999 \\, 1-{D}f2 \\, {D}f1));")   # 2 accent, 1 normal, between 0 and 1: drawn velocity
 out=p.add("#X obj 70 260 outlet;")
 racc=p.add("#X obj 230 190 r ockm-accent;")
 p.add(f"#X obj 30 300 table ockm-pat-\\$1 {STEPS};")
 tw=p.add(f"#X obj 400 520 tabwrite ockm-pat-{D}1;")
 upk=p.add("#X obj 400 460 unpack f f;"); offs=p.add("#X obj 480 490 + 0;")
-tfi=p.add("#X obj 30 135 t f f;"); fix=p.add(f"#X obj 160 135 expr int({D}f1)%16 + 16*{D}f2;"); rsn=p.add(f"#X obj 260 110 r ockm-{D}1-sound;")
+tnd=p.add("#X obj 30 152 t f f;"); nrd=p.add(f"#X obj 300 160 tabread ockm-pat-{D}1-nudge;")
+nex=p.add(f"#X obj 300 185 expr ({D}f1+0.25)*ockm_stepms;"); npp=p.add("#X obj 70 240 pipe 0;")
+p.add(f"#X obj 300 300 table ockm-pat-{D}1-nudge {STEPS};")
+tfi=p.add("#X obj 30 135 t f f;"); dlp=p.add(f"#X obj 30 148 expr if(ockm_dloop>0 \\, {D}f1 % ockm_dloop \\, {D}f1);"); fix=p.add(f"#X obj 160 135 expr int({D}f1)%16 + 16*{D}f2;"); rsn=p.add(f"#X obj 260 110 r ockm-{D}1-sound;")
 frd=p.add("#X obj 160 160 tabread ockm-fillx;"); fsel=p.add(f"#X obj 30 175 expr if(ockm_fill_on && {D}f2>=0 \\, {D}f2 \\, {D}f1);")
-for c in [(inl,0,tfi,0),(tfi,1,fix,0),(rsn,0,fix,1),(fix,0,frd,0),(frd,0,fsel,1),(tfi,0,tr,0),(tr,0,fsel,0),(fsel,0,sel,0),
-          (sel,1,vel,0),(racc,0,vel,1),(vel,0,out,0),(upk,1,offs,0),(offs,0,tw,1),(upk,0,tw,0)]: p.con(*c)
+for c in [(inl,0,tfi,0),(tfi,1,fix,0),(rsn,0,fix,1),(fix,0,frd,0),(frd,0,fsel,1),(tfi,0,dlp,0),(dlp,0,tnd,0),(tnd,1,nrd,0),(nrd,0,nex,0),(nex,0,npp,1),(tnd,0,tr,0),(tr,0,fsel,0),(fsel,0,sel,0),
+          (sel,1,vel,0),(racc,0,vel,1),(vel,0,npp,0),(npp,0,out,0),(upk,1,offs,0),(offs,0,tw,1),(upk,0,tw,0)]: p.con(*c)
 for i in range(16):
     x=102+i*20+(i//4)*6
     t=p.add(f"#X obj {x} 22 tgl 18 0 empty ockm-sq-{D}1-{i} empty 17 7 0 10 #fcfcfc #000000 #000000 0 1;")
@@ -287,14 +290,21 @@ for c in [(rp,0,pm,0),(pm,0,ptf,0),(ptf,1,offs,1),(ptf,1,roff,1),(ptf,0,tr2,0)]:
 re=p.add("#X obj 1150 120 r ockm-edit;"); ro=p.add(f"#X obj 1150 150 route {D}1;"); up=p.add("#X obj 1150 180 unpack f f;")
 fv=p.add("#X obj 1210 240 f;"); ti=p.add("#X obj 1150 210 t b b f;"); ase=p.add(f"#X obj 1210 280 array set ockm-pat-{D}1;")
 for c in [(re,0,ro,0),(ro,0,up,0),(up,1,fv,1),(up,0,ti,0),(ti,2,ase,1),(ti,1,fv,0),(fv,0,ase,0),(ti,0,tr2,0)]: p.con(*c)
+# timing hook: ockm-nudge <track> <step> <-0.25 early .. 0 on time .. 0.25 late, in steps>
+rnu=p.add("#X obj 1150 440 r ockm-nudge;"); rou=p.add(f"#X obj 1150 465 route {D}1;"); unu=p.add("#X obj 1150 490 unpack f f;")
+asn=p.add(f"#X obj 1150 520 array set ockm-pat-{D}1-nudge;"); fnu=p.add("#X obj 1210 495 f;"); tnu=p.add("#X obj 1150 495 t b f;")
+for c in [(rnu,0,rou,0),(rou,0,unu,0),(unu,1,fnu,1),(unu,0,tnu,0),(tnu,1,asn,1),(tnu,0,fnu,0),(fnu,0,asn,0)]: p.con(*c)   # step first, then the value
 # extend: when a pattern gets longer, repeat what's there to fill the new steps
 rx=p.add("#X obj 1400 120 r ockm-extend;"); ux=p.add("#X obj 1400 150 unpack f f;")
 cnt=p.add(f"#X obj 1400 210 expr {D}f2-{D}f1;"); txo=p.add("#X obj 1400 180 t f f;")
 mo=p.add("#X obj 1400 240 moses 1;"); ux2=p.add("#X obj 1460 270 until;")
 ci=p.add("#X obj 1460 300 f;"); cip=p.add("#X obj 1510 300 + 1;"); tci=p.add("#X obj 1460 330 t f f;")
 md=p.add(f"#X obj 1460 360 expr {D}f1 % {D}f2;"); xr=p.add(f"#X obj 1460 390 tabread ockm-pat-{D}1;"); xw=p.add(f"#X obj 1460 420 tabwrite ockm-pat-{D}1;")
+xr2=p.add(f"#X obj 1600 390 tabread ockm-pat-{D}1-nudge;"); xw2=p.add(f"#X obj 1600 420 tabwrite ockm-pat-{D}1-nudge;")
+p.con(md,0,xr2,0); p.con(xr2,0,xw2,0)
 for c in [(rx,0,ux,0),(ux,1,cnt,1),(ux,0,txo,0),(txo,1,ci,1),(txo,1,md,1),(txo,0,cnt,0),(cnt,0,mo,0),
           (ux2,0,ci,0),(ci,0,cip,0),(cip,0,ci,1),(ci,0,tci,0),(tci,1,xw,1),(tci,0,md,0),(md,0,xr,0),(xr,0,xw,0)]: p.con(*c)
+p.con(tci,1,xw2,1)
 tbf2=p.add("#X obj 1400 270 t b f;"); p.con(mo,1,tbf2,0); p.con(tbf2,1,ux2,0); p.con(tbf2,0,tr2,0)
 p.add("#X text 100 120 step in -> look it up -> send hit strength out (accent = 1 \\, normal = 1 minus accent amount);")
 p.add("#X text 900 90 refresh: update the squares after a pattern loads;")
@@ -356,10 +366,10 @@ for nm,snd in SLOTS:
 SYNTH_DEFAULTS={"bass":dict(engine=0,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.37,k2=0.9,k3=0.31,k4=0.55,drive=0,verb=0,delay=0,rhythm=3,notes=3),
                 "lead":dict(engine=4,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0.2,delay=0.25,rhythm=8,notes=12),
                 "chord":dict(engine=0,mode=0,level=1,k1=0.45,k2=0.5,k3=0.4,k4=0.3,type=0,smooth=1,verb=0.3,delay=0.35,rhythm=0,prog=0)}
-PATTERN_KEYS=[("ockm-len",64,None),("ockm-len-max",64,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None),("ockm-leader",0,None),("ockm-drum-groove",-1,None),("ockm-fill-every",0,None),("ockm-fill-style",0,None)]
+PATTERN_KEYS=[("ockm-drum-loop",0,None),("ockm-len",64,None),("ockm-len-max",64,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None),("ockm-leader",0,None),("ockm-drum-groove",-1,None),("ockm-fill-every",0,None),("ockm-fill-style",0,None)]
 for t,d in SYNTH_DEFAULTS.items():
     PATTERN_KEYS+=[(f"ockm-{t}-{k}",v,None) for k,v in d.items()]
-TABLES=[f"ockm-pat-{n}" for n,_ in SLOTS]+[f"ockm-pat-{t}-{f}" for t in ("bass","lead") for f in MONO]+[f"ockm-pat-chord-{f}" for f in CHORD]
+TABLES=[f"ockm-pat-{n}" for n,_ in SLOTS]+[f"ockm-pat-{n}-nudge" for n,_ in SLOTS]+[f"ockm-pat-{t}-{f}" for t in ("bass","lead") for f in MONO]+[f"ockm-pat-chord-{f}" for f in CHORD]
 PROJ_DIR="projects/default"
 p=P()
 p.raw("#X declare -path voices -path seq;")
@@ -450,6 +460,21 @@ for r,(nm,snd) in enumerate(SLOTS):
     p.con(v,0,vs,0); p.con(vs,0,vt,0); p.con(vr,0,vs,1)
     ds=p.add(f"#X obj 990 {y+2} *~ 0;"); dt_=p.add(f"#X obj 1060 {y+2} throw~ ockm-dlybus;"); dr_=p.add(f"#X obj 990 {y-18} r ockm-{nm}-delay;")
     p.con(v,0,ds,0); p.con(ds,0,dt_,0); p.con(dr_,0,ds,1)
+# drums loop: ockm-drum-loop <steps> makes the drums repeat their first steps (0 = the whole pattern).
+# ockm-drum-double copies the loop into the steps after it and doubles the loop (back to the whole pattern once it fills it)
+rdl=p.add("#X obj 1300 380 r ockm-drum-loop;"); vdl=p.add("#X obj 1300 405 v ockm_dloop;"); p.con(rdl,0,vdl,0)
+rsm=p.add("#X obj 1600 380 r ockm-stepms;"); vsm=p.add("#X obj 1600 405 v ockm_stepms;"); p.con(rsm,0,vsm,0)
+rpl=p.add("#X obj 1450 380 r ockm-len;"); vpl=p.add("#X obj 1450 405 v ockm_plen;"); p.con(rpl,0,vpl,0)
+rdd=p.add("#X obj 1300 440 r ockm-drum-double;"); tdd=p.add("#X obj 1300 465 t b;"); gdl=p.add("#X obj 1300 490 v ockm_dloop;")
+mdl=p.add("#X obj 1300 515 moses 1;"); tdl=p.add("#X obj 1300 540 t b f f;"); sdlen=p.add("#X obj 1340 570 sel 16 32 64;")
+nxl=p.add(f"#X obj 1300 700 expr if({D}f1*2 >= ockm_plen \\, 0 \\, {D}f1*2);"); fdl=p.add("#X obj 1300 675 f;")
+sdl=p.add("#X msg 1300 730 \\; ockm-drum-loop \\$1 \\; ockm-show-drum-loop \\$1 \\; ockm-drums-changed bang \\; ockm-refresh bang;")
+for c in [(rdd,0,tdd,0),(tdd,0,gdl,0),(gdl,0,mdl,0),(mdl,1,tdl,0),(tdl,2,fdl,1),(tdl,1,sdlen,0),(tdl,0,fdl,0),(fdl,0,nxl,0),(nxl,0,sdl,0)]: p.con(*c)
+for k,(nm,_) in enumerate(SLOTS):
+    for j,tb in enumerate([f"ockm-pat-{nm}",f"ockm-pat-{nm}-nudge"]):
+        asg=p.add(f"#X obj {1300+k*150} {630+j*60} array set {tb};"); p.con(tdl,2,asg,1)
+        for m,n in enumerate((16,32,64)):   # the loop's length picks the copy
+            ag=p.add(f"#X obj {1300+k*150+m*40} {600+j*60} array get {tb} 0 {n};"); p.con(sdlen,m,ag,0); p.con(ag,0,asg,0)
 # drum settings subpatch
 sub=P()
 sub.add("#X text 20 10 Drum slots. Sound 0 kick 1 snare 2 clap 3 perc-1 4 closed hat 5 open hat 6 tom 7 perc-2. Tune in semitones \\, decay in % (100 = normal) \\, level 0 to 1.;")
@@ -469,12 +494,15 @@ p.add("#X text 30 985 sound \\, tune \\, decay \\, level and sends per drum slot
 by=380+len(SLOTS)*40+10
 SYN=[("bass","ockm-monoseq bass","ockm-mono bass"),("lead","ockm-monoseq lead","ockm-lead lead"),("chord","ockm-chordseq chord","ockm-chord chord")]
 synth_voice={}
+rq4=p.add("#X obj 300 1500 r ockm-stepms;"); lq4=p.add("#X obj 300 1525 * 0.25;"); p.con(rq4,0,lq4,0)
 for r,(nm,seqo,voi) in enumerate(SYN):
     y=by+r*40
     p.add(f"#X text 20 {y+2} {nm};")
     sq=p.add(f"#X obj 110 {y} {seqo};"); vo=p.add(f"#X obj 560 {y} {voi};")
     gt=p.add(f"#X obj 660 {y} ockm-gate {nm} level;")
-    p.con(pipe,0,sq,0); p.con(sq,0,vo,0); p.con(vo,0,gt,0); p.con(gt,0,mix,0)
+    # a quarter step late, like the drums on time, so drum steps can be nudged early
+    lq=p.add(f"#X obj 300 {y} pipe 0;"); p.con(pipe,0,lq,0); p.con(lq,0,sq,0); p.con(lq4,0,lq,1)
+    p.con(sq,0,vo,0); p.con(vo,0,gt,0); p.con(gt,0,mix,0)
     vs=p.add(f"#X obj 760 {y} *~ 0;"); vt=p.add(f"#X obj 830 {y} throw~ ockm-revbus;"); vr=p.add(f"#X obj 760 {y-18} r ockm-{nm}-verb;")
     p.con(gt,0,vs,0); p.con(vs,0,vt,0); p.con(vr,0,vs,1)
     ds=p.add(f"#X obj 990 {y} *~ 0;"); dt_=p.add(f"#X obj 1060 {y} throw~ ockm-dlybus;"); dr_=p.add(f"#X obj 990 {y-18} r ockm-{nm}-delay;")
@@ -1062,7 +1090,34 @@ GROOVES=[
  ("trip-hop",60,dict(kick="X.........x.....",snare="....X.......X...",hat="x...x.x.x...x.x.",perc1="..x.......x.....",tom=".............x..")),
  ("electro",50,dict(kick="X.....x...x.....",clap="....X.......X...",hat="xxxxxxxxxxxxxxxx",tom="..........x..x..")),
  ("clear",0,dict()),
+ # bank 2: house and garage (after 'clear', so the numbers of bank 1 never move)
+ ("chicago",56,dict(kick="X...X...X...X...",clap="....X.......X...",hat="x.x.x.x.x.x.x.x.",ohat="..x...x...x...x.",perc1="..........x.....")),
+ ("jackin",58,dict(kick="X...X...X...X...",clap="....X.......X...",hat=".xx..xx..xx..xx.",ohat="..X...X...X...X.",perc2="x..x..x...x..x..")),
+ ("disco",54,dict(kick="X...X...X...X...",snare="....X.......X...",ohat="..x...x...x...x.",hat="xxXxxxXxxxXxxxXx",perc1="x.x.x.x.x.x.x.x.")),
+ ("soulful",58,dict(kick="X...X...X...X...",clap="....x.......x...",hat="..x...x...x...x.",perc1="x..x..x...x..x..",perc2="......x.......x.")),
+ ("afro-house",56,dict(kick="X...X...X...X...",clap="....x.......x...",hat=".x.x.x.x.x.x.x.x",perc1="x..x..x...x.x...",perc2="..x...x.x...x..x")),
+ ("lofi-house",62,dict(kick="X.....x.X.......",snare="....X.......X...",hat="x.x.x.x.x.x.x.x.",ohat=".......x........")),
+ ("2-step",64,dict(kick="X.....x...X.....",snare="....X.......X...",hat="x.x.x.x.x.x.x.x.",perc2="..x.......x..x..")),
+ ("speed-garage",58,dict(kick="X...X...X...X...",snare="....X.......X...",ohat="..X...X...X...X.",hat="x.xxx.xxx.xxx.xx",perc1="......x.......x.")),
+ ("funky-house",56,dict(kick="X...X...X...X...",clap="....X.......X...",hat="xxXxxxXxxxXxxxXx",ohat="..x.......x.....",perc1=".x...x.x.x...x..",tom="...........x..x.")),
+ ("ghetto-house",54,dict(kick="X...X..xX...X..x",clap="....X.......X...",hat="x.x.x.x.x.x.x.x.",perc2=".x...x...x...x..")),
+ ("nu-disco",54,dict(kick="X...X...X...X...",snare="....X.......X...",hat="..x...x...x...x.",ohat="..........X.....",perc1="xxxxxxxxxxxxxxxx",tom="..............x.")),
+ ("rolling",56,dict(kick="X...X...X...X...",clap="........x.......",ohat="..x...x...x...x.",hat="xxxxxxxxxxxxxxxx",perc2=".x....x..x....x.",perc1="...x.......x....")),
+ # bank 3: techno, breaks and downtempo
+ ("detroit",54,dict(kick="X...X...X...X...",clap="....X.......X...",hat="x.xxx.xxx.xxx.xx",ohat="..x...x...x...x.",tom=".........x....x.")),
+ ("berlin",50,dict(kick="X...X...X...X...",ohat="..X...X...X...X.",hat="xxxxxxxxxxxxxxxx",perc2=".x.......x......",clap="....x.......x...")),
+ ("industrial",50,dict(kick="X..xX...X..xX...",snare="....X.......X...",hat="x.x.x.x.x.x.x.x.",perc1="...x...x...x...x",tom="......x.......x.")),
+ ("hypnotic",52,dict(kick="X...X...X...X...",perc1=".x.x.x.x.x.x.x.x",perc2="...x.....x...x..",ohat="..x...x...x...x.")),
+ ("acid-techno",50,dict(kick="X...X...X...X...",clap="....X.......X...",hat="xxxxxxxxxxxxxxxx",ohat="..X...X...X...X.",snare="...............x")),
+ ("think-break",56,dict(kick="X.....X...X.....",snare="....X.......X..x",hat="x.x.x.x.x.x.x.x.",ohat="..............x.")),
+ ("jungle",50,dict(kick="X.........X.....",snare="....X..x.x..X..x",hat="xxxxxxxxxxxxxxxx")),
+ ("big-beat",54,dict(kick="X.....X.X.....X.",snare="....X.......X...",hat="x.x.x.x.x.x.x.x.",ohat="......x.......x.",perc1="..x...x...x...x.")),
+ ("downtempo",60,dict(kick="X.......x.x.....",snare="....X.......X...",hat="x...x...x...x...",perc1="..x...x...x...x.")),
+ ("one-drop",58,dict(kick="........X.......",snare="........X.......",hat="x.x.x.x.x.x.x.x.",perc2="..x...x...x...x.")),
+ ("half-time",56,dict(kick="X.........x.....",snare="........X.......",hat="x.x.x.x.x.x.x.x.",perc1="...x.......x....")),
+ ("lofi-hip-hop",64,dict(kick="X......x..X.....",snare="....X.......X...",hat="x.x.x.x.x.x.x.x.",perc2=".......x........")),
 ]
+GROOVE_BANKS=[("classics",0),("house + garage",13),("techno + breaks",25)]   # name, first groove number
 _SND=["kick","snare","clap","perc1","hat","ohat","tom","perc2"]
 def _groove_line(sw,parts):
     for k,v in parts.items(): assert k in _SND and len(v)==16, (k,v)
@@ -1104,6 +1159,7 @@ if os.path.exists(_ui_src):
             "local SPICE = "+_lua_list([(i,lab) for i,lab in SPICE])+"\n"
             "local FILLS = { "+", ".join(f'"{n.replace("-"," ")}"' for n,_ in FILLS)+" }\n"
             "local GROOVES = { "+", ".join(f'"{n.replace("-"," ")}"' for n,_,_ in GROOVES)+" }\n"
+            "local GROOVE_BANKS = { "+", ".join(f'{{ "{n}", {i} }}' for n,i in GROOVE_BANKS)+" }\n"
             "local PROG_SHAPES = { "+", ".join("{ "+", ".join(f"{{ {d}, {int(b*16)} }}" for d,b in ch)+" }" for _,_,ch in PROGS)+" }\n")
     os.makedirs(os.path.join(R,"ui"),exist_ok=True)
     open(os.path.join(R,"ui","ockm-ui.pd_lua"),"w").write(_t[:_a]+_block+_t[_b:])
@@ -1538,6 +1594,8 @@ l1=q.add("#X msg 560 1330 1;"); sl1=q.add("#X obj 560 1355 s ockm-loading;")
 play=q.add(f"#X msg 620 1330 {D}1 rewind \\, {D}1 bang;"); fcur=q.add("#X obj 620 1305 f;")
 l0=q.add("#X msg 700 1330 0;"); sl0=q.add("#X obj 700 1355 s ockm-loading;")
 rf=q.add("#X msg 760 1330 \; ockm-refresh bang;")
+# settings older pattern files don't have: back to their defaults before the pattern plays in
+nwd=q.add("#X msg 560 1380 \\; ockm-drum-loop 0 \\; "+" \\; ".join(f"ockm-pat-{n}-nudge const 0" for n,_ in SLOTS)+";"); q.con(tl,4,nwd,0)
 syn=q.add(f"#X obj 820 1330 s {D}0-sync;"); one=q.add("#X msg 880 1330 1;")
 for c in [(rl,0,tfb,0),(tfb,1,started,0),(started,0,scap,0),(tfb,0,tl,0),
           (tl,5,cur,1),(tl,5,lpp,1),(tl,5,fcur,1),(tl,4,l1,0),(l1,0,sl1,0),(tl,3,fcur,0),(fcur,0,play,0),(play,0,sq,0),

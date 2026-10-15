@@ -96,6 +96,9 @@ SHOTS = [
     ("drums-long", ["test tap 414 36", "test tap 861 88", "test tap 194 88"]),        # 64 steps, forward to the second block
     ("compose-melody", ["test tap 345 36", "test tap 186 154", "test tap 400 540"]),   # melody leads, ask for chords, then mutate the bass
     ("drums-samples", ["test tap 414 36", "test tap 366 380", "test tap 366 380", "test tap 366 380"]),   # drums tab, step to sample 3
+    ("drums-velocity", ["array ockm-pat-d1 2 0 0 0 1 0 0.5 0 2 0 0 0 1 0 0.3 0", "test tap 414 36"]),
+    ("drums-timing", ["array ockm-pat-d1 2 0 0 0 1 0 0.5 0 2 0 0 0 1 0 0.3 0", "array ockm-pat-d1-nudge 0 0 0 0 -0.2 0 0.1 0 0 0 0 0 0.25 0 -0.1 0",
+                      "test tap 414 36", "test tap 145 282", "send ockm-drum-loop float 32"]),
     ("drums-groove", ["test tap 414 36", "test tap 660 445"]),                         # drums tab, tap a groove
     ("project", ["test tap 910 36", "test tap 600 261"]),                              # project screen, pick an older project
     ("song", ["test tap 759 36", "test tap 640 282", "test tap 727 282", "test tap 727 282", "test tap 640 332", "test tap 380 199", "test tap 380 199", "test tap 380 199"]),

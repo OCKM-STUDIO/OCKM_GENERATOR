@@ -557,7 +557,6 @@ def touchscreen_drives_the_engine(work):
     tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
     h.at(100, "ockm-resync bang")
     tap(150, 50, 137)                    # perform: open the kick lane
-    tap(160, 300, 312)                   # drums: sound pad 3 (clap)
     tap(170, 160, 212); tap(180, 160, 212)   # step 3: on, then accent
     tap(190, 281, 36)                    # perform tab
     tap(200, 807, 88)                    # length 2 bars (navigation strip)
@@ -591,7 +590,6 @@ def touchscreen_drives_the_engine(work):
     out = run(work, f)
     edits = printed(out, "ockm-edit")
     assert edits[:2] == ["d1 2 1", "d1 2 2"], f"tapping step 3 should go on, then accent: {edits}"
-    assert "2" in printed(out, "ockm-d1-sound"), "sound pad didn't change the slot's sound"
     assert "32" in printed(out, "ockm-len"), "length button didn't set 32"
     pages = printed(out, "ockm-page")
     assert pages.count("1") >= 2 and "0" in pages[pages.index("1") + 1:], f"swipes and block buttons should go to block 2 and back: {pages}"
@@ -622,7 +620,7 @@ def touchscreen_screens_draw(work):
         raise Skip("Pillow not installed")
     p = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_preview.py"), os.path.join(work, "preview")], capture_output=True, text=True)
     assert p.returncode == 0, p.stderr[-800:]
-    assert len(os.listdir(os.path.join(work, "preview"))) == 17, "expected seventeen screen pictures"
+    assert len(os.listdir(os.path.join(work, "preview"))) == 19, "expected nineteen screen pictures"
 
 @test
 def mute_solo_and_levels(work):
@@ -917,6 +915,50 @@ def drum_fill_on_the_fourth_bar(work):
     assert seg(4 * bar + 0.15, 5 * bar - 0.05) < 0.01, "bar 5 should be back to normal (no snare)"
 
 @test
+def drum_velocity_timing_and_loop(work):
+    """Kick only, 120 bpm (a step is 125 ms). Hits on steps 0, 4, 8, 12: step 4 nudged a fifth of a step early, step 8 a fifth late,
+    step 12 drawn at velocity 0.4. The drums loop is 1 bar under a 2-bar pattern, so bar 2 repeats bar 1, nudges and all."""
+    h = Harness(); h.record(os.path.join(work, "nudge.wav"))
+    mutes = " ; ".join(f"ockm-{t}-mute 1" for t in ["d2","d3","d4","d5","d6","d7","d8","bass","lead","chord"])
+    h.at(100, f"ockm-bpm 120 ; ockm-verb-mix 0 ; ockm-delay-mix 0 ; ockm-swing 50 ; ockm-length 32 ; ockm-fill-every 0 ; ockm-d1-sample 0 ; ockm-d1-sound 0 ; {mutes}")
+    h.at(150, "ockm-pat-d1 const 0 ; ockm-pat-d1-nudge const 0 ; ockm-drum-loop 16")
+    h.at(170, "ockm-edit d1 0 2 ; ockm-edit d1 4 2 ; ockm-edit d1 8 2 ; ockm-edit d1 12 0.4 ; ockm-nudge d1 4 -0.2 ; ockm-nudge d1 8 0.2")
+    h.at(300, "ockm-play 1"); h.at(4500, "ockm-play 0")
+    _, (x, sr) = play(work, h, "t_nudge", ms=4500)
+    on, i, last = [], 0, -1.0
+    while i < len(x):                       # onsets: first loud sample at least 300 ms after the last one
+        if abs(x[i]) > 0.02 and (i / sr - last) > 0.3:
+            on.append(i / sr); last = i / sr
+        i += 1
+    assert len(on) >= 8, f"expected 8 kicks over two bars, heard {len(on)}"
+    gaps = [round(b - a, 3) for a, b in zip(on, on[1:])][:7]
+    want = [0.475, 0.55, 0.475, 0.5, 0.475, 0.55, 0.475]
+    assert all(abs(g - w) < 0.008 for g, w in zip(gaps, want)), f"gaps between kicks {gaps}, expected about {want}"
+    pk = [peak(x[int(o * sr):int((o + 0.08) * sr)]) for o in on[:4]]
+    assert 0.3 < pk[3] / pk[0] < 0.5, f"velocity 0.4 should play at about 0.4 of an accent ({pk[3] / pk[0]:.2f})"
+
+@test
+def drum_double_copies_the_loop(work):
+    """1-bar loop under a 4-bar pattern: double makes it 2 bars (bar 1 copied to bar 2, timing too), double again fills the pattern."""
+    h = Harness(); h.show("ockm-drum-loop")
+    g = h.add("#X obj 10 300 r test-get;"); t = h.add("#X obj 10 325 t b b;")
+    a1 = h.add("#X obj 10 350 array get ockm-pat-d1 0 64;"); p1 = h.add("#X obj 10 375 print STEPS;")
+    a2 = h.add("#X obj 300 350 array get ockm-pat-d1-nudge 0 32;"); p2 = h.add("#X obj 300 375 print NUDGE;")
+    h.con(g, t); h.con(t, a2, 0); h.con(t, a1, 1); h.con(a1, p1); h.con(a2, p2)
+    h.at(100, "ockm-length 64 ; ockm-pat-d1 const 0 ; ockm-pat-d1-nudge const 0 ; ockm-drum-loop 16")
+    h.at(150, "ockm-edit d1 0 2 ; ockm-edit d1 6 0.5 ; ockm-nudge d1 6 -0.1")
+    h.at(200, "ockm-drum-double bang"); h.at(250, "ockm-drum-double bang"); h.at(300, "test-get bang")
+    f = os.path.join(work, "t_double.pd"); h.finish(400, f)
+    out = run(work, f)
+    loops = [int(float(v)) for v in printed(out, "ockm-drum-loop")]
+    assert loops[-2:] == [32, 0], f"loop should go 16 -> 32 -> whole pattern: {loops}"
+    st = [float(v) for v in printed(out, "STEPS")[0].split()]
+    for b in range(4):
+        assert st[b * 16] == 2 and st[b * 16 + 6] == 0.5, f"bar {b + 1} should be a copy of bar 1: {st[b * 16:b * 16 + 16]}"
+    nu = [float(v) for v in printed(out, "NUDGE")[0].split()]
+    assert nu[6] == -0.1 and nu[22] == -0.1, f"the timing should be copied too: {nu[:32]}"
+
+@test
 def length_keeps_bars_and_rebuilds_followers(work):
     """Shorten a 4-bar drum part to 1 bar and back: the original bars return (not copies). Lengthen a 1-bar pattern with a 4-bar progression: the chords fill out the whole progression."""
     h = Harness()
@@ -1061,6 +1103,32 @@ def ui_preview_shapes():
             if depth == 0: progs.append([(int(d), int(b)) for d, b in re.findall(r"\{ (\d+), (\d+) \}", cur)]); cur = ""
     return progs
 
+@test
+def touchscreen_velocity_timing_loop_and_banks(work):
+    """Drums tab: drag a step's velocity up, switch to timing and pull it early, pick a 1-bar loop and double it,
+    then pick a groove from the second bank."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness(); h.show("ockm-edit", "ockm-nudge", "ockm-drum-loop", "ockm-drum-double", "ockm-drum-groove")
+    h.at(100, "ockm-length 64 ; ockm-edit d1 0 1")
+    h.at(200, "ockm-ui-test tap 414 36")              # drums tab
+    h.at(300, "ockm-ui-test drag 45 336 45 302")      # velocity: drag step 1 to the top (accent)
+    h.at(400, "ockm-ui-test tap 145 282")             # timing
+    h.at(500, "ockm-ui-test drag 45 319 45 336")      # pull step 1 early
+    h.at(600, "ockm-ui-test tap 707 282")             # drums loop: 1 bar
+    h.at(700, "ockm-ui-test tap 907 282")             # double
+    h.at(800, "ockm-ui-test tap 716 354")             # bank 2
+    h.at(900, "ockm-ui-test tap 531 389")             # its first groove
+    f = os.path.join(work, "t_lane_ui.pd"); h.finish(1000, f)
+    out = run(work, f)
+    edits = [e for e in printed(out, "ockm-edit") if e.startswith("d1 0")]
+    assert edits and edits[-1].split()[-1] == "2", f"dragging to the top should make it an accent: {edits}"
+    nud = [float(e.split()[-1]) for e in printed(out, "ockm-nudge") if e.startswith("d1 0")]
+    assert nud and nud[-1] < -0.2, f"dragging down should pull it early: {nud}"
+    loops = [int(float(v)) for v in printed(out, "ockm-drum-loop")]
+    assert 16 in loops and loops[-1] == 32, f"1-bar loop then double should give 2 bars: {loops}"
+    assert printed(out, "ockm-drum-groove")[-1:] == ["13"], f"bank 2's first groove is number 13: {printed(out, 'ockm-drum-groove')}"
+
 def write_tone(path, hz, secs, sr=44100, channels=1):
     w = wave.open(path, "w"); w.setnchannels(channels); w.setsampwidth(2); w.setframerate(sr)
     n = int(secs * sr)
@@ -1110,8 +1178,7 @@ def samples_load_and_play_on_drum_slots(work):
 
 @test
 def touchscreen_picks_samples_and_kits(work):
-    """Drums tab: arrows step through the folder (and stop at the end), the box plays it, a new sound folder with
-    fewer files pulls the number back, and 'new kit' picks for every slot that has samples."""
+    """Drums tab: arrows step through the folder (and stop at the end), the box plays it, and 'new kit' picks for every slot that has samples."""
     if not PDLUA:
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     kd = os.path.join(work, "samples", "kick")
@@ -1123,12 +1190,11 @@ def touchscreen_picks_samples_and_kits(work):
     h.at(500, "ockm-ui-test tap 366 380")     # 2
     h.at(700, "ockm-ui-test tap 366 380")     # only 2 kicks: stays put
     h.at(900, "ockm-ui-test tap 200 380")     # tap the box: hear it
-    h.at(1100, "ockm-ui-test tap 187 312")    # sound: snare. No snare samples, so back to the synth
     h.at(1300, "ockm-ui-test tap 430 380")    # new kit: perc 1 and perc 2 get the perc sample
     f = os.path.join(work, "t_samples_ui.pd"); h.finish(1500, f)
     out = run(work, f)
     d1 = [int(float(v)) for v in printed(out, "ockm-d1-sample")]
-    assert d1 == [1, 2, 0], f"sample steps wrong: {d1}"
+    assert d1[:2] == [1, 2] and len(d1) <= 3, f"sample steps wrong (the last one is new kit's pick): {d1}"
     assert len(printed(out, "ockm-d1-audition")) >= 3, f"should play on each change and on tapping the box: {printed(out, 'ockm-d1-audition')}"
     assert printed(out, "ockm-d6-sample") == ["1"] and printed(out, "ockm-d7-sample") == ["1"], "new kit should give both perc slots a sample"
 

@@ -70,6 +70,57 @@ for root, dirs, files in os.walk(SRC):
         pr = -1 if src == "Tape909_Samples" else prio(top)
         cands[k].setdefault((pr, src), []).append(path)
 rnd = random.Random(14)
+PRETTY = {"Tape909_Samples": "Tape909", " CM Lofi Kit 01": "CM Lofi Kit 01", "CMLOFIKIT 05 Wavs": "CM Lofi Kit 05"}
+pretty = lambda s: PRETTY.get(s, s.strip())
+
+# --add N: N more per sound, after the files already there (their numbers never move). Same rules: no file twice,
+# no duplicate audio, no more than 3 per source counting the ones already picked (Tape909 keeps its 5).
+if "--add" in sys.argv:
+    import hashlib
+    N = int(sys.argv[sys.argv.index("--add") + 1])
+    old = list(csv.DictReader(open(os.path.join(DST, "sources.csv"))))
+    rows = [[r["sound"], r["file"], r["source"], r["original"]] for r in old]
+    for k, bysrc in cands.items():
+        d = os.path.join(DST, k)
+        have = [f for f in os.listdir(d) if f.lower().endswith(".wav")] if os.path.isdir(d) else []
+        hashes = {hashlib.md5(open(os.path.join(d, f), "rb").read()).hexdigest() for f in have}
+        used = {}
+        for r in old:
+            if r["sound"] == k: used[r["source"]] = used.get(r["source"], 0) + 1
+        taken = {r["original"] for r in old}
+        keys = sorted(bysrc, key=lambda t: (used.get(pretty(t[1]), 0), rnd.random()))   # sources not used yet come first
+        for key in keys: rnd.shuffle(bysrc[key])
+        new = []
+        for take in range(CAP):
+            for key in keys:
+                src = pretty(key[1])
+                if len(new) >= N: break
+                if used.get(src, 0) >= (TAPE if src == "Tape909" else CAP): continue
+                for path in bysrc[key]:
+                    rel = os.path.relpath(path, SRC)
+                    if rel in taken: continue
+                    h = hashlib.md5(open(path, "rb").read()).hexdigest()
+                    taken.add(rel)
+                    if h in hashes: continue
+                    hashes.add(h); new.append((src, path)); used[src] = used.get(src, 0) + 1
+                    break
+        first = []
+        for s_, _ in new:
+            if s_ not in first: first.append(s_)
+        new.sort(key=lambda t: first.index(t[0]))
+        start = max([int(f[:2]) for f in have if f[:2].isdigit()] + [len(have)]) + 1
+        print(f"{k:9s} +{len(new)} as {start:02d}-{start + len(new) - 1:02d}: " + ", ".join(first))
+        if COPY:
+            for i, (src, path) in enumerate(new):
+                name = f"{start + i:02d}.wav"
+                shutil.copyfile(path, os.path.join(d, name))
+                rows.append([k, name, src, os.path.relpath(path, SRC)])
+    if COPY:
+        with open(os.path.join(DST, "sources.csv"), "w", newline="") as f:
+            w = csv.writer(f); w.writerow(["sound", "file", "source", "original"]); w.writerows(rows)
+        print("written")
+    sys.exit(0)
+
 picked = {}
 for k, bysrc in cands.items():
     keys = sorted(bysrc, key=lambda t: (t[0], rnd.random()))

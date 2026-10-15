@@ -289,7 +289,10 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 | `ockm-chord-rhythm` | Chord rhythm preset, 0 to 7, and rebuild |
 | `ockm-chord-prog` | Chord progression, 0 to 9, and rebuild |
 | `ockm-chord-type` | 0 triad, 1 seventh, 2 sus2, 3 power chord. Applies straight away |
-| `ockm-edit` | Set one drum step: slot, step (0 to 127), value (0 off, 1 on, 2 accent). For example `d1 4 2` |
+| `ockm-edit` | Set one drum step: slot, step (0 to 127), value (0 off, 1 on, 2 accent, anything between 0 and 1 a velocity). For example `d1 4 2` |
+| `ockm-nudge` | One drum step's timing: slot, step, -0.25 (a quarter step early) to 0.25 (late). Saved with the pattern |
+| `ockm-drum-loop` | Drums loop length in steps (16, 32, 64), 0 = the whole pattern. Saved with the pattern |
+| `ockm-drum-double` | Copy the drums loop into the steps after it and double it |
 | `ockm-bass-edit`, `ockm-lead-edit` | Set one bass or lead step: step (0 to 127), note (MIDI), on, accent, slide. For example `0 33 1 1 0` |
 | `ockm-chord-edit` | Set one chord step: step, 0 off / 1 on / 2 accent, chord root as a scale step (0 is the key's root). For example `4 1 5` |
 | `ockm-accent` | Accent amount, 0 to 1 |
@@ -330,7 +333,21 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 
 Eight drum slots, d1 to d8. Each slot can play any of 8 sounds: 0 kick, 1 snare, 2 clap, 3 perc 1, 4 closed hat, 5 open hat, 6 tom, 7 perc 2. Perc 1's synth sound is a short rim and perc 2's a 909-style rimshot (the old cowbell is in `sketches/`). Only the chosen sound runs. The default line-up is kick, snare, clap, closed hat, open hat, perc 2, perc 1 and tom.
 
-Each step can be off, on or accented. Accented steps play at full strength. Normal steps play at full strength minus the accent amount. For now, accents are set with the `ockm-edit` hook. The squares show on or off only, until the touchscreen work.
+Each slot's sound is fixed (slot 1 kick, 2 snare, 3 clap, 4 hat, 5 open hat, 6 perc 2, 7 perc 1, 8 tom); what changes is its sample. Tapping a step cycles off, on and accent. Accented steps play at full strength; normal steps play at full strength minus the accent amount.
+
+### Velocity and timing
+
+The lane under the steps has two modes. **Velocity**: drag a step's bar up or down, or swipe across to draw a shape; the top tenth snaps to accent. **Timing**: drag up to push a hit late, down to pull it early, up to a quarter of a step either way.
+
+To make early hits possible, the whole engine plays a quarter of a step behind the clock (about 30 ms at 124 bpm). Everything moves together, so you won't hear it. Gear following OCKM's MIDI clock will play about that much ahead.
+
+### Drums loop
+
+Sketch the drums on 1 or 2 bars under a longer pattern: pick **1 bar** or **2 bars** next to "drums loop" and the drums repeat those bars while the synths play the whole pattern. The repeats show as outlines. **Double** copies the loop (steps, velocity and timing) into the bars after it and doubles the loop, until it fills the pattern. **All** goes back to the whole pattern.
+
+### Grooves
+
+Three banks of 12: classics, house + garage, and techno + breaks. A groove rewrites all 8 drums and sets the swing; back to last save undoes it.
 
 Slot sounds, samples, tune, decay, level and sends are part of the drum kit, which is saved with the project and shared by every pattern.
 

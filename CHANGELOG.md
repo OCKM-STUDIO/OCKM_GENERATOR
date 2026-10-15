@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.38 (15 October 2026)
+
+- **Velocity**: a lane under the drum steps. Drag each bar up and down, or swipe across to draw
+- **Micro timing**: the same lane in timing mode pushes a hit up to a quarter step late or pulls it early. The engine runs a quarter step behind the clock to make early possible
+- **Drums loop**: sketch the drums on 1 or 2 bars under a longer pattern, then **double** to fill it out
+- **Swing** on the drums tab
+- **Three groove banks**: classics, house + garage, techno + breaks. 24 new grooves
+- **10 more samples per sound** (30 a folder; 27 toms and 29 percs after duplicates were skipped). The existing numbers don't move
+- The sound bar is gone: each slot is its sound, and the sample picks the flavour
+
 ## v0.37 (15 October 2026)
 
 - **The lead has its own sounds**, separate from the bass: mini (Minimoog-style, the new default), juno (with chorus), dx (DX7-style FM: tine, reed, bell, glass), acid (voiced as a lead) and sync
