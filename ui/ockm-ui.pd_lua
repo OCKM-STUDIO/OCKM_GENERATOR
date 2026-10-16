@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.54"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.55"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
@@ -252,6 +252,7 @@ function ui:postinitialize()
   listen("ockm-playing", function(o, sel, a)
     if o.exporting and o.exporting.song and (tonumber(a[1]) or 0) == 0 and not o.exporting.tail then o:export_end() end
   end)
+  listen("ockm-project-name", function(o) if o.new_pending then o.new_pending = nil; if o.newclock then o.newclock:delay(300) end end end)
   for _, n in ipairs({ "ockm-saved", "ockm-revert", "ockm-project-name" }) do listen(n, function(o) o.unsaved = false; o:dirty() end) end
   for _, n in ipairs({ "ockm-revert", "ockm-project-name" }) do listen(n, function(o) o.undo_label = nil end) end
   listen("ockm-project-item", function(o, sel, a) if o.incoming then o.incoming[#o.incoming + 1] = tostring(a[1]) end end)
@@ -285,6 +286,10 @@ function ui:postinitialize()
   self.expclock = pd.Clock:new():register(self, "export_end")
   self.tickclock = pd.Clock:new():register(self, "tick")
   self.demudclock = pd.Clock:new():register(self, "demud_finish")
+  self.rampclock = pd.Clock:new():register(self, "ramp_tick")
+  self.newclock = pd.Clock:new():register(self, "apply_new_defaults")
+  self.initclock = pd.Clock:new():register(self, "init_sends")
+  self:load_settings()
 end
 
 -- play a drum slot once. After a sample change it waits a moment, so the new file is loaded first
@@ -463,6 +468,7 @@ function ui:layout()
   else self:layout_synth(add) end
   if self.sheet == "export" then self:layout_export(add) end
   if self.sheet == "eq" then self:layout_eq(add) end
+  if self.sheet == "slotpick" then self:layout_slotpick(add) end
   -- messages on screens that have no message line of their own
   if self.msg and (self.screen == "perform" or self.screen == "live" or self.screen == "compose" or self.screen == "mixer" or self.screen == "arrange" or self.screen == "setup" or self.screen == "drums"
                    or (self.msg_undo and self.undo_label)) then
@@ -473,43 +479,72 @@ function ui:layout()
       add{ kind="toast", x=W / 2 - 330, y=H - 50, w=660, h=38, label=self.msg }
     end
   end
+  if self.menu then self:layout_menu(add) end      -- last, so it sits on top and gets the taps
   return L
 end
 
 -- Screen hierarchy, top to bottom:
---   1. top bar: play, tempo, the six screens as tabs, save and revert
+--   1. top bar: play, tempo, the screens as tabs (playing, making, arranging), save, and a menu for the rest
 --   2. navigation strip: pattern, length, which block of 16 steps
 --   3. what you're editing (drum slot tabs on the drums screen), then the steps
 --   4. sound shaping at the bottom
-local TABS = { { "perform", "perform" }, { "live", "live" }, { "compose", "compose" }, { "drums", "drums" }, { "synth", "bass", 1 }, { "synth", "lead", 2 }, { "synth", "chord", 3 }, { "mixer", "mixer" }, { "arrange", "arrange" } }
+-- the tabs, in three groups: playing (perform A, perform B, mixer), making (compose and the four parts), arranging.
+-- { screen, label, part, width, gap before }
+local TABS = { { "perform", "perform A", nil, 72 }, { "live", "perform B", nil, 72 }, { "mixer", "mixer", nil, 58 },
+               { "compose", "compose", nil, 58, 8 }, { "drums", "drums", nil, 58 }, { "synth", "bass", 1, 58 }, { "synth", "lead", 2, 58 }, { "synth", "chord", 3, 58 },
+               { "arrange", "arrange", nil, 58, 8 } }
 local NAV_Y, NAV_H = 70, 36
+local KIOSK = os.getenv and os.getenv("OCKM_KIOSK")
 function ui:layout_top(add)
   add{ kind="play", x=16, y=12, w=64, h=48, tap=function()
     if self.playing ~= 0 then self:send("ockm-play", 0) else self:send("ockm-play", 1) end
   end }
-  add{ kind="bpm", x=92, y=12, w=140, h=48, tap=function() if self.screen ~= "setup" then self:open("setup") end end }
+  add{ kind="bpm", x=92, y=12, w=124, h=48, tap=function() if self.screen ~= "setup" then self:open("setup") end end }
+  local busy = self.recording or self.exporting
+  local x = 226
   for i, t in ipairs(TABS) do
+    x = x + (t[5] or 0)
     local sel = (self.screen == t[1]) and (t[3] == nil or t[3] == self.part)
-    add{ kind="tab", x=244 + (i - 1) * 62, y=12, w=58, h=48, label=t[2], sel=sel, tap=function()
-      if t[3] then
-        if self.part ~= t[3] then self.part = t[3]; self.sel_step = 0; self.msg = nil end
-      end
-      if self.screen ~= t[1] then self:open(t[1]) end
-    end }
+    if not (busy and t[1] == "arrange") then
+      add{ kind="tab", x=x, y=12, w=t[4], h=48, label=t[2], sel=sel, tap=function()
+        self.menu = nil
+        if t[3] then
+          if self.part ~= t[3] then self.part = t[3]; self.sel_step = 0; self.msg = nil end
+        end
+        if self.screen ~= t[1] then self:open(t[1]) end
+      end }
+    end
+    x = x + t[4] + 4
   end
-  if self.recording or self.exporting then
-    local x = self.recording or self.exporting
-    local secs = os.time() - x.t0
-    add{ kind="btn", x=W - 224, y=12, w=134, h=48, accent=true, label=string.format("%s %d:%02d  stop", self.recording and "rec" or "export", math.floor(secs / 60), secs % 60),
+  if busy then
+    local secs = os.time() - busy.t0
+    add{ kind="btn", x=766, y=12, w=124, h=48, accent=true, small=true, label=string.format("%s %d:%02d stop", self.recording and "rec" or "export", math.floor(secs / 60), secs % 60),
          tap=function() if self.recording then self:record_stop() else self:export_cancel() end end }
   else
-  add{ kind="btn", x=W - 154, y=12, w=64, h=48, label=self.unsaved and "save •" or "save", accent=self.unsaved, tap=function()
-    psend("ockm-save", "bang", {}); self:say("saved " .. ockm_pretty(self.project) .. ": the loop and the kit") end }
+    -- save: a disc, orange when there's something to save
+    add{ kind="disc", x=W - 120, y=12, w=50, h=48, tap=function()
+      psend("ockm-save", "bang", {}); self:say("saved " .. ockm_pretty(self.project) .. ": the loop and the kit") end }
   end
-  add{ kind="tab", x=W - 84, y=12, w=68, h=48, label="project", sel=(self.screen == "project"), tap=function()
-    if self.screen ~= "project" then self:open("project") end
-  end }
+  add{ kind="menubtn", x=W - 66, y=12, w=50, h=48, sel=(self.menu or self.screen == "project" or self.screen == "setup"), tap=function() self.menu = not self.menu end }
   if self.screen ~= "project" and self.screen ~= "setup" and self.screen ~= "live" then self:layout_nav(add) end
+end
+
+-- the menu (top right): everything that isn't a screen you play or make on
+function ui:layout_menu(add)
+  local items = {
+    { "project", "open, new, save as, delete", function() self:open("project") end },
+    { "export", "audio, stems, MIDI", function() psend("ockm-usb-scan", "bang", {}); psend("ockm-exports-ask", "bang", {}); self.sheet = "export" end },
+    { "settings", "tempo, swing, clock, sound", function() self:open("setup") end },
+    { "revert", "back to the last save", function() psend("ockm-revert", "bang", {}); self:say("back to the last save of " .. ockm_pretty(self.project)) end },
+  }
+  if KIOSK then items[#items + 1] = { "quit to desktop", "", function() psend("pd", "quit", {}) end } end
+  -- a tap anywhere else closes it
+  add{ kind="scrim", x=0, y=62, w=W, h=H - 62, tap=function() self.menu = nil end }
+  local mx, my, mw = W - 16 - 230, 66, 230
+  add{ kind="menupanel", x=mx, y=my, w=mw, h=12 + #items * 50 - 4 }
+  for i, it in ipairs(items) do
+    add{ kind="menuitem", x=mx + 6, y=my + 6 + (i - 1) * 50, w=mw - 12, h=46, label=it[1], sub=it[2], tap=function() self.menu = nil; it[3]() end }
+  end
 end
 
 -- the navigation strip: pattern 1-8, length, and the blocks of 16 steps (only as many as the length allows)
@@ -714,47 +749,7 @@ function ui:scene(keep)
   end
 end
 
--- macros: hold to play. Each moves several controls at once and puts them back when you let go
-local function bars_ms(self, bars) return bars * 16 * 15000 / math.max(40, self.v["ockm-bpm"] or 124) end
-local MACROS = {
-  { name = "build", sub = "rise + open up",
-    set = { ["ockm-verb-mix"] = 0.65, ["ockm-delay-mix"] = 0.45, ["ockm-pump"] = 1 }, filter = { 0.6, function(self) return bars_ms(self, 2) end } },
-  { name = "wash", sub = "echo + verb, dark",
-    set = { ["ockm-delay-mix"] = 0.85, ["ockm-delay-fb"] = 0.78, ["ockm-verb-mix"] = 0.9, ["ockm-verb-size"] = 0.93 }, filter = { -0.5, function() return 400 end } },
-  { name = "strip", sub = "kick + bass only", keep = "kickbass" },
-}
 function ui:kick_slots() local k = {}; for _, nm in ipairs(self:drum_slots({ kick = true })) do k[nm] = true end; return k end
-function ui:macro_down(i)
-  local m = MACROS[i]
-  if self.macro then self:macro_up() end
-  local saved = { set = {}, filter = self.v["ockm-filter"] or 0, mutes = {} }
-  for hook, x in pairs(m.set or {}) do
-    saved.set[hook] = self.v[hook] or 0
-    self.v[hook] = x; pd.send(hook, "float", { x })
-  end
-  if m.filter then pd.send("ockm-filter-glide", "list", { m.filter[1], m.filter[2](self) }) end
-  if m.keep == "kickbass" then
-    local kicks = self:kick_slots()
-    for _, t in ipairs(TRACKS) do
-      saved.mutes[t] = self:mute_target(t)
-      local want = (kicks[t] or t == "bass") and 0 or 1
-      if want ~= saved.mutes[t] then self:qmute(t, want) end
-    end
-  end
-  self.macro = { i = i, saved = saved }
-end
-function ui:macro_up()
-  local mc = self.macro
-  if not mc then return end
-  self.macro = nil
-  local m = MACROS[mc.i]
-  for hook, x in pairs(mc.saved.set) do self.v[hook] = x; pd.send(hook, "float", { x }) end
-  if m.filter then
-    if self.filter_hold then pd.send("ockm-filter-glide", "list", { mc.saved.filter, 50 })
-    else self:filter_spring() end
-  end
-  for t, x in pairs(mc.saved.mutes) do if self:mute_target(t) ~= x then self:qmute(t, x) end end
-end
 
 function ui:layout_live(add)
   local lx, rx = 16, 16 + half_w + 16
@@ -820,10 +815,372 @@ function ui:layout_live(add)
     add{ kind="hbar", x=mx + (i - 1) * (w5 + 6), y=362, w=w5, h=56, hook=m[1], lo=m[2], hi=m[3], label=m[4], bold=true }
   end
   local w3 = (iw - 12) / 3
-  for i, m in ipairs(MACROS) do
-    add{ kind="hold", x=mx + (i - 1) * (w3 + 6), y=426, w=w3, h=156, label=m.name, sub=m.sub, on=(self.macro and self.macro.i == i),
-         down=function() self:macro_down(i) end, up=function() self:macro_up() end }
+  for i = 1, 3 do
+    -- your three slots (pick them in settings, or with the small v on each)
+    local rc = self.me.macros[self.me.slots[i]]
+    local x = mx + (i - 1) * (w3 + 6)
+    local lit = self.macro and self.macro.slot == i
+    add{ kind="hold", x=x, y=426, w=w3, h=156, label=(rc and #rc.moves > 0) and rc.name or "empty",
+         sub=(lit and self.macro.latched) and "tap to let go" or ("slot " .. string.char(64 + i)),
+         on=lit, down=function() self:macro_down(i) end, up=function() self:macro_up(i) end }
+    add{ kind="btn", x=x + w3 - 40, y=432, w=34, h=30, small=true, quiet=true, label="v", tap=function() self.pick_slot = i; self.sheet = "slotpick" end }
   end
+end
+
+-- ------------------------------------------------------------------ my settings
+-- Things that belong to you, not to a project: your macros, which three are on Perform B, defaults for new
+-- projects and how this device behaves. Kept in my-settings.lua beside the patch (not inside any project).
+local TARGETS = {
+  { id = "filter",   hook = "ockm-filter",      lo = -1, hi = 1 },
+  { id = "delay",    hook = "ockm-delay-mix",   lo = 0, hi = 1 },
+  { id = "feedback", hook = "ockm-delay-fb",    lo = 0, hi = 0.9 },
+  { id = "reverb",   hook = "ockm-verb-mix",    lo = 0, hi = 1 },
+  { id = "size",     hook = "ockm-verb-size",   lo = 0, hi = 1 },
+  { id = "drive",    hook = "ockm-drive",       lo = 0, hi = 1 },
+  { id = "pump",     hook = "ockm-pump",        lo = 0, hi = 1 },
+  { id = "volume",   hook = "ockm-volume",      lo = 0, hi = 1 },
+  { id = "rise",     hook = "ockm-rise",        switch = true },
+  { id = "throw",    hook = "ockm-delay-throw", switch = true },
+  { id = "mutes",    choices = { "kick + bass", "drums only", "no drums", "no kick" } },
+}
+local TARGET = {}; for _, t in ipairs(TARGETS) do TARGET[t.id] = t end
+local HOW = { { "jump", 0 }, { "1 beat", 4 }, { "1 bar", 16 }, { "2 bars", 32 }, { "4 bars", 64 } }   -- in steps
+local BACK = { "snap back", "glide back", "stay" }
+local MACRO_NAMES = { "build", "wash", "strip", "sink", "dub out", "lift", "blur", "freeze", "smash", "swell", "haze",
+                      "tunnel", "pressure", "drop out", "air", "grit" }
+local function default_settings()
+  return {
+    macros = {
+      { name = "build", moves = { { t = "filter", v = 0.6, how = 4, back = 1 }, { t = "reverb", v = 0.65, how = 1, back = 2 },
+                                  { t = "delay", v = 0.45, how = 1, back = 1 }, { t = "pump", v = 1, how = 1, back = 1 } } },
+      { name = "wash", moves = { { t = "delay", v = 0.85, how = 1, back = 1 }, { t = "feedback", v = 0.78, how = 1, back = 1 },
+                                 { t = "reverb", v = 0.9, how = 1, back = 1 }, { t = "filter", v = -0.5, how = 2, back = 1 } } },
+      { name = "strip", moves = { { t = "mutes", v = 1, how = 1, back = 1 } } },
+      { name = "sink", moves = { { t = "filter", v = -0.85, how = 3, back = 1 }, { t = "drive", v = 0.7, how = 3, back = 1 } } },
+      { name = "dub out", moves = { { t = "throw", v = 1, how = 1, back = 1 }, { t = "feedback", v = 0.85, how = 1, back = 3 },
+                                    { t = "delay", v = 0.8, how = 1, back = 3 } } },
+      { name = "lift", moves = { { t = "filter", v = 0.35, how = 3, back = 2 }, { t = "size", v = 0.95, how = 1, back = 2 } } },
+    },
+    slots = { 1, 2, 3 },
+    new = { drum = 16, synth = 64, lead = 1 },
+    device = { theme = "dark", snap = 1, mutes = 0 },
+  }
+end
+local SNAP_MS = { 50, 150, 400 }
+local NEW_LEAD = { { "hook", 8, 12 }, { "motif", 10, 15 }, { "call and answer", 11, 16 }, { "arp", 13, 18 } }   -- name, rhythm, notes
+
+-- writing and reading the file: plain Lua, so it can be read back with no parser
+local function ser(v, ind)
+  ind = ind or ""
+  if type(v) == "table" then
+    local out, n = {}, #v
+    for i = 1, n do out[#out + 1] = ind .. "  " .. ser(v[i], ind .. "  ") end
+    for k, x in pairs(v) do
+      if type(k) ~= "number" or k > n or k < 1 then out[#out + 1] = ind .. "  " .. string.format("[%q]", k) .. " = " .. ser(x, ind .. "  ") end
+    end
+    return "{\n" .. table.concat(out, ",\n") .. "\n" .. ind .. "}"
+  elseif type(v) == "string" then return string.format("%q", v) end
+  return tostring(v)
+end
+function ui:settings_path()
+  if not self._loadpath or self._loadpath == "" then return nil end
+  return self._loadpath .. "../my-settings.lua"
+end
+function ui:load_settings()
+  local d = default_settings()
+  local path = self:settings_path()
+  local f = path and io.open(path, "r")
+  if f then
+    local src = f:read("a"); f:close()
+    local fn = load(src, "my-settings", "t", {})
+    local ok, t = pcall(fn or function() end)
+    if ok and type(t) == "table" then
+      for k, x in pairs(t) do if d[k] ~= nil and type(x) == type(d[k]) then d[k] = x end end
+    end
+  end
+  self.me = d
+  local dev = d.device
+  self.theme = THEMES[dev.theme] or self.theme
+  SPRING_MS = SNAP_MS[dev.snap] or 50
+  self.v["ockm-mute-quant"] = dev.mutes or 0
+  if self.initclock then self.initclock:delay(0) end     -- tell the engine once everything has loaded
+end
+function ui:init_sends() pd.send("ockm-mute-quant", "float", { self.v["ockm-mute-quant"] or 0 }) end
+function ui:save_settings()
+  local path = self:settings_path()
+  if not path then return end
+  local f = io.open(path, "w")
+  if f then f:write("-- OCKM_GENERATOR: your macros and settings (not part of any project)\nreturn " .. ser(self.me) .. "\n"); f:close() end
+end
+
+-- a line describing a recipe: "filter up over 2 bars, reverb, pump"
+local function move_label(m)
+  local t = TARGET[m.t]
+  if not t then return "?" end
+  if t.choices then return t.choices[m.v] or "mutes" end
+  local word = m.t
+  if m.t == "filter" then word = (m.v >= 0) and "filter up" or "filter down" end
+  if t.switch then return word end
+  if HOW[m.how] and HOW[m.how][2] > 0 then word = word .. " over " .. HOW[m.how][1] end
+  return word
+end
+local function recipe_summary(r)
+  if not r or #r.moves == 0 then return "empty: tap to make one" end
+  local out = {}
+  for _, m in ipairs(r.moves) do out[#out + 1] = move_label(m) end
+  return table.concat(out, ", ")
+end
+
+-- ------------------------------------------------------------------ playing a macro
+-- press: each move goes to its amount (straight away or over its time); let go: each comes back (snap or glide),
+-- unless it stays, in which case the macro stays lit until you tap it again
+local function steps_ms(self, steps) return steps * 15000 / math.max(40, self.v["ockm-bpm"] or 124) end
+function ui:mset(hook, x) self.v[hook] = x; pd.send(hook, "float", { x }) end
+function ui:ramp(hook, to, ms)
+  self.ramps = self.ramps or {}
+  if ms <= 0 then self.ramps[hook] = nil; self:mset(hook, to); return end
+  self.ramps[hook] = { from = self.v[hook] or 0, to = to, t = 0, dur = ms }
+  if self.rampclock then self.rampclock:delay(30) end
+end
+function ui:ramp_tick()
+  local any = false
+  for hook, r in pairs(self.ramps or {}) do
+    r.t = r.t + 30
+    local f = math.min(1, r.t / r.dur)
+    self:mset(hook, r.from + (r.to - r.from) * f)
+    if f >= 1 then self.ramps[hook] = nil else any = true end
+  end
+  self:dirty()
+  if any and self.rampclock then self.rampclock:delay(30) end
+end
+local function keep_for(kind, kicks)
+  if kind == 1 then return function(t) return kicks[t] or t == "bass" end
+  elseif kind == 2 then return function(t) return t:match("^d%d") ~= nil end
+  elseif kind == 3 then return function(t) return t:match("^d%d") == nil end
+  else return function(t) return not kicks[t] end end
+end
+function ui:macro_down(slot)
+  local mc = self.macro
+  if mc and mc.slot == slot and mc.latched then self:macro_finish(); return end   -- a macro that stayed: tap again to let it go
+  if mc then self:macro_finish() end
+  local r = (slot == 4) and self.me.macros[self.try_sel or 1] or self.me.macros[self.me.slots[slot]]
+  if not r then return end
+  local saved = { set = {}, mutes = {}, filter = self.v["ockm-filter"] or 0 }
+  for _, m in ipairs(r.moves) do
+    local t = TARGET[m.t]
+    local ms = steps_ms(self, HOW[m.how] and HOW[m.how][2] or 0)
+    if t and t.choices then
+      local keep = keep_for(m.v, self:kick_slots())
+      for _, tr in ipairs(TRACKS) do
+        saved.mutes[tr] = self:mute_target(tr)
+        local want = keep(tr) and 0 or 1
+        if want ~= saved.mutes[tr] then self:qmute(tr, want) end
+      end
+    elseif t and t.id == "filter" then
+      pd.send("ockm-filter-glide", "list", { m.v, math.max(30, ms) }); self.v["ockm-filter"] = m.v
+    elseif t then
+      saved.set[t.hook] = self.v[t.hook] or 0
+      self:ramp(t.hook, t.switch and 1 or m.v, t.switch and 0 or ms)
+    end
+  end
+  self.macro = { slot = slot, recipe = r, saved = saved }
+end
+-- put moves back: on letting go, all but the ones that stay; when finishing, everything
+function ui:macro_restore(all)
+  local mc = self.macro
+  local r, saved = mc.recipe, mc.saved
+  local stays = false
+  for _, m in ipairs(r.moves) do
+    local back = m.back or 1
+    if back == 3 and not all then stays = true
+    elseif not (all and back ~= 3 and mc.latched) then
+      local t = TARGET[m.t]
+      local glide = (back == 2) and steps_ms(self, 16) or 0
+      if t and t.choices then
+        for tr, x in pairs(saved.mutes) do if self:mute_target(tr) ~= x then self:qmute(tr, x) end end
+      elseif t and t.id == "filter" then
+        if self.filter_hold then pd.send("ockm-filter-glide", "list", { saved.filter, math.max(50, glide) }); self.v["ockm-filter"] = saved.filter
+        elseif glide > 0 then pd.send("ockm-filter-glide", "list", { 0, glide }); self.v["ockm-filter"] = 0
+        else self:filter_spring() end
+      elseif t then
+        self:ramp(t.hook, saved.set[t.hook] or 0, t.switch and 0 or glide)
+      end
+    end
+  end
+  return stays
+end
+function ui:macro_up(slot)
+  local mc = self.macro
+  if not mc or mc.slot ~= slot or mc.latched then return end
+  if self:macro_restore(false) then mc.latched = true else self.macro = nil end
+end
+function ui:macro_finish()
+  if not self.macro then return end
+  self:macro_restore(true)
+  self.macro = nil
+end
+
+-- ------------------------------------------------------------------ settings screen
+local SECTIONS = { "this project", "new projects", "this device", "macros" }
+local SX = 184                       -- where a section's content starts
+function ui:layout_setup(add)
+  local sec = self.set_sec or 1
+  for i, nm in ipairs(SECTIONS) do
+    add{ kind="choice", x=16, y=80 + (i - 1) * 56, w=154, h=48, label=nm, sel=(sec == i), tap=function() self.set_sec = i; self.edit_move = nil end }
+  end
+  add{ kind="text", x=16, y=H - 40, w=160, h=12, label="OCKM " .. VERSION, size=10 }
+  add{ kind="text", x=16, y=H - 26, w=160, h=12, label=ockm_pretty(self.project), size=10 }
+  if sec == 1 then self:layout_set_project(add)
+  elseif sec == 2 then self:layout_set_new(add)
+  elseif sec == 3 then self:layout_set_device(add)
+  else self:layout_set_macros(add) end
+end
+
+function ui:layout_set_project(add)
+  local cw = W - 16 - SX
+  local bpm = math.floor(self.v["ockm-bpm"] or 124)
+  add{ kind="text", x=SX, y=80, w=200, h=12, label="tempo", size=10 }
+  add{ kind="text", x=SX, y=96, w=200, h=40, label=bpm .. " bpm", size=34, col="txt" }
+  for i, d in ipairs({ -5, -1, 1, 5 }) do
+    add{ kind="btn", x=SX + 230 + (i - 1) * 82, y=88, w=76, h=52, label=(d > 0 and "+" or "") .. d, tap=function() self:send("ockm-bpm", clamp(bpm + d, 40, 200)) end }
+  end
+  add{ kind="slider", x=SX, y=156, w=cw, h=40, hook="ockm-bpm", lo=60, hi=180, label="tempo" }
+  add{ kind="slider", x=SX, y=212, w=cw, h=40, hook="ockm-swing", lo=50, hi=75, label="swing" }
+  add{ kind="text", x=SX + 110, y=252, w=cw - 110, h=12, label="50 is straight, 58 a gentle house shuffle, 66 heavy", size=10 }
+  add{ kind="slider", x=SX, y=276, w=cw, h=40, hook="ockm-accent", lo=0, hi=1, label="accents" }
+  add{ kind="text", x=SX + 110, y=316, w=cw - 110, h=12, label="how much quieter an ordinary hit is than an accented one", size=10 }
+  add{ kind="slider", x=SX, y=340, w=cw, h=40, hook="ockm-verb-tone", lo=0, hi=1, label="reverb tone" }
+  add{ kind="text", x=SX, y=404, w=300, h=12, label="MIDI clock", size=10 }
+  local half = (cw - 8) / 2
+  local sync = math.floor(self.v["ockm-sync"] or 0)
+  add{ kind="choice", x=SX, y=420, w=half, h=52, label="lead: my tempo, send clock out", sel=(sync == 0), tap=function() self:send("ockm-sync", 0) end }
+  add{ kind="choice", x=SX + half + 8, y=420, w=half, h=52, label="follow incoming MIDI clock", sel=(sync == 1), tap=function() self:send("ockm-sync", 1) end }
+  add{ kind="text", x=SX, y=492, w=cw, h=12, label="these belong to the project: save to keep them", size=10 }
+end
+
+-- a row of choices with a name on the left
+function ui:set_row(add, y, name, note, opts, cur, pick)
+  add{ kind="text", x=SX, y=y + 12, w=170, h=14, label=name, size=13, col="txt" }
+  if note and note ~= "" then add{ kind="text", x=SX, y=y + 30, w=170, h=12, label=note, size=9 } end
+  local x0, cw = SX + 180, W - 16 - SX - 180
+  local ow = (cw - 6 * (#opts - 1)) / #opts
+  for i, o in ipairs(opts) do
+    add{ kind="choice", x=x0 + (i - 1) * (ow + 6), y=y, w=ow, h=48, label=o, small=true, sel=(cur == i), tap=function() pick(i) end }
+  end
+end
+
+function ui:layout_set_new(add)
+  local n = self.me.new
+  add{ kind="text", x=SX, y=80, w=600, h=12, label="how a new blank project starts (yours, not the project's)", size=10 }
+  local DL = { 16, 32, 64 }
+  local SL = { 32, 64, 128 }
+  local function idx(t, x) for i, v in ipairs(t) do if v == x then return i end end return 1 end
+  self:set_row(add, 104, "drums", "you can build up from here", { "1 bar", "2 bars", "4 bars" }, idx(DL, n.drum), function(i) n.drum = DL[i]; self:save_settings() end)
+  self:set_row(add, 164, "synths", "bass, lead and chords", { "2 bars", "4 bars", "8 bars" }, idx(SL, n.synth), function(i) n.synth = SL[i]; self:save_settings() end)
+  local LN = {}; for i, l in ipairs(NEW_LEAD) do LN[i] = l[1] end
+  self:set_row(add, 224, "lead starts as", "its notes and rhythm", LN, n.lead, function(i) n.lead = i; self:save_settings() end)
+end
+
+function ui:layout_set_device(add)
+  local d = self.me.device
+  add{ kind="text", x=SX, y=80, w=600, h=12, label="this device: kept here, not in projects", size=10 }
+  self:set_row(add, 104, "theme", "", { "dark", "light" }, (d.theme == "light") and 2 or 1, function(i)
+    d.theme = (i == 2) and "light" or "dark"; self.theme = THEMES[d.theme]; self:save_settings() end)
+  self:set_row(add, 164, "filter lets go", "how fast it goes home", { "snap", "quick", "slow" }, d.snap, function(i)
+    d.snap = i; SPRING_MS = SNAP_MS[i]; self:save_settings() end)
+  self:set_row(add, 224, "mutes land", "where Perform B starts", { "now", "next beat", "next bar" }, (d.mutes or 0) + 1, function(i)
+    d.mutes = i - 1; self.v["ockm-mute-quant"] = i - 1; pd.send("ockm-mute-quant", "float", { i - 1 }); self:save_settings() end)
+  add{ kind="text", x=SX, y=300, w=W - 16 - SX, h=12, label="audio out (DAC or headphones) comes here once the DAC is fitted", size=10 }
+  if KIOSK then
+    add{ kind="btn", x=SX, y=H - 76, w=220, h=56, label="quit to desktop", tap=function() psend("pd", "quit", {}) end }
+  end
+end
+
+-- macros: your six recipes on the left, the one you're editing on the right, and which slot it's on
+function ui:layout_set_macros(add)
+  local me = self.me
+  local sel = self.mac_sel or 1
+  local lw = 236
+  for i = 1, 6 do
+    local r = me.macros[i]
+    local slot
+    for s = 1, 3 do if me.slots[s] == i then slot = string.char(64 + s) end end
+    add{ kind="recipe", x=SX, y=80 + (i - 1) * 84, w=lw, h=78, label=(r and #r.moves > 0) and r.name or "empty", sub=recipe_summary(r), slot=slot, sel=(sel == i),
+         tap=function() self.mac_sel = i end }
+  end
+  local r = me.macros[sel]
+  local ex, ew = SX + lw + 12, W - 16 - (SX + lw + 12)
+  add{ kind="card", x=ex, y=80, w=ew, h=H - 12 - 80 }
+  local ix, iw = ex + 8, ew - 16
+  -- name: step through a list of names (there's no keyboard on the Pi)
+  local ni = 1; for k, nm in ipairs(MACRO_NAMES) do if nm == r.name then ni = k end end
+  add{ kind="arrow", x=ix, y=88, w=44, h=44, dir=-1, on=true, tap=function() r.name = MACRO_NAMES[(ni - 2) % #MACRO_NAMES + 1]; self:save_settings() end }
+  add{ kind="preset", x=ix + 50, y=88, w=iw - 100, h=44, num="", label=r.name, sel=true, inline=true }
+  add{ kind="arrow", x=ix + iw - 44, y=88, w=44, h=44, dir=1, on=true, tap=function() r.name = MACRO_NAMES[ni % #MACRO_NAMES + 1]; self:save_settings() end }
+  -- the moves: what, how much, how it gets there, how it lets go. Tap a box to step through its choices
+  local cols = { 112, iw - 112 - 104 - 104 - 34 - 24, 104, 104, 34 }
+  local function colx(c) local x = ix; for k = 1, c - 1 do x = x + cols[k] + 6 end; return x end
+  add{ kind="text", x=colx(1), y=140, w=100, h=10, label="move", size=9 }
+  add{ kind="text", x=colx(2), y=140, w=100, h=10, label="amount", size=9 }
+  add{ kind="text", x=colx(3), y=140, w=100, h=10, label="gets there", size=9 }
+  add{ kind="text", x=colx(4), y=140, w=100, h=10, label="lets go", size=9 }
+  for k, m in ipairs(r.moves) do
+    local y = 154 + (k - 1) * 54
+    local t = TARGET[m.t]
+    add{ kind="btn", x=colx(1), y=y, w=cols[1], h=48, small=true, label=m.t, tap=function()
+      local ti = 1; for q, tt in ipairs(TARGETS) do if tt.id == m.t then ti = q end end
+      local nt = TARGETS[ti % #TARGETS + 1]
+      m.t = nt.id; m.v = nt.choices and 1 or (nt.switch and 1 or ((nt.lo + nt.hi) / 2)); self:save_settings() end }
+    if t.choices then
+      add{ kind="btn", x=colx(2), y=y, w=cols[2], h=48, small=true, label=t.choices[m.v] or "?", tap=function() m.v = m.v % #t.choices + 1; self:save_settings() end }
+    elseif t.switch then
+      add{ kind="locked", x=colx(2), y=y, w=cols[2], h=48, label="on while held" }
+    else
+      local hk = "macro-edit-" .. k
+      self.v[hk] = m.v
+      add{ kind="hbar", x=colx(2), y=y, w=cols[2], h=48, hook=hk, lo=t.lo, hi=t.hi, label=m.t, bold=true, edit=function(x) m.v = x; self:save_settings() end }
+    end
+    add{ kind="btn", x=colx(3), y=y, w=cols[3], h=48, small=true, label=HOW[m.how][1], tap=function() m.how = m.how % #HOW + 1; self:save_settings() end }
+    add{ kind="btn", x=colx(4), y=y, w=cols[4], h=48, small=true, label=BACK[m.back or 1], tap=function() m.back = (m.back or 1) % #BACK + 1; self:save_settings() end }
+    add{ kind="btn", x=colx(5), y=y, w=cols[5], h=48, small=true, quiet=true, label="x", tap=function() table.remove(r.moves, k); self:save_settings() end }
+  end
+  if #r.moves < 4 then
+    add{ kind="btn", x=ix, y=154 + #r.moves * 54, w=iw, h=40, small=true, quiet=true, label="+ add a move (up to 4)", tap=function()
+      r.moves[#r.moves + 1] = { t = "reverb", v = 0.6, how = 1, back = 1 }; self:save_settings() end }
+  end
+  -- which slot on Perform B, and try it
+  add{ kind="text", x=ix, y=H - 62, w=60, h=12, label="on slot", size=10 }
+  for s = 1, 3 do
+    add{ kind="choice", x=ix + 64 + (s - 1) * 62, y=H - 76, w=56, h=56, label=string.char(64 + s), sel=(me.slots[s] == sel), accent=true,
+         tap=function() me.slots[s] = sel; self:save_settings() end }
+  end
+  local tw = iw - 64 - 3 * 62 - 6
+  add{ kind="hold", x=ix + iw - tw, y=H - 76, w=tw, h=56, label="try it", sub="hold", on=(self.macro and self.macro.slot == 4),
+       down=function() self.try_sel = sel; self:macro_down(4) end, up=function() self:macro_up(4) end }
+end
+
+-- Perform B: choose which recipe is on a slot
+function ui:layout_slotpick(add)
+  local s = self.pick_slot or 1
+  add{ kind="scrim", x=0, y=0, w=W, h=H, tap=function() self.sheet = nil end }
+  local x0, y0, w0 = W / 2 - 220, 110, 440
+  add{ kind="sheet", x=x0, y=y0, w=w0, h=6 * 56 + 70 }
+  add{ kind="text", x=x0 + 16, y=y0 + 16, w=w0 - 32, h=14, label="slot " .. string.char(64 + s) .. ": play which macro?", size=13, col="txt" }
+  for i = 1, 6 do
+    local r = self.me.macros[i]
+    add{ kind="recipe", x=x0 + 16, y=y0 + 44 + (i - 1) * 56, w=w0 - 32, h=50, label=(r and #r.moves > 0) and r.name or "empty", sub=recipe_summary(r),
+         sel=(self.me.slots[s] == i), tap=function() self.me.slots[s] = i; self:save_settings(); self.sheet = nil end }
+  end
+end
+
+-- a new blank project starts the way you like (only what differs from how the engine starts one)
+function ui:apply_new_defaults()
+  local n = self.me.new
+  if n.drum ~= 16 then psend("ockm-drum-len", "float", { n.drum }) end
+  if n.synth ~= 64 then for _, p in ipairs(SYNTHS) do psend("ockm-" .. p .. "-len", "float", { n.synth }) end end
+  local l = NEW_LEAD[n.lead or 1]
+  if l and (n.lead or 1) ~= 1 then psend("ockm-lead-rhythm", "float", { l[2] }); psend("ockm-lead-notes", "float", { l[3] }) end
+  if n.drum ~= 16 or n.synth ~= 64 or (n.lead or 1) ~= 1 then psend("ockm-save", "bang", {}) end
 end
 
 -- is a track playing a note on this step (and can it be heard)? For the lights on live
@@ -1583,29 +1940,6 @@ function ui:layout_export(add)
 end
 
 -- ------------------------------------------------------------------ setup (tap the tempo)
-function ui:layout_setup(add)
-  local bpm = math.floor(self.v["ockm-bpm"] or 124)
-  add{ kind="text", x=16, y=80, w=200, h=12, label="tempo", size=10 }
-  add{ kind="text", x=16, y=96, w=200, h=40, label=bpm .. " bpm", size=34, col="txt" }
-  local steps = { -5, -1, 1, 5 }
-  for i, d in ipairs(steps) do
-    add{ kind="btn", x=230 + (i - 1) * 82, y=92, w=76, h=52, label=(d > 0 and "+" or "") .. d, tap=function() self:send("ockm-bpm", clamp(bpm + d, 40, 200)) end }
-  end
-  add{ kind="slider", x=16, y=156, w=W - 32, h=40, hook="ockm-bpm", lo=60, hi=180, label="tempo" }
-  add{ kind="slider", x=16, y=212, w=W - 32, h=40, hook="ockm-swing", lo=50, hi=75, label="swing" }
-  add{ kind="text", x=126, y=252, w=600, h=12, label="swing belongs to the loop: 50 is straight, 58 is a gentle house shuffle, 66 is heavy", size=10 }
-  add{ kind="slider", x=16, y=276, w=W - 32, h=40, hook="ockm-accent", lo=0, hi=1, label="accents" }
-  add{ kind="text", x=126, y=316, w=600, h=12, label="how much quieter an ordinary hit is than an accented one", size=10 }
-  add{ kind="slider", x=16, y=340, w=W - 32, h=40, hook="ockm-volume", lo=0, hi=1, label="volume" }
-  add{ kind="text", x=16, y=404, w=300, h=12, label="MIDI clock", size=10 }
-  local half = (W - 40) / 2
-  local sync = math.floor(self.v["ockm-sync"] or 0)
-  add{ kind="choice", x=16, y=420, w=half, h=52, label="lead: use my tempo, send clock out", sel=(sync == 0), tap=function() self:send("ockm-sync", 0) end }
-  add{ kind="choice", x=24 + half, y=420, w=half, h=52, label="follow: play to incoming MIDI clock", sel=(sync == 1), tap=function() self:send("ockm-sync", 1) end }
-  add{ kind="slider", x=16, y=484, w=W - 32, h=36, hook="ockm-verb-tone", lo=0, hi=1, label="reverb tone" }
-  add{ kind="text", x=16, y=532, w=W - 32, h=12, label="tempo, accents, volume, reverb tone and MIDI clock belong to the project. Save to keep them", size=10 }
-  add{ kind="text", x=16, y=552, w=W - 32, h=12, label="OCKM_GENERATOR " .. VERSION .. "  ·  project: " .. ockm_pretty(self.project), size=10 }
-end
 
 -- ------------------------------------------------------------------ projects
 -- A project is a folder: 8 patterns plus the kit, tempo and effects. New ones get two random words and the date.
@@ -1647,7 +1981,7 @@ function ui:layout_project(add)
         local n = self:new_name(); psend("ockm-project-saveas", "symbol", { n }); psend("ockm-project-list", "bang", {})
         self:say("saved a copy as " .. ockm_pretty(n) .. ". You're now working in the copy") end },
     { "new blank project", function()
-        local n = self:new_name(); self.exists = 1; psend("ockm-project-new", "symbol", { n }); psend("ockm-project-list", "bang", {})
+        local n = self:new_name(); self.exists = 1; self.new_pending = true; psend("ockm-project-new", "symbol", { n }); psend("ockm-project-list", "bang", {})
         self.pick = nil; self:say("new project: " .. ockm_pretty(n) .. ". The last one stays as you last saved it") end },
     { "export...", function() psend("ockm-usb-scan", "bang", {}); psend("ockm-exports-ask", "bang", {}); self.sheet = "export" end },
   }
@@ -2032,6 +2366,7 @@ function ui:slide(w, x, y)
   local v = w.lo + f * (w.hi - w.lo)
   if w.log then v = math.floor(w.lo * (w.hi / w.lo) ^ f + 0.5) end
   if w.hi - w.lo > 4 then v = math.floor(v + 0.5) else v = math.floor(v * 100 + 0.5) / 100 end
+  if w.edit then self.v[w.hook] = v; w.edit(v); return end
   self:send(w.hook, v)
 end
 
@@ -2194,7 +2529,7 @@ function ui:draw(g, w)
     self:ctext(g, w.label, w, w.small and 12 or 14, w.accent and "#ffffff" or (w.quiet and "mute" or "txt"))
   elseif k == "tab" then
     self:col(g, w.sel and "on" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
-    self:ctext(g, w.label, w, 13, w.sel and "bg" or "txt")
+    self:ctext(g, w.label, w, 12, w.sel and "bg" or "txt")
   elseif k == "play" then
     local on = self.playing ~= 0
     self:col(g, on and "acc" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
@@ -2219,6 +2554,42 @@ function ui:draw(g, w)
     local sel = w.sel
     self:col(g, sel and (w.accent and "acc" or "on") or (w.onbar and "dim" or "off")); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
     self:ctext(g, w.label, w, w.small and 11 or 13, sel and (w.accent and "#ffffff" or "bg") or (w.disabled and "mute" or "txt"))
+  elseif k == "recipe" then
+    self:col(g, w.sel and "on" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 8)
+    self:text(g, w.label, w.x + 12, w.y + w.h / 2 - 17, 14, w.sel and "bg" or "txt", w.w - 70)
+    self:text(g, w.sub or "", w.x + 12, w.y + w.h / 2 + 3, 9, w.sel and "dim" or "mute", w.w - 20)
+    if w.slot then
+      self:col(g, "acc"); g:fill_rounded_rect(w.x + w.w - 56, w.y + 8, 48, 20, 4)
+      self:ctext(g, "slot " .. w.slot, { x=w.x + w.w - 56, y=w.y + 8, w=48, h=20 }, 10, "#ffffff")
+    end
+  elseif k == "disc" then
+    -- save: a floppy disc, orange when there's something unsaved
+    local on = self.unsaved
+    self:col(g, on and "acc" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
+    local c = on and "#ffffff" or "txt"
+    local cx, cy = w.x + w.w / 2, w.y + w.h / 2
+    self:col(g, c); g:stroke_rounded_rect(cx - 11, cy - 11, 22, 22, 3, 2)
+    g:fill_rect(cx - 6, cy - 11, 12, 7)
+    self:col(g, on and "acc" or "off"); g:fill_rect(cx - 2, cy - 10, 4, 5)
+    self:col(g, c); g:fill_rect(cx - 7, cy + 3, 14, 6)
+  elseif k == "menubtn" then
+    self:col(g, w.sel and "on" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
+    self:col(g, w.sel and "bg" or "txt")
+    for j = -1, 1 do g:fill_rect(w.x + w.w / 2 - 11, w.y + w.h / 2 + j * 7 - 1, 22, 3) end
+  elseif k == "scrim" then
+    -- nothing to draw: it only catches taps outside the menu
+  elseif k == "menupanel" then
+    self:col(g, "bg"); g:fill_rounded_rect(w.x - 3, w.y - 3, w.w + 6, w.h + 6, 12)
+    self:col(g, "card"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 10)
+    self:col(g, "dim"); g:stroke_rounded_rect(w.x, w.y, w.w, w.h, 10, 1)
+  elseif k == "menuitem" then
+    self:col(g, "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
+    if w.sub ~= "" then
+      self:text(g, w.label, w.x + 12, w.y + 7, 13, "txt", w.w - 16)
+      self:text(g, w.sub, w.x + 12, w.y + 27, 9, "mute", w.w - 16)
+    else
+      self:text(g, w.label, w.x + 12, w.y + 15, 13, "txt", w.w - 16)
+    end
   elseif k == "hold" then
     if w.on then self:col(g, "acc"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 8)
     else self:col(g, "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 8); self:col(g, "acc"); g:stroke_rounded_rect(w.x + 1, w.y + 1, w.w - 2, w.h - 2, 8, 2) end

@@ -594,31 +594,31 @@ def touchscreen_drives_the_engine(work):
     h.at(100, "ockm-resync bang")
     tap(150, 50, 137)                    # perform: open the kick lane
     tap(170, 160, 212); tap(180, 160, 212)   # step 3: on, then accent
-    tap(190, 273, 36)                    # perform tab
-    tap(200, 459, 36)                    # drums tab (back to the kick slot)
+    tap(190, 262, 36)                    # perform tab
+    tap(200, 539, 36)                    # drums tab (back to the kick slot)
     tap(210, 668, 88)                    # drum length: 2 bars (navigation strip)
     h.at(220, "ockm-ui-test drag 600 212 200 212")   # swipe left: steps 17-32
     tap(230, 45, 212)                    # step 17
     h.at(240, "ockm-ui-test drag 200 212 600 212")   # swipe right: back to 1-16
     tap(245, 194, 88)                    # forward arrow (steps 17-32)
     tap(248, 38, 88)                     # back arrow (steps 1-16)
-    tap(250, 273, 36)                    # perform tab
+    tap(250, 262, 36)                    # perform tab
     tap(255, 200, 438); tap(258, 129, 524)   # synth card: lead, then its first knob
-    tap(260, 521, 36)                    # bass tab (bass is on auto)
+    tap(260, 601, 36)                    # bass tab (bass is on auto)
     tap(265, 45, 158)                    # tap a step on auto: locked, nothing is edited
-    tap(266, 397, 36); tap(267, 417, 154)   # compose: mode manual (every part yours)
-    tap(268, 521, 36)                    # back to the bass tab
+    tap(266, 477, 36); tap(267, 417, 154)   # compose: mode manual (every part yours)
+    tap(268, 601, 36)                    # back to the bass tab
     tap(270, 45, 158)                    # now bass step 1 edits
     tap(280, 600, 236)                   # note picker: third note of the scale
-    tap(290, 273, 36)                    # perform tab
+    tap(290, 262, 36)                    # perform tab
     tap(310, 629, 500)                   # master fx: filter, middle
-    tap(320, 397, 36)                    # compose tab
+    tap(320, 477, 36)                    # compose tab
     tap(330, 71, 154)                    # mode: chord priority again (chords are yours)
     tap(335, 283, 349)                   # chord column: next progression
     tap(340, 200, 486)                   # spice 3 (ninth)
-    tap(345, 273, 36); tap(348, 126, 137)  # perform tab, mute the kick lane
+    tap(345, 262, 36); tap(348, 126, 137)  # perform tab, mute the kick lane
     tap(349, 192 + 47 * 1 + 20, 165)     # perform: snare lane, step 2
-    tap(350, 707, 36)                    # mixer tab
+    tap(350, 407, 36)                    # mixer tab
     tap(355, 673, 361)                   # bass fader, halfway (below the EQ button)
     tap(360, 130, 505)                   # mute on strip 2
     f = os.path.join(work, "t_touch.pd"); h.finish(600, f)
@@ -654,7 +654,7 @@ def touchscreen_screens_draw(work):
         raise Skip("Pillow not installed")
     p = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_preview.py"), os.path.join(work, "preview")], capture_output=True, text=True)
     assert p.returncode == 0, p.stderr[-800:]
-    assert len(os.listdir(os.path.join(work, "preview"))) == 24, "expected twenty-four screen pictures"
+    assert len(os.listdir(os.path.join(work, "preview"))) == 28, "expected twenty-eight screen pictures"
 
 @test
 def mute_solo_and_levels(work):
@@ -734,7 +734,7 @@ def touchscreen_mode_dial(work):
     names = ["ockm-leader", "ockm-lead-sync", "ockm-bass-sync", "ockm-bass-mode", "ockm-lead-mode", "ockm-chord-mode"]
     h = Harness(); h.show(*names)
     tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
-    tap(150, 397, 36)                   # compose
+    tap(150, 477, 36)                   # compose
     tap(200, 186, 154); h.at(250, "test-mark 1")    # melody priority
     tap(300, 417, 154); h.at(350, "test-mark 2")    # manual
     tap(400, 71, 154);  h.at(450, "test-mark 3")    # chord priority
@@ -802,7 +802,7 @@ def live_mutes_land_on_the_bar(work):
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness(); h.show("ockm-d1-mute", "ockm-bass-mute", "ockm-bar", "ockm-d2-mute")
     h.at(100, "ockm-bpm 120 ; ockm-play 1")
-    h.at(150, "ockm-ui-test tap 335 36")       # live tab
+    h.at(150, "ockm-ui-test tap 338 36")       # live tab
     h.at(200, "ockm-ui-test tap 400 97")       # mutes land: next bar
     h.at(700, "test-mark 1 ; ockm-ui-test tap 60 180")      # kick tile, part way through the first bar (a bar is 2 s)
     h.at(2600, "ockm-ui-test tap 74 556")      # scene: drums only (after the kick has gone)
@@ -827,7 +827,7 @@ def live_macros_move_several_things_and_put_them_back(work):
     if not PDLUA:
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness(); h.show("ockm-delay-mix", "ockm-verb-mix", "ockm-d2-mute", "ockm-d1-mute", "ockm-bass-mute", "ockm-filter-glide")
-    h.at(100, "ockm-ui-test tap 335 36")       # live tab (mutes land now)
+    h.at(100, "ockm-ui-test tap 338 36")       # live tab (mutes land now)
     h.at(200, "ockm-ui-test press 700 500")    # wash, held
     h.at(300, "ockm-ui-test release 700 500")
     h.at(400, "ockm-ui-test press 850 500")    # strip, held
@@ -840,6 +840,35 @@ def live_macros_move_several_things_and_put_them_back(work):
     assert printed(out, "ockm-filter-glide"), "wash: the filter moves too"
     assert printed(out, "ockm-d2-mute") == ["1", "0"], f"strip: the snare mutes, then comes back: {printed(out, 'ockm-d2-mute')}"
     assert not printed(out, "ockm-d1-mute") and not printed(out, "ockm-bass-mute"), "strip: kick and bass keep playing"
+
+@test
+def settings_macro_library_and_slots(work):
+    """Settings, macros: put 'sink' on slot A, then hold slot A on Perform B: the filter sinks and the drive rises over
+    a bar, and both come back when you let go. Your choice is kept in my-settings.lua, outside the projects."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    mine = os.path.join(work, "my-settings.lua")
+    if os.path.exists(mine): os.remove(mine)
+    h = Harness(); h.show("ockm-filter-glide", "ockm-drive")
+    h.at(100, "ockm-bpm 120 ; ockm-ui-test tap 919 36")   # menu
+    h.at(150, "ockm-ui-test tap 830 195")      # settings
+    h.at(200, "ockm-ui-test tap 90 272")       # macros
+    h.at(250, "ockm-ui-test tap 260 371")      # recipe 4: sink
+    h.at(300, "ockm-ui-test tap 532 552")      # on slot A
+    h.at(350, "ockm-ui-test tap 338 36")       # Perform B
+    h.at(400, "ockm-ui-test press 550 520")    # hold slot A
+    h.at(2600, "ockm-ui-test release 550 520")
+    f = os.path.join(work, "t_settings.pd"); h.finish(2800, f)
+    out = run(work, f)
+    try:
+        saved = open(mine).read() if os.path.exists(mine) else ""
+    finally:
+        if os.path.exists(mine): os.remove(mine)
+    gl = printed(out, "ockm-filter-glide")
+    assert gl and gl[0].split()[0] == "-0.85", f"sink should take the filter down: {gl}"
+    dr = [float(x) for x in printed(out, "ockm-drive")]
+    assert dr and max(dr) > 0.65 and len([x for x in dr if 0.05 < x < 0.65]) >= 3 and dr[-1] < 0.01, f"drive should rise over the bar, then go back: {dr[:6]} ... {dr[-3:]}"
+    assert '"slots"' in saved and re.search(r'"slots"\]\s*=\s*\{\s*4', saved), f"slot A should be saved as recipe 4: {saved[:400]}"
 
 @test
 def touchscreen_filter_springs_and_throw(work):
@@ -1078,7 +1107,7 @@ def touchscreen_makes_and_opens_projects(work):
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness(); h.show("ockm-project-name", "ockm-project-new", "ockm-project-open")
     tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
-    tap(150, 910, 36)                    # project screen
+    tap(150, 919, 36); tap(151, 830, 95)   # menu, project
     tap(200, 667, 178)                   # new blank project
     f = os.path.join(work, "t_touchproj.pd"); h.finish(400, f)
     out = run(work, f)
@@ -1126,7 +1155,7 @@ def suggest_chords_fit_the_melody(work):
         on = " ".join("1" if i % 4 == 0 else "0" for i in range(64))
         nt = " ".join(str(notes[(i // 4) % len(notes)]) for i in range(64))
         lines = ui_preview.run(["send ockm-length float 64", f"array ockm-pat-lead-on {on}", f"array ockm-pat-lead-note {nt}",
-                                "send ockm-lead-mode float 1", "test tap 397 36", "test tap 186 154", "test tap 100 558"])
+                                "send ockm-lead-mode float 1", "test tap 477 36", "test tap 186 154", "test tap 100 558"])
         return [int(float(l.split()[3])) for l in lines if l.startswith("sent ockm-chord-prog")]
     a_minor = picks([57, 60, 64])           # A C E: the home chord
     assert a_minor[0] == 0, f"a melody on A C E should suggest one chord first: {a_minor}"
@@ -1134,7 +1163,7 @@ def suggest_chords_fit_the_melody(work):
     # a melody that walks A minor, F, C, G one bar each: the pop progression (i VI III VII) should come first
     pop = picks([57, 60, 64, 57, 65, 69, 72, 65, 60, 64, 67, 60, 67, 71, 74, 67])
     assert ui_preview_shapes()[pop[0]] == [(0, 16), (5, 16), (2, 16), (6, 16)], f"expected the pop progression first: {pop}"
-    empty = ui_preview.run(["test tap 397 36", "test tap 186 154"])
+    empty = ui_preview.run(["test tap 477 36", "test tap 186 154"])
     assert not any(l.startswith("sent ockm-chord-prog") for l in empty), "no melody, no suggestion"
 
 def ui_preview_shapes():
@@ -1159,7 +1188,7 @@ def touchscreen_velocity_timing_loop_and_banks(work):
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness(); h.show("ockm-edit", "ockm-nudge", "ockm-drum-len", "ockm-drum-double", "ockm-drum-groove")
     h.at(100, "ockm-length 64 ; ockm-edit d1 0 1")
-    h.at(200, "ockm-ui-test tap 459 36")              # drums tab
+    h.at(200, "ockm-ui-test tap 539 36")              # drums tab
     h.at(300, "ockm-ui-test drag 45 336 45 302")      # velocity: drag step 1 to the top (accent)
     h.at(400, "ockm-ui-test tap 145 282")             # timing
     h.at(500, "ockm-ui-test drag 45 319 45 336")      # pull step 1 early
@@ -1185,7 +1214,7 @@ def touchscreen_exports_audio_stems_and_midi(work):
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness()
     h.at(100, "ockm-bass-gen bang ; ockm-chord-gen bang ; ockm-bpm 160")
-    h.at(300, "ockm-ui-test tap 910 36")      # project
+    h.at(300, "ockm-ui-test tap 919 36 ; ockm-ui-test tap 830 95")      # project
     h.at(400, "ockm-ui-test tap 854 178")     # export...
     h.at(600, "ockm-ui-test tap 224 162")     # the loop plays once
     h.at(700, "ockm-ui-test tap 510 222")     # stems on
@@ -1220,10 +1249,10 @@ def touchscreen_exports_the_loop_and_records_live(work):
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness()
     h.at(100, "ockm-bass-gen bang ; ockm-bpm 160")
-    h.at(300, "ockm-ui-test tap 910 36"); h.at(400, "ockm-ui-test tap 854 178")   # project, export...
+    h.at(300, "ockm-ui-test tap 919 36 ; ockm-ui-test tap 830 95"); h.at(400, "ockm-ui-test tap 854 178")   # project, export...
     h.at(500, "ockm-ui-test tap 224 162")     # the loop plays once
     h.at(600, "ockm-ui-test tap 644 544")     # export (stereo mix)
-    h.at(8000, "ockm-ui-test tap 910 36"); h.at(8100, "ockm-ui-test tap 854 178")
+    h.at(8000, "ockm-ui-test tap 919 36 ; ockm-ui-test tap 830 95"); h.at(8100, "ockm-ui-test tap 854 178")
     h.at(8200, "ockm-ui-test tap 154 544")    # record what I play
     h.at(8300, "ockm-play 1")
     h.at(9800, "ockm-ui-test tap 803 36")     # stop recording
@@ -1270,7 +1299,7 @@ def touchscreen_demud_listens_and_cuts(work):
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness(); h.show("ockm-d1-lowcut", "ockm-d4-lowcut", "ockm-bass-lowcut", "ockm-spec-all")
     h.at(100, "ockm-bass-gen bang ; ockm-chord-gen bang ; ockm-play 1")
-    h.at(600, "ockm-ui-test tap 707 36")      # mixer
+    h.at(600, "ockm-ui-test tap 407 36")      # mixer
     h.at(700, "ockm-ui-test tap 905 232")     # de-mud (master strip)
     h.at(5200, "ockm-play 0")
     f = os.path.join(work, "t_demud.pd"); h.finish(5400, f)
@@ -1296,7 +1325,7 @@ def undo_takes_back_the_last_big_change(work):
     h.at(300, "test-get bang")
     h.at(350, "ockm-undo bang")
     h.at(450, "test-get bang")
-    h.at(500, "ockm-ui-test tap 707 36")      # mixer
+    h.at(500, "ockm-ui-test tap 407 36")      # mixer
     h.at(550, "ockm-ui-test tap 905 232")     # de-mud while stopped: fixed low cuts, with an undo button
     h.at(600, "ockm-ui-test tap 761 569")     # undo
     f = os.path.join(work, "t_undo.pd"); h.finish(800, f)
@@ -1317,7 +1346,7 @@ def touchscreen_compose_mutes_and_solos(work):
     if not PDLUA:
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness(); h.show("ockm-bass-mute", "ockm-lead-solo", "ockm-chord-mute")
-    h.at(100, "ockm-ui-test tap 397 36")      # compose
+    h.at(100, "ockm-ui-test tap 477 36")      # compose
     h.at(200, "ockm-ui-test tap 425 278")     # bass M
     h.at(300, "ockm-ui-test tap 778 278")     # lead S
     h.at(400, "ockm-ui-test tap 112 278")     # chord M
@@ -1336,7 +1365,7 @@ def touchscreen_steps_act_on_press(work):
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness(); h.show("ockm-edit", "ockm-page")
     h.at(50, "ockm-length 32")                        # 2 bars, so there's a second page to swipe to
-    h.at(100, "ockm-ui-test tap 459 36")              # drums
+    h.at(100, "ockm-ui-test tap 539 36")              # drums
     h.at(200, "ockm-ui-test press 105 212")           # step 2 of the kick: finger down only
     h.at(300, "ockm-ui-test release 105 212")
     h.at(400, "ockm-ui-test drag 400 212 100 212")    # press step 7, then swipe left
@@ -1423,7 +1452,7 @@ def touchscreen_part_lengths_and_undo(work):
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness(); h.show("ockm-bass-len", "ockm-len", "ockm-drum-len")
     h.at(90, "ockm-bass-sync 0")                      # its own length, not the chords'
-    h.at(100, "ockm-ui-test tap 521 36")              # bass tab
+    h.at(100, "ockm-ui-test tap 601 36")              # bass tab
     h.at(200, "ockm-ui-test tap 724 88")              # 4 bars
     h.at(300, "ockm-ui-test tap 612 88")              # 1 bar: shorter, so undo is offered
     h.at(400, "ockm-ui-test tap 761 569")             # undo
@@ -1497,7 +1526,7 @@ def touchscreen_picks_samples_and_kits(work):
     write_tone(os.path.join(kd, "01.wav"), 110, 0.2); write_tone(os.path.join(kd, "02.wav"), 220, 0.2)
     write_tone(os.path.join(work, "samples", "perc", "01.wav"), 330, 0.2)
     h = Harness(); h.show("ockm-d1-sample", "ockm-d1-audition", "ockm-d6-sample", "ockm-d7-sample", "ockm-d1-sound")
-    h.at(100, "ockm-ui-test tap 459 36")      # drums tab: counts the folders
+    h.at(100, "ockm-ui-test tap 539 36")      # drums tab: counts the folders
     h.at(300, "ockm-ui-test tap 366 380")     # 909 -> 808
     h.at(350, "ockm-ui-test tap 366 380")     # -> industrial
     h.at(400, "ockm-ui-test tap 366 380")     # -> sample 1

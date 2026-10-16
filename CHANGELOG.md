@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.55 (16 October 2026)
+
+- **A new top bar:** Perform A (was perform), Perform B (was live) and mixer together, then compose and the four parts, then arrange. Save is a disc that goes orange when there's something to save; **☰** opens project, export, settings and revert (and quit to desktop on the Pi)
+- **Settings,** in four sections: this project (tempo, swing, accents, reverb tone, MIDI clock), new projects (starting lengths and lead style), this device (theme, filter snap speed, where mutes start) and macros
+- **Your macro library:** six macros, each up to four moves with an amount, how it gets there and how it lets go (snap, glide or stay). Three slots on Perform B; the small v on each picks the macro. Kept in `my-settings.lua`, the same in every project
+- New macros out of the box: sink, dub out and lift, alongside build, wash and strip
+
 ## v0.54 (16 October 2026)
 
 - **Live, a second perform screen** (its own tab, next to perform): a big tile per track to mute, plus all synths, scenes (drums only, no drums, kick + bass, all in) and the master effects at full size

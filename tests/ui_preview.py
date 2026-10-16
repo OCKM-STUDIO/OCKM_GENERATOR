@@ -90,29 +90,33 @@ SHOTS = [
                         "array ockm-pat-bass-on 1 0 1 1 0 1 1 0 1 0 1 1 0 1 1 0", "array ockm-pat-chord-on 1 0 0 0 0 0 0 0 1",
                         "send ockm-bass-seed float 2", "send ockm-play float 1", "send ockm-step float 2", "test tap 742 476"]),   # bass playing, filter held
     ("perform-chord", ["array ockm-pat-chord-on 1 0 0 0 0 0 0 0 1", "test tap 340 438"]),                                     # chords picked: rhythm stepper
-    ("live", ["array ockm-pat-d1 2 0 0 0 1 0 0 0 2 0 0 0 1 0 0 0", "send ockm-playing float 1", "send ockm-step float 4", "test tap 335 36",
+    ("live", ["array ockm-pat-d1 2 0 0 0 1 0 0 0 2 0 0 0 1 0 0 0", "send ockm-playing float 1", "send ockm-step float 4", "test tap 338 36",
               "test tap 400 97", "test tap 60 180", "send ockm-d3-mute float 1"]),          # next bar, kick waiting to mute, clap muted
-    ("live-macro", ["test tap 335 36", "test press 700 500"]),                              # holding wash
+    ("live-macro", ["test tap 338 36", "test press 700 500"]),                              # holding wash
+    ("menu", ["send ockm-bpm float 124", "test tap 919 36"]),                                # the menu, open (unsaved: the disc is orange)
+    ("settings-device", ["test release 700 500", "test tap 830 195", "test tap 90 216"]),   # the menu is still open from the shot before
+    ("settings-macros", ["test tap 90 272", "test tap 260 119"]),
+    ("perform-b-pick", ["test tap 338 36", "test tap 610 447"]),                                # the v on slot A: pick a recipe
     ("drums", ["test tap 50 137"]),                                   # tap the kick lane name
-    ("bass", ["test tap 521 36", "test tap 89 158"]),                 # bass tab; tapping a step on auto just explains the lock
-    ("lead", ["test tap 583 36"]),
-    ("chord", ["test tap 645 36"]),
-    ("compose", ["test tap 397 36"]),
-    ("perform-mutes", ["test tap 273 36", "test tap 126 137", "test tap 145 438"]),   # mute kick, solo bass
-    ("mixer", ["test tap 707 36"]),
-    ("mixer-eq", ["send ockm-d4-lowcut float 300", "send ockm-d4-eqmid float -6", "send ockm-d4-eqmidf float 500", "send ockm-d4-eqhigh float 5", "test tap 707 36", "test tap 288 232"]),
-    ("drums-long", ["test tap 750 546", "test tap 459 36", "test tap 861 88", "test tap 194 88"]),        # 64 steps, forward to the second block
-    ("compose-melody", ["test tap 397 36", "test tap 186 154", "test tap 400 540"]),   # melody leads, ask for chords, then mutate the bass
-    ("drums-samples", ["test tap 459 36", "test tap 366 380", "test tap 366 380", "test tap 366 380"]),   # drums tab, step to sample 3
-    ("drums-velocity", ["array ockm-pat-d1 2 0 0 0 1 0 0.5 0 2 0 0 0 1 0 0.3 0", "test tap 459 36"]),
+    ("bass", ["test tap 601 36", "test tap 89 158"]),                 # bass tab; tapping a step on auto just explains the lock
+    ("lead", ["test tap 663 36"]),
+    ("chord", ["test tap 725 36"]),
+    ("compose", ["test tap 477 36"]),
+    ("perform-mutes", ["test tap 262 36", "test tap 126 137", "test tap 145 438"]),   # mute kick, solo bass
+    ("mixer", ["test tap 407 36"]),
+    ("mixer-eq", ["send ockm-d4-lowcut float 300", "send ockm-d4-eqmid float -6", "send ockm-d4-eqmidf float 500", "send ockm-d4-eqhigh float 5", "test tap 407 36", "test tap 288 232"]),
+    ("drums-long", ["test tap 750 546", "test tap 539 36", "test tap 861 88", "test tap 194 88"]),        # 64 steps, forward to the second block
+    ("compose-melody", ["test tap 477 36", "test tap 186 154", "test tap 400 540"]),   # melody leads, ask for chords, then mutate the bass
+    ("drums-samples", ["test tap 539 36", "test tap 366 380", "test tap 366 380", "test tap 366 380"]),   # drums tab, step to sample 3
+    ("drums-velocity", ["array ockm-pat-d1 2 0 0 0 1 0 0.5 0 2 0 0 0 1 0 0.3 0", "test tap 539 36"]),
     ("drums-timing", ["array ockm-pat-d1 2 0 0 0 1 0 0.5 0 2 0 0 0 1 0 0.3 0", "array ockm-pat-d1-nudge 0 0 0 0 -0.2 0 0.1 0 0 0 0 0 0.25 0 -0.1 0",
-                      "test tap 459 36", "test tap 145 282", "send ockm-drum-loop float 32"]),
-    ("drums-groove", ["test tap 459 36", "test tap 660 445"]),                         # drums tab, tap a groove
-    ("project", ["test tap 910 36", "test tap 600 261"]),                              # project screen, pick an older project
+                      "test tap 539 36", "test tap 145 282", "send ockm-drum-loop float 32"]),
+    ("drums-groove", ["test tap 539 36", "test tap 660 445"]),                         # drums tab, tap a groove
+    ("project", ["test tap 919 36", "test tap 830 95", "test tap 600 261"]),                              # project screen, pick an older project
     ("setup", ["test tap 150 36"]),
-    ("arrange", ["test tap 769 36"]),                                                     # arrange tab (being rebuilt)
-    ("export", ["test tap 910 36", "test tap 854 178"]),                                    # project screen, export...
-    ("bass-manual", ["test tap 521 36", "test tap 900 283", "test tap 89 158"]),      # switch to manual, then edit step 2
+    ("arrange", ["test tap 795 36"]),                                                     # arrange tab (being rebuilt)
+    ("export", ["test tap 919 36", "test tap 830 95", "test tap 854 178"]),                                    # project screen, export...
+    ("bass-manual", ["test tap 601 36", "test tap 900 283", "test tap 89 158"]),      # switch to manual, then edit step 2
 ]
 
 
