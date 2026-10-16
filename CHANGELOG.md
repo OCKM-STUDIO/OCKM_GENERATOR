@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.51 (16 October 2026)
+
+- **Perform reworked:** the bass, lead and chord lanes are gone, so the 8 drum lanes are deeper and easier to hit
+- **A synth card:** bass, lead and chord buttons with M, S and a light that flashes as each part plays. For the part you pick: **new**, **orig** and **busy** (bass and lead), the chord rhythms (chords), and its four knobs
+- **An effects card:** a row of moves (rise, pump, **drop**, throw), the filter with hold in its corner, drive, then delay and reverb
+- **Drop** (new): hold it and nothing new plays while the effects ring on; let go and everything lands back on the next bar
+- **The filter snaps back** when you let go (50 ms instead of 180), and the screen shows it home at once
+
 ## v0.50 (16 October 2026)
 
 - **A length per part:** drums, bass, lead and chords each 1, 2, 4, 8 or 16 bars. The loop is as long as the longest part, and shorter parts repeat inside it. Loops can now be 16 bars

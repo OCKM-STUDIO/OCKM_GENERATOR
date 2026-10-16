@@ -86,12 +86,16 @@ def render(lines, label, path):
 
 SHOTS = [
     ("perform", ["send ockm-play float 1", "send ockm-step float 4"]),
+    ("perform-synths", ["array ockm-pat-d1 2 0 0 0 1 0 0 0 2 0 0 0 1 0 0 0", "array ockm-pat-d5 1 1 0 1 1 1 0 1 1 1 0 1 1 1 0 1",
+                        "array ockm-pat-bass-on 1 0 1 1 0 1 1 0 1 0 1 1 0 1 1 0", "array ockm-pat-chord-on 1 0 0 0 0 0 0 0 1",
+                        "send ockm-bass-seed float 2", "send ockm-play float 1", "send ockm-step float 2", "test tap 742 476"]),   # bass playing, filter held
+    ("perform-chord", ["array ockm-pat-chord-on 1 0 0 0 0 0 0 0 1", "test tap 340 438"]),                                     # chords picked: rhythm stepper
     ("drums", ["test tap 50 137"]),                                   # tap the kick lane name
     ("bass", ["test tap 483 36", "test tap 89 158"]),                 # bass tab; tapping a step on auto just explains the lock
     ("lead", ["test tap 552 36"]),
     ("chord", ["test tap 621 36"]),
     ("compose", ["test tap 345 36"]),
-    ("perform-mutes", ["test tap 281 36", "test tap 126 137", "test tap 166 369"]),   # mute kick, solo bass
+    ("perform-mutes", ["test tap 281 36", "test tap 126 137", "test tap 145 438"]),   # mute kick, solo bass
     ("mixer", ["test tap 690 36"]),
     ("mixer-eq", ["send ockm-d4-lowcut float 300", "send ockm-d4-eqmid float -6", "send ockm-d4-eqmidf float 500", "send ockm-d4-eqhigh float 5", "test tap 690 36", "test tap 288 232"]),
     ("drums-long", ["test tap 750 546", "test tap 414 36", "test tap 861 88", "test tap 194 88"]),        # 64 steps, forward to the second block

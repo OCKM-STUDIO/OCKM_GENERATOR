@@ -574,15 +574,15 @@ def touchscreen_drives_the_engine(work):
     tap(245, 194, 88)                    # forward arrow (steps 17-32)
     tap(248, 38, 88)                     # back arrow (steps 1-16)
     tap(250, 281, 36)                    # perform tab
-    tap(255, 244, 467); tap(258, 128, 512)   # synth half: lead, then its first knob
-    tap(260, 50, 369)                    # open bass from its lane (bass is on auto)
+    tap(255, 200, 438); tap(258, 129, 524)   # synth card: lead, then its first knob
+    tap(260, 483, 36)                    # bass tab (bass is on auto)
     tap(265, 45, 158)                    # tap a step on auto: locked, nothing is edited
     tap(266, 345, 36); tap(267, 417, 154)   # compose: mode manual (every part yours)
     tap(268, 483, 36)                    # back to the bass tab
     tap(270, 45, 158)                    # now bass step 1 edits
     tap(280, 600, 236)                   # note picker: third note of the scale
     tap(290, 281, 36)                    # perform tab
-    tap(310, 600, 486)                   # master fx: filter, middle
+    tap(310, 629, 500)                   # master fx: filter, middle
     tap(320, 345, 36)                    # compose tab
     tap(330, 71, 154)                    # mode: chord priority again (chords are yours)
     tap(335, 283, 349)                   # chord column: next progression
@@ -625,7 +625,7 @@ def touchscreen_screens_draw(work):
         raise Skip("Pillow not installed")
     p = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_preview.py"), os.path.join(work, "preview")], capture_output=True, text=True)
     assert p.returncode == 0, p.stderr[-800:]
-    assert len(os.listdir(os.path.join(work, "preview"))) == 20, "expected twenty screen pictures"
+    assert len(os.listdir(os.path.join(work, "preview"))) == 22, "expected twenty-two screen pictures"
 
 @test
 def mute_solo_and_levels(work):
@@ -748,18 +748,37 @@ def dub_throw_rings_out_and_filter_springs_back(work):
     assert len(mid) >= 5, "the way back should be a glide, not a jump"
 
 @test
+def drop_holds_the_hits_and_lands_on_the_bar(work):
+    """Perform's drop: hold it and nothing new plays; let go and the hits come back on the next bar, not straight away."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness(); h.show("ockm-gap", "ockm-drop", "ockm-bar")
+    h.at(100, "ockm-bpm 120 ; ockm-play 1")
+    h.at(300, "ockm-ui-test press 760 438")       # drop, held
+    h.at(700, "ockm-ui-test release 760 438")     # let go part way through a bar (a bar is 2 s at 120)
+    f = os.path.join(work, "t_drop.pd"); h.finish(3000, f)
+    out = run(work, f)
+    lines = [l for l in out.splitlines() if l.startswith(("ockm-gap:", "ockm-drop:", "ockm-bar:"))]
+    gaps = [l for l in lines if l.startswith("ockm-gap:")]
+    assert [g.split()[-1] for g in gaps] == ["1", "0"], f"drop should close the gap, then open it once: {lines}"
+    rel = lines.index("ockm-drop: 0")
+    back = lines.index(gaps[-1])
+    assert any(l.startswith("ockm-bar:") for l in lines[rel:back + 1]), f"the hits should come back on a bar, not on release: {lines}"
+
+@test
 def touchscreen_filter_springs_and_throw(work):
     """On perform: sweep the filter and let go, it glides back to 0. With hold on it stays. The throw pad sends 1 then 0."""
     if not PDLUA:
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness(); h.show("ockm-filter-glide", "ockm-delay-throw", "ockm-filter-now")
     h.at(100, "ockm-ui-test drag 600 486 520 486")          # sweep the filter left, let go
-    h.at(500, "ockm-ui-test tap 690 470")                   # hold on
+    h.at(500, "ockm-ui-test tap 742 476")                   # hold on
     h.at(550, "ockm-ui-test drag 600 486 520 486")          # sweep again, let go: it stays
-    h.at(900, "ockm-ui-test tap 773 486")                   # throw
+    h.at(900, "ockm-ui-test tap 870 438")                   # throw
     f = os.path.join(work, "t_spring_ui.pd"); h.finish(1000, f)
     out = run(work, f)
-    assert len(printed(out, "ockm-filter-glide")) == 1, f"only the first sweep should spring back: {printed(out, 'ockm-filter-glide')}"
+    gl = printed(out, "ockm-filter-glide")
+    assert len(gl) == 1 and gl[0].split()[-1] == "50", f"only the first sweep should spring back, quickly (50 ms): {gl}"
     now = [float(v.split()[-1]) for v in printed(out, "ockm-filter-now")]
     assert min(now) < -0.3 and abs(now[-1]) > 0.3, f"held filter should stay where it was left: last {now[-3:]}"
     assert [int(float(v.split()[-1])) for v in printed(out, "ockm-delay-throw")] == [1, 0], printed(out, "ockm-delay-throw")

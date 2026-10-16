@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.50"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.51"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
@@ -216,7 +216,12 @@ function ui:postinitialize()
   listen("ockm-filter-now", function(o, sel, a)
     local t = o.touch
     if t and t.w and t.w.hook == "ockm-filter" then return end
-    o.v["ockm-filter"] = tonumber(a[1]) or 0; o:dirty()
+    local f = tonumber(a[1]) or 0
+    if o.filter_springing then          -- on its way back to off: the screen already shows it there
+      if f == 0 then o.filter_springing = nil end
+      return
+    end
+    o.v["ockm-filter"] = f; o:dirty()
   end)
   self.roleclock = pd.Clock:new():register(self, "check_roles")
   listen("ockm-refresh", function(o) if o.roleclock then o.roleclock:delay(0) end end)
@@ -560,83 +565,115 @@ function ui:shown_block()
   return clamp(self.page, 0, self:blocks() - 1)
 end
 
-local LANE_Y, LANE_H, LANE_P, LANE_X = 124, 26, 28, 192
-function ui:lane_y(i) return LANE_Y + (i - 1) * LANE_P + ((i > 8) and 8 or 0) end
+local LANE_Y, LANE_H, LANE_P, LANE_X = 124, 31, 35, 192
+function ui:lane_y(i) return LANE_Y + (i - 1) * LANE_P end
+-- the bottom half of perform: the synths on the left, master effects on the right, each on its own card
+local PB_Y, PB_H = 412, 176
+local PART_Y, PART_H = 418, 40
+local half_w = (W - 32 - 16) / 2
+local function part_x(i) local tw = (half_w - 12 - 12) / 3; return 22 + (i - 1) * (tw + 6), tw end
 
 function ui:layout_perform(add)
-  -- now: 8 drum lanes and 3 synth lanes, a picture of the block that is playing. Tap a name to open it
-  for i = 1, 11 do
-    local isdrum = i <= 8
+  -- the drums: 8 lanes, a picture of the block that is playing. Tap a name to open it, a step to change it
+  for i = 1, 8 do
     local y = self:lane_y(i)
-    local name = isdrum and SHORT[(self.v["ockm-"..SLOTS[i].."-sound"] or 0) + 1] or SYNTHS[i - 8]
+    local name = SHORT[(self.v["ockm-"..SLOTS[i].."-sound"] or 0) + 1]
     local tr = TRACKS[i]
-    add{ kind="ms", x=108, y=y, w=36, h=LANE_H, label="M", hook="ockm-"..tr.."-mute" }
-    add{ kind="ms", x=148, y=y, w=36, h=LANE_H, label="S", hook="ockm-"..tr.."-solo" }
-    add{ kind="lanename", x=16, y=y, w=88, h=LANE_H, label=name, tap=function()
-      if isdrum then self.slot = i; self:open("drums") else self.part = i - 8; self:open("synth") end
-    end }
+    add{ kind="ms", x=108, y=y, w=38, h=LANE_H, label="M", hook="ockm-"..tr.."-mute" }
+    add{ kind="ms", x=150, y=y, w=38, h=LANE_H, label="S", hook="ockm-"..tr.."-solo" }
+    add{ kind="lanename", x=16, y=y, w=88, h=LANE_H, label=name, tap=function() self.slot = i; self:open("drums") end }
     add{ kind="lane", x=LANE_X, y=y, w=W - LANE_X - 16, h=LANE_H, track=i }
-    if not isdrum and self:part_empty(SYNTHS[i - 8]) then
-      local p = SYNTHS[i - 8]
-      add{ kind="btn", x=LANE_X, y=y + 2, w=W - LANE_X - 16, h=LANE_H - 4, small=true, quiet=true, label="empty: tap to " .. START[p],
-           tap=function() self:start_part(p) end }
-    end
-    if isdrum then
-      -- drum lanes are editable here too: tap cycles empty, hit, accent on the block on screen
-      local cw = (W - LANE_X - 16) / 16
-      for c = 0, 15 do
-        local st = (self:shown_block() * 16 + c) % self:plen("drum")
-        add{ kind="pcell", x=LANE_X + c * cw, y=y, w=cw, h=LANE_H, slot=i, step=st,
-             tap=function() self:drum_cycle(i, st) end }
-      end
+    -- tap cycles empty, hit, accent on the block on screen
+    local cw = (W - LANE_X - 16) / 16
+    for c = 0, 15 do
+      local st = (self:shown_block() * 16 + c) % self:plen("drum")
+      add{ kind="pcell", x=LANE_X + c * cw, y=y, w=cw, h=LANE_H, slot=i, step=st, tap=function() self:drum_cycle(i, st) end }
     end
   end
-  -- bottom: the chosen synth's four main knobs on the left, master effects on the right (the way the sound flows)
-  local half = (W - 32 - 16) / 2
-  local lx, rx = 16, 16 + half + 16
-  add{ kind="text", x=rx, y=441, w=200, h=10, label="master fx", size=9 }
-  local mw = (half - 3 * 6) / 4
-  -- top row: the filter (wide, springs back to off when you let go unless held), the dub throw, drive
-  local hold = self.filter_hold
-  add{ kind="hbar", x=rx, y=456, w=2 * mw + 6, h=60, hook="ockm-filter", lo=-1, hi=1, label=hold and "filter (held)" or "filter", bold=true, spring=not hold }
-  add{ kind="choice", x=rx + 2 * mw + 6 - 50, y=460, w=46, h=22, label="hold", small=true, sel=hold, tap=function()
-    self.filter_hold = not hold
-    if hold then psend("ockm-filter-glide", "list", { 0, 180 }) end
-  end }
-  -- build rise (this pattern): the high-pass climbs across the pattern and drops back on the next one
+  local lx, rx = 16, 16 + half_w + 16
+  add{ kind="card", x=lx, y=PB_Y, w=half_w, h=PB_H }
+  add{ kind="card", x=rx, y=PB_Y, w=half_w, h=PB_H }
+  local iw = half_w - 12
+  -- synths. Each part: tap to pick it (its controls below), a light that flashes as it plays, mute and solo
+  local pi = self.perf_part or 1
+  for i, p in ipairs(SYNTHS) do
+    local x, tw = part_x(i)
+    add{ kind="partbtn", x=x, y=PART_Y, w=tw, h=PART_H, label=p, sel=(pi == i), tap=function() self.perf_part = i end }
+    add{ kind="ms", x=x + tw - 64, y=PART_Y + 6, w=28, h=PART_H - 12, label="M", hook="ockm-"..p.."-mute" }
+    add{ kind="ms", x=x + tw - 32, y=PART_Y + 6, w=28, h=PART_H - 12, label="S", hook="ockm-"..p.."-solo" }
+  end
+  local part = SYNTHS[pi]
+  local ay, ah = PART_Y + PART_H + 6, 34
+  if self:part_empty(part) then
+    add{ kind="btn", x=lx + 6, y=ay, w=iw, h=ah, small=true, accent=true, label=START[part], tap=function() self:start_part(part) end }
+  elseif part == "chord" then
+    -- chords: step through the rhythms while it plays
+    self:stepper(add, lx + 6, ay, iw, ah, CHORD_RHY, "ockm-chord-rhythm")
+  elseif not self:part_auto(part) or self:mode() == 3 then
+    add{ kind="locked", x=lx + 6, y=ay, w=iw, h=ah, label="manual: your notes. Pick a priority on compose for new ones" }
+  else
+    -- new: a fresh variation of the line; orig: back to the one you started with; busy: fewer or more notes
+    local skey = "ockm-"..part.."-seed"
+    local seed = math.floor(self.v[skey] or 0)
+    local bw = 80
+    add{ kind="btn", x=lx + 6, y=ay, w=bw, h=ah, small=true, accent=true, label="new", tap=function()
+      self:send(skey, seed + 1); self:say(part .. ": variation " .. (seed + 1) .. ". orig goes back") end }
+    add{ kind="btn", x=lx + 12 + bw, y=ay, w=bw, h=ah, small=true, quiet=(seed == 0), label="orig", tap=function() self:send(skey, 0) end }
+    add{ kind="hbar", x=lx + 18 + 2 * bw, y=ay, w=iw - 12 - 2 * bw, h=ah, hook="ockm-"..part.."-density", lo=0, hi=2, label="busy", bold=true }
+  end
+  local eng = engines_of(part)
+  local kn = KNOBS[eng[(self.v["ockm-"..part.."-engine"] or 0) + 1]] or KNOBS.acid
+  local kw = (iw - 6) / 2
+  for k = 1, 4 do
+    local col, row = (k - 1) % 2, math.floor((k - 1) / 2)
+    add{ kind="hbar", x=lx + 6 + col * (kw + 6), y=504 + row * 44, w=kw, h=40, hook="ockm-"..part.."-k"..k, lo=0, hi=1, label=kn[k], bold=true }
+  end
+  -- master effects. Top row: the moves you play (rise and pump switch on and off, drop and throw while held)
+  local mx = rx + 6
+  local mw = (iw - 18) / 4
   local rise = (self.v["ockm-rise"] or 0) > 0
   local pump = self.v["ockm-pump"] or 0
+  add{ kind="choice", x=mx, y=PART_Y, w=mw, h=PART_H, label="rise", sel=rise, accent=true, tap=function()
+    self:send("ockm-rise", rise and 0 or 1)
+    self:say(rise and "rise off" or "rise on: the filter climbs across the loop, then drops as it starts again")
+  end }
   local plab = (pump <= 0) and "pump" or ((pump < 0.75) and "pump ·" or "pump ··")
-  add{ kind="choice", x=rx + 54, y=460, w=62, h=22, label=plab, small=true, sel=(pump > 0), accent=true, tap=function()
+  add{ kind="choice", x=mx + (mw + 6), y=PART_Y, w=mw, h=PART_H, label=plab, sel=(pump > 0), accent=true, tap=function()
     local nx = (pump <= 0) and 0.5 or ((pump < 0.75) and 1 or 0)
     self:send("ockm-pump", nx)
     self:say((nx == 0) and "pump off" or ((nx < 0.75) and "pump: the kick ducks the synths, lightly" or "pump: deep, house-style"))
   end }
-  add{ kind="choice", x=rx + 4, y=460, w=46, h=22, label="rise", small=true, sel=rise, accent=true, tap=function()
-    self:send("ockm-rise", rise and 0 or 1)
-    self:say(rise and "rise off" or "rise on: the filter climbs across the loop, then drops as it starts again")
+  add{ kind="pad", x=mx + 2 * (mw + 6), y=PART_Y, w=mw, h=PART_H, hook="ockm-drop", label="drop" }
+  add{ kind="pad", x=mx + 3 * (mw + 6), y=PART_Y, w=mw, h=PART_H, hook="ockm-delay-throw", label="throw" }
+  -- the filter: springs back to off when you let go, unless held. Drive beside it
+  local fw = math.floor((iw - 6) * 2 / 3)
+  local hold = self.filter_hold
+  add{ kind="hbar", x=mx, y=ay, w=fw, h=78, hook="ockm-filter", lo=-1, hi=1, label=hold and "filter (held)" or "filter", bold=true, spring=not hold }
+  add{ kind="choice", x=mx + fw - 52, y=ay + 6, w=46, h=24, label="hold", small=true, onbar=true, sel=hold, tap=function()
+    self.filter_hold = not hold
+    if hold then self:filter_spring() end
   end }
-  add{ kind="pad", x=rx + 2 * (mw + 6), y=456, w=mw, h=60, hook="ockm-delay-throw", label="throw", sub="hold" }
-  add{ kind="hbar", x=rx + 3 * (mw + 6), y=456, w=mw, h=60, hook="ockm-drive", lo=0, hi=1, label="drive", bold=true }
+  add{ kind="hbar", x=mx + fw + 6, y=ay, w=iw - fw - 6, h=78, hook="ockm-drive", lo=0, hi=1, label="drive", bold=true }
   local ROW2 = { { "ockm-delay-mix", 0, 1, "delay" }, { "ockm-delay-fb", 0, 0.9, "feedback" }, { "ockm-delay-steps", 1, 8, "time" },
                  { "ockm-verb-mix", 0, 1, "reverb" }, { "ockm-verb-size", 0, 1, "size" } }
-  local w5 = (half - 4 * 6) / 5
+  local w5 = (iw - 4 * 6) / 5
   for i, m in ipairs(ROW2) do
-    add{ kind="hbar", x=rx + (i - 1) * (w5 + 6), y=524, w=w5, h=60, hook=m[1], lo=m[2], hi=m[3], label=m[4], bold=true }
+    add{ kind="hbar", x=mx + (i - 1) * (w5 + 6), y=548, w=w5, h=40, hook=m[1], lo=m[2], hi=m[3], label=m[4], bold=true }
   end
-  local part = SYNTHS[self.perf_part or 1]
-  local tw = (half - 2 * 6) / 3
-  for i, t in ipairs(SYNTHS) do
-    add{ kind="choice", x=lx + (i - 1) * (tw + 6), y=452, w=tw, h=30, label=t, small=true, sel=((self.perf_part or 1) == i),
-         tap=function() self.perf_part = i end }
-  end
-  local eng = engines_of(part)
-  local kn = KNOBS[eng[(self.v["ockm-"..part.."-engine"] or 0) + 1]] or KNOBS.acid
-  local kw = (half - 6) / 2
-  for k = 1, 4 do
-    local col, row = (k - 1) % 2, math.floor((k - 1) / 2)
-    add{ kind="hbar", x=lx + col * (kw + 6), y=490 + row * 52, w=kw, h=46, hook="ockm-"..part.."-k"..k, lo=0, hi=1, label=kn[k], bold=true }
-  end
+end
+
+-- let go of the filter: it snaps back to off. The screen shows it there at once rather than drawing the glide
+local SPRING_MS = 50
+function ui:filter_spring()
+  self.v["ockm-filter"] = 0; self.filter_springing = true
+  psend("ockm-filter-glide", "list", { 0, SPRING_MS })
+end
+
+-- does a synth part play on this step (and can it be heard)? For the lights on perform
+function ui:part_sounding(p)
+  if (self.v["ockm-"..p.."-mute"] or 0) > 0 then return false end
+  if self:soloing() and (self.v["ockm-"..p.."-solo"] or 0) <= 0 then return false end
+  return self:get("ockm-pat-"..p.."-on", self.step % self:plen(p)) > 0
 end
 
 function ui:open(screen)
@@ -1886,7 +1923,7 @@ function ui:release(x, y)
   if t.mode == "pad" then
     self.pad_on = nil; psend(w.hook, "float", { 0 })
   elseif t.mode == "slider" and w.spring then
-    psend("ockm-filter-glide", "list", { 0, 180 })     -- let go: glide back to off
+    self:filter_spring()     -- let go: snap back to off
   elseif t.mode == "swipe" then
     local dx = x - t.x0
     self:set_page(self.page + ((dx < 0) and 1 or -1))
@@ -1949,6 +1986,12 @@ function ui:paint_layer_2(g)
   if self.screen == "perform" then
     local lw = (W - LANE_X - 16) / 16
     self:col(g, "acc"); g:fill_rect(LANE_X + i * lw + 2, LANE_Y - 6, lw - 4, 3)
+    for n, p in ipairs(SYNTHS) do
+      if self:part_sounding(p) then
+        local x = part_x(n)
+        g:fill_rounded_rect(x + 10, PART_Y + PART_H / 2 - 5, 10, 10, 5)
+      end
+    end
   elseif (self.screen == "drums" or self.screen == "synth") and self:play_block() == self.page then
     -- under the step pads, over the beat marks
     local y = (self.screen == "drums") and (D_STEP_Y + D_STEP_H + 3) or (S_STEP_Y + S_STEP_H + 3)
@@ -1962,8 +2005,12 @@ function ui:draw(g, w)
   if k == "pad" then
     local on = (self.pad_on == w.hook)
     self:col(g, on and "acc" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
-    self:ctext(g, w.label, { x=w.x, y=w.y + 8, w=w.w, h=20 }, 14, on and "#ffffff" or "txt")
-    self:ctext(g, w.sub or "", { x=w.x, y=w.y + 32, w=w.w, h=16 }, 10, on and "#ffffff" or "mute")
+    if w.h < 50 then
+      self:ctext(g, w.label, w, 13, on and "#ffffff" or "txt")
+    else
+      self:ctext(g, w.label, { x=w.x, y=w.y + 8, w=w.w, h=20 }, 14, on and "#ffffff" or "txt")
+      self:ctext(g, w.sub or "", { x=w.x, y=w.y + 32, w=w.w, h=16 }, 10, on and "#ffffff" or "mute")
+    end
   elseif k == "key" then
     -- what the step colours mean
     local x = w.x + w.w - 290
@@ -2005,8 +2052,12 @@ function ui:draw(g, w)
     self:ctext(g, string.format("%d", math.floor(w.n + 1)), w, (w.h > 44) and 22 or 13, playing and "bg" or ((w.used == false) and "mute" or "txt"))
   elseif k == "choice" then
     local sel = w.sel
-    self:col(g, sel and (w.accent and "acc" or "on") or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
+    self:col(g, sel and (w.accent and "acc" or "on") or (w.onbar and "dim" or "off")); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
     self:ctext(g, w.label, w, w.small and 11 or 13, sel and (w.accent and "#ffffff" or "bg") or (w.disabled and "mute" or "txt"))
+  elseif k == "partbtn" then
+    self:col(g, w.sel and "on" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
+    self:col(g, "dim"); g:fill_rounded_rect(w.x + 10, w.y + w.h / 2 - 5, 10, 10, 5)
+    self:text(g, w.label, w.x + 28, w.y + w.h / 2 - 8, 13, w.sel and "bg" or "txt", w.w - 96)
   elseif k == "card" then
     self:col(g, "card"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 8)
   elseif k == "locked" then
@@ -2066,7 +2117,7 @@ function ui:draw(g, w)
     g:fill_rounded_rect(w.x + 4, fy - 7, w.w - 8, 14, 4)
     self:ctext(g, string.format("%d", math.floor(v * 100 + 0.5)), { x=w.x, y=w.y + w.h - 2, w=w.w, h=12 }, 10, "mute")
   elseif k == "lanename" then
-    self:text(g, w.label, w.x, w.y + 4, 13, "txt", w.w)
+    self:text(g, w.label, w.x, w.y + math.max(4, (w.h - 15) / 2), 13, "txt", w.w)
   elseif k == "lane" then
     self:draw_lane(g, w)
   elseif k == "blockinfo" then

@@ -724,6 +724,19 @@ rgp=p.add("#X obj 400 340 r ockm-gap;"); ngp=p.add("#X obj 400 365 == 0;"); p.co
 sg1=p.add("#X obj 470 365 sel 1;"); p.con(rgp,0,sg1,0)
 gof=p.add("#X msg 470 390 off;")
 p.con(sg1,0,gof,0)
+# drop (perform): hold it and nothing new plays (the same gap as above, the effects ring on); let go and everything
+# comes back on the next bar. Stopped, it comes back straight away
+rpv=p.add("#X obj 1500 300 r ockm-playing;"); vpv=p.add("#X obj 1500 325 v ockm_playv;"); p.con(rpv,0,vpv,0)
+rdr=p.add("#X obj 1650 300 r ockm-drop;"); sdr=p.add("#X obj 1650 325 sel 1;")
+don=p.add("#X msg 1650 350 \\; ockm-gap 1;")
+dwait=p.add("#X obj 1720 350 expr if(ockm_playv>0 \\, 1 \\, -1);"); dsel=p.add("#X obj 1720 375 sel 1 -1;")
+dpend=p.add("#X msg 1720 400 1;"); vdp=p.add("#X obj 1720 425 v ockm_droppend;")
+rdb=p.add("#X obj 1850 300 r ockm-bar;"); rds=p.add("#X obj 1950 300 r ockm-playing;"); rds0=p.add("#X obj 1950 325 sel 0;")
+dchk=p.add("#X obj 1850 350 expr ockm_droppend;"); dsel2=p.add("#X obj 1850 375 sel 1;")
+dback=p.add("#X msg 1850 400 \\; ockm-gap 0;"); dclr=p.add("#X msg 1950 400 0;"); vdp2=p.add("#X obj 1950 425 v ockm_droppend;")
+dtb=p.add("#X obj 1850 375 t b b;")
+for c in [(rdr,0,sdr,0),(sdr,0,don,0),(sdr,0,dclr,0),(sdr,1,dwait,0),(dwait,0,dsel,0),(dsel,0,dpend,0),(dpend,0,vdp,0),(dsel,1,dtb,0),
+          (rdb,0,dchk,0),(rds,0,rds0,0),(rds0,0,dchk,0),(dchk,0,dsel2,0),(dsel2,0,dtb,0),(dtb,1,dclr,0),(dtb,0,dback,0),(dclr,0,vdp2,0)]: p.con(*c)
 # transition sounds into the mix (and a little reverb)
 tfx=p.add("#X obj 400 1000 ockm-transfx;"); p.con(tfx,0,mix,0)
 tfs=p.add("#X obj 480 1030 *~ 0.35;"); p.con(tfx,0,tfs,0); p.con(tfs,0,p.add("#X obj 480 1055 throw~ ockm-revbus;"),0)

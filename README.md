@@ -21,14 +21,17 @@ Tap a track's name on perform or the mixer to jump straight to it.
 **Perform** (home)
 - **Play** and **tempo** top left. Drag the tempo number up or down
 - One loop per project: everything you play live works on it. **Save** keeps the loop and the kit. It turns orange with a dot when there's something unsaved
-- **Now**: all 11 tracks for the 16 steps on screen, with the playhead running above them. **Tap a drum lane's steps to edit them** (empty, hit, accent), just like the drums screen. The bass, lead and chord lanes are a picture: edit those on their own tabs
-- Tap a track's **name** to open it
-- **M** mutes a track and **S** solos it (several can be soloed at once). Silent tracks go dim. Mutes and solos are for playing live, so they aren't saved
-- **Bottom left, synth:** pick bass, lead or chord, then play its four main knobs (named for the engine it's using)
+- **The drums**: 8 lanes for the 16 steps on screen, with the playhead running above them. **Tap a step to edit it** (empty, hit, accent), just like the drums screen. Tap a drum's **name** to open it
+- **M** mutes a track and **S** solos it (several can be soloed at once). Mutes and solos are for playing live, so they aren't saved
+- **Bottom left, the synths:** bass, lead and chord buttons, each with its own **M** and **S** and a light that flashes as the part plays. Tap one to pick it, then:
+  - bass or lead on auto: **new** (a fresh variation), **orig** (back to the one you started with) and **busy** (fewer or more notes)
+  - chords: step through the chord **rhythms**
+  - an empty part: a button to start it
+  - and the part's four main knobs (named for the engine it's using)
 - **Bottom right, master FX**, played like an SP-404:
-  - **Filter** (double width): drag left for low-pass, right for high-pass. Let go and it glides back to off in a fifth of a second. Tap **hold** to make it stay where you leave it; tap hold again and it glides home
-  - **Throw** (hold the pad): sends the whole mix into its own echo line. Let go and the echoes ring out and fade, at the delay time and feedback you've set. The dub throw
-  - **Drive**; then delay level, **feedback** and **time** (in steps); reverb level and **size**. Reverb tone is in setup
+  - **Moves** along the top: **rise** and **pump** switch on and off. **Drop** (hold it): nothing new plays while you hold it, the effects ring on, and everything comes back on the next bar after you let go. **Throw** (hold it): sends the whole mix into its own echo line; let go and the echoes ring out at your delay time and feedback. The dub throw
+  - **Filter**: drag left for low-pass, right for high-pass. Let go and it snaps back to off. Tap **hold** (in its corner) to make it stay where you leave it; tap hold again and it snaps home
+  - **Drive** beside it; then delay level, **feedback** and **time** (in steps); reverb level and **size**. Reverb tone is in setup
 - These are bars: drag along them. The orange line shows the value
 - **Length** is in the navigation strip. Making the loop longer repeats what's there
 - **Save** and **project**, top right
@@ -304,7 +307,8 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 | `ockm-<synth>-k1` to `-k4` | Synth knobs, 0 to 1. What they do depends on the engine (see below) |
 | `ockm-bass-drive`, `ockm-lead-drive` | Distortion, 0 to 1 |
 | `ockm-filter` | Master DJ filter, -1 to 1. Below 0 cuts the top, above 0 cuts the bottom, 0 is off. Smoothed, so moves don't click |
-| `ockm-filter-glide <to> <ms>` | Glide the filter to a value, for example `0 180` to spring back to off |
+| `ockm-filter-glide <to> <ms>` | Glide the filter to a value, for example `0 50` to snap back to off |
+| `ockm-drop` | 1: nothing new plays (effects ring on). 0: everything comes back on the next bar (straight away when stopped) |
 | `ockm-filter-now` | Sent by the engine: where the filter actually is (what gets saved) |
 | `ockm-delay-throw` | 1 sends the whole mix into the throw echo line, 0 stops sending (the echoes ring out) |
 | `ockm-drive` | Master drive, 0 to 1 |
