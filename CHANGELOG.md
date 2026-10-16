@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.53 (16 October 2026)
+
+- **909 clap re-voiced:** higher, shorter, a touch darker and a little quieter. What used to take tune +5, decay 62, tone -0.43 and level 0.91 is now where it starts, with the sliders at neutral
+
 ## v0.52 (16 October 2026)
 
 - **Motif melodies for the lead:** motif, motif call and motif high. A short idea is stated, repeated, varied and brought home over four bars, so the lead sings rather than wanders. Each has 8 versions, and new steps through them

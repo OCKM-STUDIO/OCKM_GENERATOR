@@ -166,8 +166,9 @@ def kick909(fn,title,f0,fm,f1,t1,t2,dec,click,sat,base=1):
     p.con(t,0,tx,0); p.con(tx,0,fs,1); p.con(tx,1,fmid,1); p.con(tx,2,fe,1); p.con(d,0,dx,0); p.con(dx,0,pk,1); p.con(l,0,lev,1)
     p.save(fn,"#N canvas 200 200 1000 460 12;")
 
-def crunch_noise(fn,title,bands,msg,dec,base,drive,tones=None):
-    """noise through band-passes (freq, q, gain), shaped by a burst envelope message, then driven for crunch. Optional tones [(hz, gain)]"""
+def crunch_noise(fn,title,bands,msg,dec,base,drive,tones=None,lp=None,gain=1):
+    """noise through band-passes (freq, q, gain), shaped by a burst envelope message, then driven for crunch. Optional tones [(hz, gain)],
+    then an optional low-pass (Hz) and output gain: voicing baked in, so the slot's own sliders start from neutral"""
     p=P(); header_text(p,title)
     inl=p.add("#X obj 30 50 inlet;"); lev=p.add("#X obj 30 80 * 1;"); tbf=p.add("#X obj 30 65 t b f;"); one=p.add("#X msg 100 80 1;")
     pk,va=env(p,100,110,one,base,dec,msg)
@@ -182,8 +183,12 @@ def crunch_noise(fn,title,bands,msg,dec,base,drive,tones=None):
         for j,(hz,g) in enumerate(tones):
             o=p.add(f"#X obj {600+j*90} 110 osc~ {hz};"); og=p.add(f"#X obj {600+j*90} 140 *~ {g};"); p.con(o,0,og,0)
             sm=p.add(f"#X obj 250 {190+j*4} +~;"); p.con(summ,0,sm,0); p.con(og,0,sm,1); summ=sm
-    mul=p.add("#X obj 250 230 *~;"); dr=p.add(f"#X obj 250 260 expr~ tanh({D}v1*{drive})/tanh({drive});"); out=p.add("#X obj 250 300 outlet~;")
-    for c in [(summ,0,mul,0),(va,0,mul,1),(mul,0,dr,0),(dr,0,post,0),(post,0,out,0)]: p.con(*c)
+    mul=p.add("#X obj 250 230 *~;"); dr=p.add(f"#X obj 250 260 expr~ tanh({D}v1*{drive})/tanh({drive});"); out=p.add("#X obj 250 330 outlet~;")
+    for c in [(summ,0,mul,0),(va,0,mul,1),(mul,0,dr,0),(dr,0,post,0)]: p.con(*c)
+    last=post
+    if lp: f=p.add(f"#X obj 250 305 lop~ {lp};"); p.con(last,0,f,0); last=f
+    if gain!=1: g=p.add(f"#X obj 400 305 *~ {gain};"); p.con(last,0,g,0); last=g
+    p.con(last,0,out,0)
     t,d,l=hooks(p,700,50)
     if fls:
         ex="expr "+" \\; ".join(f"{fq}*pow(2\\,{D}f1/12)" for _,fq in fls)
@@ -196,8 +201,9 @@ kick909("voices/ockm-kick.pd","909 kick: a fast drop from high up \\, a click on
 kick_like("voices/ockm-tom.pd","Tom: like the kick but higher and longer. Input is hit strength (0-1).",200,120,100,350,0.8)
 noise_voice("voices/ockm-hat.pd","Closed hat: high-passed noise \\, very short.","hip~",7000,None,50,0.3)
 noise_voice("voices/ockm-ohat.pd","Open hat: high-passed noise \\, longer tail.","hip~",6000,None,300,0.25)
-crunch_noise("voices/ockm-clap.pd","909 clap: four hard-edged bursts of two noise bands \\, then a tail \\, driven for crunch.",[(1100,2.5,1),(2600,3,0.6)],
-             "{D}1 \\, 0 9 0 \\, {D}1 0 11 \\, 0 9 11 \\, {D}1 0 22 \\, 0 9 22 \\, {D}1 0 33 \\, 0 {D}2 33",200,1.6,3)
+# voiced by ear (16 Oct): what used to need tune +5, decay 62, tone -0.43 and level 0.91 is now where it starts
+crunch_noise("voices/ockm-clap.pd","909 clap: four hard-edged bursts of two noise bands \\, then a tail \\, driven for crunch.",[(1468,2.5,1),(3471,3,0.6)],
+             "{D}1 \\, 0 9 0 \\, {D}1 0 11 \\, 0 9 11 \\, {D}1 0 22 \\, 0 9 22 \\, {D}1 0 33 \\, 0 {D}2 33",124,1.6,3,lp=2240,gain=0.91)
 tonal_voice("voices/ockm-snare.pd","909 snare: two tuned tones for the body plus bright noise for the snap.",[185,330],100,0.55,noise=("hip~",2200,190,0.75))
 tonal_voice("voices/ockm-rim.pd","Rim: two high tones \\, very short.",[500,1720],30,0.6,filt="hip~ 400")
 tonal_voice("voices/ockm-perc.pd","Perc: a 909-style rimshot. Two woody tones plus a sharp noise snap.",[330,820],60,0.4,filt="hip~ 200",noise=("hip~",3000,15,0.35))

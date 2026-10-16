@@ -20,7 +20,7 @@
 #X obj 250 190 +~;
 #X obj 250 230 *~;
 #X obj 250 260 expr~ tanh(\$v1*5)/tanh(5);
-#X obj 250 300 outlet~;
+#X obj 250 330 outlet~;
 #X obj 700 50 r ockm-\$1-tune;
 #X obj 870 50 r ockm-\$1-decay;
 #X obj 1050 50 r ockm-\$1-level;
