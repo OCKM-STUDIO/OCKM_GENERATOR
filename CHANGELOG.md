@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.56 (16 October 2026)
+
+- **Perform A:** empty steps on the beat (1, 5, 9, 13) are a shade lighter, so each bar reads in fours
+
 ## v0.55 (16 October 2026)
 
 - **A new top bar:** Perform A (was perform), Perform B (was live) and mixer together, then compose and the four parts, then arrange. Save is a disc that goes orange when there's something to save; **☰** opens project, export, settings and revert (and quit to desktop on the Pi)

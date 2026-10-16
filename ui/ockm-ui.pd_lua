@@ -25,11 +25,11 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.55"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.56"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
-  dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
-  light = { bg="#f4f3ef", card="#ffffff", off="#e4e2dc", on="#1a1a1a", acc="#ff4f1a", mute="#9a9890", txt="#1a1a1a", dim="#cfccc4" },
+  dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
+  light = { bg="#f4f3ef", card="#ffffff", off="#e4e2dc", on="#1a1a1a", acc="#ff4f1a", mute="#9a9890", txt="#1a1a1a", dim="#cfccc4", beat="#d6d3cc" },
 }
 
 local SLOTS   = { "d1","d2","d3","d4","d5","d6","d7","d8" }
@@ -2870,8 +2870,10 @@ function ui:draw_lane(g, w)
       local part = SYNTHS[n - 8]
       if self:get("ockm-pat-"..part.."-on", ix) > 0 then st = (self:get("ockm-pat-"..part.."-acc", ix) > 0) and 2 or 1 end
     else st = self:get("ockm-pat-chord-on", ix) end
+    -- an empty step on the beat (1, 5, 9, 13) is a shade lighter, so the bar reads in fours
+    local empty = (i % 4 == 0) and "beat" or "off"
     if self:silent(TRACKS[n]) then self:col(g, (st > 0) and "dim" or "off")
-    else self:col(g, (st >= 2) and "acc" or ((st > 0) and "on" or "off")) end
+    else self:col(g, (st >= 2) and "acc" or ((st > 0) and "on" or empty)) end
     g:fill_rounded_rect(w.x + i * cw + 2, w.y + 4, cw - 4, w.h - 8, 3)
   end
 end
