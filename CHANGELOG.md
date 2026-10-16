@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.52 (16 October 2026)
+
+- **Motif melodies for the lead:** motif, motif call and motif high. A short idea is stated, repeated, varied and brought home over four bars, so the lead sings rather than wanders. Each has 8 versions, and new steps through them
+- **Arp evolve:** an arpeggio over whichever chord is playing that changes as it goes. New gives a different shape
+- **Four-bar rhythms:** phrase, question answer, pickup and arp gate. A rhythm now repeats at its own length (one bar or four)
+- **Chord notes on the beat (lead):** a note landing on a beat always belongs to the chord playing. This also tightens the existing melodies
+
 ## v0.51 (16 October 2026)
 
 - **Perform reworked:** the bass, lead and chord lanes are gone, so the 8 drum lanes are deeper and easier to hit

@@ -337,6 +337,35 @@ def lead_plays_two_octaves_up(work):
     assert hits == [57, 69, 57, 69], f"lead octaves pattern in A minor should be A3 A4, got {hits}"
 
 @test
+def lead_motifs_follow_the_bar(work):
+    """A motif melody over a four-bar rhythm: the rhythm runs four bars before it repeats, the idea in bar 1 comes back
+    in bar 2, every note on the beat is in the chord, bar 4 comes home to the root, and new gives a different line."""
+    h = Harness()
+    h.at(100, "ockm-lead-sync 0 ; ockm-lead-len 64 ; ockm-lead-notes 15 ; ockm-lead-rhythm 10")
+    g = h.add("#X obj 10 300 r test-get;"); t = h.add("#X obj 10 330 t b b;")
+    a1 = h.add("#X obj 10 360 array get ockm-pat-lead-on 0 64;"); p1 = h.add("#X obj 10 390 print ON;")
+    a2 = h.add("#X obj 150 360 array get ockm-pat-lead-note 0 64;"); p2 = h.add("#X obj 150 390 print NOTE;")
+    h.con(g, t); h.con(t, a1, 1); h.con(a1, p1); h.con(t, a2, 0); h.con(a2, p2)
+    h.at(200, "test-get bang")
+    h.at(250, "ockm-lead-seed 3")
+    h.at(300, "test-get bang")
+    f = os.path.join(work, "t_motif.pd"); h.finish(400, f)
+    out = run(work, f)
+    ons = [[int(float(x)) for x in l.split()] for l in printed(out, "ON")]
+    notes = [[int(float(x)) for x in l.split()] for l in printed(out, "NOTE")]
+    on, note = ons[0], notes[0]
+    assert on[0:16] != on[48:64] and sum(on) > 20, f"the phrase rhythm should run four bars: {on}"
+    both = [i for i in range(16) if on[i] and on[16 + i]]
+    assert both and all(note[i] == note[16 + i] for i in both), f"bar 2 should say bar 1's idea again: {note[:32]}"
+    chord = {9, 0, 4}   # A minor: A C E
+    beats = [(i, note[i]) for i in range(64) if on[i] and i % 4 == 0]
+    assert all(n % 12 in chord for _, n in beats), f"notes on the beat should be in the chord: {beats}"
+    last = max(i for i in range(48, 64) if on[i])
+    assert note[last] % 12 == 9, f"bar 4 should come home to the root: {note[48:64]}"
+    hits0 = [n for n, o in zip(note, on) if o]; hits1 = [n for n, o in zip(notes[1], ons[1]) if o]
+    assert hits0 != hits1, "new should give a different line"
+
+@test
 def chord_notes_follow_key_scale_and_type(work):
     h = Harness(dut="ockm-chordseq zz")
     h.add("#X obj 400 120 ockm-presets;")

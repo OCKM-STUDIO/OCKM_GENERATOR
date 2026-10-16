@@ -816,8 +816,8 @@ for nm in ("bass","lead","chord"): p.con(offm,0,synth_voice[nm],0); p.con(gof,0,
 # generators and shared presets
 gy=by+3*40+20
 p.add(f"#X obj 110 {gy} ockm-presets;")
-p.add(f"#X obj 230 {gy} ockm-monogen bass 0 3 3 0 1;")
-p.add(f"#X obj 400 {gy} ockm-monogen lead 24 8 12 0 1;")
+p.add(f"#X obj 230 {gy} ockm-monogen bass 0 3 3 0 1 0;")
+p.add(f"#X obj 400 {gy} ockm-monogen lead 24 8 12 0 1 1;")
 p.add(f"#X obj 530 {gy} ockm-chordgen chord 0;")
 p.add(f"#X obj 700 {gy} ockm-grooves;")
 for i,(nm,snd) in enumerate(SLOTS): p.add(f"#X obj {110+i*120} {gy+30} ockm-drumgen {nm} {snd};")
@@ -1357,12 +1357,72 @@ def _tune(seed, passing, lift):
             i=max(0,min(len(ladder)-1,i+mv))
         out.append(ladder[i]+lift)
     return " ".join(str(v) for v in out)
+# Melodies that follow the bar (v0.52). Unlike the lists above, which hand out the next note each time the rhythm plays,
+# these give a pitch for every step of four bars, so the shape lines up with the phrase whatever the rhythm.
+# Scale steps are from the chord's root: on the beat they're always a chord tone (root, third, fifth).
+# Each is 8 versions of 64 steps: version 0 is the original, 'new' steps through the others.
+_CT=[-3,0,2,4,7,9,11]                     # chord tones, low to high (as scale steps from the chord's root)
+def _bar(beats, rnd):
+    """16 steps: each beat's chord tone, with passing or neighbour notes on the steps between."""
+    out=[]
+    for k in range(4):
+        a=beats[k]; b=beats[k+1] if k<3 else beats[k]
+        out.append(a)
+        for j in (1,2,3):
+            v=round(a+(b-a)*j/4)
+            if v==a and j==2: v=a+rnd.choice([1,-1])        # a neighbour note so held beats still move
+            out.append(v)
+    return out
+def _ct_move(d, n): i=min(range(len(_CT)),key=lambda k:abs(_CT[k]-d)); return _CT[max(0,min(len(_CT)-1,i+n))]
+def _motif_beats(rnd):
+    b=[rnd.choice([0,2,4])]
+    for _ in range(3): b.append(_ct_move(b[-1], rnd.choices([-2,-1,0,1,2],[1,3,2,3,1])[0]))
+    return b
+def _cadence(beats, target, rnd):
+    """keep the start of the idea, then step home to target (0 the root: an answer; 4 the fifth: a question)"""
+    mid=_ct_move(target, rnd.choice([1,-1]))
+    return [beats[0], mid, target, target]   # home by beat 3 and stay there, so a phrase that ends early still lands
+def _melody4(seed, kind, lift):
+    rnd=_random.Random(seed)
+    A=_motif_beats(rnd)
+    if kind=="motif":                 # sing-along: say it, say it again, change it, come home
+        B=[_ct_move(x,1) for x in A] if rnd.random()<0.5 else [_ct_move(A[0],0)]+[_ct_move(A[0], -( _CT.index(_ct_move(x,0)) - _CT.index(_ct_move(A[0],0)) )) for x in A[1:]]
+        bars=[A, A, B, _cadence(A, 0, rnd)]
+    else:                             # question and answer: up in the air on the fifth, then home to the root
+        A2=A[:]; A2[3]=_ct_move(A2[3], rnd.choice([1,-1]))
+        bars=[A, _cadence(A2, 4, rnd), A, _cadence(A, 0, rnd)]
+    out, made = [], {}
+    for b in bars:                    # the same idea comes back note for note
+        if tuple(b) not in made: made[tuple(b)] = _bar(b, rnd)
+        out += made[tuple(b)]
+    return [max(-3,min(11,v))+lift for v in out]
+ARP_SHAPES=[[0,2,4,7],[7,4,2,0],[0,2,4,7,4,2],[0,4,2,7],[0,4,7,4],[0,7,4,2],[-3,0,2,4],[0,2,0,4,0,7]]
+def _arp4(seed):
+    """an arpeggio over whichever chord is playing that changes as it goes: the same shape twice, then lifted, then a turn"""
+    rnd=_random.Random(seed)
+    s1=rnd.choice(ARP_SHAPES); s2=rnd.choice(ARP_SHAPES)
+    lift=[_ct_move(x,1) for x in s1]
+    out=[]
+    for bar,shape in enumerate([s1, s1, lift if rnd.random()<0.6 else s2, s2]):
+        out+=[shape[j % len(shape)] for j in range(16)]
+    return out
+def _bank(fn): return " ".join(str(v) for k in range(8) for v in fn(k))
+def _rhy4(*bars):
+    assert len(bars)==4 and all(len(b)==16 for b in bars)
+    return " ".join(str({".":0,"x":1,"X":2,"s":3,"S":4}[c]) for b in bars for c in b)
 PRE={"rhythm":[("offbeat","0 0 2 0 0 0 1 0 0 0 2 0 0 0 1 0"),("rolling","0 2 1 1 0 2 1 1 0 2 1 1 0 2 1 1"),("gallop","0 0 2 1 0 1 2 0 0 0 2 1 0 1 2 0"),
                ("acid-classic","2 1 0 1 3 4 1 0 2 1 3 1 0 2 1 3"),("sparse-dub","2 0 0 0 0 0 0 1 0 0 1 0 0 0 0 0"),("tech-bounce","0 0 2 0 0 1 0 0 0 0 2 0 0 1 0 1"),
-               ("acid-16ths","2 1 3 1 2 1 1 3 2 1 3 1 2 3 1 1"),("trip-hop","2 0 0 0 0 0 3 1 0 0 0 0 0 0 1 0"),("hook","2 0 0 1 0 0 1 0 0 0 1 0 1 0 0 0"),("sparse-melody","2 0 0 0 0 0 1 0 0 3 0 0 1 0 0 0")],
+               ("acid-16ths","2 1 3 1 2 1 1 3 2 1 3 1 2 3 1 1"),("trip-hop","2 0 0 0 0 0 3 1 0 0 0 0 0 0 1 0"),("hook","2 0 0 1 0 0 1 0 0 0 1 0 1 0 0 0"),("sparse-melody","2 0 0 0 0 0 1 0 0 3 0 0 1 0 0 0"),
+               # four bars long (v0.52): phrases that breathe
+               ("phrase",_rhy4("X.x.x.x.X...x.x.","X.x.x.x.X...x...","X.x.x.x.X.x.x.x.","X...x...X.......")),
+               ("question-answer",_rhy4("X.x.x..xX.x.....","x.......X.......","X.x.x..xX.x.....","x...x...X.......")),
+               ("pickup",_rhy4("X.....x.....x.x.","X.......x...x.x.","X.....x.....x.x.","X...x...X.......")),
+               ("arp-gate",_rhy4("XxxxXxx.XxxxXxx.","XxxxXxx.XxxxXxx.","XxxxXxxxXxxxXxxx","Xxx.Xxx.X.x.X..."))],
      "notes":[("root","0"),("octaves","0 7"),("root-fifth","0 4"),("acid-riff","0 0 7 0 2 0 6 4"),("walk-up","0 1 2 4"),("minor-stab","0 2 4 2"),
               ("dub","0 0 -3 -2"),("pedal","0 0 0 1"),("arp-up","0 2 4 7"),("arp-updown","0 2 4 7 4 2"),("call","4 4 2 0 2 4 5 4"),("descend","7 6 4 2"),
-              ("melody",_tune(1,False,0)),("melody-steps",_tune(2,True,0)),("melody-high",_tune(3,False,7))],
+              ("melody",_tune(1,False,0)),("melody-steps",_tune(2,True,0)),("melody-high",_tune(3,False,7)),
+              ("motif",_bank(lambda k:_melody4(100+k,"motif",0))),("motif-call",_bank(lambda k:_melody4(200+k,"call",0))),
+              ("motif-high",_bank(lambda k:_melody4(300+k,"motif",7))),("arp-evolve",_bank(lambda k:_arp4(400+k)))],
      "scale":[("minor","0 2 3 5 7 8 10"),("major","0 2 4 5 7 9 11"),("dorian","0 2 3 5 7 9 10"),("phrygian","0 1 3 5 7 8 10"),
               ("mixolydian","0 2 4 5 7 9 10"),("harmonic-minor","0 2 3 5 7 8 11")],
      "chordrhythm":[("bar-pads","2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"),("two-beat","2 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0"),
@@ -1548,7 +1608,7 @@ p.save("seq/ockm-lengths.pd","#N canvas 100 100 1900 1000 12;")
 # args: track, octave offset (semitones), default rhythm, default notes
 p=P()
 p.add("#X text 20 10 Mono generator: builds a bass or lead line from a rhythm preset + a note pattern + the shared key. Args: track \\, octave offset \\, default rhythm \\, default notes.;")
-for nm,n in [("r",16),("n",64),("s",7)]: p.add(f"#X obj {700+['r','n','s'].index(nm)*130} 60 array define {D}0-{nm} {n};")
+for nm,n in [("r",64),("n",512),("s",7)]: p.add(f"#X obj {700+['r','n','s'].index(nm)*130} 60 array define {D}0-{nm} {n};")
 regen=p.add("#X obj 20 330 t b b b b b;")
 # Two kinds of trigger. Picking a preset (rhythm, notes) or pressing new always generates, and puts the part in auto.
 # Everything else (key, scale, chords changing) only regenerates a part that is in auto. Nothing fires while a pattern loads.
@@ -1593,7 +1653,8 @@ tn=p.add("#X obj 360 380 text get ockm-presets-notes;"); ln=p.add("#X obj 360 41
 ll=p.add("#X obj 420 470 list length;"); an=p.add(f"#X obj 360 500 array set {D}0-n;")
 p.con(regen,3,store[1],0); p.con(store[1],0,tn,0); p.con(tn,0,ln,0); p.con(ln,1,tl,0); p.con(tl,1,ll,0); p.con(tl,0,an,0)
 tr=p.add("#X obj 170 380 text get ockm-presets-rhythm;"); lr=p.add("#X obj 170 410 list split 1;"); ar=p.add(f"#X obj 170 440 array set {D}0-r;")
-p.con(regen,2,store[0],0); p.con(store[0],0,tr,0); p.con(tr,0,lr,0); p.con(lr,1,ar,0)
+trl=p.add("#X obj 230 425 t l l;"); rll=p.add("#X obj 270 455 list length;")
+p.con(regen,2,store[0],0); p.con(store[0],0,tr,0); p.con(tr,0,lr,0); p.con(lr,1,trl,0); p.con(trl,1,rll,0); p.con(trl,0,ar,0)
 rx=p.add(f"#X obj 20 410 expr if(36+{D}f1>40 \\, 24+{D}f1 \\, 36+{D}f1);"); ro=p.add(f"#X obj 20 440 + {D}2;")
 p.con(regen,1,store[2],0); p.con(store[2],0,rx,0); p.con(rx,0,ro,0)
 lp=p.add("#X obj 20 560 t b b;"); p.con(regen,0,lp,0)
@@ -1613,16 +1674,21 @@ lockx=p.add(f"#X obj 160 720 expr if({D}f3==1 \\, if({D}f2>0 \\, if({D}f1==2 || 
 H=f"(abs(sin({D}f4*12.9898+{D}f3*78.233+1.7)*43758.5453)-floor(abs(sin({D}f4*12.9898+{D}f3*78.233+1.7)*43758.5453)))"
 dens=p.add(f"#X obj 160 735 expr if({D}f1>0 && {D}f2<1 && {D}f1!=2 && {D}f1!=4 && {H}>{D}f2 \\, 0 \\, if({D}f1==0 && {D}f2>1 && {H}<({D}f2-1)*0.5 \\, 1 \\, {D}f1));")
 cx=p.add(f"#X obj 20 745 expr {D}f1>0 \; {D}f1==2 || {D}f1==4 \; {D}f1>=3;")
+p.con(rll,0,m16,1)   # a four-bar rhythm repeats every 64 steps
 for c in [(ti,0,m16,0),(m16,0,rd,0),(rd,0,lockx,0),(lockx,0,dens,0),(dens,0,cx,0),(cx,2,tws["slide"],0),(cx,1,tws["acc"],0),
           (ti,1,kick,0),(kick,0,lockx,1),(var["lock"],1,lockx,2),(var["density"],1,dens,1),(one_d,0,dens,1),(var["seed"],1,dens,2),(ti,1,dens,3)]: p.con(*c)
 to=p.add("#X obj 20 780 t f f;"); s1=p.add("#X obj 20 810 sel 1;"); th=p.add("#X obj 400 790 t f f;")
-ix=p.add(f"#X obj 400 820 expr int({D}f1+{D}f3) % int({D}f2);"); rn=p.add(f"#X obj 400 845 tabread {D}0-n;"); td=p.add("#X obj 400 870 t f f;")
+ix=p.add(f"#X obj 400 820 expr if(int({D}f2)==512 \\, (int({D}f3)%8)*64 + int({D}f4)%64 \\, int({D}f1+{D}f3) % int({D}f2));"); rn=p.add(f"#X obj 400 845 tabread {D}0-n;"); td=p.add("#X obj 400 870 t f f;")
 sx=p.add(f"#X obj 560 870 expr ((int({D}f1)%7)+7)%7;"); rs=p.add(f"#X obj 560 895 tabread {D}0-s;")
 addc=p.add("#X obj 400 857 + 0;")
-ojump=p.add(f"#X obj 400 850 expr {D}f1 + 7*({D}f2>0 && (abs(sin({D}f3*7.13+{D}f2*3.7+0.3)*9137.21)-floor(abs(sin({D}f3*7.13+{D}f2*3.7+0.3)*9137.21)))<0.2);")
-p.con(var["seed"],1,ix,2); p.con(var["seed"],1,ojump,1); p.con(ti,1,ojump,2)
+ojump=p.add(f"#X obj 400 850 expr {D}f1 + 7*({D}f4!=512 && {D}f2>0 && (abs(sin({D}f3*7.13+{D}f2*3.7+0.3)*9137.21)-floor(abs(sin({D}f3*7.13+{D}f2*3.7+0.3)*9137.21)))<0.2);")
+p.con(var["seed"],1,ix,2); p.con(var["seed"],1,ojump,1); p.con(ti,1,ojump,2); p.con(ti,1,ix,3); p.con(ll,0,ojump,3)
+# the lead (arg 7): on the beat, a note that isn't in the chord moves to the nearest one that is
+_R=f"((int({D}f1)%7+7)%7)"
+snap=p.add(f"#X obj 400 860 expr if({D}f3>0 && int({D}f2)%4==0 \\, {D}f1 - ({_R}==1 || {_R}==3 || {_R}==5) + ({_R}==6) \\, {D}f1);")
+fsn=p.add(f"#X obj 560 820 f {D}7;"); p.con(lbm,0,fsn,0); p.con(fsn,0,snap,2); p.con(ti,1,snap,1)
 nx=p.add(f"#X obj 400 930 expr {D}f2 + 12*floor({D}f1/7) + {D}f3;")
-for c in [(cx,0,to,0),(to,1,tws["on"],0),(to,0,s1,0),(s1,0,fh,0),(fh,0,th,0),(th,1,ph,0),(ph,0,fh,1),(th,0,ix,0),(ll,0,ix,1),(ix,0,rn,0),(rn,0,ojump,0),(ojump,0,addc,0),(fold,0,addc,1),(addc,0,td,0),
+for c in [(cx,0,to,0),(to,1,tws["on"],0),(to,0,s1,0),(s1,0,fh,0),(fh,0,th,0),(th,1,ph,0),(ph,0,fh,1),(th,0,ix,0),(ll,0,ix,1),(ix,0,rn,0),(rn,0,ojump,0),(ojump,0,snap,0),(snap,0,addc,0),(fold,0,addc,1),(addc,0,td,0),
           (td,1,sx,0),(sx,0,rs,0),(rs,0,nx,2),(td,0,nx,0),(ro,0,nx,1),(nx,0,tws["note"],0)]: p.con(*c)
 p.add("#X text 20 980 hooks: ockm-<track>-rhythm 0-7 \\, ockm-<track>-notes 0-11 \\, ockm-<track>-gen (rebuild) \\, ockm-<track>-mode (0 auto \\, 1 manual) \\, ockm-<track>-sync (follow the chords) \\, ockm-<track>-lock (0 own rhythm \\, 1 lock to kick \\, 2 fill the gaps) \\, ockm-<track>-density (0-2 \\, 1 = the preset) \\, ockm-<track>-seed (mutate: 0 = the original) \\, and the shared ockm-root 0-11 and ockm-scale 0-5. Args: track \\, octave \\, rhythm \\, notes \\, default mode \\, default sync.;")
 p.save("seq/ockm-monogen.pd","#N canvas 120 120 1100 1020 12;")

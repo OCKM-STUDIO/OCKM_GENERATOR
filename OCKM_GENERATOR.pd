@@ -520,8 +520,8 @@
 #X msg 400 105 off;
 #X msg 460 105 \; ockm-rise-now 0;
 #X obj 110 850 ockm-presets;
-#X obj 230 850 ockm-monogen bass 0 3 3 0 1;
-#X obj 400 850 ockm-monogen lead 24 8 12 0 1;
+#X obj 230 850 ockm-monogen bass 0 3 3 0 1 0;
+#X obj 400 850 ockm-monogen lead 24 8 12 0 1 1;
 #X obj 530 850 ockm-chordgen chord 0;
 #X obj 700 850 ockm-grooves;
 #X obj 110 880 ockm-drumgen d1 0;
