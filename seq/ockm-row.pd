@@ -5,7 +5,7 @@
 #X obj 70 220 expr if(\$f1>1 \, 1 \, if(\$f1>0.999 \, 1-\$f2 \, \$f1));
 #X obj 70 260 outlet;
 #X obj 230 190 r ockm-accent;
-#X obj 30 300 table ockm-pat-\$1 128;
+#X obj 30 300 table ockm-pat-\$1 256;
 #X obj 400 520 tabwrite ockm-pat-\$1;
 #X obj 400 460 unpack f f;
 #X obj 480 490 + 0;
@@ -13,12 +13,12 @@
 #X obj 300 160 tabread ockm-pat-\$1-nudge;
 #X obj 300 185 expr (\$f1+0.25)*ockm_stepms;
 #X obj 70 240 pipe 0;
-#X obj 300 300 table ockm-pat-\$1-nudge 128;
+#X obj 300 300 table ockm-pat-\$1-nudge 256;
 #X obj 120 270 spigot;
 #X obj 200 245 == 0;
 #X obj 120 295 s ockm-kick-hit;
 #X obj 30 135 t f f;
-#X obj 30 148 expr if(ockm_dloop>0 \, \$f1 % ockm_dloop \, \$f1);
+#X obj 30 148 expr if(ockm_drumlen>0 \, \$f1 % ockm_drumlen \, \$f1);
 #X obj 160 135 expr int(\$f1)%16 + 16*\$f2;
 #X obj 260 110 r ockm-\$1-sound;
 #X obj 160 160 tabread ockm-fillx;
@@ -83,7 +83,7 @@
 #X obj 1150 520 array set ockm-pat-\$1-nudge;
 #X obj 1210 495 f;
 #X obj 1150 495 t b f;
-#X obj 1400 120 r ockm-extend;
+#X obj 1400 120 r ockm-drum-extend;
 #X obj 1400 150 unpack f f;
 #X obj 1400 210 expr \$f2-\$f1;
 #X obj 1400 180 t f f;

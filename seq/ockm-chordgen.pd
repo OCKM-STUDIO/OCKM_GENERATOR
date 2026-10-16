@@ -9,7 +9,7 @@
 #X obj 20 225 t b b;
 #X msg 60 225 0;
 #X obj 60 245 s ockm-\$1-mode;
-#X obj 700 160 r ockm-len;
+#X obj 700 160 r ockm-\$1-len;
 #X obj 700 180 t b;
 #X obj 700 200 spigot 1;
 #X obj 820 160 r ockm-\$1-mode;
@@ -39,13 +39,13 @@
 #X obj 100 360 t l l;
 #X obj 160 390 list length;
 #X obj 100 420 array set \$0-r;
-#X obj 360 470 r ockm-len;
-#X obj 300 500 expr if(ockm_cg_nofit \, 0 \, if(\$f1>\$f2 \, \$f1 \, 0));
+#X obj 360 470 r ockm-\$1-len;
+#X obj 300 500 expr if(ockm_cg_nofit \, 0 \, if(\$f1!=\$f2 \, max(\$f1 \, 16) \, 0));
 #X obj 300 530 sel 0;
-#X obj 340 560 s ockm-length;
+#X obj 340 560 s ockm-\$1-len;
 #X msg 120 470 0;
-#X obj 20 470 f 16;
-#X obj 80 440 r ockm-len;
+#X obj 20 470 f 128;
+#X obj 80 440 r ockm-\$1-len;
 #X obj 20 500 until;
 #X obj 20 530 f;
 #X obj 70 530 + 1;

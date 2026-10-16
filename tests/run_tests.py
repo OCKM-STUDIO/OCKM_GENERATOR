@@ -231,12 +231,12 @@ def save_quit_and_reopen(work):
     h.at(200, "ockm-bpm 131 ; ockm-d2-decay 150 ; ockm-bass-engine 5 ; ockm-swing 60 ; ockm-length 32")
     h.at(300, "ockm-save bang")
     f = os.path.join(work, "t_save1.pd"); h.finish(400, f); run(work, f)
-    h = Harness(); show_values(h, ["bpm", "d2-decay", "bass-engine", "swing", "len"], "V")
+    h = Harness(); show_values(h, ["bpm", "d2-decay", "bass-engine", "swing", "bass-len"], "V")
     h.at(200, "ockm-resync bang")
     f = os.path.join(work, "t_save2.pd"); h.finish(400, f)
     out = run(work, f)
-    got = {k: last(out, f"V-{k}") for k in ["bpm", "d2-decay", "bass-engine", "swing", "len"]}
-    assert got == {"bpm": "131", "d2-decay": "150", "bass-engine": "5", "swing": "60", "len": "32"}, f"settings not restored after reopening: {got}"
+    got = {k: last(out, f"V-{k}") for k in ["bpm", "d2-decay", "bass-engine", "swing", "bass-len"]}
+    assert got == {"bpm": "131", "d2-decay": "150", "bass-engine": "5", "swing": "60", "bass-len": "32"}, f"settings not restored after reopening: {got}"
 
 @test
 def revert_goes_back_to_saved(work):
@@ -566,8 +566,8 @@ def touchscreen_drives_the_engine(work):
     tap(150, 50, 137)                    # perform: open the kick lane
     tap(170, 160, 212); tap(180, 160, 212)   # step 3: on, then accent
     tap(190, 281, 36)                    # perform tab
-    tap(200, 807, 88)                    # length 2 bars (navigation strip)
-    tap(210, 414, 36)                    # drums tab (back to the kick slot)
+    tap(200, 414, 36)                    # drums tab (back to the kick slot)
+    tap(210, 668, 88)                    # drum length: 2 bars (navigation strip)
     h.at(220, "ockm-ui-test drag 600 212 200 212")   # swipe left: steps 17-32
     tap(230, 45, 212)                    # step 17
     h.at(240, "ockm-ui-test drag 200 212 600 212")   # swipe right: back to 1-16
@@ -995,8 +995,8 @@ def touchscreen_makes_and_opens_projects(work):
 
 @test
 def drum_grooves_fill_every_slot(work):
-    """A groove lands on each slot by the sound it plays, repeats across the pattern, sets the swing and moves a part locked to the kick."""
-    h = Harness()
+    """A groove lands on each slot by the sound it plays, makes the drums 1 bar (a groove's natural length), sets the swing and moves a part locked to the kick."""
+    h = Harness(); h.show("ockm-drum-len")
     h.at(100, "ockm-resync bang ; ockm-length 32 ; ockm-bass-lock 1 ; ockm-bass-mode 0")
     h.at(150, "ockm-drum-groove 3")                              # tech house
     g = h.add("#X obj 10 300 r test-get;"); t = h.add("#X obj 10 325 t b b b b;")
@@ -1012,12 +1012,13 @@ def drum_grooves_fill_every_slot(work):
     out = run(work, f)
     rows = {n: [[int(float(x)) for x in v.split()] for v in printed(out, n)] for n in outs}
     kick = [2,0,0,0,1,0,0,0,2,0,0,0,1,0,0,0] * 2
-    assert rows["D1"][0] == kick, f"slot 1 (kick) should get the tech house kick, twice over 32 steps: {rows['D1'][0]}"
+    assert rows["D1"][0][:16] == kick[:16], f"slot 1 (kick) should get the tech house kick: {rows['D1'][0]}"
+    assert printed(out, "ockm-drum-len")[-1] == "16", f"a groove makes the drums 1 bar: {printed(out, 'ockm-drum-len')}"
     assert rows["D4"][0][:16] == [1,1,0,1,1,1,0,1,1,1,0,1,1,1,0,1], f"slot 4 (hat) should get the hats: {rows['D4'][0]}"
     assert rows["D5"][0][:16] == [0,0,2,0,0,0,2,0,0,0,2,0,0,0,2,0], f"slot 5 (open hat) should get the open hats: {rows['D5'][0]}"
     assert [1 if v else 0 for v in rows["BASS-ON"][0][:16]] == [1 if v else 0 for v in kick[:16]], f"bass locked to the kick should follow the new kick: {rows['BASS-ON'][0]}"
     assert "54" in [v.split()[0].split(".")[0] for v in printed(out, "SWING")], f"tech house should set swing 54: {printed(out, 'SWING')}"
-    assert all(v == 0 for n in ("D1", "D4", "D5") for v in rows[n][1]), "clear should empty every slot"
+    assert all(v == 0 for n in ("D1", "D4", "D5") for v in rows[n][1][:16]), "clear should empty every slot"
 
 @test
 def suggest_chords_fit_the_melody(work):
@@ -1057,18 +1058,18 @@ def ui_preview_shapes():
 
 @test
 def touchscreen_velocity_timing_loop_and_banks(work):
-    """Drums tab: drag a step's velocity up, switch to timing and pull it early, pick a 1-bar loop and double it,
+    """Drums tab: drag a step's velocity up, switch to timing and pull it early, set the drums to 1 bar and double them,
     then pick a groove from the second bank."""
     if not PDLUA:
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
-    h = Harness(); h.show("ockm-edit", "ockm-nudge", "ockm-drum-loop", "ockm-drum-double", "ockm-drum-groove")
+    h = Harness(); h.show("ockm-edit", "ockm-nudge", "ockm-drum-len", "ockm-drum-double", "ockm-drum-groove")
     h.at(100, "ockm-length 64 ; ockm-edit d1 0 1")
     h.at(200, "ockm-ui-test tap 414 36")              # drums tab
     h.at(300, "ockm-ui-test drag 45 336 45 302")      # velocity: drag step 1 to the top (accent)
     h.at(400, "ockm-ui-test tap 145 282")             # timing
     h.at(500, "ockm-ui-test drag 45 319 45 336")      # pull step 1 early
-    h.at(600, "ockm-ui-test tap 707 282")             # drums loop: 1 bar
-    h.at(700, "ockm-ui-test tap 907 282")             # double
+    h.at(600, "ockm-ui-test tap 612 88")              # drum length: 1 bar (navigation strip)
+    h.at(700, "ockm-ui-test tap 909 88")              # double
     h.at(800, "ockm-ui-test tap 716 354")             # bank 2
     h.at(900, "ockm-ui-test tap 531 389")             # its first groove
     f = os.path.join(work, "t_lane_ui.pd"); h.finish(1000, f)
@@ -1077,8 +1078,8 @@ def touchscreen_velocity_timing_loop_and_banks(work):
     assert edits and edits[-1].split()[-1] == "2", f"dragging to the top should make it an accent: {edits}"
     nud = [float(e.split()[-1]) for e in printed(out, "ockm-nudge") if e.startswith("d1 0")]
     assert nud and nud[-1] < -0.2, f"dragging down should pull it early: {nud}"
-    loops = [int(float(v)) for v in printed(out, "ockm-drum-loop")]
-    assert 16 in loops and loops[-1] == 32, f"1-bar loop then double should give 2 bars: {loops}"
+    loops = [int(float(v)) for v in printed(out, "ockm-drum-len")]
+    assert 32 in loops and loops[-1] == 16, f"double should give 2 bars, then the groove makes the drums 1 bar again: {loops}"
     assert printed(out, "ockm-drum-groove")[-1:] == ["13"], f"bank 2's first groove is number 13: {printed(out, 'ockm-drum-groove')}"
 
 @test
@@ -1250,6 +1251,95 @@ def touchscreen_steps_act_on_press(work):
     assert edits[0] == "d1 1 1", f"the step should change as the finger lands: {edits}"
     assert len(edits) >= 3 and edits[1].split()[:2] == ["d1", "6"] and edits[2] == "d1 6 0", f"a swipe should put the pressed step back: {edits}"
     assert printed(out, "ockm-page")[-1:] == ["1"], f"the swipe should turn the page: {printed(out, 'ockm-page')}"
+
+@test
+def part_lengths_repeat_inside_the_loop(work):
+    """Each part has its own length; the loop is as long as the longest. A 1-bar drum part under a 4-bar bass plays
+    its kick 4 times per loop. Shortening the bass shortens the loop, a longer chord part lengthens it, and
+    ockm-drum-double doubles only the drums (copying their bar)."""
+    h = Harness(); h.show("ockm-len", "ockm-kick-hit", "ockm-drum-len", "ockm-drum-loop")
+    g = h.add("#X obj 10 300 r test-get;"); a = h.add("#X obj 10 330 array get ockm-pat-d1 0 32;"); pr = h.add("#X obj 10 360 print D1;")
+    h.con(g, a); h.con(a, pr)
+    h.at(90, "ockm-bass-sync 0 ; ockm-lead-sync 0")              # independent lengths (a part following the chords takes theirs)
+    h.at(100, "ockm-bpm 240 ; ockm-swing 50 ; ockm-drum-len 16 ; ockm-bass-len 64 ; ockm-lead-len 16 ; ockm-chord-len 16")
+    h.at(150, "ockm-pat-d1 const 0 ; ockm-pat-d1 0 1")          # one kick, on the first step of the drum bar
+    h.at(200, "ockm-play 1")
+    h.at(200 + 64 * 62.5 - 20, "ockm-play 0")                     # exactly one 4-bar loop at 240 bpm
+    h.at(4500, "ockm-bass-len 32")                                # loop shrinks to 2 bars
+    h.at(4600, "ockm-chord-len 128")                              # and grows to 8
+    h.at(4700, "ockm-pat-d1 2 1 ; ockm-drum-double bang")         # drums: 1 bar -> 2 bars, bar 1 copied
+    h.at(4800, "test-get bang")
+    f = os.path.join(work, "t_lens.pd"); h.finish(5000, f)
+    out = run(work, f)
+    kicks = printed(out, "ockm-kick-hit")
+    assert len(kicks) == 4, f"a 1-bar kick part in a 4-bar loop should play 4 times: {len(kicks)}"
+    lens = [int(float(v)) for v in printed(out, "ockm-len")]
+    lens = [v for i, v in enumerate(lens) if i == 0 or v != lens[i - 1]]   # it may be re-sent unchanged
+    assert lens[-3:] == [64, 32, 128], f"the loop should follow the longest part (64, then 32, then 128): {lens}"
+    assert printed(out, "ockm-drum-len")[-1] == "32", f"double should make the drums 2 bars: {printed(out, 'ockm-drum-len')}"
+    d1 = [int(float(x)) for x in printed(out, "D1")[-1].split()]
+    assert d1[16] == 1 and d1[18] == 1, f"double should copy bar 1 (steps 1 and 3) into bar 2: {d1}"
+    assert printed(out, "ockm-drum-loop")[-1] == "32", f"the screens hear the drums are shorter than the loop: {printed(out, 'ockm-drum-loop')}"
+
+@test
+def parts_following_the_chords_take_their_length(work):
+    """A bass or melody that follows the chords takes the chord part's length; one that doesn't keeps its own."""
+    h = Harness(); h.show("ockm-bass-len", "ockm-lead-len")
+    h.at(100, "ockm-bass-sync 1 ; ockm-lead-sync 0 ; ockm-bass-len 16 ; ockm-lead-len 16")
+    h.at(200, "ockm-chord-len 64")
+    f = os.path.join(work, "t_follow_len.pd"); h.finish(400, f)
+    out = run(work, f)
+    assert printed(out, "ockm-bass-len")[-1] == "64", f"the bass follows the chords to 4 bars: {printed(out, 'ockm-bass-len')}"
+    assert printed(out, "ockm-lead-len")[-1] == "16", f"the melody doesn't follow, so it stays 1 bar: {printed(out, 'ockm-lead-len')}"
+
+@test
+def part_lengths_save_and_older_files_load(work):
+    """Part lengths are saved with the loop and come back. An older loop file with one length and a drums loop
+    loads as: drums the drums-loop length, every other part the old length."""
+    h = Harness(); h.show("ockm-len", "ockm-drum-len", "ockm-bass-len", "ockm-chord-len")
+    h.at(90, "ockm-bass-sync 0 ; ockm-lead-sync 0")
+    h.at(100, "ockm-drum-len 16 ; ockm-bass-len 64 ; ockm-lead-len 32 ; ockm-chord-len 128 ; ockm-save bang")
+    h.at(200, "ockm-drum-len 64 ; ockm-chord-len 16")
+    h.at(300, "ockm-revert bang")
+    f = os.path.join(work, "t_lens_save.pd"); h.finish(500, f)
+    out = run(work, f)
+    assert printed(out, "ockm-drum-len")[-1] == "16" and printed(out, "ockm-chord-len")[-1] == "128", \
+        f"back to last save should restore the part lengths: drum {printed(out, 'ockm-drum-len')} chord {printed(out, 'ockm-chord-len')}"
+    assert printed(out, "ockm-len")[-1] == "128", f"the loop length after loading: {printed(out, 'ockm-len')}"
+    saved = open(os.path.join(work, "projects", "default", "loop.txt")).read()
+    assert "ockm-bass-len 64" in saved and "ockm-len " not in saved, "loop.txt keeps part lengths, not one length"
+    # an older file: one length (32) and drums looping at 16
+    lp = os.path.join(work, "projects", "default", "loop.txt")
+    old = [l for l in open(lp).read().split(";\n") if l.strip() and not l.strip().startswith(("ockm-drum-len", "ockm-bass-len", "ockm-lead-len", "ockm-chord-len"))]
+    open(lp, "w").write(";\n".join(old + ["ockm-drum-loop 16", "ockm-len 32"]) + ";\n")
+    h2 = Harness(); h2.show("ockm-len", "ockm-drum-len", "ockm-bass-len")
+    h2.at(100, "ockm-revert bang")                                # read the older file again, now we're listening
+    f2 = os.path.join(work, "t_lens_old.pd"); h2.finish(400, f2)
+    out2 = run(work, f2)
+    assert printed(out2, "ockm-drum-len")[-1:] == ["16"] and printed(out2, "ockm-bass-len")[-1:] == ["32"], \
+        f"an older file: drums 16, the rest 32: drum {printed(out2, 'ockm-drum-len')} bass {printed(out2, 'ockm-bass-len')}"
+    assert printed(out2, "ockm-len")[-1:] == ["32"], f"the loop is the old length: {printed(out2, 'ockm-len')}"
+
+@test
+def touchscreen_part_lengths_and_undo(work):
+    """Bass tab: the length buttons on the strip set the bass's own length; the loop follows the longest part.
+    Shortening offers undo, which brings the old length back. Double doubles just this part."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness(); h.show("ockm-bass-len", "ockm-len", "ockm-drum-len")
+    h.at(90, "ockm-bass-sync 0")                      # its own length, not the chords'
+    h.at(100, "ockm-ui-test tap 483 36")              # bass tab
+    h.at(200, "ockm-ui-test tap 724 88")              # 4 bars
+    h.at(300, "ockm-ui-test tap 612 88")              # 1 bar: shorter, so undo is offered
+    h.at(400, "ockm-ui-test tap 761 569")             # undo
+    h.at(600, "ockm-ui-test tap 909 88")              # double: 4 -> 8 bars
+    f = os.path.join(work, "t_partlen_ui.pd"); h.finish(800, f)
+    out = run(work, f)
+    bl = [int(float(v)) for v in printed(out, "ockm-bass-len")]
+    assert bl[:2] == [64, 16], f"the length buttons should set the bass to 4 bars, then 1: {bl}"
+    assert 64 in bl[2:-1] and bl[-1] == 128, f"undo should bring back 4 bars, then double makes 8: {bl}"
+    assert printed(out, "ockm-len")[-1] == "128", f"the loop follows the longest part: {printed(out, 'ockm-len')}"
+    assert set(printed(out, "ockm-drum-len")) <= {"16"}, f"the drums keep their own length (undo re-sends it unchanged): {printed(out, 'ockm-drum-len')}"
 
 def write_tone(path, hz, secs, sr=44100, channels=1):
     w = wave.open(path, "w"); w.setnchannels(channels); w.setsampwidth(2); w.setframerate(sr)

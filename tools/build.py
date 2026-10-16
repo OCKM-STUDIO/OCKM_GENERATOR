@@ -26,7 +26,7 @@ ap.add_argument("--ui-scale",type=int,choices=[1,2],default=1,help="1 = 960x600 
 args=ap.parse_args()
 R=args.out
 for d in ("voices","seq"): os.makedirs(os.path.join(R,d),exist_ok=True)
-STEPS=128   # longest pattern
+STEPS=256   # longest part: 16 bars
 SLOTN=1     # one loop per project (the store still speaks in slots, so this stays a number)
 LOOP_FILE="loop.txt"
 D="\\$"   # Pd dollar as written in a file
@@ -543,7 +543,7 @@ tnd=p.add("#X obj 30 152 t f f;"); nrd=p.add(f"#X obj 300 160 tabread ockm-pat-{
 nex=p.add(f"#X obj 300 185 expr ({D}f1+0.25)*ockm_stepms;"); npp=p.add("#X obj 70 240 pipe 0;")
 p.add(f"#X obj 300 300 table ockm-pat-{D}1-nudge {STEPS};")
 kspg=p.add("#X obj 120 270 spigot;"); kis=p.add("#X obj 200 245 == 0;"); skh=p.add("#X obj 120 295 s ockm-kick-hit;")   # a kick: tell the pump
-tfi=p.add("#X obj 30 135 t f f;"); dlp=p.add(f"#X obj 30 148 expr if(ockm_dloop>0 \\, {D}f1 % ockm_dloop \\, {D}f1);"); fix=p.add(f"#X obj 160 135 expr int({D}f1)%16 + 16*{D}f2;"); rsn=p.add(f"#X obj 260 110 r ockm-{D}1-sound;")
+tfi=p.add("#X obj 30 135 t f f;"); dlp=p.add(f"#X obj 30 148 expr if(ockm_drumlen>0 \\, {D}f1 % ockm_drumlen \\, {D}f1);"); fix=p.add(f"#X obj 160 135 expr int({D}f1)%16 + 16*{D}f2;"); rsn=p.add(f"#X obj 260 110 r ockm-{D}1-sound;")
 frd=p.add("#X obj 160 160 tabread ockm-fillx;"); fsel=p.add(f"#X obj 30 175 expr if((ockm_fill_on || ockm_fill_end) && {D}f2>=0 \\, {D}f2 \\, {D}f1);")
 for c in [(inl,0,tfi,0),(tfi,1,fix,0),(rsn,0,fix,1),(fix,0,frd,0),(frd,0,fsel,1),(tfi,0,dlp,0),(dlp,0,tnd,0),(tnd,1,nrd,0),(nrd,0,nex,0),(nex,0,npp,1),(tnd,0,tr,0),(tr,0,fsel,0),(fsel,0,sel,0),
           (sel,1,vel,0),(racc,0,vel,1),(vel,0,npp,0),(npp,0,out,0),(npp,0,kspg,0),(kspg,0,skh,0),(rsn,0,kis,0),(kis,0,kspg,1),(upk,1,offs,0),(offs,0,tw,1),(upk,0,tw,0)]: p.con(*c)
@@ -572,7 +572,7 @@ rnu=p.add("#X obj 1150 440 r ockm-nudge;"); rou=p.add(f"#X obj 1150 465 route {D
 asn=p.add(f"#X obj 1150 520 array set ockm-pat-{D}1-nudge;"); fnu=p.add("#X obj 1210 495 f;"); tnu=p.add("#X obj 1150 495 t b f;")
 for c in [(rnu,0,rou,0),(rou,0,unu,0),(unu,1,fnu,1),(unu,0,tnu,0),(tnu,1,asn,1),(tnu,0,fnu,0),(fnu,0,asn,0)]: p.con(*c)   # step first, then the value
 # extend: when a pattern gets longer, repeat what's there to fill the new steps
-rx=p.add("#X obj 1400 120 r ockm-extend;"); ux=p.add("#X obj 1400 150 unpack f f;")
+rx=p.add("#X obj 1400 120 r ockm-drum-extend;"); ux=p.add("#X obj 1400 150 unpack f f;")
 cnt=p.add(f"#X obj 1400 210 expr {D}f2-{D}f1;"); txo=p.add("#X obj 1400 180 t f f;")
 mo=p.add("#X obj 1400 240 moses 1;"); ux2=p.add("#X obj 1460 270 until;")
 ci=p.add("#X obj 1460 300 f;"); cip=p.add("#X obj 1510 300 + 1;"); tci=p.add("#X obj 1460 330 t f f;")
@@ -593,21 +593,22 @@ p.save("seq/ockm-row.pd","#N canvas 200 200 1700 600 12;",["#X coords 0 -1 1 1 3
 p=P()
 p.add("#X text 20 10 Mono synth pattern (bass or lead). Each step has a note \\, on/off \\, accent and slide. Up to 128 steps.;")
 inl=p.add("#X obj 30 60 inlet;"); t5=p.add("#X obj 30 100 t f f f f f;")
+pmod=p.add("#X obj 30 80 mod 256;"); p.con(p.add(f"#X obj 100 55 r ockm-{D}1-len;"),0,pmod,1)   # the step inside this part's own length
 rn=p.add(f"#X obj 30 300 tabread ockm-pat-{D}1-note;"); ra=p.add(f"#X obj 140 260 tabread ockm-pat-{D}1-acc;"); rsl=p.add(f"#X obj 250 220 tabread ockm-pat-{D}1-slide;")
-pz=p.add("#X obj 360 130 sel 0;"); lst=p.add("#X obj 360 160 f 16;"); m1a=p.add("#X obj 360 185 - 1;"); m1b=p.add("#X obj 420 160 - 1;"); rlen=p.add("#X obj 470 100 r ockm-len;")
+pz=p.add("#X obj 360 130 sel 0;"); lst=p.add("#X obj 360 160 f 128;"); m1a=p.add("#X obj 360 185 - 1;"); m1b=p.add("#X obj 420 160 - 1;"); rlen=p.add(f"#X obj 470 100 r ockm-{D}1-len;")
 t2=p.add("#X obj 360 210 t f f;")
 ps=p.add(f"#X obj 360 260 tabread ockm-pat-{D}1-slide;"); po=p.add(f"#X obj 470 230 tabread ockm-pat-{D}1-on;"); mul=p.add("#X obj 360 300 *;")
 pk=p.add("#X obj 30 360 pack f f f f;"); ro=p.add(f"#X obj 600 140 tabread ockm-pat-{D}1-on;"); sp=p.add("#X obj 30 400 spigot;")
 eq=p.add("#X obj 600 180 == 0;"); s1=p.add("#X obj 600 210 sel 1;"); off=p.add("#X msg 600 240 off;"); out=p.add("#X obj 30 460 outlet;")
 for j,nm in enumerate(["note","on","acc","slide"]): p.add(f"#X obj {30+j*160} 520 table ockm-pat-{D}1-{nm} {STEPS};")
-for c in [(inl,0,t5,0),(t5,4,ro,0),(t5,3,rsl,0),(t5,2,pz,0),(t5,1,ra,0),(t5,0,rn,0),(rn,0,pk,0),(ra,0,pk,1),(rsl,0,pk,3),
+for c in [(inl,0,pmod,0),(pmod,0,t5,0),(t5,4,ro,0),(t5,3,rsl,0),(t5,2,pz,0),(t5,1,ra,0),(t5,0,rn,0),(rn,0,pk,0),(ra,0,pk,1),(rsl,0,pk,3),
     (pz,0,lst,0),(lst,0,m1a,0),(m1a,0,t2,0),(pz,1,m1b,0),(m1b,0,t2,0),(rlen,0,lst,1),
     (t2,1,po,0),(t2,0,ps,0),(po,0,mul,1),(ps,0,mul,0),(mul,0,pk,2),(pk,0,sp,0),(ro,0,sp,1),(ro,0,eq,0),(eq,0,s1,0),(s1,0,off,0),(off,0,out,0),(sp,0,out,0)]: p.con(*c)
 re=p.add(f"#X obj 720 560 r ockm-{D}1-edit;"); tl=p.add("#X obj 720 590 t l l;"); ls=p.add("#X obj 900 620 list split 1;")
 up=p.add("#X obj 720 650 unpack f f f f f;")
 p.con(re,0,tl,0); p.con(tl,1,ls,0); p.con(tl,0,up,0)
 # extend
-rx=p.add("#X obj 1500 120 r ockm-extend;"); ux=p.add("#X obj 1500 150 unpack f f;")
+rx=p.add(f"#X obj 1500 120 r ockm-{D}1-extend;"); ux=p.add("#X obj 1500 150 unpack f f;")
 cnt=p.add(f"#X obj 1500 210 expr {D}f2-{D}f1;"); txo=p.add("#X obj 1500 180 t f f;")
 mo=p.add("#X obj 1500 240 moses 1;"); ux2=p.add("#X obj 1560 270 until;")
 ci=p.add("#X obj 1560 300 f;"); cip=p.add("#X obj 1610 300 + 1;"); tci=p.add("#X obj 1560 330 t f f;")
@@ -645,7 +646,7 @@ for _t in [n for n,_ in SLOTS]+["bass","lead","chord"]:
 SYNTH_DEFAULTS={"bass":dict(engine=0,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.37,k2=0.9,k3=0.31,k4=0.55,drive=0,verb=0,delay=0,rhythm=3,notes=3),
                 "lead":dict(engine=4,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0.2,delay=0.25,rhythm=8,notes=12),
                 "chord":dict(engine=0,mode=0,level=1,k1=0.45,k2=0.5,k3=0.4,k4=0.3,type=0,smooth=1,verb=0.3,delay=0.35,rhythm=0,prog=0)}
-PATTERN_KEYS=[("ockm-end",0,None),("ockm-impact",0,None),("ockm-pump",0,None),("ockm-bass-on",1,None),("ockm-lead-on",1,None),("ockm-chord-on",1,None),("ockm-rise",0,None),("ockm-drum-loop",0,None),("ockm-len",128,None),("ockm-len-max",128,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None),("ockm-leader",0,None),("ockm-drum-groove",-1,None),("ockm-fill-every",0,None),("ockm-fill-style",0,None)]
+PATTERN_KEYS=[("ockm-end",0,None),("ockm-impact",0,None),("ockm-pump",0,None),("ockm-bass-on",1,None),("ockm-lead-on",1,None),("ockm-chord-on",1,None),("ockm-rise",0,None),("ockm-drum-len",16,None),("ockm-bass-len",64,None),("ockm-lead-len",64,None),("ockm-chord-len",64,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None),("ockm-leader",0,None),("ockm-drum-groove",-1,None),("ockm-fill-every",0,None),("ockm-fill-style",0,None)]
 for t,d in SYNTH_DEFAULTS.items():
     PATTERN_KEYS+=[(f"ockm-{t}-{k}",v,None) for k,v in d.items()]
 TABLES=[f"ockm-pat-{n}" for n,_ in SLOTS]+[f"ockm-pat-{n}-nudge" for n,_ in SLOTS]+[f"ockm-pat-{t}-{f}" for t in ("bass","lead") for f in MONO]+[f"ockm-pat-chord-{f}" for f in CHORD]
@@ -695,23 +696,12 @@ for c in [(rw,0,tbf,0),(tbf,1,pend,1),(tbf,0,tbb,0),(tbb,1,one,0),(one,0,flag,1)
     (pend,0,tcur,0),(tcur,1,cur,1),(tcur,0,sld,0),(sv,0,tsv,0),(tsv,1,cur,0),(cur,0,sstore,0)]: p.con(*c)
 # pattern length (1-128) and editing page
 p.add("#X text 880 50 length;")
-lenb=p.add("#X floatatom 880 75 4 1 128 0 - - ockm-length;"); lset=p.add(f"#X msg 880 105 set {D}1;"); rl2=p.add("#X obj 940 105 r ockm-len;")
+lenb=p.add("#X floatatom 880 75 4 1 256 0 - - ockm-length;"); lset=p.add(f"#X msg 880 105 set {D}1;"); rl2=p.add("#X obj 940 105 r ockm-len;")
 p.con(rl2,0,lset,0); p.con(lset,0,lenb,0)
 p.add("#X text 960 50 page;")
 pg=p.add("#X floatatom 960 75 3 0 7 0 - - ockm-page;")
 p.add("#X text 1000 75 (squares show steps page x 16 + 1 to 16);")
-rlg=p.add("#X obj 880 140 r ockm-length;"); clp=p.add("#X obj 880 165 clip 1 128;"); tl4=p.add("#X obj 880 190 t f f f;")
-# the furthest this pattern has reached: max(longest so far, current length)
-rlm=p.add("#X obj 1150 140 r ockm-len-max;"); rl3=p.add("#X obj 1060 140 r ockm-len;"); fmax=p.add("#X obj 1060 215 f 64;"); fcur=p.add("#X obj 1150 215 f 64;")
-p.con(rlm,0,fmax,1); p.con(rl3,0,fcur,1)
-reach=p.add(f"#X obj 980 240 expr max({D}f1\\, {D}f2);"); tbr=p.add("#X obj 980 215 t b b;")
-gt=p.add(f"#X obj 980 270 expr {D}f1>{D}f2;"); sg1=p.add("#X obj 980 295 sel 1;"); curl=p.add("#X obj 1040 295 f 64;"); pkx=p.add("#X obj 980 345 pack f f;")
-sx=p.add("#X obj 980 370 s ockm-extend;"); slen=p.add("#X obj 880 370 s ockm-len;"); smax=p.add("#X obj 1100 370 s ockm-len-max;")
-tnew=p.add("#X obj 880 215 t f f b;"); tsg=p.add("#X obj 980 320 t b b;"); fnew=p.add("#X obj 1150 320 f;")
-for c in [(rlg,0,clp,0),(clp,0,tnew,0),
-          (tnew,2,tbr,0),(tbr,1,fcur,0),(tbr,0,fmax,0),(fmax,0,reach,0),(fcur,0,reach,1),(reach,0,curl,1),(reach,0,gt,1),
-          (tnew,1,pkx,1),(tnew,1,fnew,1),(tnew,1,gt,0),(gt,0,sg1,0),(sg1,0,tsg,0),(tsg,1,curl,0),(curl,0,pkx,0),(pkx,0,sx,0),(tsg,0,fnew,0),(fnew,0,smax,0),
-          (tnew,0,slen,0)]: p.con(*c)
+p.add("#X obj 880 140 ockm-lengths;")   # each part's length, and the loop length (the longest part)
 rvb=p.add("#X obj 810 50 bng 25 250 50 0 empty empty empty 17 7 0 10 #fcfcfc #000000 #000000;"); p.add("#X text 842 52 revert;")
 p.con(rvb,0,p.add("#X obj 810 85 s ockm-revert;"),0)
 p.add("#X obj 1100 420 ockm-store;")
@@ -758,9 +748,6 @@ for r,(nm,snd) in enumerate(SLOTS):
     p.con(v,0,vs,0); p.con(vs,0,vt,0); p.con(vr,0,vs,1)
     ds=p.add(f"#X obj 990 {y+2} *~ 0;"); dt_=p.add(f"#X obj 1060 {y+2} throw~ ockm-dlybus;"); dr_=p.add(f"#X obj 990 {y-18} r ockm-{nm}-delay;")
     p.con(v,0,ds,0); p.con(ds,0,dt_,0); p.con(dr_,0,ds,1)
-# drums loop: ockm-drum-loop <steps> makes the drums repeat their first steps (0 = the whole pattern).
-# ockm-drum-double copies the loop into the steps after it and doubles the loop (back to the whole pattern once it fills it)
-rdl=p.add("#X obj 1300 380 r ockm-drum-loop;"); vdl=p.add("#X obj 1300 405 v ockm_dloop;"); p.con(rdl,0,vdl,0)
 rsm=p.add("#X obj 1600 380 r ockm-stepms;"); vsm=p.add("#X obj 1600 405 v ockm_stepms;"); p.con(rsm,0,vsm,0)
 # build rise: with ockm-rise above 0, the high-pass climbs over the pattern (slowly at first) and drops back when the pattern changes
 rri=p.add("#X obj 1750 380 r ockm-rise;"); vri=p.add("#X obj 1750 405 v ockm_rise;"); tri=p.add("#X obj 1750 430 t b f;"); p.con(rri,0,tri,0); p.con(tri,1,vri,0)
@@ -769,16 +756,6 @@ rex=p.add(f"#X obj 1900 455 expr if(ockm_rise>0 \\, ockm_rise*0.75*pow(({D}f1+1)
 z0r=p.add("#X msg 1750 455 0;")
 for c in [(rstp,0,rex,0),(rex,0,srn,0),(tri,0,z0r,0),(z0r,0,srn,0)]: p.con(*c)
 rpl=p.add("#X obj 1450 380 r ockm-len;"); vpl=p.add("#X obj 1450 405 v ockm_plen;"); p.con(rpl,0,vpl,0)
-rdd=p.add("#X obj 1300 440 r ockm-drum-double;"); tdd=p.add("#X obj 1300 465 t b;"); gdl=p.add("#X obj 1300 490 v ockm_dloop;")
-mdl=p.add("#X obj 1300 515 moses 1;"); tdl=p.add("#X obj 1300 540 t b f f;"); sdlen=p.add("#X obj 1340 570 sel 16 32 64;")
-nxl=p.add(f"#X obj 1300 700 expr if({D}f1*2 >= ockm_plen \\, 0 \\, {D}f1*2);"); fdl=p.add("#X obj 1300 675 f;")
-sdl=p.add("#X msg 1300 730 \\; ockm-drum-loop \\$1 \\; ockm-show-drum-loop \\$1 \\; ockm-drums-changed bang \\; ockm-refresh bang;")
-for c in [(rdd,0,tdd,0),(tdd,0,gdl,0),(gdl,0,mdl,0),(mdl,1,tdl,0),(tdl,2,fdl,1),(tdl,1,sdlen,0),(tdl,0,fdl,0),(fdl,0,nxl,0),(nxl,0,sdl,0)]: p.con(*c)
-for k,(nm,_) in enumerate(SLOTS):
-    for j,tb in enumerate([f"ockm-pat-{nm}",f"ockm-pat-{nm}-nudge"]):
-        asg=p.add(f"#X obj {1300+k*150} {630+j*60} array set {tb};"); p.con(tdl,2,asg,1)
-        for m,n in enumerate((16,32,64)):   # the loop's length picks the copy
-            ag=p.add(f"#X obj {1300+k*150+m*40} {600+j*60} array get {tb} 0 {n};"); p.con(sdlen,m,ag,0); p.con(ag,0,asg,0)
 # drum settings subpatch
 sub=P()
 sub.add("#X text 20 10 Drum slots. Sound 0 kick 1 snare 2 clap 3 perc-1 4 closed hat 5 open hat 6 tom 7 perc-2. Tune in semitones \\, decay in % (100 = normal) \\, level 0 to 1.;")
@@ -1488,6 +1465,72 @@ for i,(k,rows) in enumerate(PRE.items()):
 p.add("#X text 20 150 Change presets in tools/build.py (PRE) so they survive rebuilds.;")
 p.save("seq/ockm-presets.pd","#N canvas 200 200 820 200 12;")
 
+# ================= part lengths =================
+# Each part has its own length in steps (16, 32, 64, 128 or 256): ockm-drum-len (all 8 drum rows), ockm-bass-len,
+# ockm-lead-len, ockm-chord-len. The loop is as long as the longest part (sent out as ockm-len); shorter parts repeat inside it.
+# Growing a part repeats its own bars to fill the new ones, unless it was that long before: then its old bars come back.
+# Older loop files hold one length (ockm-len) and maybe a drums loop (ockm-drum-loop): while loading, those set the parts.
+# Until the screens have a length per part: ockm-length sets every part (drums stay shorter if they were),
+# ockm-drum-loop sets the drum length (0 = as long as the synths), ockm-drum-double doubles the drums.
+PARTS=["drum","bass","lead","chord"]
+LOOPX="max(max(ockm_drumlen\\,ockm_basslen)\\,max(ockm_leadlen\\,ockm_chordlen))"
+SYNX="max(ockm_basslen\\,max(ockm_leadlen\\,ockm_chordlen))"
+p=P()
+p.add("#X text 20 10 Part lengths: each part repeats inside the loop \\, and the loop is as long as the longest part.;")
+rld0=p.add("#X obj 20 20 r ockm-loading;"); rld=p.add("#X obj 20 40 t f f f f f f;"); p.con(rld0,0,rld,0)
+vld=p.add("#X obj 20 65 v ockm_loadingv;"); p.con(rld,5,vld,0)
+nld=p.add("#X obj 120 65 == 0;"); p.con(rld,4,nld,0)
+# the loop length, sent whenever a part changes (held back while a loop loads, then sent once at the end)
+lbang=p.add("#X obj 20 600 t b b;"); lx=p.add(f"#X obj 20 630 expr {LOOPX};"); lsp=p.add("#X obj 20 660 spigot 1;"); p.con(nld,0,lsp,1)
+sln=p.add("#X obj 20 690 s ockm-len;")
+dx=p.add(f"#X obj 200 630 expr if(ockm_drumlen<{SYNX} \\, ockm_drumlen \\, 0);"); dsp=p.add("#X obj 200 660 spigot 1;"); p.con(nld,0,dsp,1)
+dch=p.add("#X obj 200 690 change -1;"); sdl=p.add("#X obj 200 720 s ockm-drum-loop;")   # for the screens: drums shorter than the synths
+for c in [(lbang,1,lx,0),(lx,0,lsp,0),(lsp,0,sln,0),(lbang,0,dx,0),(dx,0,dsp,0),(dsp,0,dch,0),(dch,0,sdl,0)]: p.con(*c)
+for i,pt in enumerate(PARTS):
+    x=20+i*260
+    rr=p.add(f"#X obj {x} 120 r ockm-{pt}-len;"); cl=p.add(f"#X obj {x} 145 clip 16 256;"); t3=p.add(f"#X obj {x} 170 t f f f;")
+    # 1. grew past where it has been: repeat its bars into the new ones
+    t2=p.add(f"#X obj {x+100} 200 t f f;"); pk=p.add(f"#X obj {x+100} 290 pack f f;")
+    ex=p.add(f"#X obj {x+100} 230 expr if(ockm_loadingv==0 && {D}f1>ockm_{pt}max && ockm_{pt}max>0 \\, ockm_{pt}max \\, -1);")
+    mo=p.add(f"#X obj {x+100} 260 moses 0;"); sx=p.add(f"#X obj {x+100} 320 s ockm-{pt}-extend;")
+    # 2. the furthest it has reached
+    mx=p.add(f"#X obj {x+50} 350 expr if(ockm_loadingv \\, {D}f1 \\, max({D}f1 \\, ockm_{pt}max));"); vmx=p.add(f"#X obj {x+50} 380 v ockm_{pt}max;")
+    # 3. its length, then the loop length
+    tbf=p.add(f"#X obj {x} 410 t b f;"); vl=p.add(f"#X obj {x+30} 440 v ockm_{pt}len;")
+    for c in [(rr,0,cl,0),(cl,0,t3,0),(t3,2,t2,0),(t2,1,pk,1),(t2,0,ex,0),(ex,0,mo,0),(mo,1,pk,0),(pk,0,sx,0),
+              (t3,1,mx,0),(mx,0,vmx,0),(t3,0,tbf,0),(tbf,1,vl,0),(tbf,0,lbang,0)]: p.con(*c)
+# loaded: each part has reached its own length; send the loop length (and the drums' share) once
+s0=p.add("#X obj 1100 40 sel 0;"); p.con(rld,0,s0,0); tl=p.add("#X obj 1100 65 t b b b b b;"); p.con(s0,0,tl,0)
+for i,pt in enumerate(PARTS):
+    e=p.add(f"#X obj {1100+i*120} 95 expr ockm_{pt}len;"); v=p.add(f"#X obj {1100+i*120} 120 v ockm_{pt}max;"); p.con(tl,4-i,e,0); p.con(e,0,v,0)
+fl=p.add("#X obj 1100 160 t b b;"); p.con(tl,0,fl,0)
+fx2=p.add(f"#X obj 1100 190 expr if(ockm_drumlen<{SYNX} \\, ockm_drumlen \\, 0);"); p.con(fl,1,lbang,0); p.con(fl,0,fx2,0)
+st=p.add(f"#X msg 1100 220 set {D}1;"); p.con(fx2,0,st,0); p.con(st,0,dch,0); p.con(fx2,0,sdl,0)
+# older files: one length for everything, maybe with the drums looping shorter
+s1=p.add("#X obj 1100 280 sel 1;"); p.con(rld,1,s1,0); z=p.add("#X msg 1100 305 0;"); vdl=p.add("#X obj 1100 330 v ockm_legacy_dl;"); p.con(s1,0,z,0); p.con(z,0,vdl,0)
+rol=p.add("#X obj 1300 280 r ockm-len;"); osp=p.add("#X obj 1300 305 spigot;"); p.con(rld,3,osp,1); p.con(rol,0,osp,0)
+ot=p.add("#X obj 1300 330 t f f;"); od=p.add(f"#X obj 1400 360 expr if(ockm_legacy_dl>0 && ockm_legacy_dl<{D}f1 \\, ockm_legacy_dl \\, {D}f1);")
+om=p.add(f"#X msg 1300 390 \\; ockm-bass-len {D}1 \\; ockm-lead-len {D}1 \\; ockm-chord-len {D}1;"); odm=p.add(f"#X msg 1400 390 \\; ockm-drum-len {D}1;")
+for c in [(osp,0,ot,0),(ot,1,od,0),(od,0,odm,0),(ot,0,om,0)]: p.con(*c)
+rdl=p.add("#X obj 1600 280 r ockm-drum-loop;"); dl_t=p.add("#X obj 1600 305 t f f;"); p.con(rdl,0,dl_t,0)
+lsp2=p.add("#X obj 1700 330 spigot;"); p.con(rld,2,lsp2,1); p.con(dl_t,1,lsp2,0); p.con(lsp2,0,p.add("#X obj 1700 355 v ockm_legacy_dl;"),0)
+# the screens, for now: one length for everything (drums stay shorter if they were), a drums loop, and double
+rlg=p.add("#X obj 20 800 r ockm-length;"); cl=p.add("#X obj 20 825 clip 16 256;"); gsp=p.add("#X obj 20 850 spigot 1;"); p.con(nld,0,gsp,1)
+gt=p.add("#X obj 20 875 t f f;"); gd=p.add(f"#X obj 120 905 expr if(ockm_drumlen>0 && ockm_drumlen<{LOOPX} \\, min(ockm_drumlen \\, {D}f1) \\, {D}f1);")
+gm=p.add(f"#X msg 20 935 \\; ockm-bass-len {D}1 \\; ockm-lead-len {D}1 \\; ockm-chord-len {D}1;"); gdm=p.add(f"#X msg 120 935 \\; ockm-drum-len {D}1;")
+for c in [(rlg,0,cl,0),(cl,0,gsp,0),(gsp,0,gt,0),(gt,1,gd,0),(gd,0,gdm,0),(gt,0,gm,0)]: p.con(*c)
+dsp2=p.add("#X obj 400 830 spigot 1;"); p.con(nld,0,dsp2,1); p.con(dl_t,0,dsp2,0)
+dd=p.add(f"#X obj 400 855 expr if({D}f1>0 \\, {D}f1 \\, max(ockm_drumlen \\, {SYNX}));"); p.con(dsp2,0,dd,0); p.con(dd,0,p.add("#X obj 400 880 s ockm-drum-len;"),0)
+# double: a part's bars copied after themselves (up to 16 bars). ockm-<part>-double, for each part
+for i,pt in enumerate(PARTS):
+    x=700+i*260
+    rdd=p.add(f"#X obj {x} 800 r ockm-{pt}-double;"); ddx=p.add(f"#X obj {x} 825 expr ockm_{pt}len;"); ddm=p.add(f"#X obj {x} 850 moses 129;")
+    ddt=p.add(f"#X obj {x} 875 t f f;"); ddv=p.add(f"#X obj {x+100} 905 v ockm_{pt}max;"); dd2=p.add(f"#X obj {x} 905 * 2;"); dds=p.add(f"#X obj {x} 935 s ockm-{pt}-len;")
+    for c in [(rdd,0,ddx,0),(ddx,0,ddm,0),(ddm,0,ddt,0),(ddt,1,ddv,0),(ddt,0,dd2,0),(dd2,0,dds,0)]: p.con(*c)
+    if pt=="drum":
+        p.con(dd2,0,p.add(f"#X msg {x} 965 \\; ockm-drums-changed bang \\; ockm-refresh bang;"),0)
+p.save("seq/ockm-lengths.pd","#N canvas 100 100 1900 1000 12;")
+
 # ================= mono generator (bass or lead) =================
 # args: track, octave offset (semitones), default rhythm, default notes
 p=P()
@@ -1519,13 +1562,18 @@ lbd=p.add("#X obj 1360 120 loadbang;"); one_d=p.add("#X msg 1360 145 1;"); p.con
 red=p.add("#X obj 1200 230 r ockm-edit;"); teb=p.add("#X obj 1200 255 t b;"); rdc=p.add("#X obj 1120 230 r ockm-drums-changed;"); p.con(rdc,0,teb,0); lkg=p.add("#X obj 1200 280 spigot;"); lk0=p.add("#X obj 1280 230 != 0;")
 for c in [(red,0,teb,0),(teb,0,lkg,0),(var["lock"],1,lk0,0),(lk0,0,lkg,1),(lkg,0,img,0)]: p.con(*c)
 # a new length: an auto part rebuilds to fill it (after everything else has heard the new length)
-rln=p.add("#X obj 1400 230 r ockm-len;"); tlb=p.add("#X obj 1400 255 t b;"); lsp=p.add("#X obj 1400 280 spigot 1;"); ldl=p.add("#X obj 1400 305 delay 0;")
+rln=p.add(f"#X obj 1400 230 r ockm-{D}1-len;"); tlb=p.add("#X obj 1400 255 t b;"); lsp=p.add("#X obj 1400 280 spigot 1;"); ldl=p.add("#X obj 1400 305 delay 0;")
 for c in [(rln,0,tlb,0),(tlb,0,lsp,0),(nl0,0,lsp,1),(lsp,0,ldl,0),(ldl,0,ima,0)]: p.con(*c)
 # sync: follow the chord part. When the chords change, a synced part in auto regenerates
 rsy=p.add(f"#X obj 760 230 r ockm-{D}1-sync;"); nsy=p.add("#X obj 760 255 != 0;"); fsy=p.add(f"#X obj 860 230 f {D}6;")
 syg=p.add("#X obj 760 300 spigot;")
 rcc=p.add("#X obj 900 270 r ockm-chord-changed;"); rce=p.add("#X obj 1060 270 r ockm-chord-edit;"); tce=p.add("#X obj 1060 290 t b;")
 for c in [(rsy,0,nsy,0),(lbm,0,fsy,0),(fsy,0,nsy,0),(nsy,0,syg,1),(rcc,0,syg,0),(rce,0,tce,0),(tce,0,syg,0),(syg,0,img,0)]: p.con(*c)
+# a part that follows the chords takes their length too (not while a loop loads: saved lengths stay as they were)
+rcl=p.add("#X obj 760 120 r ockm-chord-len;"); csp=p.add("#X obj 760 145 spigot 1;"); csy=p.add("#X obj 760 170 spigot;")
+ctf=p.add("#X obj 760 195 t f b;"); cvl=p.add(f"#X obj 860 220 v ockm_{D}1len;"); cne=p.add("#X obj 760 245 !=;"); ctf2=p.add("#X obj 760 220 t f f;")
+cgo=p.add("#X obj 700 270 spigot;"); csl=p.add(f"#X obj 700 295 s ockm-{D}1-len;")
+for c in [(rcl,0,csp,0),(nl0,0,csp,1),(csp,0,csy,0),(nsy,0,csy,1),(csy,0,ctf,0),(ctf,1,cvl,0),(cvl,0,cne,1),(ctf,0,ctf2,0),(ctf2,1,cne,0),(cne,0,cgo,1),(ctf2,0,cgo,0),(cgo,0,csl,0)]: p.con(*c)
 ts=p.add("#X obj 560 380 text get ockm-presets-scale;"); lsp=p.add("#X obj 560 410 list split 1;"); asx=p.add(f"#X obj 560 440 array set {D}0-s;")
 p.con(regen,4,store[3],0); p.con(store[3],0,ts,0); p.con(ts,0,lsp,0); p.con(lsp,1,asx,0)
 tn=p.add("#X obj 360 380 text get ockm-presets-notes;"); ln=p.add("#X obj 360 410 list split 1;"); tl=p.add("#X obj 360 440 t l l;")
@@ -1536,7 +1584,7 @@ p.con(regen,2,store[0],0); p.con(store[0],0,tr,0); p.con(tr,0,lr,0); p.con(lr,1,
 rx=p.add(f"#X obj 20 410 expr if(36+{D}f1>40 \\, 24+{D}f1 \\, 36+{D}f1);"); ro=p.add(f"#X obj 20 440 + {D}2;")
 p.con(regen,1,store[2],0); p.con(store[2],0,rx,0); p.con(rx,0,ro,0)
 lp=p.add("#X obj 20 560 t b b;"); p.con(regen,0,lp,0)
-z1=p.add("#X msg 120 590 0;"); nl=p.add("#X obj 20 590 f 16;"); rlg=p.add("#X obj 80 560 r ockm-len;"); un=p.add("#X obj 20 620 until;")
+z1=p.add("#X msg 120 590 0;"); nl=p.add("#X obj 20 590 f 128;"); rlg=p.add(f"#X obj 80 560 r ockm-{D}1-len;"); un=p.add("#X obj 20 620 until;")
 fi=p.add("#X obj 20 650 f;"); pi=p.add("#X obj 70 650 + 1;"); fh=p.add("#X obj 400 760 f;"); ph=p.add("#X obj 450 760 + 1;")
 for c in [(rlg,0,nl,1),(lp,1,z1,0),(z1,0,fi,1),(z1,0,fh,1),(lp,0,nl,0),(nl,0,un,0),(un,0,fi,0),(fi,0,pi,0),(pi,0,fi,1)]: p.con(*c)
 ti=p.add("#X obj 20 680 t f f f;"); p.con(fi,0,ti,0)
@@ -1580,11 +1628,12 @@ rsm=p.add(f"#X obj 1250 120 r ockm-{D}1-smooth;"); one_sm=p.add("#X msg 1250 90 
 rro=p.add("#X obj 1100 120 r ockm-root;"); rox=p.add(f"#X obj 1100 150 expr if({D}f1<=7 \\, 48+{D}f1 \\, 36+{D}f1);")
 for c in [(lb,0,lbt,0),(lbt,2,d0a,0),(lbt,1,d0b,0),(lbt,0,d9,0),(d0a,0,tsc,0),(d0b,0,tty,0),(d9,0,rox,0),
           (rsc,0,tsc,0),(tsc,0,lsc,0),(lsc,1,asc,0),(rty,0,tty,0),(tty,0,lty,0),(lty,1,aty,0),(rro,0,rox,0)]: p.con(*c)
+cmod=p.add("#X obj 30 65 mod 256;"); p.con(p.add(f"#X obj 100 40 r ockm-{D}1-len;"),0,cmod,1)
 ts=p.add("#X obj 30 80 t f f;"); rdeg=p.add(f"#X obj 200 110 tabread ockm-pat-{D}1-deg;"); ron=p.add(f"#X obj 30 110 tabread ockm-pat-{D}1-on;")
 son=p.add("#X obj 30 140 sel 0;"); vx=p.add(f"#X obj 70 170 expr if({D}f1>1 \\, 1 \\, 0.75);"); tv=p.add("#X obj 70 200 t b f;")
 t4=p.add("#X obj 70 230 t b b b b;")
 pk=p.add("#X obj 30 640 pack 0 0 0 0 0;"); sno=p.add(f"#X obj 200 700 s ockm-{D}1-notes-out;")
-for c in [(inl,0,ts,0),(ts,1,rdeg,0),(ts,0,ron,0),(ron,0,son,0),(son,1,vx,0),(vx,0,tv,0),(tv,1,pk,4),(tv,0,t4,0),(pk,0,out,0),(pk,0,sno,0)]: p.con(*c)
+for c in [(inl,0,cmod,0),(cmod,0,ts,0),(ts,1,rdeg,0),(ts,0,ron,0),(ron,0,son,0),(son,1,vx,0),(vx,0,tv,0),(tv,1,pk,4),(tv,0,t4,0),(pk,0,out,0),(pk,0,sno,0)]: p.con(*c)
 for k in range(4):
     x=70+k*260
     mk=p.add(f"#X msg {x} 270 {k};"); rt=p.add(f"#X obj {x} 300 tabread {D}0-ty;"); tt=p.add(f"#X obj {x} 330 t f f;")
@@ -1598,7 +1647,7 @@ for k in range(4):
 # store / load / edit / extend
 re=p.add(f"#X obj 1300 600 r ockm-{D}1-edit;"); tl=p.add("#X obj 1300 630 t l l;"); ls=p.add("#X obj 1480 660 list split 1;"); up=p.add("#X obj 1300 690 unpack f f f;")
 p.con(re,0,tl,0); p.con(tl,1,ls,0); p.con(tl,0,up,0)
-rx=p.add("#X obj 1700 300 r ockm-extend;"); ux=p.add("#X obj 1700 330 unpack f f;")
+rx=p.add(f"#X obj 1700 300 r ockm-{D}1-extend;"); ux=p.add("#X obj 1700 330 unpack f f;")
 cnt=p.add(f"#X obj 1700 390 expr {D}f2-{D}f1;"); txo=p.add("#X obj 1700 360 t f f;"); mo=p.add("#X obj 1700 420 moses 1;"); ux2=p.add("#X obj 1760 450 until;")
 ci=p.add("#X obj 1760 480 f;"); cip=p.add("#X obj 1810 480 + 1;"); tci=p.add("#X obj 1760 510 t f f;")
 md=p.add(f"#X obj 1760 540 expr {D}f1 % {D}f2;"); t2=p.add("#X obj 1760 570 t f f;")
@@ -1621,7 +1670,7 @@ gate=p.add("#X obj 20 200 spigot 1;"); rld=p.add("#X obj 120 160 r ockm-loading;
 gt=p.add("#X obj 20 225 t b b;"); m0=p.add("#X msg 60 225 0;"); sm0=p.add(f"#X obj 60 245 s ockm-{D}1-mode;")
 p.con(gate,0,gt,0); p.con(gt,1,m0,0); p.con(m0,0,sm0,0); p.con(gt,0,regen,0); p.con(rld,0,nl0,0); p.con(nl0,0,gate,1)
 # a new length: chords on auto rebuild to fill it, without stretching the pattern back out
-rln=p.add("#X obj 700 160 r ockm-len;"); tlb=p.add("#X obj 700 180 t b;"); lsp=p.add("#X obj 700 200 spigot 1;"); p.con(nl0,0,lsp,1)
+rln=p.add(f"#X obj 700 160 r ockm-{D}1-len;"); tlb=p.add("#X obj 700 180 t b;"); lsp=p.add("#X obj 700 200 spigot 1;"); p.con(nl0,0,lsp,1)
 rcm=p.add(f"#X obj 820 160 r ockm-{D}1-mode;"); cm0=p.add("#X obj 820 180 == 0;"); asp=p.add("#X obj 700 225 spigot 1;"); p.con(rcm,0,cm0,0); p.con(cm0,0,asp,1)
 ldl=p.add("#X obj 700 250 delay 0;"); tnf=p.add("#X obj 700 275 t b b b;"); n1=p.add("#X msg 800 300 1;"); n0=p.add("#X msg 700 325 0;"); vn1=p.add("#X obj 800 325 v ockm_cg_nofit;"); vn0=p.add("#X obj 700 350 v ockm_cg_nofit;")
 for c in [(rln,0,tlb,0),(tlb,0,lsp,0),(lsp,0,asp,0),(asp,0,ldl,0),(ldl,0,tnf,0),(tnf,2,n1,0),(n1,0,vn1,0),(tnf,1,regen,0),(tnf,0,n0,0),(n0,0,vn0,0)]: p.con(*c)
@@ -1641,10 +1690,10 @@ tr=p.add("#X obj 100 300 text get ockm-presets-chordrhythm;"); lr=p.add("#X obj 
 llr=p.add("#X obj 160 390 list length;"); ar=p.add(f"#X obj 100 420 array set {D}0-r;")
 for c in [(regen,3,store[0],0),(store[0],0,tr,0),(tr,0,lr,0),(lr,1,tlr,0),(tlr,1,llr,0),(tlr,0,ar,0)]: p.con(*c)
 # make the pattern long enough for the progression (never shorter)
-curl=p.add("#X obj 360 470 r ockm-len;"); fit=p.add(f"#X obj 300 500 expr if(ockm_cg_nofit \\, 0 \\, if({D}f1>{D}f2 \\, {D}f1 \\, 0));"); sz=p.add("#X obj 300 530 sel 0;"); sl=p.add("#X obj 340 560 s ockm-length;")
+curl=p.add(f"#X obj 360 470 r ockm-{D}1-len;"); fit=p.add(f"#X obj 300 500 expr if(ockm_cg_nofit \\, 0 \\, if({D}f1!={D}f2 \\, max({D}f1 \\, 16) \\, 0));"); sz=p.add("#X obj 300 530 sel 0;"); sl=p.add(f"#X obj 340 560 s ockm-{D}1-len;")
 for c in [(regen,2,plen,0),(plen,0,fit,0),(curl,0,fit,1),(fit,0,sz,0),(sz,1,sl,0)]: p.con(*c)
 # write every step of the pattern
-z1=p.add("#X msg 120 470 0;"); nl=p.add("#X obj 20 470 f 16;"); rlg=p.add("#X obj 80 440 r ockm-len;"); un=p.add("#X obj 20 500 until;")
+z1=p.add("#X msg 120 470 0;"); nl=p.add("#X obj 20 470 f 128;"); rlg=p.add(f"#X obj 80 440 r ockm-{D}1-len;"); un=p.add("#X obj 20 500 until;")
 fi=p.add("#X obj 20 530 f;"); pi=p.add("#X obj 70 530 + 1;"); ti=p.add("#X obj 20 560 t f f;"); tl2=p.add("#X obj 20 590 t f f;")
 for c in [(regen,1,z1,0),(regen,1,nl,0),(rlg,0,nl,1),(z1,0,fi,1),(nl,0,un,0),(un,0,fi,0),(fi,0,pi,0),(pi,0,fi,1),(fi,0,ti,0),(ti,0,tl2,0)]: p.con(*c)
 two=p.add(f"#X obj 200 700 tabwrite ockm-pat-{D}1-on;"); twd=p.add(f"#X obj 400 700 tabwrite ockm-pat-{D}1-deg;")
@@ -1662,6 +1711,9 @@ mo=p.add("#X obj 20 120 moses 0;"); t=p.add("#X obj 60 150 t b b f f;")
 tg=p.add("#X obj 260 190 text get ockm-presets-groove;"); l1=p.add("#X obj 260 220 list split 1;"); l2=p.add("#X obj 260 250 list split 1;")
 sw=p.add("#X obj 260 280 moses 1;"); ssw=p.add("#X obj 300 310 s ockm-swing;")
 go=p.add("#X obj 160 190 s ockm-groove-go;"); rf=p.add("#X obj 60 340 s ockm-refresh;"); dc=p.add("#X obj 110 310 s ockm-drums-changed;")
+# a groove is one bar: the drums become 1 bar, starting afresh (go longer and the groove repeats, not whatever was there)
+gl=p.add("#X msg 160 150 \\; ockm-drum-len 16;"); gm=p.add("#X msg 260 150 16;"); gv=p.add("#X obj 260 170 v ockm_drummax;")
+p.con(t,3,gm,0); p.con(gm,0,gv,0); p.con(t,3,gl,0)
 for c in [(r,0,gate,0),(rld,0,nl0,0),(nl0,0,gate,1),(gate,0,mo,0),(mo,1,t,0),(t,3,tg,0),(tg,0,l1,0),(l1,1,l2,0),(l2,0,sw,0),(sw,1,ssw,0),
           (t,2,go,0),(t,1,dc,0),(t,0,rf,0)]: p.con(*c)
 # fills: on the last bar of every 4, 8 or 16 bars (counted from play), the drums play the chosen fill
@@ -1691,7 +1743,7 @@ r=p.add("#X obj 20 60 r ockm-groove-go;"); t=p.add("#X obj 20 90 t b f;")
 tg=p.add("#X obj 120 120 text get ockm-presets-groove;"); l1=p.add("#X obj 120 150 list split 2;"); ls=p.add("#X obj 120 180 list split 0;"); l16=p.add("#X obj 120 210 list split 16;")
 ag=p.add(f"#X obj 120 240 array set {D}0-g;")
 for c in [(r,0,t,0),(t,1,tg,0),(tg,0,l1,0),(l1,1,ls,0),(m16,0,ls,1),(ls,1,l16,0),(l16,0,ag,0)]: p.con(*c)
-ln=p.add("#X obj 20 270 f 16;"); rl=p.add("#X obj 80 245 r ockm-len;"); z=p.add("#X msg 80 270 0;")
+ln=p.add("#X obj 20 270 f 128;"); rl=p.add("#X obj 80 245 r ockm-drum-len;"); z=p.add("#X msg 80 270 0;")
 un=p.add("#X obj 20 300 until;"); fi=p.add("#X obj 20 330 f;"); pi=p.add("#X obj 70 330 + 1;"); ti=p.add("#X obj 20 360 t f f;")
 md=p.add("#X obj 20 390 % 16;"); rd=p.add(f"#X obj 20 420 tabread {D}0-g;"); tw=p.add(f"#X obj 20 450 tabwrite ockm-pat-{D}1;")
 tb=p.add("#X obj 20 240 t b b;")
@@ -1873,10 +1925,8 @@ for i,T in enumerate(TABLES):
     ag=q.add(f"#X obj 1000 {yy} array get {T};"); lp=q.add(f"#X obj 1150 {yy} list prepend add {T} 0;"); ltr=q.add(f"#X obj 1320 {yy} list trim;")
     q.con(rct,0,ag,0); q.con(ag,0,lp,0); q.con(lp,0,ltr,0); q.con(ltr,0,sap,0)
 # --- an empty pattern: clear the steps, keep the synth sounds, key and swing ---
-rlz=q.add("#X obj 1200 560 r ockm-loading;"); slz=q.add("#X obj 1200 580 sel 1;"); mlz=q.add("#X msg 1200 600 \\; ockm-len-max 0;")
-q.con(rlz,0,slz,0); q.con(slz,0,mlz,0)
 re_=q.add("#X obj 1000 600 r ockm-empty;")
-me=q.add("#X msg 1000 630 \; "+" \; ".join(f"{T} const 0" for T in TABLES)+" \; ockm-len 64 \; ockm-len-max 64;"); q.con(re_,0,me,0)
+me=q.add("#X msg 1000 630 \; "+" \; ".join(f"{T} const 0" for T in TABLES)+";"); q.con(re_,0,me,0)
 # --- capture the current pattern into its buffer (memory only) ---
 cap=q.add("#X obj 20 1200 t b b b;"); clr=q.add("#X msg 200 1230 clear;")
 scp=q.add(f"#X obj 110 1260 s {D}0-cap-p;"); sct=q.add(f"#X obj 20 1290 s {D}0-capt;")
@@ -2157,7 +2207,7 @@ def build_project(reset=False, demo=False):
             write(LOOP_FILE,[f"{h} {fmt(d)}" for h,d,_ in PATTERN_KEYS]+["ockm-empty 1"]); continue
         if k>=4 or not demo:   # empty: no steps, and it takes on the sounds you're already using
             write(LOOP_FILE,["ockm-empty 1"]); continue
-        lines=[f"{h} {fmt(d)}" if h not in ("ockm-len","ockm-len-max") else f"{h} 16" for h,d,_ in PATTERN_KEYS]
+        lines=[f"{h} {fmt(d)}" if not h.endswith("-len") else f"{h} 16" for h,d,_ in PATTERN_KEYS]
         lines+=[f"ockm-pat-{nm} 0 {pad(drums[nm][k])}" for nm,_ in SLOTS]
         lines+=[f"ockm-pat-bass-{f} 0 {pad(bass[k][f])}" for f in MONO]
         lines+=[f"ockm-pat-lead-{f} 0 {pad(lead[k][f])}" for f in MONO]

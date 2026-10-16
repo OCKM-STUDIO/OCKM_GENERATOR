@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.50 (16 October 2026)
+
+- **A length per part:** drums, bass, lead and chords each 1, 2, 4, 8 or 16 bars. The loop is as long as the longest part, and shorter parts repeat inside it. Loops can now be 16 bars
+- **Length and double on each part's tab,** on the navigation strip. Shorter offers undo. The strip shows "loop 4 bars (bass, lead, chords)" on every screen
+- **New projects:** drums 1 bar, synths 4 bars
+- **Generators write their natural length:** a groove makes the drums 1 bar; a progression sets the chords' length; a bass or melody following the chords takes their length
+- The old "drums loop" buttons are gone: the drum length does that job. Older loops load with their single length on every part
+- MIDI export repeats each part at its own length
+
 ## v0.49 (15 October 2026)
 
 - **Runs on the Raspberry Pi**, full screen on the 10" Touch Display 2, and starts by itself at power-on (`tools/pi/`)

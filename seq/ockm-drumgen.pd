@@ -12,8 +12,8 @@
 #X obj 120 180 list split 0;
 #X obj 120 210 list split 16;
 #X obj 120 240 array set \$0-g;
-#X obj 20 270 f 16;
-#X obj 80 245 r ockm-len;
+#X obj 20 270 f 128;
+#X obj 80 245 r ockm-drum-len;
 #X msg 80 270 0;
 #X obj 20 300 until;
 #X obj 20 330 f;

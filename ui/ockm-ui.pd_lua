@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.49"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.50"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
@@ -152,6 +152,7 @@ function ui:defaults()
   v["ockm-bass-on"] = 1; v["ockm-lead-on"] = 1; v["ockm-chord-on"] = 1; v["ockm-rise"] = 0; v["ockm-end"] = 0; v["ockm-impact"] = 0; v["ockm-pump"] = 0
   v["ockm-bass-mode"] = 0; v["ockm-lead-mode"] = 0; v["ockm-chord-mode"] = 0   -- 0 auto, 1 manual
   v["ockm-bass-sync"] = 1; v["ockm-lead-sync"] = 1; v["ockm-leader"] = 0; v["ockm-drum-groove"] = -1
+  v["ockm-drum-len"] = 16; v["ockm-bass-len"] = 64; v["ockm-lead-len"] = 64; v["ockm-chord-len"] = 64
   v["ockm-drum-loop"] = 0; v["ockm-fill-every"] = 0; v["ockm-fill-style"] = 0; v["ockm-swing"] = 56; v["ockm-accent"] = 0.3; v["ockm-sync"] = 0; v["ockm-volume"] = 1
   for _, p in ipairs({ "bass", "lead" }) do v["ockm-"..p.."-lock"] = 0; v["ockm-"..p.."-density"] = 1; v["ockm-"..p.."-seed"] = 0 end
   v["ockm-bpm"] = 124; v["ockm-len"] = 128; v["ockm-filter"] = 0; v["ockm-root"] = 9; v["ockm-scale"] = 0
@@ -185,6 +186,7 @@ function ui:hooks()
   for _, p in ipairs({ "bass", "lead" }) do
     for _, k in ipairs({ "lock", "density", "seed" }) do h[#h+1] = "ockm-"..p.."-"..k end
   end
+  for _, k in ipairs({ "ockm-drum-len", "ockm-bass-len", "ockm-lead-len", "ockm-chord-len" }) do h[#h+1] = k end
   for _, k in ipairs({ "ockm-drum-loop", "ockm-swing", "ockm-accent", "ockm-sync", "ockm-fill-every", "ockm-fill-style" }) do h[#h+1] = k end
   for _, k in ipairs({ "ockm-volume", "ockm-verb-mix", "ockm-delay-mix", "ockm-drive", "ockm-delay-fb", "ockm-delay-steps", "ockm-verb-size", "ockm-verb-tone" }) do h[#h+1] = k end
   return h
@@ -373,8 +375,36 @@ function ui:get(name, i)
   if t and i < t:length() then return t:get(i) or 0 end
   return 0
 end
-function ui:blocks() return math.max(1, math.ceil((self.v["ockm-len"] or 16) / 16)) end
-function ui:play_block() return math.floor(self.step / 16) end
+-- each part has its own length (in steps); the loop is as long as the longest part
+local PART_NAMES = { drum = "drums", bass = "bass", lead = "lead", chord = "chords" }
+function ui:plen(p) return math.max(16, math.floor(self.v["ockm-" .. p .. "-len"] or 64)) end
+function ui:track_part(n) if n <= 8 then return "drum" end return SYNTHS[n - 8] end
+function ui:loop_len() return math.max(self:plen("drum"), self:plen("bass"), self:plen("lead"), self:plen("chord")) end
+function ui:screen_part()
+  if self.screen == "drums" then return "drum" elseif self.screen == "synth" then return SYNTHS[self.part] end
+  return nil
+end
+-- the steps shown on this screen: the part's own length on its tab, the whole loop elsewhere
+function ui:shown_len()
+  local p = self:screen_part()
+  if p then return self:plen(p) end
+  return self:loop_len()
+end
+function ui:blocks() return math.max(1, math.ceil(self:shown_len() / 16)) end
+function ui:play_block()
+  local s = self.step
+  if self:screen_part() then s = s % self:shown_len() end
+  return math.floor(s / 16)
+end
+-- "loop 4 bars (bass)": how long the loop is, and which part makes it that long
+function ui:loop_label()
+  local L = self:loop_len()
+  local bars = math.floor(L / 16)
+  local who = {}
+  for _, p in ipairs({ "drum", "bass", "lead", "chord" }) do if self:plen(p) >= L then who[#who + 1] = PART_NAMES[p] end end
+  local by = (#who == 4) and "every part" or table.concat(who, ", ")
+  return string.format("loop %d %s (%s)", bars, (bars == 1) and "bar" or "bars", by)
+end
 function ui:set_page(p)
   p = clamp(math.floor(p), 0, self:blocks() - 1)
   self.page = p
@@ -427,7 +457,8 @@ function ui:layout()
   if self.sheet == "export" then self:layout_export(add) end
   if self.sheet == "eq" then self:layout_eq(add) end
   -- messages on screens that have no message line of their own
-  if self.msg and (self.screen == "perform" or self.screen == "compose" or self.screen == "mixer" or self.screen == "arrange" or self.screen == "setup" or self.screen == "drums") then
+  if self.msg and (self.screen == "perform" or self.screen == "compose" or self.screen == "mixer" or self.screen == "arrange" or self.screen == "setup" or self.screen == "drums"
+                   or (self.msg_undo and self.undo_label)) then
     if self.msg_undo and self.undo_label then
       add{ kind="toast", x=W / 2 - 330, y=H - 50, w=556, h=38, label=self.msg }
       add{ kind="btn", x=W / 2 + 232, y=H - 50, w=98, h=38, label="undo", accent=true, tap=function() self:undo() end }
@@ -482,19 +513,45 @@ function ui:layout_nav(add)
   add{ kind="arrow", x=16, y=y, w=44, h=h, dir=-1, on=(self:shown_block() > 0), tap=function() self:set_page(self:shown_block() - 1) end }
   add{ kind="steps", x=64, y=y, w=104, h=h }
   add{ kind="arrow", x=172, y=y, w=44, h=h, dir=1, on=(self:shown_block() < n - 1), tap=function() self:set_page(self:shown_block() + 1) end }
-  -- right: length
-  -- right: length in bars. Shorter keeps the start (the rest comes back if you go longer again); longer repeats what's there
-  add{ kind="text", x=W - 16 - 216 - 46, y=y + 12, w=46, h=12, label="length", size=10 }
-  for i, len in ipairs({ 16, 32, 64, 128 }) do
-    local bars = len // 16
-    add{ kind="choice", x=W - 16 - 216 + (i - 1) * 54, y=y, w=50, h=h, label=bars .. ((bars == 1) and " bar" or " bars"), small=true,
-         sel=(self.v["ockm-len"] == len), tap=function()
-           local old = math.floor(self.v["ockm-len"] or 64)
-           psend("ockm-length", "float", { len })
-           if len < old then self:say("now " .. bars .. (bars == 1 and " bar" or " bars") .. ": the start is kept. Go longer again and the rest comes back")
-           elseif len > old then self:say("now " .. bars .. " bars: your parts repeat to fill it, following parts are rebuilt to fit") end
-         end }
+  -- middle: how long the loop is, and which part sets it
+  add{ kind="text", x=236, y=y + 12, w=300, h=12, label=self:loop_label(), size=11 }
+  -- right, on a part's tab: that part's length in bars, and double
+  local p = self:screen_part()
+  if p then
+    local cur = self:plen(p)
+    local cw, dw = 52, 70
+    local x0 = W - 16 - dw - 8 - 5 * (cw + 4)
+    add{ kind="text", x=x0 - 50, y=y + 12, w=48, h=12, label="length", size=10 }
+    for i, len in ipairs({ 16, 32, 64, 128, 256 }) do
+      local bars = len // 16
+      add{ kind="choice", x=x0 + (i - 1) * (cw + 4), y=y, w=cw, h=h, small=true, sel=(cur == len),
+           label=bars .. ((bars == 1) and " bar" or " bars"), tap=function() self:set_part_len(p, len) end }
+    end
+    add{ kind="btn", x=W - 16 - dw, y=y, w=dw, h=h, small=true, label="double", disabled=(cur >= 256), tap=function()
+      if cur < 256 then
+        psend("ockm-" .. p .. "-double", "bang", {})
+        self:say(PART_NAMES[p] .. " doubled: " .. math.floor(cur / 8) .. " bars, the first " .. math.floor(cur / 16) .. " copied after themselves")
+      end
+    end }
   end
+end
+
+-- a part's length. Shorter keeps the bars beyond (go longer again and they come back), so it's offered as undo too;
+-- longer repeats the part's own bars to fill the new ones
+function ui:set_part_len(p, len)
+  local old = self:plen(p)
+  if len == old then return end
+  local bars = math.floor(len / 16)
+  local what = PART_NAMES[p] .. " now " .. bars .. ((bars == 1) and " bar" or " bars")
+  if len < old then
+    self:snapshot(PART_NAMES[p] .. " length")
+    psend("ockm-" .. p .. "-len", "float", { len })
+    self:say_undo(what .. ": the rest is kept, go longer to bring it back")
+  else
+    psend("ockm-" .. p .. "-len", "float", { len })
+    self:say(what .. ": its bars repeat to fill")
+  end
+  self:set_page(self.page)
 end
 
 -- the block on screen: perform follows the playhead while playing, the edit screens stay where you put them
@@ -528,8 +585,9 @@ function ui:layout_perform(add)
       -- drum lanes are editable here too: tap cycles empty, hit, accent on the block on screen
       local cw = (W - LANE_X - 16) / 16
       for c = 0, 15 do
-        add{ kind="pcell", x=LANE_X + c * cw, y=y, w=cw, h=LANE_H, slot=i, step=self:shown_block() * 16 + c,
-             tap=function() self:drum_cycle(i, self:shown_block() * 16 + c) end }
+        local st = (self:shown_block() * 16 + c) % self:plen("drum")
+        add{ kind="pcell", x=LANE_X + c * cw, y=y, w=cw, h=LANE_H, slot=i, step=st,
+             tap=function() self:drum_cycle(i, st) end }
       end
     end
   end
@@ -622,28 +680,6 @@ function ui:layout_drums(add)
     end }
   end
   add{ kind="hbar", x=196, y=270, w=190, h=24, hook="ockm-swing", lo=50, hi=75, label="swing" }
-  -- drums loop: sketch on 1 or 2 bars under a longer pattern, then double
-  local len, loop = math.floor(self.v["ockm-len"] or 64), math.floor(self.v["ockm-drum-loop"] or 0)
-  local opts = {}
-  for _, n in ipairs({ 16, 32, 64 }) do if n < len then opts[#opts + 1] = n end end
-  opts[#opts + 1] = 0
-  local cw, dw = 58, 74
-  local x0 = W - 16 - dw - 6 - #opts * (cw + 4)
-  add{ kind="text", x=x0 - 82, y=276, w=80, h=12, label="drums loop", size=10 }
-  for i, n in ipairs(opts) do
-    local lab = (n == 0) and "all" or ((n == 16) and "1 bar" or (math.floor(n / 16) .. " bars"))
-    add{ kind="choice", x=x0 + (i - 1) * (cw + 4), y=270, w=cw, h=24, small=true, label=lab, accent=(n > 0),
-         sel=(loop == n or (n == 0 and loop >= len)), tap=function() self:send("ockm-drum-loop", n) end }
-  end
-  add{ kind="btn", x=W - 16 - dw, y=270, w=dw, h=24, small=true, label="double", disabled=(loop <= 0 or loop >= len),
-       tap=function()
-         if loop > 0 and loop < len then
-           psend("ockm-drum-double", "bang", {})
-           local nl = (loop * 2 >= len) and 0 or loop * 2
-           self.v["ockm-drum-loop"] = nl
-           self:say((nl == 0) and "doubled: the drums now fill the whole loop" or ("doubled: the drums loop over " .. math.floor(nl / 16) .. " bars"))
-         end
-       end }
   add{ kind="vlane", x=0, y=300, w=W, h=38 }
   -- this slot's sound on the left, grooves for the whole kit on the right
   local half = (W - 48) / 2
@@ -881,7 +917,7 @@ function ui:score_prog(pi, src)
   local steps = {}
   for _, seg in ipairs(shape) do for _ = 1, seg[2] do steps[#steps + 1] = seg[1] end end
   local plen = #steps
-  local L = math.max(1, math.floor(self.v["ockm-len"] or 16))
+  local L = self:plen(src)      -- the leading part repeats at its own length
   local sc, root = self:scale(), math.floor(self.v["ockm-root"] or 9)
   local total, weight = 0, 0
   for i = 0, math.max(plen, L) - 1 do
@@ -1053,7 +1089,7 @@ end
 
 -- is a synth part empty across the whole pattern?
 function ui:part_empty(p)
-  local L = math.max(1, math.floor(self.v["ockm-len"] or 16))
+  local L = self:plen(p)
   for i = 0, L - 1 do
     if self:get("ockm-pat-"..p.."-on", i) > 0 then return false end
   end
@@ -1173,7 +1209,7 @@ function ui:export_audio(dir)
   self.exporting = { t0 = os.time(), base = base }
   self:rec_start(e.stems > 0)
   psend("ockm-play", "float", { 1 })
-  local bars = e.times * math.max(1, math.floor((self.v["ockm-len"] or 128) / 16))
+  local bars = e.times * math.max(1, math.floor(self:loop_len() / 16))
   self.expclock:delay(bars * 16 * 15000 / (self.v["ockm-bpm"] or 124))
   self.tickclock:delay(500)
 end
@@ -1200,24 +1236,27 @@ end
 
 -- everything MIDI needs from the pattern that's open
 function ui:collect_pattern()
-  local d = { len = math.floor(self.v["ockm-len"] or 64), root = math.floor(self.v["ockm-root"] or 9), scale = self:scale(),
+  local d = { len = self:loop_len(), root = math.floor(self.v["ockm-root"] or 9), scale = self:scale(),
               ctype = math.floor(self.v["ockm-chord-type"] or 0), smooth = (self.v["ockm-chord-smooth"] or 1) > 0,
-              loop = math.floor(self.v["ockm-drum-loop"] or 0), on = {}, drums = {}, mono = {}, chord = {} }
+              loop = 0, on = {}, drums = {}, mono = {}, chord = {} }
+  -- every step of the loop, each part repeating inside it at its own length
+  local dl, bl, ll, cl = self:plen("drum"), self:plen("bass"), self:plen("lead"), self:plen("chord")
   for _, t in ipairs(SYNTHS) do d.on[t] = (self.v["ockm-"..t.."-on"] or 1) > 0 end
   for _, nm in ipairs(SLOTS) do
     local sl = { sound = math.floor(self.v["ockm-"..nm.."-sound"] or 0), v = {}, n = {} }
-    for st = 0, d.len - 1 do sl.v[st] = self:get("ockm-pat-"..nm, st); sl.n[st] = self:get("ockm-pat-"..nm.."-nudge", st) end
+    for st = 0, d.len - 1 do sl.v[st] = self:get("ockm-pat-"..nm, st % dl); sl.n[st] = self:get("ockm-pat-"..nm.."-nudge", st % dl) end
     d.drums[nm] = sl
   end
   for _, part in ipairs({ "bass", "lead" }) do
-    local m = {}
+    local m, pl = {}, (part == "bass") and bl or ll
     for st = 0, d.len - 1 do
-      m[st] = { note = self:get("ockm-pat-"..part.."-note", st), on = self:get("ockm-pat-"..part.."-on", st),
-                acc = self:get("ockm-pat-"..part.."-acc", st), slide = self:get("ockm-pat-"..part.."-slide", st) }
+      local i = st % pl
+      m[st] = { note = self:get("ockm-pat-"..part.."-note", i), on = self:get("ockm-pat-"..part.."-on", i),
+                acc = self:get("ockm-pat-"..part.."-acc", i), slide = self:get("ockm-pat-"..part.."-slide", i) }
     end
     d.mono[part] = m
   end
-  for st = 0, d.len - 1 do d.chord[st] = { on = self:get("ockm-pat-chord-on", st), deg = self:get("ockm-pat-chord-deg", st) } end
+  for st = 0, d.len - 1 do d.chord[st] = { on = self:get("ockm-pat-chord-on", st % cl), deg = self:get("ockm-pat-chord-deg", st % cl) } end
   return d
 end
 -- a chord's notes, worked out the way the chord sequencer does it
@@ -1667,11 +1706,7 @@ function ui:drum_cycle(slot, step)
 end
 function ui:drum_tap(i) self:drum_cycle(self.slot, self:dabs(i)) end
 -- with a drums loop on, every bar shows (and edits) the loop
-function ui:dabs(i)
-  local s, L = self.page * 16 + i, math.floor(self.v["ockm-drum-loop"] or 0)
-  if L > 0 then return s % L end
-  return s
-end
+function ui:dabs(i) return (self.page * 16 + i) % self:plen("drum") end
 -- how hard a step plays, 0 to 1: 2 = accent (full), 1 = normal (full minus the accent amount), between = drawn
 function ui:drum_vel(v)
   if v >= 2 then return 1 elseif v > 0.999 then return 1 - (self.v["ockm-accent"] or 0.3) end
@@ -1909,7 +1944,7 @@ end
 function ui:paint_layer_2(g)
   if self.s ~= 1 then g:scale(self.s, self.s) end
   if self.playing == 0 then return end
-  local i = self.step % 16
+  local i = self.step % 16      -- every part's length is whole bars, so the step within the bar is the same for all
   local pitch = (W - 32) / 16
   if self.screen == "perform" then
     local lw = (W - LANE_X - 16) / 16
@@ -2038,7 +2073,7 @@ function ui:draw(g, w)
     local b = w.follow and self:play_block() or self.page
     local n = self:blocks()
     b = clamp(b, 0, n - 1)
-    local s = string.format("steps %d-%d", b * 16 + 1, math.min((b + 1) * 16, self.v["ockm-len"] or 16))
+    local s = string.format("steps %d-%d", b * 16 + 1, math.min((b + 1) * 16, self:shown_len()))
     if n > 1 then s = s .. string.format("   block %d of %d", b + 1, n) end
     if w.follow then s = (self.playing ~= 0 and "playing " or "") .. s end
     self:text(g, s, w.x, w.y + w.h / 2 - 8, 13, "mute", w.w)
@@ -2058,7 +2093,7 @@ function ui:draw(g, w)
     p:close(); g:fill_path(p)
   elseif k == "steps" then
     local n, b = self:blocks(), self:shown_block()
-    local len = self.v["ockm-len"] or 16
+    local len = self:shown_len()
     local s = string.format("%d-%d", b * 16 + 1, math.min((b + 1) * 16, len))
     self:col(g, "card"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
     self:ctext(g, s, { x=w.x, y=w.y + 3, w=w.w, h=18 }, 13, "txt")
@@ -2085,15 +2120,8 @@ function ui:draw(g, w)
     -- nothing to draw: it only catches swipes between the pads
   elseif k == "dstep" then
     local v = self:get("ockm-pat-"..SLOTS[self.slot], self:dabs(w.i))
-    local L = math.floor(self.v["ockm-drum-loop"] or 0)
     local c = (v >= 2) and "acc" or ((v > 0) and "on" or "off")
-    if L > 0 and self.page * 16 + w.i >= L then
-      -- past the loop: a repeat of the loop, drawn as outlines
-      self:col(g, "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
-      if v > 0 then self:col(g, c); g:stroke_rounded_rect(w.x + 1, w.y + 1, w.w - 2, w.h - 2, 6, 2) end
-    else
-      self:col(g, c); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
-    end
+    self:col(g, c); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
     if w.i % 4 == 0 then self:col(g, "mute"); g:fill_rect(w.x, w.y + w.h + 4, w.w, 2) end
   elseif k == "vlane" then
     local pitch = (W - 32) / 16
@@ -2218,13 +2246,14 @@ function ui:draw_lane(g, w)
   local cw = w.w / 16
   local base = self:play_block() * 16
   if self.playing == 0 then base = self.page * 16 end
+  local plen = self:plen(self:track_part(n))
   for i = 0, 15 do
-    local st = 0
-    if n <= 8 then st = self:get("ockm-pat-"..SLOTS[n], base + i)
+    local st, ix = 0, (base + i) % plen      -- a shorter part repeats inside the loop
+    if n <= 8 then st = self:get("ockm-pat-"..SLOTS[n], ix)
     elseif n <= 10 then
       local part = SYNTHS[n - 8]
-      if self:get("ockm-pat-"..part.."-on", base + i) > 0 then st = (self:get("ockm-pat-"..part.."-acc", base + i) > 0) and 2 or 1 end
-    else st = self:get("ockm-pat-chord-on", base + i) end
+      if self:get("ockm-pat-"..part.."-on", ix) > 0 then st = (self:get("ockm-pat-"..part.."-acc", ix) > 0) and 2 or 1 end
+    else st = self:get("ockm-pat-chord-on", ix) end
     if self:silent(TRACKS[n]) then self:col(g, (st > 0) and "dim" or "off")
     else self:col(g, (st >= 2) and "acc" or ((st > 0) and "on" or "off")) end
     g:fill_rounded_rect(w.x + i * cw + 2, w.y + 4, cw - 4, w.h - 8, 3)

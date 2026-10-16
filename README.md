@@ -2,7 +2,7 @@
 
 A drum machine and easy-to-program synths in one box. Built in Pure Data, designed to run on a Raspberry Pi with a touchscreen and a few knobs.
 
-Current version: **v0.49**
+Current version: **v0.50**
 
 ## How to open it
 
@@ -12,7 +12,7 @@ The window is the instrument: three touch screens, drawn in Lua (plugdata has Lu
 
 **How every screen is laid out**, top to bottom:
 1. **Top bar:** play, tempo, then the screens as tabs: **perform, compose, drums, bass, lead, chord, mixer, arrange**. Save and **project** on the right. The version number sits next to the tempo
-2. **Navigation strip:** on the left, right above the steps, the **steps** navigator: back and forward arrows either side of the steps you're looking at (for example "17-32"). The dots show every block of 16: white is the one on screen, orange is the one playing. You can also swipe the step row sideways. On the right, **length** of the loop in bars (1, 2, 4, 8). New loops are 8 bars. **Shorter** keeps the start; nothing is deleted, so going longer again brings your bars back. **Longer** repeats what you've written to fill the new bars, and following parts are rebuilt to fit (a 4-bar progression fills out properly instead of repeating its first chord)
+2. **Navigation strip:** on the left, right above the steps, the **steps** navigator: back and forward arrows either side of the steps you're looking at (for example "17-32"). The dots show every block of 16: white is the one on screen, orange is the one playing. You can also swipe the step row sideways. In the middle, how long the loop is and which part sets it, like "loop 4 bars (bass, lead, chords)". On the drums, bass, lead and chord tabs, the right of the strip has that part's **length** (1, 2, 4, 8 or 16 bars) and **double**. See "Part lengths" below
 3. **What you're editing:** the steps (and, on the drums screen, which of the 8 drum slots)
 4. **Sound shaping** at the bottom
 
@@ -39,7 +39,7 @@ Tap a track's name on perform or the mixer to jump straight to it.
 - **Steps**: tap cycles empty, hit (white), accent (orange)
 - Move between blocks of 16 with the **steps** arrows in the navigation strip, or swipe the step row sideways
 - **Level, tune, decay, reverb, delay** for this slot. These belong to the kit, so they stay when you change pattern
-- **Grooves** (right of the sliders): tap one to fill all 8 drums at once. Each slot gets the part for the sound it plays, so a groove's hats land on whichever slot is your hat. It fills the whole pattern length and sets a swing to suit. Twelve to pick from: four floor, house, deep house, tech house, minimal, techno, dub techno, garage, breakbeat, boom bap, trip hop, electro. **Clear** empties the drums. A groove replaces your drum steps, so the message that pops up has an **undo** button
+- **Grooves** (right of the sliders): tap one to fill all 8 drums at once. Each slot gets the part for the sound it plays, so a groove's hats land on whichever slot is your hat. A groove is one bar, so it makes the drums 1 bar long (go longer and it repeats), and sets a swing to suit. Twelve to pick from: four floor, house, deep house, tech house, minimal, techno, dub techno, garage, breakbeat, boom bap, trip hop, electro. **Clear** empties the drums. A groove replaces your drum steps, so the message that pops up has an **undo** button
 - **Fills** (under the grooves): **fill on the last bar of every** 4, 8 or 16 bars, counted from when you press play. Styles: **snare roll** (builds through the second half of the bar), **tom run**, **drop** (kick and claps out for the last half bar, hats out for the last beat, so the next downbeat lands harder), **build** (snare 16ths rising over the whole bar). A fill only replaces the drums it uses; everything else keeps playing your pattern, and your steps are never changed. Saved with each pattern, so a breakdown can have fills off
 
 **Compose** (next to perform): how the loop is put together. Each part's card (chord, bass, lead) has **M** and **S**, the same mute and solo as on perform and the mixer.
@@ -164,7 +164,7 @@ The Pi runs the same app as the Mac, drawn at double size (`--ui-scale 2`), so t
 - **Arrange is a beta feature** (decided October 2026). It's useful as a starting point; making transitions and drops properly musical will take a lot more work, so it's parked as beta rather than polished now.
 - **Raspberry Pi, not Daisy or Arduino.** No hardware skills needed, and it runs full Pd, so nothing has to be rewritten.
 - **11 tracks: 8 drum slots plus 3 synths (bass, lead, chord).** Between a TR-6S and a TR-8. More would make the screen too busy without making the music better.
-- **8 pattern slots, each up to 128 steps.** One length per pattern, shown 16 steps at a time.
+- **One loop, a length per part** (decided October 2026). Drums, bass, lead and chords each 1 to 16 bars; the loop is the longest. Shown 16 steps at a time.
 - **Drum slots are flexible.** Each of the 8 slots can play any of the 8 drum sounds, and later any of your samples.
 - **One key for all synths.** Bass, lead and chord share the key and scale, so they always agree.
 - **A self-contained box.** Pi, 10" screen and DAC Pro in one unit, a USB MIDI controller alongside, audio out on RCA to the mixer. No iRig, no MIDI interface for now.
@@ -185,7 +185,7 @@ The Pi runs the same app as the Mac, drawn at double size (`--ui-scale 2`), so t
 
 - FM drum and bass voices (likely to come back with the bass engines)
 - Probability, ratchets and Euclidean patterns
-- Different lengths per row (one length per pattern for now)
+- Different lengths per drum row (the drums share one length), and odd lengths or polymeter (lengths are 1, 2, 4, 8 or 16 bars)
 - An Arduino-built custom control panel
 - The Daisy route for a fully embedded box
 
@@ -230,7 +230,7 @@ The data model, smallest first:
 2. **Track:** one lane. 8 drum slots, plus bass, lead and chord.
 3. **Sound:** what a track plays. A drum slot: its sound, tune, decay, level and sends. A synth: engine, k1 to k4, drive (bass and lead), chord type (chord) and sends.
 4. **Kit:** the 8 drum sounds together.
-5. **Loop:** the steps for all 11 tracks, plus length (1 to 128), swing, key and scale, generator choices and **the three synth sounds**.
+5. **Loop:** the steps for all 11 tracks, plus each part's length (1 to 16 bars), swing, key and scale, generator choices and **the three synth sounds**.
 6. **Project:** a whole set. The loop, **the drum kit**, tempo, master effects, MIDI settings and accent amount.
 
 | Setting | Lives in |
@@ -267,8 +267,10 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 | `ockm-loading` | 1 while a pattern is loading, 0 after. Generators don't rebuild while it's 1 |
 | `ockm-refresh` | Sent after a pattern loads, so the squares update |
 | `ockm-step` | Sends the current step as it plays, counting from 0 |
-| `ockm-length` | Set the current pattern's length, 1 to 128. Lengthening repeats existing steps |
-| `ockm-len` | Sent whenever the active length changes (for example when a pattern loads) |
+| `ockm-drum-len`, `ockm-bass-len`, `ockm-lead-len`, `ockm-chord-len` | A part's length in steps (16, 32, 64, 128, 256). Saved with the loop. Longer repeats the part's bars; shorter keeps the rest |
+| `ockm-<part>-double` | Copy a part's bars after themselves and double its length (up to 256 steps) |
+| `ockm-length` | Older screens and tests: sets every part's length at once (drums stay shorter if they were) |
+| `ockm-len` | Sent by the engine: the loop length, the longest part (not set directly) |
 | `ockm-page` | Which 16 steps the squares show: 0 is steps 1 to 16, 1 is 17 to 32, up to 7 |
 | `ockm-extend` | Internal: tells every track to repeat its steps to fill a longer pattern |
 | `ockm-master` | The final audio mix |
@@ -294,8 +296,7 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 | `ockm-chord-type` | 0 triad, 1 seventh, 2 sus2, 3 power chord. Applies straight away |
 | `ockm-edit` | Set one drum step: slot, step (0 to 127), value (0 off, 1 on, 2 accent, anything between 0 and 1 a velocity). For example `d1 4 2` |
 | `ockm-nudge` | One drum step's timing: slot, step, -0.25 (a quarter step early) to 0.25 (late). Saved with the pattern |
-| `ockm-drum-loop` | Drums loop length in steps (16, 32, 64), 0 = the whole pattern. Saved with the pattern |
-| `ockm-drum-double` | Copy the drums loop into the steps after it and double it |
+| `ockm-drum-loop` | Older screens: the drums' length when shorter than the synths (0 = not shorter). Setting it sets the drum length |
 | `ockm-bass-edit`, `ockm-lead-edit` | Set one bass or lead step: step (0 to 127), note (MIDI), on, accent, slide. For example `0 33 1 1 0` |
 | `ockm-chord-edit` | Set one chord step: step, 0 off / 1 on / 2 accent, chord root as a scale step (0 is the key's root). For example `4 1 5` |
 | `ockm-accent` | Accent amount, 0 to 1 |
@@ -346,9 +347,15 @@ The lane under the steps has two modes. **Velocity**: drag a step's bar up or do
 
 To make early hits possible, the whole engine plays a quarter of a step behind the clock (about 30 ms at 124 bpm). Everything moves together, so you won't hear it. Gear following OCKM's MIDI clock will play about that much ahead.
 
-### Drums loop
+### Part lengths
 
-Sketch the drums on 1 or 2 bars under a longer pattern: pick **1 bar** or **2 bars** next to "drums loop" and the drums repeat those bars while the synths play the whole pattern. The repeats show as outlines. **Double** copies the loop (steps, velocity and timing) into the bars after it and doubles the loop, until it fills the pattern. **All** goes back to the whole pattern.
+Every part has its own length: the drums (all 8 rows together), bass, lead and chords, each 1, 2, 4, 8 or 16 bars. **The loop is as long as the longest part,** and shorter parts repeat inside it. So you can draw a 1-bar beat under a 4-bar bassline and hear it all.
+
+- **Set a part's length** on its tab, on the right of the navigation strip. The steps and the playhead on that tab follow the part's own length; perform shows every lane repeating at its own length
+- **Longer** repeats the part's own bars to fill the new ones. **Shorter** keeps the bars beyond (nothing is deleted, go longer again and they come back), and the message has an **undo** button
+- **Double** copies the part's bars (steps, velocity and timing) after themselves: 1 bar becomes 2, up to 16
+- **New projects** start with drums at 1 bar and the bass, lead and chords at 4 bars
+- **Generators write their natural length:** a groove makes the drums 1 bar; a chord progression sets the chords to the progression's length. A bass or melody that follows the chords takes the chords' length too
 
 ### Grooves
 
