@@ -43,6 +43,13 @@ Tap a track's name on Perform A or the mixer to jump straight to it.
 - **Master effects:** rise, pump, drop and throw; a big filter with hold; drive and master volume; delay and reverb
 - **Macros:** three slots, A, B and C. Hold one to play it; let go and everything goes back (a macro with a move that stays lights up and waits: tap it again to let go). The small **v** on each picks which of your six macros is on that slot. Out of the box: build, wash and strip
 
+**Drum lab** (its own patch: open `OCKM_DRUM_LAB.pd` in plugdata on the Mac). For designing claps and snares of your own, then rendering them as samples:
+- **Clap:** how many bursts, the gap between them and how loose it is, burst length, two noise colours (body and air) with their focus and balance, a separate tail with its own tone, a small room, snap and drive
+- **Snare:** two tuned tones with a pitch drop, a noise "wires" layer with its own tone, focus and decay, a click, the body-to-wires balance, and drive
+- **play**, **loop with kick** (a kick on every beat, the clap or snare on 2 and 4), **randomise** small, medium or wild (around the sound you have), and **reset**
+- **render** records one hit to `samples/clap` or `samples/snare` as a 24-bit mono WAV, named `lab-clap-` or `lab-snare-` plus the date and time. Pick it on the drums tab like any other sample (it's yours, so it can go on the SP-404 or into Ableton too)
+- Nothing in the instrument depends on the lab: it only writes WAVs
+
 **Drum** (one slot at a time)
 - The 8 slots along the top, named by the sound they play
 - **Sound**: 8 pads, one per drum sound

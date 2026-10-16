@@ -92,12 +92,12 @@ class Harness:
         open(path, "w").write("\n".join(lines) + "\n")
 
 
-def run(work, harness_file, with_main=True, timeout=60):
+def run(work, harness_file, with_main=True, timeout=60, main="OCKM_GENERATOR.pd"):
     cmd = [PD, "-nogui", "-nosound", "-nomidi", "-stderr"]
     if PDLUA:
         cmd += ["-path", PDLUA, "-lib", "pdlua"]
     if with_main:
-        cmd += ["-open", "OCKM_GENERATOR.pd"]
+        cmd += ["-open", main]
     cmd += ["-open", harness_file]
     p = subprocess.run(cmd, cwd=work, capture_output=True, text=True, timeout=timeout)
     return p.stdout + p.stderr
@@ -869,6 +869,40 @@ def settings_macro_library_and_slots(work):
     dr = [float(x) for x in printed(out, "ockm-drive")]
     assert dr and max(dr) > 0.65 and len([x for x in dr if 0.05 < x < 0.65]) >= 3 and dr[-1] < 0.01, f"drive should rise over the bar, then go back: {dr[:6]} ... {dr[-3:]}"
     assert '"slots"' in saved and re.search(r'"slots"\]\s*=\s*\{\s*4', saved), f"slot A should be saved as recipe 4: {saved[:400]}"
+
+@test
+def drum_lab_renders_claps_and_snares(work):
+    """The drum lab (its own patch): render a clap and a snare into samples/clap and samples/snare. Both files are
+    real hits: loud enough, not clipped, and they die away. Randomise moves the settings within their ranges."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    import wave, struct
+    h = Harness(); h.show("lab-status")
+    h.at(300, "lab-clap-render bang")
+    h.at(3200, "lab-snare-render bang")
+    h.at(5600, "lab-clap-rand-wild bang ; lab-test dump")
+    f = os.path.join(work, "t_lab.pd"); h.finish(5800, f)
+    out = run(work, f, main="OCKM_DRUM_LAB.pd")
+    errs = [l for l in out.splitlines() if "error" in l.lower() and "audio" not in l.lower()]
+    assert not errs, f"the lab should load cleanly: {errs[:4]}"
+    def read(folder):
+        d = os.path.join(work, "samples", folder)
+        names = [n for n in os.listdir(d) if n.startswith("lab-") and n.endswith(".wav")]
+        assert names, f"no render in samples/{folder}: {printed(out, 'lab-status')}"
+        w = wave.open(os.path.join(d, names[0]))
+        assert w.getnchannels() == 1 and w.getsampwidth() == 3, "renders should be 24-bit mono"
+        raw = w.readframes(w.getnframes()); sr = w.getframerate()
+        vals = [int.from_bytes(raw[i:i + 3], "little", signed=True) / 8388608 for i in range(0, len(raw), 3)]
+        return vals, sr
+    for folder in ("clap", "snare"):
+        v, sr = read(folder)
+        peak = max(abs(x) for x in v)
+        head = v[: int(sr * 0.08)]; tail = v[-int(sr * 0.05):]
+        rms = (sum(x * x for x in head) / len(head)) ** 0.5
+        assert 0.05 < rms and peak < 1.0, f"{folder}: the hit should be loud but not clipped (rms {rms:.3f}, peak {peak:.3f})"
+        assert max(abs(x) for x in tail) < 0.2 * peak, f"{folder}: the render should catch the whole hit as it dies away"
+    dump = [l for l in out.splitlines() if "ockm-lab: clap" in l]
+    assert len(dump) == 13, f"every clap setting should be listed: {dump[:3]}"
 
 @test
 def touchscreen_filter_springs_and_throw(work):

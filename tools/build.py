@@ -2342,4 +2342,6 @@ One folder per drum sound: """+", ".join(SAMPLE_DIRS)+""". Perc 1 and perc 2 bot
 Audio files in here aren't saved to git (they're big). Back the folder up yourself.
 """)
 build_samples()
+# the drum lab: a separate patch for designing claps and snares (tools/build_lab.py)
+exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "build_lab.py")).read())
 print("built", R)

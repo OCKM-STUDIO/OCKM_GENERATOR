@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.57 (17 October 2026)
+
+- **Drum lab:** a separate patch (`OCKM_DRUM_LAB.pd`) for designing claps and snares with far more control than the drums page: bursts, noise colours, tails and room for the clap; tuned body, pitch drop, wires and click for the snare. Play, loop against a kick, randomise around what you have, and render a hit straight into `samples/clap` or `samples/snare` as a WAV
+
 ## v0.56 (16 October 2026)
 
 - **Perform A:** empty steps on the beat (1, 5, 9, 13) are a shade lighter, so each bar reads in fours
