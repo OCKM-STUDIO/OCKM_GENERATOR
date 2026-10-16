@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.54 (16 October 2026)
+
+- **Live, a second perform screen** (its own tab, next to perform): a big tile per track to mute, plus all synths, scenes (drums only, no drums, kick + bass, all in) and the master effects at full size
+- **Mutes that land on the beat or the bar** (or now). Tap several and they switch together. The engine holds them, so they land exactly before that step's hits
+- **Macros** (hold to play): build, wash and strip. Each moves several effects (or mutes) at once and puts them all back when you let go
+- The tabs are a little narrower to make room for live
+
 ## v0.53 (16 October 2026)
 
 - **909 clap re-voiced:** higher, shorter, a touch darker and a little quieter. What used to take tune +5, decay 62, tone -0.43 and level 0.91 is now where it starts, with the sliders at neutral

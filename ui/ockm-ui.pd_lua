@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.53"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.54"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a" },
@@ -107,7 +107,7 @@ local NOT_CHANGES = { ["ockm-play"]=1, ["ockm-want"]=1, ["ockm-page"]=1, ["ockm-
   ["ockm-project-list"]=1, ["ockm-project-open"]=1, ["ockm-project-new"]=1, ["ockm-project-saveas"]=1, ["ockm-project-delete"]=1,
   ["ockm-resync"]=1, ["ockm-snapshot"]=1, ["ockm-usb-scan"]=1, ["ockm-exports-ask"]=1, ["ockm-mkdir"]=1, ["ockm-rec-stop"]=1, ["ockm-filter"]=1, ["ockm-filter-glide"]=1, ["ockm-delay-throw"]=1 }
 local function psend(name, sel, atoms)
-  if UI_NOW and not NOT_CHANGES[name] and not name:match("^ockm%-rec%-") and not name:match("%-mute$") and not name:match("%-solo$") and not name:match("%-audition$")
+  if UI_NOW and not NOT_CHANGES[name] and not name:match("^ockm%-rec%-") and not name:match("%-mute$") and not name:match("%-mute%-q$") and not name:match("%-solo$") and not name:match("%-audition$")
      and name ~= "ockm-samples-scan" then UI_NOW.unsaved = true end
   pd["send"](name, sel, atoms)
 end
@@ -211,6 +211,7 @@ function ui:postinitialize()
     listen("ockm-show-" .. hook:sub(6), set)
   end
   listen("ockm-playing", function(o, sel, a) o.playing = tonumber(a[1]) or 0; o:dirty() end)
+  for _, t in ipairs(TRACKS) do listen("ockm-"..t.."-mute", function(o) if o.mpend then o.mpend[t] = nil end end) end
   listen("ockm-project-name", function(o, sel, a) o.project = tostring(a[1] or "default"); o:dirty() end)
   listen("ockm-project-list-start", function(o) o.incoming = {} end)
   listen("ockm-filter-now", function(o, sel, a)
@@ -452,6 +453,7 @@ function ui:layout()
   local function add(w) L[#L+1] = w; return w end
   self:layout_top(add)
   if self.screen == "perform" then self:layout_perform(add)
+  elseif self.screen == "live" then self:layout_live(add)
   elseif self.screen == "drums" then self:layout_drums(add)
   elseif self.screen == "mixer" then self:layout_mixer(add)
   elseif self.screen == "compose" then self:layout_compose(add)
@@ -462,7 +464,7 @@ function ui:layout()
   if self.sheet == "export" then self:layout_export(add) end
   if self.sheet == "eq" then self:layout_eq(add) end
   -- messages on screens that have no message line of their own
-  if self.msg and (self.screen == "perform" or self.screen == "compose" or self.screen == "mixer" or self.screen == "arrange" or self.screen == "setup" or self.screen == "drums"
+  if self.msg and (self.screen == "perform" or self.screen == "live" or self.screen == "compose" or self.screen == "mixer" or self.screen == "arrange" or self.screen == "setup" or self.screen == "drums"
                    or (self.msg_undo and self.undo_label)) then
     if self.msg_undo and self.undo_label then
       add{ kind="toast", x=W / 2 - 330, y=H - 50, w=556, h=38, label=self.msg }
@@ -479,7 +481,7 @@ end
 --   2. navigation strip: pattern, length, which block of 16 steps
 --   3. what you're editing (drum slot tabs on the drums screen), then the steps
 --   4. sound shaping at the bottom
-local TABS = { { "perform", "perform" }, { "compose", "compose" }, { "drums", "drums" }, { "synth", "bass", 1 }, { "synth", "lead", 2 }, { "synth", "chord", 3 }, { "mixer", "mixer" }, { "arrange", "arrange" } }
+local TABS = { { "perform", "perform" }, { "live", "live" }, { "compose", "compose" }, { "drums", "drums" }, { "synth", "bass", 1 }, { "synth", "lead", 2 }, { "synth", "chord", 3 }, { "mixer", "mixer" }, { "arrange", "arrange" } }
 local NAV_Y, NAV_H = 70, 36
 function ui:layout_top(add)
   add{ kind="play", x=16, y=12, w=64, h=48, tap=function()
@@ -488,7 +490,7 @@ function ui:layout_top(add)
   add{ kind="bpm", x=92, y=12, w=140, h=48, tap=function() if self.screen ~= "setup" then self:open("setup") end end }
   for i, t in ipairs(TABS) do
     local sel = (self.screen == t[1]) and (t[3] == nil or t[3] == self.part)
-    add{ kind="tab", x=244 + (i - 1) * 69, y=12, w=64, h=48, label=t[2], sel=sel, tap=function()
+    add{ kind="tab", x=244 + (i - 1) * 62, y=12, w=58, h=48, label=t[2], sel=sel, tap=function()
       if t[3] then
         if self.part ~= t[3] then self.part = t[3]; self.sel_step = 0; self.msg = nil end
       end
@@ -507,7 +509,7 @@ function ui:layout_top(add)
   add{ kind="tab", x=W - 84, y=12, w=68, h=48, label="project", sel=(self.screen == "project"), tap=function()
     if self.screen ~= "project" then self:open("project") end
   end }
-  if self.screen ~= "project" and self.screen ~= "setup" then self:layout_nav(add) end
+  if self.screen ~= "project" and self.screen ~= "setup" and self.screen ~= "live" then self:layout_nav(add) end
 end
 
 -- the navigation strip: pattern 1-8, length, and the blocks of 16 steps (only as many as the length allows)
@@ -674,6 +676,162 @@ function ui:part_sounding(p)
   if (self.v["ockm-"..p.."-mute"] or 0) > 0 then return false end
   if self:soloing() and (self.v["ockm-"..p.."-solo"] or 0) <= 0 then return false end
   return self:get("ockm-pat-"..p.."-on", self.step % self:plen(p)) > 0
+end
+
+-- ------------------------------------------------------------------ live
+-- Perform 2: no steps, just the mutes and the master effects, big enough to play with your thumbs.
+-- Mutes can land now, on the next beat or on the next bar (the engine holds them until then).
+local LV_Y = 72
+local LV_GRID_Y, LV_ROW_H, LV_COL_W = 122, 128, (448 - 12 - 18) / 4
+local function live_tile(n)   -- n: 1-8 drums, 9-11 synths, 12 all synths
+  local c, r = (n - 1) % 4, math.floor((n - 1) / 4)
+  return 22 + c * (LV_COL_W + 6), LV_GRID_Y + r * (LV_ROW_H + 8)
+end
+local QUANT = { { 0, "now" }, { 1, "next beat" }, { 2, "next bar" } }
+
+-- ask for a mute: the engine applies it now or holds it for the beat or bar. The tile shows it waiting
+function ui:qmute(t, val)
+  self.mpend = self.mpend or {}
+  local now = (self.playing == 0) or ((self.v["ockm-mute-quant"] or 0) == 0)
+  if not now and (self.v["ockm-"..t.."-mute"] or 0) ~= val then self.mpend[t] = val end
+  psend("ockm-"..t.."-mute-q", "float", { val })
+end
+function ui:pending(t)
+  local p = self.mpend and self.mpend[t]
+  if p == nil or self.playing == 0 then return nil end
+  if (self.v["ockm-"..t.."-mute"] or 0) == p then return nil end
+  return p
+end
+-- where a mute is heading: what it will be once anything waiting has landed
+function ui:mute_target(t) local p = self:pending(t); if p ~= nil then return p end; return self.v["ockm-"..t.."-mute"] or 0 end
+
+-- scenes: which tracks play. Everything else is muted; solos are cleared so the scene is what you hear
+function ui:scene(keep)
+  for _, t in ipairs(TRACKS) do
+    if (self.v["ockm-"..t.."-solo"] or 0) > 0 then self:send("ockm-"..t.."-solo", 0) end
+    local want = keep(t) and 0 or 1
+    if self:mute_target(t) ~= want then self:qmute(t, want) end
+  end
+end
+
+-- macros: hold to play. Each moves several controls at once and puts them back when you let go
+local function bars_ms(self, bars) return bars * 16 * 15000 / math.max(40, self.v["ockm-bpm"] or 124) end
+local MACROS = {
+  { name = "build", sub = "rise + open up",
+    set = { ["ockm-verb-mix"] = 0.65, ["ockm-delay-mix"] = 0.45, ["ockm-pump"] = 1 }, filter = { 0.6, function(self) return bars_ms(self, 2) end } },
+  { name = "wash", sub = "echo + verb, dark",
+    set = { ["ockm-delay-mix"] = 0.85, ["ockm-delay-fb"] = 0.78, ["ockm-verb-mix"] = 0.9, ["ockm-verb-size"] = 0.93 }, filter = { -0.5, function() return 400 end } },
+  { name = "strip", sub = "kick + bass only", keep = "kickbass" },
+}
+function ui:kick_slots() local k = {}; for _, nm in ipairs(self:drum_slots({ kick = true })) do k[nm] = true end; return k end
+function ui:macro_down(i)
+  local m = MACROS[i]
+  if self.macro then self:macro_up() end
+  local saved = { set = {}, filter = self.v["ockm-filter"] or 0, mutes = {} }
+  for hook, x in pairs(m.set or {}) do
+    saved.set[hook] = self.v[hook] or 0
+    self.v[hook] = x; pd.send(hook, "float", { x })
+  end
+  if m.filter then pd.send("ockm-filter-glide", "list", { m.filter[1], m.filter[2](self) }) end
+  if m.keep == "kickbass" then
+    local kicks = self:kick_slots()
+    for _, t in ipairs(TRACKS) do
+      saved.mutes[t] = self:mute_target(t)
+      local want = (kicks[t] or t == "bass") and 0 or 1
+      if want ~= saved.mutes[t] then self:qmute(t, want) end
+    end
+  end
+  self.macro = { i = i, saved = saved }
+end
+function ui:macro_up()
+  local mc = self.macro
+  if not mc then return end
+  self.macro = nil
+  local m = MACROS[mc.i]
+  for hook, x in pairs(mc.saved.set) do self.v[hook] = x; pd.send(hook, "float", { x }) end
+  if m.filter then
+    if self.filter_hold then pd.send("ockm-filter-glide", "list", { mc.saved.filter, 50 })
+    else self:filter_spring() end
+  end
+  for t, x in pairs(mc.saved.mutes) do if self:mute_target(t) ~= x then self:qmute(t, x) end end
+end
+
+function ui:layout_live(add)
+  local lx, rx = 16, 16 + half_w + 16
+  add{ kind="card", x=lx, y=LV_Y, w=half_w, h=H - 12 - LV_Y }
+  add{ kind="card", x=rx, y=LV_Y, w=half_w, h=H - 12 - LV_Y }
+  -- mutes: when they land
+  add{ kind="text", x=24, y=89, w=90, h=12, label="mutes land", size=11 }
+  local q = math.floor(self.v["ockm-mute-quant"] or 0)
+  local qw = (458 - 116 - 12) / 3
+  for i, o in ipairs(QUANT) do
+    add{ kind="choice", x=116 + (i - 1) * (qw + 6), y=80, w=qw, h=34, label=o[2], small=true, sel=(q == o[1]),
+         tap=function() self.v["ockm-mute-quant"] = o[1]; pd.send("ockm-mute-quant", "float", { o[1] }) end }
+  end
+  -- a tile per track: tap anywhere to mute or bring it back; S in the corner
+  for n = 1, 12 do
+    local x, y = live_tile(n)
+    if n <= 11 then
+      local t = TRACKS[n]
+      add{ kind="mtile", x=x, y=y, w=LV_COL_W, h=LV_ROW_H, track=t, label=self:track_name(n),
+           tap=function() self:qmute(t, (self:mute_target(t) > 0) and 0 or 1) end }
+      add{ kind="ms", x=x + LV_COL_W - 40, y=y + LV_ROW_H - 36, w=34, h=30, label="S", hook="ockm-"..t.."-solo" }
+    else
+      add{ kind="mtile", x=x, y=y, w=LV_COL_W, h=LV_ROW_H, group=SYNTHS, label="all synths", tap=function()
+        local any = false
+        for _, p in ipairs(SYNTHS) do if self:mute_target(p) == 0 then any = true end end
+        for _, p in ipairs(SYNTHS) do if self:mute_target(p) ~= (any and 1 or 0) then self:qmute(p, any and 1 or 0) end end
+      end }
+    end
+  end
+  -- scenes
+  local kicks = self:kick_slots()
+  local SC = { { "drums only", function(t) return t:match("^d%d") ~= nil end },
+               { "no drums", function(t) return t:match("^d%d") == nil end },
+               { "kick + bass", function(t) return kicks[t] or t == "bass" end },
+               { "all in", function() return true end } }
+  local sw = (436 - 18) / 4
+  for i, sc in ipairs(SC) do
+    add{ kind="btn", x=22 + (i - 1) * (sw + 6), y=530, w=sw, h=52, small=true, label=sc[1], tap=function() self:scene(sc[2]) end }
+  end
+  -- master effects, big
+  local mx, iw = rx + 6, half_w - 12
+  local mw = (iw - 18) / 4
+  local rise = (self.v["ockm-rise"] or 0) > 0
+  local pump = self.v["ockm-pump"] or 0
+  add{ kind="choice", x=mx, y=80, w=mw, h=52, label="rise", sel=rise, accent=true, tap=function() self:send("ockm-rise", rise and 0 or 1) end }
+  add{ kind="choice", x=mx + (mw + 6), y=80, w=mw, h=52, label=(pump <= 0) and "pump" or ((pump < 0.75) and "pump ·" or "pump ··"), sel=(pump > 0), accent=true,
+       tap=function() self:send("ockm-pump", (pump <= 0) and 0.5 or ((pump < 0.75) and 1 or 0)) end }
+  add{ kind="pad", x=mx + 2 * (mw + 6), y=80, w=mw, h=52, hook="ockm-drop", label="drop", sub="hold" }
+  add{ kind="pad", x=mx + 3 * (mw + 6), y=80, w=mw, h=52, hook="ockm-delay-throw", label="throw", sub="hold" }
+  local hold = self.filter_hold
+  add{ kind="hbar", x=mx, y=140, w=iw, h=150, hook="ockm-filter", lo=-1, hi=1, label=hold and "filter (held)" or "filter", bold=true, spring=not hold }
+  add{ kind="choice", x=mx + iw - 64, y=148, w=56, h=30, label="hold", small=true, onbar=true, sel=hold, tap=function()
+    self.filter_hold = not hold
+    if hold then self:filter_spring() end
+  end }
+  local hw = (iw - 6) / 2
+  add{ kind="hbar", x=mx, y=298, w=hw, h=56, hook="ockm-drive", lo=0, hi=1, label="drive", bold=true }
+  add{ kind="hbar", x=mx + hw + 6, y=298, w=hw, h=56, hook="ockm-volume", lo=0, hi=1, label="volume", bold=true }
+  local ROW2 = { { "ockm-delay-mix", 0, 1, "delay" }, { "ockm-delay-fb", 0, 0.9, "feedback" }, { "ockm-delay-steps", 1, 8, "time" },
+                 { "ockm-verb-mix", 0, 1, "reverb" }, { "ockm-verb-size", 0, 1, "size" } }
+  local w5 = (iw - 24) / 5
+  for i, m in ipairs(ROW2) do
+    add{ kind="hbar", x=mx + (i - 1) * (w5 + 6), y=362, w=w5, h=56, hook=m[1], lo=m[2], hi=m[3], label=m[4], bold=true }
+  end
+  local w3 = (iw - 12) / 3
+  for i, m in ipairs(MACROS) do
+    add{ kind="hold", x=mx + (i - 1) * (w3 + 6), y=426, w=w3, h=156, label=m.name, sub=m.sub, on=(self.macro and self.macro.i == i),
+         down=function() self:macro_down(i) end, up=function() self:macro_up() end }
+  end
+end
+
+-- is a track playing a note on this step (and can it be heard)? For the lights on live
+function ui:track_sounding(n)
+  local t = TRACKS[n]
+  if self:silent(t) then return false end
+  if n <= 8 then return self:get("ockm-pat-"..t, self.step % self:plen("drum")) > 0 end
+  return self:part_sounding(t)
 end
 
 function ui:open(screen)
@@ -1834,7 +1992,7 @@ function ui:hit(x, y)
   for k = #L, 1, -1 do
     local w = L[k]
     if inside(w, x, y) and (w.tap or w.swipe or w.kind == "slider" or w.kind == "bpm" or w.kind == "vfader" or w.kind == "hbar" or w.kind == "ms"
-       or w.kind == "dstep" or w.kind == "mstep" or w.kind == "cstep" or w.kind == "pad" or w.kind == "vlane") then return w end
+       or w.kind == "dstep" or w.kind == "mstep" or w.kind == "cstep" or w.kind == "pad" or w.kind == "vlane" or w.kind == "hold") then return w end
   end
   return nil
 end
@@ -1844,6 +2002,7 @@ function ui:press(x, y)
   self.touch = { w = w, x0 = x, y0 = y, mode = nil }
   if not w then return end
   if w.kind == "pad" then self.touch.mode = "pad"; self.pad_on = w.hook; psend(w.hook, "float", { 1 })
+  elseif w.kind == "hold" then self.touch.mode = "hold"; w.down()
   elseif w.kind == "slider" or w.kind == "vfader" or w.kind == "hbar" then self.touch.mode = "slider"; self:slide(w, x, y)
   elseif w.kind == "bpm" then self.touch.v0 = self.v["ockm-bpm"] or 124
   elseif w.kind == "vlane" then self.touch.mode = "vlane"; self:lane_set(w, x, y)
@@ -1922,6 +2081,7 @@ function ui:release(x, y)
   local w = t.w
   if t.mode == "pad" then
     self.pad_on = nil; psend(w.hook, "float", { 0 })
+  elseif t.mode == "hold" then w.up()
   elseif t.mode == "slider" and w.spring then
     self:filter_spring()     -- let go: snap back to off
   elseif t.mode == "swipe" then
@@ -1992,6 +2152,11 @@ function ui:paint_layer_2(g)
         g:fill_rounded_rect(x + 10, PART_Y + PART_H / 2 - 5, 10, 10, 5)
       end
     end
+  elseif self.screen == "live" then
+    self:col(g, "acc")
+    for n = 1, 11 do
+      if self:track_sounding(n) then local x, y = live_tile(n); g:fill_rounded_rect(x + 10, y + 14, 10, 10, 5) end
+    end
   elseif (self.screen == "drums" or self.screen == "synth") and self:play_block() == self.page then
     -- under the step pads, over the beat marks
     local y = (self.screen == "drums") and (D_STEP_Y + D_STEP_H + 3) or (S_STEP_Y + S_STEP_H + 3)
@@ -2029,7 +2194,7 @@ function ui:draw(g, w)
     self:ctext(g, w.label, w, w.small and 12 or 14, w.accent and "#ffffff" or (w.quiet and "mute" or "txt"))
   elseif k == "tab" then
     self:col(g, w.sel and "on" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
-    self:ctext(g, w.label, w, 14, w.sel and "bg" or "txt")
+    self:ctext(g, w.label, w, 13, w.sel and "bg" or "txt")
   elseif k == "play" then
     local on = self.playing ~= 0
     self:col(g, on and "acc" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
@@ -2054,6 +2219,35 @@ function ui:draw(g, w)
     local sel = w.sel
     self:col(g, sel and (w.accent and "acc" or "on") or (w.onbar and "dim" or "off")); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
     self:ctext(g, w.label, w, w.small and 11 or 13, sel and (w.accent and "#ffffff" or "bg") or (w.disabled and "mute" or "txt"))
+  elseif k == "hold" then
+    if w.on then self:col(g, "acc"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 8)
+    else self:col(g, "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 8); self:col(g, "acc"); g:stroke_rounded_rect(w.x + 1, w.y + 1, w.w - 2, w.h - 2, 8, 2) end
+    self:ctext(g, w.label, { x=w.x, y=w.y + w.h / 2 - 20, w=w.w, h=20 }, 17, w.on and "#ffffff" or "txt")
+    self:ctext(g, w.sub or "", { x=w.x, y=w.y + w.h / 2 + 6, w=w.w, h=14 }, 10, w.on and "#ffffff" or "mute")
+  elseif k == "mtile" then
+    -- a track on live: bright while it plays, dark when muted, an orange outline while a change waits for the beat or bar
+    local muted, armed, txt
+    if w.group then
+      muted = true
+      for _, p in ipairs(w.group) do if self:mute_target(p) == 0 then muted = false end end
+      txt = muted and "all muted" or "tap to mute all"
+    else
+      local p = self:pending(w.track)
+      muted = (self.v["ockm-"..w.track.."-mute"] or 0) > 0
+      armed = p ~= nil
+      local q = math.floor(self.v["ockm-mute-quant"] or 0)
+      local when = (q == 1) and "beat" or "bar"
+      if armed then txt = (p > 0 and "out on " or "in on ") .. when
+      elseif muted then txt = "muted"
+      elseif self:silent(w.track) then txt = "not soloed"
+      else txt = "playing" end
+    end
+    self:col(g, muted and "card" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 8)
+    if muted then self:col(g, "dim"); g:stroke_rounded_rect(w.x + 1, w.y + 1, w.w - 2, w.h - 2, 8, 1.5) end
+    if armed then self:col(g, "acc"); g:stroke_rounded_rect(w.x + 1.5, w.y + 1.5, w.w - 3, w.h - 3, 8, 3) end
+    if not w.group then self:col(g, "dim"); g:fill_rounded_rect(w.x + 10, w.y + 14, 10, 10, 5) end
+    self:text(g, w.label, w.x + (w.group and 10 or 26), w.y + 10, 14, muted and "mute" or "txt", w.w - 30)
+    self:text(g, txt, w.x + 10, w.y + w.h - 26, 10, armed and "acc" or "mute", w.w - 50)
   elseif k == "partbtn" then
     self:col(g, w.sel and "on" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
     self:col(g, "dim"); g:fill_rounded_rect(w.x + 10, w.y + w.h / 2 - 5, 10, 10, 5)

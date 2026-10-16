@@ -696,8 +696,10 @@ zmul=p.add("#X msg 810 380 0;"); onef=p.add("#X msg 760 380 1;")
 tcur=p.add("#X obj 560 360 t f f;"); cur=p.add("#X obj 740 140 f;"); sld=p.add("#X obj 560 385 s ockm-load;")
 tsv=p.add("#X obj 740 85 t b b;"); sstore=p.add("#X obj 740 170 s ockm-do-save;")
 tbar=p.add("#X obj 400 220 t b b;"); sbar=p.add("#X obj 330 245 s ockm-bar;")   # every bar start, after any pattern switch
+bm4=p.add("#X obj 470 200 mod 4;"); sb4=p.add("#X obj 470 220 sel 0;"); sbt=p.add("#X obj 470 245 s ockm-beat;")   # every beat, before its hits
+p.con(bm4,0,sb4,0); p.con(sb4,0,sbt,0)
 for c in [(rw,0,tbf,0),(tbf,1,pend,1),(tbf,0,tbb,0),(tbb,1,one,0),(one,0,flag,1),(tbb,0,spg,0),(spg,0,tbb2,0),(tbb2,1,zero,0),(zero,0,flag,1),(tbb2,0,pend,0),
-    (ttg,2,eqz,0),(eqz,0,spg,1),(tff,1,bm,0),(bm,0,s0,0),(s0,0,tbar,0),(tbar,1,flag,0),(tbar,0,sbar,0),(flag,0,s1,0),(s1,0,tbb3,0),
+    (ttg,2,eqz,0),(eqz,0,spg,1),(tff,1,bm,0),(bm,0,bm4,0),(bm,0,s0,0),(s0,0,tbar,0),(tbar,1,flag,0),(tbar,0,sbar,0),(flag,0,s1,0),(s1,0,tbb3,0),
     (tbb3,3,zero2,0),(zero2,0,flag,1),(tbb3,2,zmul,0),(zmul,0,mz,1),(tbb3,1,onef,0),(onef,0,f,1),(tbb3,0,pend,0),
     (pend,0,tcur,0),(tcur,1,cur,1),(tcur,0,sld,0),(sv,0,tsv,0),(tsv,1,cur,0),(cur,0,sstore,0)]: p.con(*c)
 # pattern length (1-128) and editing page
@@ -741,6 +743,24 @@ rdb=p.add("#X obj 1850 300 r ockm-bar;"); rds=p.add("#X obj 1950 300 r ockm-play
 dchk=p.add("#X obj 1850 350 expr ockm_droppend;"); dsel2=p.add("#X obj 1850 375 sel 1;")
 dback=p.add("#X msg 1850 400 \\; ockm-gap 0;"); dclr=p.add("#X msg 1950 400 0;"); vdp2=p.add("#X obj 1950 425 v ockm_droppend;")
 dtb=p.add("#X obj 1850 375 t b b;")
+# mutes that land on the beat or the bar (live screen). ockm-mute-quant: 0 now, 1 next beat, 2 next bar.
+# ockm-<track>-mute-q 0/1 asks for a mute: straight away when stopped or 'now', otherwise held until the next beat or bar,
+# then sent as ockm-<track>-mute before that step's hits. Stopping lets anything waiting go at once.
+rmq=p.add("#X obj 2100 300 r ockm-mute-quant;"); vmq=p.add("#X obj 2100 325 v ockm_mq;"); p.con(rmq,0,vmq,0)
+rbt=p.add("#X obj 2250 300 r ockm-beat;"); xbt=p.add("#X obj 2250 325 expr ockm_mq==1;"); sbt1=p.add("#X obj 2250 350 sel 1;")
+rbr=p.add("#X obj 2350 300 r ockm-bar;"); xbr=p.add("#X obj 2350 325 expr ockm_mq>=1;"); sbr1=p.add("#X obj 2350 350 sel 1;")
+rps=p.add("#X obj 2450 300 r ockm-playing;"); sps=p.add("#X obj 2450 325 sel 0;")
+stk=p.add("#X obj 2250 380 s ockm-mute-tick;")
+for c in [(rbt,0,xbt,0),(xbt,0,sbt1,0),(sbt1,0,stk,0),(rbr,0,xbr,0),(xbr,0,sbr1,0),(sbr1,0,stk,0),(rps,0,sps,0),(sps,0,stk,0)]: p.con(*c)
+for _i,_t in enumerate([n for n,_ in SLOTS]+["bass","lead","chord"]):
+    x=2100+_i*120
+    rq=p.add(f"#X obj {x} 420 r ockm-{_t}-mute-q;"); tq=p.add(f"#X obj {x} 445 t f f;"); fq=p.add(f"#X obj {x+60} 520 f;")
+    now=p.add(f"#X obj {x} 470 expr if(ockm_playv>0 && ockm_mq>0 \\, -1 \\, {D}f1);"); mo=p.add(f"#X obj {x} 495 moses 0;")
+    one=p.add(f"#X msg {x} 520 1;"); vp=p.add(f"#X obj {x} 545 v ockm_{_t}_mqp;")
+    smt=p.add(f"#X obj {x} 600 s ockm-{_t}-mute;"); z=p.add(f"#X msg {x+40} 575 0;"); vp2=p.add(f"#X obj {x+40} 600 v ockm_{_t}_mqp;")
+    rt=p.add(f"#X obj {x} 625 r ockm-mute-tick;"); xp=p.add(f"#X obj {x} 650 expr ockm_{_t}_mqp;"); sp1=p.add(f"#X obj {x} 675 sel 1;"); tbb_=p.add(f"#X obj {x} 700 t b b;")
+    for c in [(rq,0,tq,0),(tq,1,fq,1),(tq,0,now,0),(now,0,mo,0),(mo,0,one,0),(one,0,vp,0),(mo,1,smt,0),(mo,1,z,0),(z,0,vp2,0),
+              (rt,0,xp,0),(xp,0,sp1,0),(sp1,0,tbb_,0),(tbb_,1,z,0),(tbb_,0,fq,0),(fq,0,smt,0)]: p.con(*c)
 for c in [(rdr,0,sdr,0),(sdr,0,don,0),(sdr,0,dclr,0),(sdr,1,dwait,0),(dwait,0,dsel,0),(dsel,0,dpend,0),(dpend,0,vdp,0),(dsel,1,dtb,0),
           (rdb,0,dchk,0),(rds,0,rds0,0),(rds0,0,dchk,0),(dchk,0,dsel2,0),(dsel2,0,dtb,0),(dtb,1,dclr,0),(dtb,0,dback,0),(dclr,0,vdp2,0)]: p.con(*c)
 # transition sounds into the mix (and a little reverb)

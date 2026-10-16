@@ -36,6 +36,16 @@ Tap a track's name on perform or the mixer to jump straight to it.
 - **Length** is in the navigation strip. Making the loop longer repeats what's there
 - **Save** and **project**, top right
 
+**Live** (perform 2: no steps, just mutes and effects, big enough for thumbs)
+- **A tile per track**, plus **all synths**. Tap anywhere on a tile to mute it or bring it back; **S** in its corner solos. The light flashes as the track plays
+- **Mutes land:** **now** (straight away, like an MPC's track mute), **next beat** or **next bar**. A change that's waiting gets an orange outline and says when it lands, so you can tap several and have them all switch together. Stopped, they land at once
+- **Scenes** along the bottom: drums only, no drums, kick + bass, all in. They clear any solos and go through the same timing
+- **Master effects:** rise, pump, drop and throw; a big filter with hold; drive and master volume; delay and reverb
+- **Macros** (hold to play; let go and everything goes back):
+  - **build:** the filter opens upwards over two bars, more reverb and delay, deep pump
+  - **wash:** big echo and reverb, longer tails, filter darker
+  - **strip:** everything but the kick and the bass drops out (with the mute timing above)
+
 **Drum** (one slot at a time)
 - The 8 slots along the top, named by the sound they play
 - **Sound**: 8 pads, one per drum sound
@@ -308,6 +318,8 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 | `ockm-bass-drive`, `ockm-lead-drive` | Distortion, 0 to 1 |
 | `ockm-filter` | Master DJ filter, -1 to 1. Below 0 cuts the top, above 0 cuts the bottom, 0 is off. Smoothed, so moves don't click |
 | `ockm-filter-glide <to> <ms>` | Glide the filter to a value, for example `0 50` to snap back to off |
+| `ockm-<track>-mute-q` | Ask for a mute (0 or 1) that lands on the next beat or bar, by `ockm-mute-quant` (0 now, 1 beat, 2 bar) |
+| `ockm-beat` | Sent by the engine on every beat, before that step's hits (like `ockm-bar`) |
 | `ockm-drop` | 1: nothing new plays (effects ring on). 0: everything comes back on the next bar (straight away when stopped) |
 | `ockm-filter-now` | Sent by the engine: where the filter actually is (what gets saved) |
 | `ockm-delay-throw` | 1 sends the whole mix into the throw echo line, 0 stops sending (the echoes ring out) |
