@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.58 (17 October 2026)
+
+- **New projects start everything at 1:** bass and lead notes and rhythms start on the first preset, like the chords. Settings > new projects can still start the lead as motif, call and answer, or arp
+
 ## v0.57 (17 October 2026)
 
 - **Drum lab:** a separate patch (`OCKM_DRUM_LAB.pd`) for designing claps and snares with far more control than the drums page: bursts, noise colours, tails and room for the clap; tuned body, pitch drop, wires and click for the snare. Play, loop against a kick, randomise around what you have, and render a hit straight into `samples/clap` or `samples/snare` as a WAV

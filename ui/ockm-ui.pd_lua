@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.57"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.58"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -867,7 +867,7 @@ local function default_settings()
   }
 end
 local SNAP_MS = { 50, 150, 400 }
-local NEW_LEAD = { { "hook", 8, 12 }, { "motif", 10, 15 }, { "call and answer", 11, 16 }, { "arp", 13, 18 } }   -- name, rhythm, notes
+local NEW_LEAD = { { "1 and 1", 0, 0 }, { "motif", 10, 15 }, { "call and answer", 11, 16 }, { "arp", 13, 18 } }   -- name, rhythm, notes (the first is how the engine starts)
 
 -- writing and reading the file: plain Lua, so it can be read back with no parser
 local function ser(v, ind)

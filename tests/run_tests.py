@@ -958,7 +958,7 @@ def synths_sit_at_similar_levels(work):
     def rms(x): return math.sqrt(sum(v * v for v in x) / max(1, len(x)))
     tracks = ["d1","d2","d3","d4","d5","d6","d7","d8","bass","lead","chord"]
     levels = {}
-    for part, setup, eng in [("bass", "ockm-bass-gen bang", None), ("chord", "ockm-chord-prog 3 ; ockm-chord-rhythm 4", 0),
+    for part, setup, eng in [("bass", "ockm-bass-rhythm 3 ; ockm-bass-notes 3", None),   # the acid riff: a busy, typical bass line ("chord", "ockm-chord-prog 3 ; ockm-chord-rhythm 4", 0),
                              ("chord", "ockm-chord-prog 3 ; ockm-chord-rhythm 4", 1), ("chord", "ockm-chord-prog 3 ; ockm-chord-rhythm 4", 2)]:
         h = Harness(); name = f"lv-{part}{eng}"; h.record(os.path.join(work, name + ".wav"))
         mutes = " ; ".join(f"ockm-{t}-mute {0 if t == part else 1}" for t in tracks)

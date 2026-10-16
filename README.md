@@ -93,7 +93,7 @@ Tap a track's name on Perform A or the mixer to jump straight to it.
 
 **Settings** (☰, or tap the tempo). Four sections:
 - **This project** (saved with it): tempo with -5, -1, +1, +5 and a slider, swing, how strong accents are, reverb tone, and MIDI clock: lead (send clock out) or follow (play to incoming clock). Dragging the tempo up or down in the top bar still changes it directly
-- **New projects:** how a new blank project starts: drums 1, 2 or 4 bars; synths 2, 4 or 8 bars; the lead as hook, motif, call and answer, or arp
+- **New projects:** how a new blank project starts: drums 1, 2 or 4 bars; synths 2, 4 or 8 bars; the lead on notes 1 and rhythm 1 (like everything else), or as motif, call and answer, or arp
 - **This device:** theme (dark or light), how fast the filter lets go (snap, quick, slow), and where Perform B's mutes start (now, next beat, next bar)
 - **Macros:** your six macros. Each is up to four moves: what (filter, delay, feedback, reverb, size, drive, pump, volume, rise, throw or a set of mutes), how much, how it gets there (jump, or over a beat, a bar, 2 or 4 bars) and how it lets go (snap back, glide back over a bar, or stay). Tap a box to step through its choices. Pick which slot it's on (A, B or C) and hold **try it** to hear it. Names come from a list (there's no keyboard on the Pi)
 
