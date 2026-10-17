@@ -906,7 +906,8 @@ def house(q,core,ks,out):
 engine("voices/ockm-mono-pluck.pd",4,"Pluck engine: short and bright. Good for rolling riffs",pluck)
 
 def sawe(q,core,ks,out):
-    # raw sawtooth: optional second detuned saw and sub saw, simple tone control, full-level notes that end hard
+    # raw sawtooth: optional second detuned saw and sub saw, tone control, full-level notes that end hard (k4 sets how long).
+    # v0.70: brighter by default and lightly saturated for weight
     mt=q.add("#X obj 30 200 mtof~;")
     p1=q.add("#X obj 30 240 phasor~;"); dt=q.add("#X obj 150 210 *~ 1;"); p2=q.add("#X obj 150 240 phasor~;")
     sb=q.add("#X obj 270 210 *~ 0.5;"); p3=q.add("#X obj 270 240 phasor~;")
@@ -914,17 +915,17 @@ def sawe(q,core,ks,out):
     m1=q.add("#X obj 30 300 +~;"); m2=q.add("#X obj 30 325 +~;")
     nm=q.add(f"#X obj 30 355 expr~ ({D}v1-0.5*(1+{D}f2+{D}f3))*2/(1+{D}f2+{D}f3);")
     lp1=q.add("#X obj 30 390 lop~ 20000;"); lp2=q.add("#X obj 30 415 lop~ 20000;")
-    ec=q.add("#X obj 450 300 *~ 4;"); cl=q.add("#X obj 450 330 clip~ 0 1;")
-    am=q.add("#X obj 30 450 *~;"); g=q.add("#X obj 30 480 *~ 0.6;")
-    k1=q.add(f"#X obj 200 140 expr 60*pow(2\\,8.4*{D}f1);")
-    k2=q.add(f"#X obj 310 140 expr 1+0.02*{D}f1 \; if({D}f1>0 \\, 0.7 \\, 0);")
+    am=q.add(f"#X obj 30 450 expr~ tanh(1.8*{D}v1*min(1\\, max(0\\, {D}v2*4)))/tanh(1.8);")
+    g=q.add("#X obj 30 480 *~ 0.62;")
+    k1=q.add(f"#X obj 200 140 expr 737*pow(2\\,4.76*{D}f1);")
+    k2=q.add(f"#X obj 310 140 expr 1+0.02*{D}f1 \\; if({D}f1>0 \\, 0.7 \\, 0);")
     k3=q.add("#X obj 420 170 * 0.8;")
     for c in [(core,0,mt,0),(mt,0,p1,0),(mt,0,dt,0),(dt,0,p2,0),(mt,0,sb,0),(sb,0,p3,0),(p2,0,g2,0),(p3,0,g3,0),
               (p1,0,m1,0),(g2,0,m1,1),(m1,0,m2,0),(g3,0,m2,1),(m2,0,nm,0),(nm,0,lp1,0),(lp1,0,lp2,0),
-              (core,1,ec,0),(ec,0,cl,0),(lp2,0,am,0),(cl,0,am,1),(am,0,g,0),(g,0,out,0),
+              (lp2,0,am,0),(core,1,am,1),(am,0,g,0),(g,0,out,0),
               (ks[0],0,k1,0),(k1,0,lp1,1),(k1,0,lp2,1),(ks[1],0,k2,0),(k2,0,dt,1),(k2,1,g2,1),(k2,1,nm,1),
               (ks[2],0,k3,0),(k3,0,g3,1),(k3,0,nm,2)]: q.con(*c)
-    q.add("#X text 200 110 k1 tone (1 = fully raw) / k2 second saw detune (0 = single saw) / k3 sub saw an octave down / k4 note length. Notes play at full level then stop hard.;")
+    q.add("#X text 200 110 k1 tone (dark to fully raw \\, bright by default) / k2 second saw detune (0 = single saw) / k3 sub saw an octave down / k4 note length. Notes play at full level then stop hard \\, lightly saturated.;")
 
 engine("voices/ockm-mono-house.pd",6,"House engine: clean square plus a sub sine through a warm filter with a short pluck. Deep house and garage",house)
 engine("voices/ockm-mono-saw.pd",5,"Saw engine: a raw sawtooth. No squelch \\, just a hard buzzy bass",sawe)

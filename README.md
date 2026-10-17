@@ -419,6 +419,7 @@ The synth sounds are the drum lab's voices, each slot running its own copy, so t
 - **Morph:** walks a smooth path through nearby sounds. Random and wild pick a new path and put morph back to 0
 - **Random** shifts the sound a little from where it starts; **wild** goes anywhere. **Reset** goes back to the starting sound
 - These sit above the sliders and grey out while the slot plays a sample. While stopped, moving any slider plays the sound
+- Under the sliders: this drum's **reverb** and **delay** sends (the same as on the mixer)
 - **Save** (the disc next to the sound box) keeps the sound as one of yours, named like "kick 1", in `my-settings.lua`, so every project can use it. The arrows step through the synth, your saved sounds, then samples. On a saved sound the disc becomes a bin, to delete it. Perc slots share rim, conga and shaker sounds; closed and open hats share hat sounds
 
 All of it is saved with the project as seeds and slider positions, so a project always gets the same sound back.
@@ -441,7 +442,7 @@ The bass has seven engines. Only the chosen engine runs, so the others cost no p
 | 2 FM | brightness | ratio | envelope on brightness | Punchy, metallic, plucky |
 | 3 reese | cutoff | detune (width) | envelope amount | Dark and wide |
 | 4 pluck | brightness | saw to square | filter snap | Rings out and fades over the decay time, with a sub an octave down. Ignores the short 303-style note length |
-| 5 saw | tone (1 = fully raw) | second saw detune (0 = single saw) | sub saw an octave down | Hard and buzzy. Notes play at full level for the decay time, then stop |
+| 5 saw | tone (dark to fully raw; bright by default) | second saw detune (0 = single saw) | sub saw an octave down | Hard and buzzy, lightly saturated. Notes play at full level for the decay time, then stop |
 | 6 house | tone | body (sub sine an octave down) | pluck (filter snap) | Deep house and garage: a clean square and a sub sine through a warm filter |
 
 The drive comes after the engine, so it works on all of them. At 0 it's completely clean; it only colours the sound as you turn it up. The bass starts on acid.

@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.69"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.70"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -1355,36 +1355,38 @@ function ui:layout_drums(add)
   local pos = self:drum_pos(slot)
   local ns = self:synth_count(slot)
   local sname = self:synth_name(slot)
-  add{ kind="text", x=16, y=346, w=half, h=12, size=10,
-       label="sound: tap to hear it, arrows to change (the synth, your saved sounds, then samples)" }
   -- the sound box: arrows either side, then save (your own sound) or, on one of your saved sounds, delete
   local cur = self:current_preset(slot)
   local nps = #self:presets_for(slot)
   local last = ns + nps + cnt - 1
   local bw = 260
-  add{ kind="arrow", x=16, y=362, w=44, h=36, dir=-1, on=(pos > 0), tap=function() if pos > 0 then self:set_drum_pos(slot, pos - 1) end end }
-  add{ kind="preset", x=66, y=362, w=bw, h=36, inline=true, sel=(smp > 0),
+  add{ kind="arrow", x=16, y=346, w=44, h=36, dir=-1, on=(pos > 0), tap=function() if pos > 0 then self:set_drum_pos(slot, pos - 1) end end }
+  add{ kind="preset", x=66, y=346, w=bw, h=36, inline=true, sel=(smp > 0),
        num=(smp > 0) and string.format("%02d", smp) or (cur and "mine" or "synth"),
        label=(smp > 0) and ("of " .. cnt .. "  " .. folder) or (cur and self.me.sounds[cur].name or sname),
        tap=function() self:audition(slot) end }
-  add{ kind="arrow", x=66 + bw + 6, y=362, w=44, h=36, dir=1, on=(pos < last), tap=function() if pos < last then self:set_drum_pos(slot, pos + 1) end end }
+  add{ kind="arrow", x=66 + bw + 6, y=346, w=44, h=36, dir=1, on=(pos < last), tap=function() if pos < last then self:set_drum_pos(slot, pos + 1) end end }
   if cur then
-    add{ kind="bin", x=66 + bw + 56, y=362, w=44, h=36, lit=(self.flashing == "save"), tap=function() self:delete_sound(cur) end }
+    add{ kind="bin", x=66 + bw + 56, y=346, w=44, h=36, lit=(self.flashing == "save"), tap=function() self:delete_sound(cur) end }
   else
-    add{ kind="disc", x=66 + bw + 56, y=362, w=44, h=36, lit=(self.flashing == "save"), off=(smp > 0) or nil, tap=function() self:save_sound(slot) end }
+    add{ kind="disc", x=66 + bw + 56, y=346, w=44, h=36, lit=(self.flashing == "save"), off=(smp > 0) or nil, tap=function() self:save_sound(slot) end }
   end
   -- the synth's shape: character (its lab recipe) and morph sweep several settings at once; randomise and reset.
   -- Greyed out while the slot plays a sample
   local off = (smp > 0) or nil
-  local y = 404
+  local y = 388
   add{ kind="hbar", x=16, y=y, w=128, h=30, hook="ockm-"..nm.."-labchar", lo=-1, hi=1, label=off and "character" or (LAB_CHAR[sname] or "character"), bold=true, off=off, preview=slot }
   add{ kind="hbar", x=150, y=y, w=110, h=30, hook="ockm-"..nm.."-labmorph", lo=0, hi=1, label="morph", bold=true, off=off, preview=slot }
   add{ kind="btn", x=266, y=y, w=70, h=30, small=true, label="random", off=off, flash="random", tap=function() self:lab_random(slot, 0.35) end }
   add{ kind="btn", x=342, y=y, w=56, h=30, small=true, label="wild", off=off, flash="wild", tap=function() self:lab_random(slot, 1) end }
   add{ kind="btn", x=404, y=y, w=half - 388, h=30, small=true, quiet=true, label="reset", off=off, flash="reset", tap=function() self:lab_reset(slot) end }
   for j, p in ipairs((smp > 0) and SAMPLE_SLIDERS or SYNTH_SLIDERS) do
-    add{ kind="slider", x=16, y=442 + (j - 1) * 29, w=half, h=25, hook="ockm-"..nm.."-"..p[1], lo=p[2], hi=p[3], label=p[4] or p[1], preview=slot }
+    add{ kind="slider", x=16, y=424 + (j - 1) * 27, w=half, h=24, hook="ockm-"..nm.."-"..p[1], lo=p[2], hi=p[3], label=p[4] or p[1], preview=slot }
   end
+  -- this drum's reverb and delay sends (the same as on the mixer)
+  local sw = (half - 6) / 2
+  add{ kind="hbar", x=16, y=562, w=sw, h=30, hook="ockm-"..nm.."-verb", lo=0, hi=1, label="reverb", bold=true, preview=slot }
+  add{ kind="hbar", x=16 + sw + 6, y=562, w=sw, h=30, hook="ockm-"..nm.."-delay", lo=0, hi=1, label="delay", bold=true, preview=slot }
   local gx = 16 + half + 16
   -- grooves, in banks of 12 (plus clear)
   local cur = math.floor(self.v["ockm-drum-groove"] or -1)

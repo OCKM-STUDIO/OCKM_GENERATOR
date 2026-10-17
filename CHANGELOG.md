@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.70 (17 October 2026)
+
+- **Saw bass earns its slot:** brighter by default (the tone knob was starting it dark), lightly saturated for weight, and level-matched to the other bass engines
+- **Reverb and delay on the drums tab** for each drum, under its sliders (the same sends as on the mixer). While stopped, moving them plays the drum
+
 ## v0.69 (17 October 2026)
 
 - **New projects start dry:** every reverb and delay send (drums, bass, lead, chords) starts at 0. Your saved projects keep theirs

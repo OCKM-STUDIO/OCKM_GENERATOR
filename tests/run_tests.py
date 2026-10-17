@@ -1729,10 +1729,10 @@ def touchscreen_picks_samples_and_kits(work):
     write_tone(os.path.join(kd, "01.wav"), 110, 0.2); write_tone(os.path.join(kd, "02.wav"), 220, 0.2)
     h = Harness(); h.show("ockm-d1-sample", "ockm-d1-audition")
     h.at(100, "ockm-ui-test tap 539 36")      # drums tab: counts the folders
-    h.at(400, "ockm-ui-test tap 354 380")     # the synth kick -> sample 1
-    h.at(500, "ockm-ui-test tap 354 380")     # 2
-    h.at(700, "ockm-ui-test tap 354 380")     # only 2 kicks: stays put
-    h.at(900, "ockm-ui-test tap 200 380")     # tap the box: hear it
+    h.at(400, "ockm-ui-test tap 354 364")     # the synth kick -> sample 1
+    h.at(500, "ockm-ui-test tap 354 364")     # 2
+    h.at(700, "ockm-ui-test tap 354 364")     # only 2 kicks: stays put
+    h.at(900, "ockm-ui-test tap 200 364")     # tap the box: hear it
     f = os.path.join(work, "t_samples_ui.pd"); h.finish(1300, f)
     out = run(work, f)
     d1 = [int(float(v)) for v in printed(out, "ockm-d1-sample")]
@@ -1748,14 +1748,14 @@ def touchscreen_saves_drum_sounds(work):
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness(); h.show("ockm-d1-labrseed", "ockm-d1-labmorph", "ockm-d1-tune")
     h.at(100, "ockm-ui-test tap 539 36 ; ockm-d1-sample 0 ; ockm-d1-labrseed 4242 ; ockm-d1-labramt 0.35 ; ockm-d1-tune 3")
-    h.at(300, "ockm-ui-test tap 404 380")     # save: kick 1
+    h.at(300, "ockm-ui-test tap 404 364")     # save: kick 1
     h.at(400, "ockm-d1-labrseed 0 ; ockm-d1-labramt 0 ; ockm-d1-tune 0")
-    h.at(500, "ockm-ui-test tap 354 380")     # arrow right: kick 1
+    h.at(500, "ockm-ui-test tap 354 364")     # arrow right: kick 1
     h.at(600, "ockm-ui-test dump")
-    h.at(700, "ockm-ui-test tap 404 380")     # on kick 1 the icon is delete
+    h.at(700, "ockm-ui-test tap 404 364")     # on kick 1 the icon is delete
     h.at(800, "ockm-ui-test dump")
     h.at(900, "ockm-d1-labmorph 0.6")
-    h.at(1000, "ockm-ui-test tap 301 419")    # random: morph goes back to 0
+    h.at(1000, "ockm-ui-test tap 301 403")    # random: morph goes back to 0
     f = os.path.join(work, "t_save_sound.pd"); h.finish(1200, f)
     out = run(work, f)
     seeds = [int(float(v)) for v in printed(out, "ockm-d1-labrseed")]
@@ -1773,9 +1773,9 @@ def touchscreen_drum_synth_random_and_reset(work):
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness(); h.show("ockm-d1-labrseed", "ockm-d1-labramt", "ockm-d1-labchar")
     h.at(100, "ockm-ui-test tap 539 36 ; ockm-d1-sample 0 ; ockm-d1-labchar 0.5")
-    h.at(300, "ockm-ui-test tap 301 419")     # random
-    h.at(500, "ockm-ui-test tap 370 419")     # wild
-    h.at(700, "ockm-ui-test tap 438 419")     # reset
+    h.at(300, "ockm-ui-test tap 301 403")     # random
+    h.at(500, "ockm-ui-test tap 370 403")     # wild
+    h.at(700, "ockm-ui-test tap 438 403")     # reset
     f = os.path.join(work, "t_labui.pd"); h.finish(900, f)
     out = run(work, f)
     seeds = [int(float(v)) for v in printed(out, "ockm-d1-labrseed")]
@@ -1792,9 +1792,9 @@ def touchscreen_drum_slider_previews_when_stopped(work):
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness(); h.show("ockm-d1-audition", "ockm-d1-labrseed")
     h.at(100, "ockm-ui-test tap 539 36 ; ockm-d1-sample 0")
-    h.at(300, "ockm-ui-test drag 200 519 360 519")       # drag the decay slider
+    h.at(300, "ockm-ui-test drag 200 490 360 490")       # drag the decay slider
     h.at(800, "ockm-d1-sample 1")
-    h.at(900, "ockm-ui-test tap 301 419")                # random, greyed out: nothing
+    h.at(900, "ockm-ui-test tap 301 403")                # random, greyed out: nothing
     f = os.path.join(work, "t_preview.pd"); h.finish(1200, f)
     out = run(work, f)
     aud = printed(out, "ockm-d1-audition")
