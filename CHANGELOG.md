@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.63 (17 October 2026)
+
+- **Drum lab: character and morph.** Every sound gets a named character slider (punch, crack, room, metal, boom, slap, wood, shake) that moves a recipe of settings, and a morph slider that walks a smooth path through nearby sounds, TR-8S style. New path, and keep to make the result your sound
+
 ## v0.62 (17 October 2026)
 
 - **Drum lab: the full kit.** Kick, toms (a low, mid and high set), congas (low and high), rim and shaker join the clap, snare and hats. Each renders into the right samples folder; sets render as matching files. The loop plays the whole kit together

@@ -13,6 +13,9 @@ local KIT = {
   shaker = { params = { { "tone", 3000, 12000, 7000 }, { "focus", 0.4, 3, 1 }, { "lowcut", 1000, 8000, 3000 }, { "attack", 1, 40, 8 }, { "decay", 15, 250, 70 }, { "grit", 0, 1, 0.3 }, { "drive", 0, 1, 0.2 }, { "level", 0, 1, 0.75 } }, folder = "perc", variants = {  } }
 }
 local TUNED = { kick = true, tom = true, conga = true, rim = true }
+local CHARACTER = { clap = { name = "room", w = { tail = 0.6, room = 0.7, jitter = 0.4, tailtone = -0.4, bdecay = 0.2 } }, snare = { name = "crack", w = { wires = 0.4, wdecay = 0.3, bodydec = -0.4, click = 0.6, drive = 0.4, mix = 0.4 } }, hat = { name = "metal", w = { ring = 0.7, focus = 0.5, bright = -0.4, tone = -0.2 } }, kick = { name = "punch", w = { sweep = 0.5, sweeptime = -0.5, noise = 0.6, decay = -0.3, drive = 0.3 } }, tom = { name = "boom", w = { pitch = -0.4, decay = 0.5, sweep = 0.4, noise = -0.4 } }, conga = { name = "slap", w = { noise = 0.6, ntone = 0.4, decay = -0.3, second = 0.4 } }, rim = { name = "wood", w = { ratio = -0.6, decay = 0.4, noise = -0.4, pitch = -0.2 } }, shaker = { name = "shake", w = { attack = 0.5, decay = 0.5, grit = 0.6, tone = -0.2 } } }
+local MORPH_SCALE = { level = 0, pitch = 0.2, ratio = 0.25, bursts = 0.3, drive = 0.3, sweep = 0.3 }
+local MORPH_POINTS = 4
 
 function lab:initialize(sel, atoms)
   self.inlets, self.outlets = 1, 0
@@ -24,6 +27,12 @@ function lab:initialize(sel, atoms)
   end
   self.beat = 0
   math.randomseed(os.time())
+  self.home, self.char, self.morph, self.path = {}, {}, {}, {}
+  for which in pairs(KIT) do
+    self.home[which] = {}; for n, x in pairs(self.v[which]) do self.home[which][n] = x end
+    self.char[which], self.morph[which] = 0, 0
+    self:new_path(which)
+  end
   return true
 end
 
@@ -36,13 +45,22 @@ function lab:postinitialize()
   end
   for which, k in pairs(KIT) do
     for _, p in ipairs(k.params) do
-      listen("lab-" .. which .. "-" .. p[1], function(o, sel, a) local x = tonumber(a[1]); if x then o.v[which][p[1]] = x end end)
+      -- a setting moved by hand becomes part of the sound (as if you'd pressed keep)
+      listen("lab-" .. which .. "-" .. p[1], function(o, sel, a)
+        local x = tonumber(a[1]); if not x then return end
+        o.v[which][p[1]] = x
+        if not o.applying then o:keep(which, true) end
+      end)
     end
     listen("lab-" .. which .. "-play", function(o) o:play(which, 1) end)
     for i, var in ipairs(k.variants) do listen("lab-" .. which .. "-play-" .. var[1], function(o) o:play(which, i) end) end
     listen("lab-" .. which .. "-render", function(o) o:render(which) end)
     listen("lab-" .. which .. "-loop", function(o, sel, a) o.loop[which] = (tonumber(a[1]) or 0) > 0; o:loop_check() end)
     listen("lab-" .. which .. "-reset", function(o) o:reset(which) end)
+    listen("lab-" .. which .. "-char", function(o, sel, a) o.char[which] = tonumber(a[1]) or 0; o:apply(which) end)
+    listen("lab-" .. which .. "-morph", function(o, sel, a) o.morph[which] = tonumber(a[1]) or 0; o:apply(which) end)
+    listen("lab-" .. which .. "-newpath", function(o) o:new_path(which); o:apply(which); o:play(which, 1); o:status(which .. ": a new morph path") end)
+    listen("lab-" .. which .. "-keep", function(o) o:keep(which); o:status(which .. ": kept, this is the sound now") end)
     for name, amt in pairs({ small = 0.12, medium = 0.35, wild = 1 }) do
       listen("lab-" .. which .. "-rand-" .. name, function(o) o:randomise(which, amt) end)
     end
@@ -65,11 +83,57 @@ function lab:push_all()
 end
 function lab:set(which, name, x)
   self.v[which][name] = x
+  self.applying = true                               -- (the slider echoes it back: not a change by hand)
   pd.send("lab-" .. which .. "-" .. name .. "-ui", "float", { x })
+  self.applying = false
 end
 function lab:reset(which)
   for _, p in ipairs(KIT[which].params) do self:set(which, p[1], p[4]) end
+  self:keep(which)
   self:status(which .. ": back to the starting sound")
+end
+
+-- the two macro sliders. Home is the sound with both at zero; character moves its recipe of settings (either way);
+-- morph walks a smooth, fixed path through nearby sounds (further along, further from home)
+function lab:new_path(which)
+  local pts = { {} }
+  for _, p in ipairs(KIT[which].params) do pts[1][p[1]] = 0 end
+  for k = 2, MORPH_POINTS + 1 do
+    pts[k] = {}
+    for _, p in ipairs(KIT[which].params) do
+      local sc = MORPH_SCALE[p[1]] or 0.45
+      pts[k][p[1]] = (math.random() * 2 - 1) * sc * (p[3] - p[2]) * math.min(1, k / 2.5)
+    end
+  end
+  self.path[which] = pts
+end
+function lab:morph_offset(which, name)
+  local m = self.morph[which] or 0
+  if m <= 0 then return 0 end
+  local pos = math.min(m, 0.9999) * MORPH_POINTS
+  local i = math.floor(pos); local t = pos - i; t = t * t * (3 - 2 * t)
+  local pts = self.path[which]
+  return pts[i + 1][name] * (1 - t) + pts[i + 2][name] * t
+end
+function lab:apply(which)
+  local ch = CHARACTER[which]
+  for _, p in ipairs(KIT[which].params) do
+    local name, lo, hi = p[1], p[2], p[3]
+    local x = self.home[which][name]
+    if ch and ch.w[name] then x = x + (self.char[which] or 0) * ch.w[name] * (hi - lo) end
+    x = x + self:morph_offset(which, name)
+    x = math.max(lo, math.min(hi, x))
+    if name == "bursts" then x = math.floor(x + 0.5) end
+    if math.abs(x - self.v[which][name]) > 1e-9 then self:set(which, name, x) end
+  end
+end
+-- keep: the sound as it is becomes home, and both sliders go back to zero (the sound doesn't change)
+function lab:keep(which, quiet)
+  for n, x in pairs(self.v[which]) do self.home[which][n] = x end
+  self.char[which], self.morph[which] = 0, 0
+  self.applying = true
+  pd.send("lab-" .. which .. "-char-ui", "float", { 0 }); pd.send("lab-" .. which .. "-morph-ui", "float", { 0 })
+  self.applying = false
 end
 
 local function seg(name, target, time, delay) pd.send(name, "list", { target, time, delay }) end
@@ -130,6 +194,7 @@ function lab:randomise(which, amt)
       self:set(which, name, x)
     end
   end
+  self:keep(which)
   self:play(which, 1)
   self:status(which .. ": randomised (" .. ((amt >= 1) and "wild" or ((amt > 0.2) and "medium" or "small")) .. ")")
 end
@@ -205,6 +270,11 @@ function lab:status(s) pd.send("lab-status", "symbol", { s }) end
 -- headless tests
 function lab:test(sel, a)
   if sel == "set" then self:set(tostring(a[1]), tostring(a[2]), tonumber(a[3]))
+  elseif sel == "char" or sel == "morph" then
+    local which, x = tostring(a[1]), tonumber(a[2]) or 0
+    if sel == "char" then self.char[which] = x else self.morph[which] = x end
+    self:apply(which)
+  elseif sel == "keep" then self:keep(tostring(a[1]))
   elseif sel == "dump" then
     for which, k in pairs(KIT) do for _, p in ipairs(k.params) do pd.post(string.format("ockm-lab: %s %s %.3f", which, p[1], self.v[which][p[1]])) end end
   end

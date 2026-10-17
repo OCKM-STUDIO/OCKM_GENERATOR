@@ -979,6 +979,36 @@ def drum_lab_renders_claps_and_snares(work):
     assert len(dump) == 13, f"every clap setting should be listed: {dump[:3]}"
 
 @test
+def drum_lab_character_and_morph(work):
+    """The lab's macro sliders: the kick's punch moves its recipe the right ways (more drop, quicker drop, more click,
+    shorter); pulling it the other way does the opposite; morph moves several settings at once but never the level;
+    keep makes the result home, and morph back at zero then changes nothing."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness()
+    mk = h.add("#X obj 10 300 r test-mark;"); pm = h.add("#X obj 10 325 print MARK;"); h.con(mk, pm)
+    steps = [("home", ""), ("punch", "lab-test char kick 1"), ("soft", "lab-test char kick -1"), ("morph", "lab-test char kick 0 ; lab-test morph kick 0.7"),
+             ("kept", "lab-test keep kick"), ("again", "lab-test morph kick 0")]
+    t = 300
+    for name, msg in steps:
+        h.at(t, (msg + " ; " if msg else "") + f"test-mark {len(name)} ; lab-test dump"); t += 100
+    f = os.path.join(work, "t_labmacro.pd"); h.finish(t + 100, f)
+    out = run(work, f, main="OCKM_DRUM_LAB.pd")
+    snaps, cur = [], None
+    for line in out.splitlines():
+        if line.startswith("MARK:"): cur = {}; snaps.append(cur)
+        elif "ockm-lab: kick" in line and cur is not None:
+            _, _, name, val = line.split()[-4:]; cur[name] = float(val)
+    assert len(snaps) == len(steps), f"expected {len(steps)} snapshots, got {len(snaps)}"
+    home, punch, soft, morph, kept, again = snaps
+    assert punch["sweep"] > home["sweep"] and punch["sweeptime"] < home["sweeptime"] and punch["noise"] > home["noise"] and punch["decay"] < home["decay"], f"punch should move its recipe: {home} -> {punch}"
+    assert soft["sweep"] < home["sweep"] and soft["decay"] > home["decay"], f"pulling punch the other way should do the opposite: {soft}"
+    assert punch["pitch"] == home["pitch"], "punch shouldn't touch settings outside its recipe"
+    moved = [k for k in home if abs(morph[k] - home[k]) > 1e-6]
+    assert len(moved) >= 6 and "level" not in moved, f"morph should move several settings, never the level: {moved}"
+    assert kept == morph and again == morph, "keep should make the morphed sound home, so morph at zero leaves it alone"
+
+@test
 def touchscreen_filter_springs_and_throw(work):
     """On perform: sweep the filter and let go, it glides back to 0. With hold on it stays. The throw pad sends 1 then 0."""
     if not PDLUA:
