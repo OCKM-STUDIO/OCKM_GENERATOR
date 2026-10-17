@@ -108,6 +108,7 @@ SHOTS = [
     ("drums-long", ["test tap 750 546", "test tap 539 36", "test tap 861 88", "test tap 194 88"]),        # 64 steps, forward to the second block
     ("compose-melody", ["test tap 477 36", "test tap 186 154", "test tap 400 540"]),   # melody leads, ask for chords, then mutate the bass
     ("drums-samples", ["test tap 539 36", "test tap 366 380", "test tap 366 380", "test tap 366 380"]),   # drums tab, step to sample 3
+    ("drums-perc", ["test tap 539 36", "test tap 776 134", "test tap 366 380"]),         # drums tab, perc 1, step to the conga
     ("drums-velocity", ["array ockm-pat-d1 2 0 0 0 1 0 0.5 0 2 0 0 0 1 0 0.3 0", "test tap 539 36"]),
     ("drums-timing", ["array ockm-pat-d1 2 0 0 0 1 0 0.5 0 2 0 0 0 1 0 0.3 0", "array ockm-pat-d1-nudge 0 0 0 0 -0.2 0 0.1 0 0 0 0 0 0.25 0 -0.1 0",
                       "test tap 539 36", "test tap 145 282", "send ockm-drum-loop float 32"]),

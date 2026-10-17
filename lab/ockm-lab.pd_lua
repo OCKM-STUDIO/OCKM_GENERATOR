@@ -17,6 +17,44 @@ local CHARACTER = { clap = { name = "room", w = { tail = 0.6, room = 0.7, jitter
 local MORPH_SCALE = { level = 0, pitch = 0.2, ratio = 0.25, bursts = 0.3, drive = 0.3, sweep = 0.3 }
 local MORPH_POINTS = 4
 
+local VEL_CURVE = { kick = 0.66, snare = 0.56, clap = 0.51, hat = 0.5, tom = 0.61, rim = 0.8, conga = 0.63, shaker = 0.65 }
+local function seg(name, target, time, delay) pd.send(name, "list", { target, time, delay }) end
+-- play one hit. pre: where the voice listens (lab-kick, ockm-d1-kick); v: its settings; var: which of a set
+-- (hats 1 closed 2 open; toms low mid high; congas low high); vel: how hard (0 to 1)
+local function play_voice(pre, which, v, var, vel, k)
+  -- every voice squares its envelopes (for the curve) and its drive squashes loud hits, so each sound has a power
+  -- that makes its loudness follow vel (a half-strength hit about half as loud), measured by the tests
+  var, vel = var or 1, math.max(0, vel or 1) ^ (VEL_CURVE[which] or 0.6)
+  if which == "hat" then
+    seg(pre .. "-env", 0, 0, 0); seg(pre .. "-env", vel, 0.2, 0); seg(pre .. "-env", 0, (var == 2) and v.open or v.closed, 0.2)
+  elseif which == "clap" then
+    -- the bursts: each a quick hit of the two noise colours, a gap apart (looser with jitter); then the tail
+    local t, n = 0, math.max(1, math.floor(v.bursts + 0.5))
+    seg(pre .. "-burst", 0, 0, 0); seg(pre .. "-tailenv", 0, 0, 0)
+    for b = 1, n do
+      seg(pre .. "-burst", vel, 0.3, t)
+      seg(pre .. "-burst", 0, v.bdecay, t + 0.3)
+      if b < n then t = t + v.gap * (1 + v.jitter * (math.random() - 0.5)) end
+    end
+    seg(pre .. "-tailenv", vel, 1, t)
+    seg(pre .. "-tailenv", 0, v.tail, t + 1)
+  elseif which == "snare" then
+    seg(pre .. "-freq", v.pitch * 2 ^ (v.drop / 12), 0, 0); seg(pre .. "-freq", v.pitch, v.droptime, 0)
+    seg(pre .. "-body", 0, 0, 0); seg(pre .. "-body", vel, 0.5, 0); seg(pre .. "-body", 0, v.bodydec, 0.5)
+    seg(pre .. "-wenv", 0, 0, 0); seg(pre .. "-wenv", vel, 0.5, 0); seg(pre .. "-wenv", 0, v.wdecay, 0.5)
+    seg(pre .. "-cenv", 0, 0, 0); seg(pre .. "-cenv", vel, 0.1, 0); seg(pre .. "-cenv", 0, 3, 0.1)
+  elseif which == "shaker" then
+    seg(pre .. "-env", 0, 0, 0); seg(pre .. "-env", vel, v.attack, 0); seg(pre .. "-env", 0, v.decay, v.attack)
+  else
+    -- the tuned drums: kick, tom, conga, rim
+    local mul = (k and k.variants[var] and k.variants[var][2]) or 1
+    pd.send(pre .. "-mul", "float", { mul })
+    seg(pre .. "-st", v.sweep, 0, 0); seg(pre .. "-st", 0, v.sweeptime, 0)
+    seg(pre .. "-body", 0, 0, 0); seg(pre .. "-body", vel, 0.3, 0); seg(pre .. "-body", 0, v.decay, 0.3)
+    seg(pre .. "-nenv", 0, 0, 0); seg(pre .. "-nenv", vel, 0.1, 0); seg(pre .. "-nenv", 0, v.ndecay, 0.1)
+  end
+end
+
 function lab:initialize(sel, atoms)
   self.inlets, self.outlets = 1, 0
   self.v, self.loop = {}, {}
@@ -139,36 +177,13 @@ end
 local function seg(name, target, time, delay) pd.send(name, "list", { target, time, delay }) end
 
 -- play a sound; var picks one of a set (hats: 1 closed, 2 open; toms: low, mid, high; congas: low, high)
-function lab:play(which, var)
-  local v, k = self.v[which], KIT[which]
-  var = var or 1
-  if which == "hat" then
-    seg("lab-hat-env", 0, 0, 0); seg("lab-hat-env", 1, 0.2, 0); seg("lab-hat-env", 0, (var == 2) and v.open or v.closed, 0.2)
-  elseif which == "clap" then
-    -- the bursts: each a quick hit of the two noise colours, a gap apart (looser with jitter); then the tail
-    local t, n = 0, math.max(1, math.floor(v.bursts + 0.5))
-    seg("lab-clap-burst", 0, 0, 0); seg("lab-clap-tailenv", 0, 0, 0)
-    for b = 1, n do
-      seg("lab-clap-burst", 1, 0.3, t)
-      seg("lab-clap-burst", 0, v.bdecay, t + 0.3)
-      if b < n then t = t + v.gap * (1 + v.jitter * (math.random() - 0.5)) end
-    end
-    seg("lab-clap-tailenv", 1, 1, t)
-    seg("lab-clap-tailenv", 0, v.tail, t + 1)
-  elseif which == "snare" then
-    seg("lab-snare-freq", v.pitch * 2 ^ (v.drop / 12), 0, 0); seg("lab-snare-freq", v.pitch, v.droptime, 0)
-    seg("lab-snare-body", 0, 0, 0); seg("lab-snare-body", 1, 0.5, 0); seg("lab-snare-body", 0, v.bodydec, 0.5)
-    seg("lab-snare-wenv", 0, 0, 0); seg("lab-snare-wenv", 1, 0.5, 0); seg("lab-snare-wenv", 0, v.wdecay, 0.5)
-    seg("lab-snare-cenv", 0, 0, 0); seg("lab-snare-cenv", 1, 0.1, 0); seg("lab-snare-cenv", 0, 3, 0.1)
-  elseif which == "shaker" then
-    seg("lab-shaker-env", 0, 0, 0); seg("lab-shaker-env", 1, v.attack, 0); seg("lab-shaker-env", 0, v.decay, v.attack)
-  elseif TUNED[which] then
-    local mul = (k.variants[var] and k.variants[var][2]) or 1
-    pd.send("lab-" .. which .. "-mul", "float", { mul })
-    seg("lab-" .. which .. "-st", v.sweep, 0, 0); seg("lab-" .. which .. "-st", 0, v.sweeptime, 0)
-    seg("lab-" .. which .. "-body", 0, 0, 0); seg("lab-" .. which .. "-body", 1, 0.3, 0); seg("lab-" .. which .. "-body", 0, v.decay, 0.3)
-    seg("lab-" .. which .. "-nenv", 0, 0, 0); seg("lab-" .. which .. "-nenv", 1, 0.1, 0); seg("lab-" .. which .. "-nenv", 0, v.ndecay, 0.1)
-  end
+function lab:play(which, var) play_voice("lab-" .. which, which, self.v[which], var, 1, KIT[which]) end
+-- the steady kick the loop plays against (the lab kick's starting sound, on its own voice)
+function lab:ref_kick()
+  local v = {}
+  for _, p in ipairs(KIT.kick.params) do v[p[1]] = p[4] end
+  for _, n in ipairs({ "pitch", "ratio", "second", "noise", "ntone", "nfocus", "drive", "level" }) do pd.send("labref-kick-" .. n, "float", { v[n] }) end
+  play_voice("labref-kick", "kick", v, 1, 1, KIT.kick)
 end
 
 -- how long a hit lasts, so a render catches all of it
@@ -212,7 +227,7 @@ function lab:loop_tick()
   if not self.looping or self.rendering then return end
   local b, L = self.beat, self.loop                  -- half beats, 0 to 7
   if b % 2 == 0 then
-    if L.kick then self:play("kick", 1) else pd.send("lab-kick", "float", { 1 }) end
+    if L.kick then self:play("kick", 1) else self:ref_kick() end
   end
   if b == 2 or b == 6 then
     if L.clap then self:play("clap", 1) end

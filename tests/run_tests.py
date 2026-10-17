@@ -42,7 +42,7 @@ class Harness:
     """Builds a small test patch: timed messages, printed receives, optional recording."""
     def __init__(self, dut=None):
         self.objs, self.cons, self.t = [], [], 0
-        self.add("#X declare -path voices -path seq;", raw=True)
+        self.add("#X declare -path voices -path seq -path lab;", raw=True)
         self.lb = self.add("#X obj 10 10 loadbang;")
         self.dsp = self.add("#X msg 10 40 \\; pd dsp 1;"); self.con(self.lb, self.dsp)
         self.prev = self.lb
@@ -88,7 +88,7 @@ class Harness:
         self.at(ms, "pd quit")
         lines = ["#N canvas 0 0 800 600 12;"] + [l for l, _ in self.objs]
         lines += [f"#X connect {a} {o} {b} {i};" for a, o, b, i in self.cons]
-        lines += ["#X obj 10 500 declare -path voices -path seq;"]
+        lines += ["#X obj 10 500 declare -path voices -path seq -path lab;"]
         open(path, "w").write("\n".join(lines) + "\n")
 
 
@@ -164,16 +164,23 @@ def loads_clean(work):
 
 @test
 def drum_voices_sound_and_respond(work):
-    for v in ["kick", "snare", "clap", "rim", "hat", "ohat", "tom", "perc"] + [n + sfx for sfx in ("b", "c") for n in ["kick", "snare", "clap", "rim", "hat", "ohat", "tom", "perc"]]:
-        h = Harness(dut=f"ockm-{v} x")
-        h.record(os.path.join(work, f"v_{v}.wav"), source="dut")
+    """Every drum slot sound (the drum lab's voices, and the perc slots' rim, conga and shaker) plays,
+    a half-strength hit is about half as loud, and tune +12 doubles the kick's pitch."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    for snd, syn, name in [(0, 0, "kick"), (1, 0, "snare"), (2, 0, "clap"), (4, 0, "hat"), (5, 0, "open hat"), (6, 0, "tom"),
+                           (3, 0, "rim"), (3, 1, "conga"), (3, 2, "shaker")]:
+        h = Harness(dut="ockm-drum x")
+        h.record(os.path.join(work, f"v_{snd}{syn}.wav"), source="dut")
+        h.at(20, f"ockm-x-sound {snd} ; ockm-x-synth {syn} ; ockm-x-sample 0")
         h.at(50, "test-in 1"); h.at(650, "test-in 0.5")
-        _, (s, sr) = play(work, h, f"t_voice_{v}", with_main=False, ms=1250)
+        _, (s, sr) = play(work, h, f"t_voice_{snd}{syn}", with_main=False, ms=1250)
         A, B = s[int(0.05 * sr):int(0.6 * sr)], s[int(0.65 * sr):int(1.2 * sr)]
-        assert peak(A) > 0.05, f"{v} is silent"
+        assert peak(A) > 0.05, f"{name} is silent"
         a, b = math.sqrt(sum(x * x for x in A) / len(A)), math.sqrt(sum(x * x for x in B) / len(B))   # average level: metal voices beat, peaks jump about
-        assert 0.35 < b / a < 0.65, f"{v}: half-strength hit should be about half as loud ({b / a:.2f})"
-    h = Harness(dut="ockm-kick x"); h.record(os.path.join(work, "v_tune.wav"), source="dut")
+        assert 0.35 < b / a < 0.65, f"{name}: half-strength hit should be about half as loud ({b / a:.2f})"
+    h = Harness(dut="ockm-drum x"); h.record(os.path.join(work, "v_tune.wav"), source="dut")
+    h.at(20, "ockm-x-sound 0 ; ockm-x-sample 0")
     h.at(50, "test-in 1"); h.at(600, "ockm-x-tune 12"); h.at(610, "test-in 1")
     _, (s, sr) = play(work, h, "t_tune", with_main=False, ms=1100)
     f0 = cycles_per_second(s[int(0.08 * sr):int(0.2 * sr)], sr)
@@ -702,7 +709,7 @@ def touchscreen_screens_draw(work):
         raise Skip("Pillow not installed")
     p = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_preview.py"), os.path.join(work, "preview")], capture_output=True, text=True)
     assert p.returncode == 0, p.stderr[-800:]
-    assert len(os.listdir(os.path.join(work, "preview"))) == 28, "expected twenty-eight screen pictures"
+    assert len(os.listdir(os.path.join(work, "preview"))) == 29, "expected twenty-nine screen pictures"
 
 @test
 def mute_solo_and_levels(work):
@@ -1407,27 +1414,55 @@ def touchscreen_exports_the_loop_and_records_live(work):
     assert 1.2 < secs < 2.2, f"the live recording should be about 1.6 s: {secs:.1f} s"
 
 @test
-def drum_slot_909_808_industrial_tone_drive(work):
-    """A slot switches between its 909, 808 and industrial sounds (ockm-<slot>-synth 0, 1, 2), each different;
-    tone darkens or brightens it and drive makes it louder and grittier."""
-    h = Harness(); h.record(os.path.join(work, "abc.wav"))
+def drum_slot_lab_sounds_randomise_and_character(work):
+    """A slot plays the drum lab's sounds: the kick, then the perc slot's rim, conga and shaker (ockm-<slot>-synth 0, 1, 2),
+    each different. Randomise (a seed and an amount) changes the sound and the same seed gives it back; character and
+    morph change it too; tone darkens or brightens it and drive makes it denser."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness(); h.record(os.path.join(work, "lab.wav"))
     others = " ; ".join(f"ockm-{t}-mute 1" for t in ["d2","d3","d4","d5","d6","d7","d8","bass","lead","chord"])
-    h.at(100, f"ockm-verb-mix 0 ; ockm-delay-mix 0 ; ockm-d1-sound 0 ; ockm-d1-sample 0 ; ockm-d1-verb 0 ; ockm-d1-delay 0 ; {others}")
-    for i, (syn, tone, drive) in enumerate([(0, 0, 0), (1, 0, 0), (2, 0, 0), (0, -0.8, 0), (0, 0.8, 0), (0, 0, 1)]):
-        t0 = 300 + i * 900
-        h.at(t0, f"ockm-d1-synth {syn} ; ockm-d1-tone {tone} ; ockm-d1-drive {drive}")
-        h.at(t0 + 50, "ockm-d1-audition 1")
-    out, (x, sr) = play(work, h, "t_abc", ms=300 + 6 * 900 + 200)
-    segs = [x[int((0.35 + i * 0.9) * sr):int((0.35 + i * 0.9 + 0.6) * sr)] for i in range(6)]
+    h.at(100, f"ockm-verb-mix 0 ; ockm-delay-mix 0 ; ockm-d1-sound 0 ; ockm-d1-sample 0 ; ockm-d1-verb 0 ; ockm-d1-delay 0 ; ockm-d1-synth 0 ; {others}")
+    steps = [
+        "ockm-d1-sound 0",                                                         # 0 kick
+        "ockm-d1-sound 3 ; ockm-d1-synth 0",                                       # 1 rim
+        "ockm-d1-synth 1",                                                         # 2 conga
+        "ockm-d1-synth 2",                                                         # 3 shaker
+        "ockm-d1-sound 0 ; ockm-d1-synth 0 ; ockm-d1-labrseed 77 ; ockm-d1-labramt 1",   # 4 kick, randomised
+        "ockm-d1-labrseed 0 ; ockm-d1-labramt 0",                                  # 5 kick again (back to the start)
+        "ockm-d1-labrseed 77 ; ockm-d1-labramt 1",                                 # 6 the same randomise again
+        "ockm-d1-labrseed 0 ; ockm-d1-labramt 0 ; ockm-d1-labchar 1",              # 7 character up
+        "ockm-d1-labchar 0 ; ockm-d1-labmorph 0.7 ; ockm-d1-labpseed 3",           # 8 morph
+        "ockm-d1-labmorph 0 ; ockm-d1-tone -0.8",                                  # 9 darker
+        "ockm-d1-tone 0.8",                                                        # 10 brighter
+        "ockm-d1-tone 0 ; ockm-d1-drive 1",                                        # 11 driven
+    ]
+    for i, m in enumerate(steps):
+        t0 = 300 + i * 1600
+        h.at(t0, m)
+        h.at(t0 + 100, "ockm-d1-audition 1")
+    n = len(steps)
+    out, (x, sr) = play(work, h, "t_lab", ms=300 + n * 1600 + 200)
+    segs = [x[int((0.4 + i * 1.6) * sr):int((0.4 + i * 1.6 + 0.7) * sr)] for i in range(n)]
     pk = [peak(sg) for sg in segs]
-    assert min(pk) > 0.05, f"every version should sound: {[round(p, 3) for p in pk]}"
-    lens = [sum(1 for v in sg if abs(v) > 0.02) / sr for sg in segs[:3]]
-    assert lens[1] > lens[0] * 1.3, f"the 808 kick should ring longer than the 909 ({lens[0]:.2f} vs {lens[1]:.2f} s)"
-    # brightness: share of the signal that is fast change (a simple high-frequency measure)
+    assert min(pk) > 0.03, f"every version should sound: {[round(p, 3) for p in pk]}"
+    def env(sg, k=1024):     # loudness in windows longer than a low drum's cycle, so the oscillator's start point doesn't matter
+        return [math.sqrt(sum(v * v for v in sg[j:j + k]) / k) for j in range(0, len(sg) - k, k)]
+    def diff(a, b):
+        ea, eb = env(a), env(b)
+        return sum(abs(p - q) for p, q in zip(ea, eb)) / (sum(ea) + sum(eb) + 1e-9)
     def bright(sg): return sum(abs(sg[i] - sg[i - 1]) for i in range(1, len(sg))) / (sum(abs(v) for v in sg) + 1e-9)
-    assert bright(segs[3]) < bright(segs[0]) < bright(segs[4]), f"tone should darken then brighten: {bright(segs[3]):.3f} {bright(segs[0]):.3f} {bright(segs[4]):.3f}"
+    b4 = [bright(sg) for sg in segs[:4]]
+    for i in range(4):
+        for j in range(i + 1, 4):
+            assert diff(segs[i], segs[j]) > 0.1 or abs(b4[i] - b4[j]) > 0.1 * max(b4[i], b4[j]), f"sounds {i} and {j} should differ"
+    assert diff(segs[4], segs[5]) > 0.08 or abs(bright(segs[4]) - bright(segs[5])) > 0.05 * bright(segs[5]), "randomise should change the kick"
+    assert diff(segs[4], segs[6]) < 0.045, f"the same seed should give the same sound ({diff(segs[4], segs[6]):.3f})"
+    assert diff(segs[7], segs[5]) > 0.05 or abs(bright(segs[7]) - bright(segs[5])) > 0.05 * bright(segs[5]), "character should change the kick"
+    assert diff(segs[8], segs[5]) > 0.05 or abs(bright(segs[8]) - bright(segs[5])) > 0.05 * bright(segs[5]), "morph should change the kick"
+    assert bright(segs[9]) < bright(segs[5]) < bright(segs[10]), f"tone should darken then brighten: {bright(segs[9]):.3f} {bright(segs[5]):.3f} {bright(segs[10]):.3f}"
     rms = lambda sg: math.sqrt(sum(v * v for v in sg) / len(sg))
-    assert rms(segs[5]) > rms(segs[0]) * 1.1, "drive should make it denser"
+    assert rms(segs[11]) > rms(segs[5]) * 1.1, "drive should make it denser"
 
 @test
 def touchscreen_demud_listens_and_cuts(work):
@@ -1665,9 +1700,7 @@ def touchscreen_picks_samples_and_kits(work):
     write_tone(os.path.join(work, "samples", "perc", "01.wav"), 330, 0.2)
     h = Harness(); h.show("ockm-d1-sample", "ockm-d1-audition", "ockm-d6-sample", "ockm-d7-sample", "ockm-d1-sound")
     h.at(100, "ockm-ui-test tap 539 36")      # drums tab: counts the folders
-    h.at(300, "ockm-ui-test tap 366 380")     # 909 -> 808
-    h.at(350, "ockm-ui-test tap 366 380")     # -> industrial
-    h.at(400, "ockm-ui-test tap 366 380")     # -> sample 1
+    h.at(400, "ockm-ui-test tap 366 380")     # the synth kick -> sample 1
     h.at(500, "ockm-ui-test tap 366 380")     # 2
     h.at(700, "ockm-ui-test tap 366 380")     # only 2 kicks: stays put
     h.at(900, "ockm-ui-test tap 200 380")     # tap the box: hear it
@@ -1679,6 +1712,25 @@ def touchscreen_picks_samples_and_kits(work):
     assert picked[:2] == [1, 2] and len(picked) <= 3, f"sample steps wrong (the last one is new kit's pick): {d1}"
     assert len(printed(out, "ockm-d1-audition")) >= 3, f"should play on each change and on tapping the box: {printed(out, 'ockm-d1-audition')}"
     assert printed(out, "ockm-d6-sample") == ["1"] and printed(out, "ockm-d7-sample") == ["1"], "new kit should give both perc slots a sample"
+
+@test
+def touchscreen_drum_synth_random_and_reset(work):
+    """Drums tab, the kick's synth sound: random gives it a new seed (near the last sound), wild goes all the way,
+    reset puts it back to the lab's starting sound."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness(); h.show("ockm-d1-labrseed", "ockm-d1-labramt", "ockm-d1-labchar")
+    h.at(100, "ockm-ui-test tap 539 36 ; ockm-d1-sample 0 ; ockm-d1-labchar 0.5")
+    h.at(300, "ockm-ui-test tap 301 568")     # random
+    h.at(500, "ockm-ui-test tap 370 568")     # wild
+    h.at(700, "ockm-ui-test tap 438 568")     # reset
+    f = os.path.join(work, "t_labui.pd"); h.finish(900, f)
+    out = run(work, f)
+    seeds = [int(float(v)) for v in printed(out, "ockm-d1-labrseed")]
+    amts = [float(v) for v in printed(out, "ockm-d1-labramt")]
+    assert len(seeds) >= 3 and seeds[-3] > 0 and seeds[-2] > 0 and seeds[-1] == 0, f"random, wild, then reset: {seeds}"
+    assert amts[-3:] == [0.35, 1.0, 0.0], f"how far each goes: {amts}"
+    assert float(printed(out, "ockm-d1-labchar")[-1]) == 0, "reset puts the character back"
 
 def main():
     if not PD:

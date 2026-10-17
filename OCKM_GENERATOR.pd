@@ -1,5 +1,5 @@
 #N canvas 40 40 960 680 12;
-#X declare -path voices -path seq -path ui;
+#X declare -path voices -path seq -path lab -path ui;
 #X obj 0 0 ockm-ui 1 dark;
 #N canvas 60 60 1420 1100 engine 0;
 #X text 30 10 OCKM_GENERATOR engine: clock \, swing \, pattern switching \, voices and mixer. The screens only talk to it through the named ockm- hooks.;
@@ -1435,5 +1435,5 @@
 #N canvas 80 80 1140 840 test-panel 0;
 #X obj 0 0 ockm-panel;
 #X restore 130 624 pd test-panel;
-#X obj 270 624 declare -path voices -path seq -path ui;
+#X obj 270 624 declare -path voices -path seq -path lab -path ui;
 #X text 20 654 OCKM_GENERATOR. The screen above is the instrument (see CHANGELOG.md for the version). pd engine is the sound and the sequencer. pd test-panel is the old v0.12 panel \, kept for testing. The screen needs pdlua (built into plugdata).;

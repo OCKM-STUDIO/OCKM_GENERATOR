@@ -232,7 +232,8 @@ The Pi runs the same app as the Mac, drawn at double size (`--ui-scale 2`), so t
 | Path | What it is |
 |---|---|
 | `OCKM_GENERATOR.pd` | Main patch: clock, swing, pattern slots, mixer |
-| `voices/` | One file per sound: 8 drums plus `ockm-drum` (a slot that plays any of them); the mono synth used for bass and lead (`ockm-mono`, one file per engine, shared `ockm-mono-core`); the chord synth (`ockm-chord`, one file per engine); the reverb (`ockm-verb`); and the master effects (`ockm-fx`) |
+| `voices/` | `ockm-drum` (a drum slot: the lab's voices or a sample) and `ockm-labdrum.pd_lua` (its brain: picks the sound, randomise, character, morph); the mono synth used for bass and lead (`ockm-mono`, one file per engine, shared `ockm-mono-core`); the chord synth (`ockm-chord`, one file per engine); the reverb (`ockm-verb`); and the master effects (`ockm-fx`) |
+| `lab/` | The drum lab's voices (shared with the drum slots) and its brain. Built by `tools/build_lab.py` |
 | `ui/` | The touchscreen: `ockm-ui.pd_lua` (all three screens) |
 | `docs/` | The architecture review and the brief for the screens |
 | `seq/` | The old test panel (`ockm-panel`), plus sequencers and generators: drum row, mono pattern and generator (bass and lead), chord pattern and generator, the shared presets (`ockm-presets`) and MIDI clock |
@@ -356,7 +357,9 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 | `ockm-verb-tone` | Reverb tone, 0 dark to 1 bright |
 | `ockm-<slot>-sound` | Which sound a drum slot plays: 0 kick, 1 snare, 2 clap, 3 perc 1, 4 closed hat, 5 open hat, 6 tom, 7 perc 2 |
 | `ockm-<slot>-sample` | 0 = a synth sound, n = the nth file in that sound's sample folder. Saved with the project |
-| `ockm-<slot>-synth` | Which synth sound: 0 909, 1 808, 2 industrial |
+| `ockm-<slot>-synth` | Perc slots only, which synth sound: perc 1 0 rim, 1 conga, 2 shaker; perc 2 0 conga, 1 shaker, 2 rim |
+| `ockm-<slot>-labchar`, `-labmorph` | The synth sound's character (-1 to 1, its lab recipe) and morph (0 to 1) |
+| `ockm-<slot>-labrseed`, `-labramt`, `-labpseed` | Randomise: a seed (0 off) and how far (0.35 near, 1 anywhere); the morph path's seed. Saved, so a project gets the same sound back |
 | `ockm-<slot>-tone`, `-drive`, `-start` | Tone -1 (darker) to 1 (brighter); drive 0 to 1; start 0 to 1 (samples: skip up to 40% in) |
 | `ockm-<slot>-audition` | Play the slot once (the screen uses it when you pick a sound or sample) |
 | `ockm-samples-scan` | Count the files in each sample folder again. Answer: `ockm-sample-counts` with 7 numbers, in the order kick snare clap perc hat open-hat tom |
@@ -377,7 +380,7 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 
 ## Drums
 
-Eight drum slots, d1 to d8. Each slot can play any of 8 sounds: 0 kick, 1 snare, 2 clap, 3 perc 1, 4 closed hat, 5 open hat, 6 tom, 7 perc 2. Perc 1's synth sound is a short rim and perc 2's a 909-style rimshot (the old cowbell is in `sketches/`). Only the chosen sound runs. The default line-up is kick, snare, clap, closed hat, open hat, perc 2, perc 1 and tom.
+Eight drum slots, d1 to d8. Each slot can play any of 8 sounds: 0 kick, 1 snare, 2 clap, 3 perc 1, 4 closed hat, 5 open hat, 6 tom, 7 perc 2. The synth sounds are the drum lab's (see **Drum lab**); perc 1 and perc 2 choose between rim, conga and shaker. Only the chosen sound runs. The default line-up is kick, snare, clap, closed hat, open hat, perc 2, perc 1 and tom.
 
 Each slot's sound is fixed (slot 1 kick, 2 snare, 3 clap, 4 hat, 5 open hat, 6 perc 2, 7 perc 1, 8 tom); what changes is its sample. Tapping a step cycles off, on and accent. Accented steps play at full strength; normal steps play at full strength minus the accent amount.
 
@@ -405,19 +408,18 @@ Slot sounds, samples, tune, decay, level and sends are part of the drum kit, whi
 
 ### Samples
 
-Each slot has three built-in synth sounds, then the samples in its folder in `samples/` (perc 1 and perc 2 share `perc`). On the drums tab, the sound box picks it: the arrows step through **909 → 808 → industrial → your samples**, each change plays the new sound, and tapping the box plays it again.
+Each slot has its built-in synth sound (perc 1 and perc 2 have three: rim, conga and shaker), then the samples in its folder in `samples/` (perc 1 and perc 2 share `perc`). On the drums tab, the sound box picks it: the arrows step through **the synth → your samples**, each change plays the new sound, and tapping the box plays it again.
 
-| Slot | 909 | 808 | Industrial |
-|---|---|---|---|
-| kick | fast drop, click, a little saturation | long deep boom | hard click, distorted rumble |
-| snare | tuned body, bright snap | more tone, less rattle | distorted noise blast |
-| clap | four hard bursts, two noise bands, crunch | loose and roomy | wide gritty bursts, big room |
-| perc 1 | rim | clave | metallic clank |
-| hat / open hat | bright noise | six square waves, the 808 metal | harsh metal / trash ride |
-| tom | sweep tom | round 808 tom | dirty tom |
-| perc 2 | rimshot | 808 cowbell | laser zap |
+The synth sounds are the drum lab's voices, each slot running its own copy, so they start from the same sounds you hear in `OCKM_DRUM_LAB.pd`. The lab's small settings stay in the lab; on the drums tab each synth sound has:
 
-The sliders change with the source. **Synth:** level, tune, decay, tone (darker to brighter), drive. **Sample:** level, pitch, length, tone, start (skips up to 40% into the sample, to trim a slow attack). Reverb and delay sends are on the mixer. **New kit** picks a random sample for every slot that has some.
+- **Level, tune, decay, tone, drive.** Tune moves the sound's pitches; decay stretches its lengths
+- **Character:** the lab's named recipe for that sound (punch, crack, room, metal, boom, wood, slap, shake), moving several settings at once, some up and some down
+- **Morph:** walks a smooth path through nearby sounds. Each **random** press picks a new path
+- **Random** shifts the sound a little from where it starts; **wild** goes anywhere. Both have undo. **Reset** goes back to the starting sound
+
+All of it is saved with the project as seeds and slider positions, so a project always gets the same sound back.
+
+The sliders change with the source. **Synth:** as above. **Sample:** level, pitch, length, tone, start (skips up to 40% into the sample, to trim a slow attack). Reverb and delay sends are on the mixer. **New kit** picks a random sample for every slot that has some.
 
 - Samples are numbered in file-name order, so `01.wav` is sample 1. WAV and AIFF, mono or stereo (only the left channel plays), any sample rate
 - Tune changes the playback speed, like an MPC: +12 is an octave up and twice as short. Decay below 100 fades the tail early; at 100 or more the whole sample plays

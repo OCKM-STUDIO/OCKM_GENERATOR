@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.63"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.64"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -91,14 +91,16 @@ local LFO_RATES = { "1/16", "1/8", "beat", "1/2 bar", "bar", "2 bars", "4 bars",
 local DRUM_PARAMS = {
   { "level", 0, 1 }, { "tune", -12, 12 }, { "decay", 10, 400 }, { "verb", 0, 1, "reverb" }, { "delay", 0, 1 },
   { "tone", -1, 1 }, { "drive", 0, 1 }, { "start", 0, 1 }, { "synth", 0, 2 },
+  { "labchar", -1, 1 }, { "labmorph", 0, 1 }, { "labrseed", 0, 99999 }, { "labramt", 0, 1 }, { "labpseed", 0, 99999 },
 }
 local SYNTH_SLIDERS  = { { "level", 0, 1 }, { "tune", -12, 12 }, { "decay", 10, 400 }, { "tone", -1, 1 }, { "drive", 0, 1 } }
 local SAMPLE_SLIDERS = { { "level", 0, 1 }, { "tune", -12, 12, "pitch" }, { "decay", 10, 100, "length" }, { "tone", -1, 1 }, { "start", 0, 1 } }
--- the three built-in sounds for each drum: 909, 808 and industrial (by sound number, what each one is)
-local SYNTH_SETS = { "909", "808", "industrial" }
-local SYNTH_AB = { [0] = { "kick", "boom", "rumble" }, [1] = { "snare", "snare", "blast" }, [2] = { "clap", "clap", "big room" },
-                   [3] = { "rim", "clave", "clank" }, [4] = { "hat", "metal hat", "harsh hat" }, [5] = { "open hat", "metal hat", "trash ride" },
-                   [6] = { "tom", "tom", "dirty tom" }, [7] = { "rimshot", "cowbell", "zap" } }
+-- the built-in sounds are the drum lab's. Each drum has one; the perc slots choose rim, conga or shaker (ockm-<slot>-synth 0-2)
+local LAB_SOUND = { [0] = "kick", [1] = "snare", [2] = "clap", [4] = "closed hat", [5] = "open hat", [6] = "tom" }
+local LAB_PERC = { [3] = { "rim", "conga", "shaker" }, [7] = { "conga", "shaker", "rim" } }
+-- what the character slider is called for each sound (its recipe in the lab)
+local LAB_CHAR = { kick = "punch", snare = "crack", clap = "room", ["closed hat"] = "metal", ["open hat"] = "metal", tom = "boom",
+                   rim = "wood", conga = "slap", shaker = "shake" }
 
 -- ------------------------------------------------------------------ helpers
 local function hex(c)
@@ -164,6 +166,7 @@ function ui:defaults()
     v["ockm-"..nm.."-level"] = 1; v["ockm-"..nm.."-tune"] = 0; v["ockm-"..nm.."-decay"] = 100
     v["ockm-"..nm.."-verb"] = 0; v["ockm-"..nm.."-delay"] = 0; v["ockm-"..nm.."-sample"] = 0; v["ockm-"..nm.."-synth"] = 0
     v["ockm-"..nm.."-tone"] = 0; v["ockm-"..nm.."-drive"] = 0; v["ockm-"..nm.."-start"] = 0
+    v["ockm-"..nm.."-labchar"] = 0; v["ockm-"..nm.."-labmorph"] = 0; v["ockm-"..nm.."-labrseed"] = 0; v["ockm-"..nm.."-labramt"] = 0; v["ockm-"..nm.."-labpseed"] = 1
   end
   for _, t in ipairs(SYNTHS) do
     for _, k in ipairs({"engine","k1","k2","k3","k4","drive","verb","delay","rhythm","notes","type","prog"}) do v["ockm-"..t.."-"..k] = 0 end
@@ -307,21 +310,48 @@ function ui:sample_count(slot)
   local snd = math.floor(self.v["ockm-"..SLOTS[slot].."-sound"] or 0)
   return (self.scount or {})[SOUND_DIR[snd + 1]] or 0
 end
--- where a slot is in its list: 0 909, 1 808, 2 industrial, 3 and up = sample 1 and up
+-- where a slot is in its list: first its synth sound(s) (one, or rim / conga / shaker for perc), then sample 1 and up
+function ui:synth_count(slot)
+  return LAB_PERC[math.floor(self.v["ockm-"..SLOTS[slot].."-sound"] or 0)] and 3 or 1
+end
+function ui:synth_name(slot)
+  local nm = SLOTS[slot]
+  local snd = math.floor(self.v["ockm-"..nm.."-sound"] or 0)
+  if LAB_PERC[snd] then return LAB_PERC[snd][clamp(math.floor(self.v["ockm-"..nm.."-synth"] or 0), 0, 2) + 1] end
+  return LAB_SOUND[snd] or "kick"
+end
 function ui:drum_pos(slot)
   local nm = SLOTS[slot]
   local smp = math.floor(self.v["ockm-"..nm.."-sample"] or 0)
-  if smp > 0 then return smp + 2 end
-  return clamp(math.floor(self.v["ockm-"..nm.."-synth"] or 0), 0, 2)
+  local ns = self:synth_count(slot)
+  if smp > 0 then return smp + ns - 1 end
+  return clamp(math.floor(self.v["ockm-"..nm.."-synth"] or 0), 0, ns - 1)
 end
 function ui:set_drum_pos(slot, pos)
   local nm = SLOTS[slot]
-  if pos <= 2 then
+  local ns = self:synth_count(slot)
+  if pos < ns then
     self:send("ockm-"..nm.."-sample", 0); self:send("ockm-"..nm.."-synth", pos)
   else
-    self:send("ockm-"..nm.."-sample", pos - 2)
+    self:send("ockm-"..nm.."-sample", pos - ns + 1)
   end
   self:audition_soon(slot)
+end
+-- the synth sound's shape: randomise (a seed and how far), and back to the lab's starting sound
+function ui:lab_random(slot, amt)
+  local nm = SLOTS[slot]
+  self:snapshot("randomise")
+  self:send("ockm-"..nm.."-labrseed", math.random(1, 99999)); self:send("ockm-"..nm.."-labramt", amt)
+  self:send("ockm-"..nm.."-labpseed", math.random(1, 99999))
+  self:audition_soon(slot)
+  self:say_undo(self:synth_name(slot) .. ((amt >= 1) and ": a wild new sound" or ": a new sound near the last one"))
+end
+function ui:lab_reset(slot)
+  local nm = SLOTS[slot]
+  self:snapshot("reset sound")
+  for _, k in ipairs({ "labrseed", "labramt", "labchar", "labmorph" }) do self:send("ockm-"..nm.."-"..k, 0) end
+  self:audition_soon(slot)
+  self:say_undo(self:synth_name(slot) .. ": back to the starting sound")
 end
 function ui:set_sample(slot, n)
   self:send("ockm-"..SLOTS[slot].."-sample", n)
@@ -1224,7 +1254,7 @@ function ui:layout_drums(add)
   for i = 1, 8 do
     local smp = math.floor(self.v["ockm-"..SLOTS[i].."-sample"] or 0)
     add{ kind="choice", x=16 + (i - 1) * (tw + 8), y=114, w=tw, h=40,
-         label=SHORT[(self.v["ockm-"..SLOTS[i].."-sound"] or 0) + 1] .. (smp > 0 and string.format(" %02d", smp) or ({ "", " 808", " ind" })[clamp(math.floor(self.v["ockm-"..SLOTS[i].."-synth"] or 0), 0, 2) + 1]),
+         label=SHORT[(self.v["ockm-"..SLOTS[i].."-sound"] or 0) + 1] .. (smp > 0 and string.format(" %02d", smp) or ""),
          sel=(i == self.slot), tap=function() self.slot = i end }
   end
   self:step_row(add, D_STEP_Y, D_STEP_H, "dstep")
@@ -1245,19 +1275,31 @@ function ui:layout_drums(add)
   local snd = math.floor(self.v["ockm-"..nm.."-sound"] or 0)
   local folder = FOLDERS[SOUND_DIR[snd + 1]]
   local pos = self:drum_pos(slot)
+  local ns = self:synth_count(slot)
+  local sname = self:synth_name(slot)
   add{ kind="text", x=16, y=346, w=half, h=12, size=10,
-       label=(cnt == 0) and ("909, 808 and industrial synths; no samples in the " .. folder .. " folder yet") or "sound: tap to hear it, arrows to change (909, 808, industrial, then your samples)" }
+       label=(cnt == 0) and ("drum lab synth; no samples in the " .. folder .. " folder yet") or "sound: tap to hear it, arrows to change (the synth, then your samples)" }
   local bw = half - 44 * 2 - 12 - 84
-  local names = SYNTH_AB[snd] or { "", "", "" }
   add{ kind="arrow", x=16, y=362, w=44, h=36, dir=-1, on=(pos > 0), tap=function() if pos > 0 then self:set_drum_pos(slot, pos - 1) end end }
-  add{ kind="preset", x=66, y=362, w=bw, h=36, inline=true, sel=(pos > 2),
-       num=(pos <= 2) and SYNTH_SETS[pos + 1] or string.format("%02d", smp),
-       label=(pos <= 2) and names[pos + 1] or ("of " .. cnt .. "  " .. folder),
+  add{ kind="preset", x=66, y=362, w=bw, h=36, inline=true, sel=(smp > 0),
+       num=(smp == 0) and "synth" or string.format("%02d", smp),
+       label=(smp == 0) and sname or ("of " .. cnt .. "  " .. folder),
        tap=function() self:audition(slot) end }
-  add{ kind="arrow", x=66 + bw + 6, y=362, w=44, h=36, dir=1, on=(pos < cnt + 2), tap=function() if pos < cnt + 2 then self:set_drum_pos(slot, pos + 1) end end }
+  add{ kind="arrow", x=66 + bw + 6, y=362, w=44, h=36, dir=1, on=(pos < cnt + ns - 1), tap=function() if pos < cnt + ns - 1 then self:set_drum_pos(slot, pos + 1) end end }
   add{ kind="btn", x=16 + half - 84, y=362, w=84, h=36, label="new kit", small=true, tap=function() self:random_kit() end }
-  for j, p in ipairs((smp > 0) and SAMPLE_SLIDERS or SYNTH_SLIDERS) do
-    add{ kind="slider", x=16, y=406 + (j - 1) * 36, w=half, h=30, hook="ockm-"..nm.."-"..p[1], lo=p[2], hi=p[3], label=p[4] or p[1] }
+  local sl = (smp > 0) and SAMPLE_SLIDERS or SYNTH_SLIDERS
+  local gap = (smp > 0) and 36 or 29
+  for j, p in ipairs(sl) do
+    add{ kind="slider", x=16, y=406 + (j - 1) * gap, w=half, h=(smp > 0) and 30 or 25, hook="ockm-"..nm.."-"..p[1], lo=p[2], hi=p[3], label=p[4] or p[1] }
+  end
+  if smp == 0 then
+    -- the synth's shape: character (its lab recipe) and morph sweep several settings at once; randomise and reset
+    local y = 406 + 5 * gap + 2
+    add{ kind="hbar", x=16, y=y, w=128, h=30, hook="ockm-"..nm.."-labchar", lo=-1, hi=1, label=LAB_CHAR[sname] or "character" }
+    add{ kind="hbar", x=150, y=y, w=110, h=30, hook="ockm-"..nm.."-labmorph", lo=0, hi=1, label="morph" }
+    add{ kind="btn", x=266, y=y, w=70, h=30, small=true, label="random", tap=function() self:lab_random(slot, 0.35) end }
+    add{ kind="btn", x=342, y=y, w=56, h=30, small=true, label="wild", tap=function() self:lab_random(slot, 1) end }
+    add{ kind="btn", x=404, y=y, w=half - 388, h=30, small=true, quiet=true, label="reset", tap=function() self:lab_reset(slot) end }
   end
   local gx = 16 + half + 16
   -- grooves, in banks of 12 (plus clear)

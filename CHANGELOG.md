@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.64 (17 October 2026)
+
+- **The drum lab's sounds are now GNRTR's synth drums,** replacing 909, 808 and industrial. Every slot plays the lab voice for its sound; perc 1 and perc 2 choose rim, conga or shaker
+- **Character, morph, random, wild and reset** on the drums tab for each synth sound. The lab's small settings stay in the lab. Saved with the project as seeds, so the sound comes back exactly
+- Older projects: kick, snare, clap, hats and tom ignore their old 808 or industrial choice and play the lab sound; perc slots read it as rim, conga or shaker
+
 ## v0.63 (17 October 2026)
 
 - **Drum lab: character and morph.** Every sound gets a named character slider (punch, crack, room, metal, boom, slap, wood, shake) that moves a recipe of settings, and a morph slider that walks a smooth path through nearby sounds, TR-8S style. New path, and keep to make the result your sound
