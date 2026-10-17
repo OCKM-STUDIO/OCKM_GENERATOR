@@ -29,7 +29,7 @@ ockm-d3-sound 2;
 ockm-d3-tune 0;
 ockm-d3-decay 100;
 ockm-d3-level 1;
-ockm-d3-verb 0.35;
+ockm-d3-verb 0.1;
 ockm-d3-delay 0;
 ockm-d4-sound 4;
 ockm-d4-tune 0;

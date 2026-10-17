@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.66"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.67"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -1330,7 +1330,7 @@ function ui:layout_drums(add)
     local smp = math.floor(self.v["ockm-"..SLOTS[i].."-sample"] or 0)
     add{ kind="choice", x=16 + (i - 1) * (tw + 8), y=114, w=tw, h=40,
          label=SHORT[(self.v["ockm-"..SLOTS[i].."-sound"] or 0) + 1] .. (smp > 0 and string.format(" %02d", smp) or ""),
-         sel=(i == self.slot), tap=function() self.slot = i end }
+         sel=(i == self.slot), tap=function() self.slot = i; self:preview(i, true) end }
   end
   self:step_row(add, D_STEP_Y, D_STEP_H, "dstep")
   -- the lane under the steps: velocity or timing, dragged up and down per step

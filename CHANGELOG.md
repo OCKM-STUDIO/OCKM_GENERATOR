@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.67 (17 October 2026)
+
+- **Tapping a drum at the top plays it** while stopped
+- **Claps send less to the reverb in new projects** (0.1, was 0.35): the lab clap has its own room built in
+
 ## v0.66 (17 October 2026)
 
 - **Save your own drum sounds.** The disc next to the sound box keeps the slot's synth sound (named like "kick 1") in my-settings.lua, so any project can use it. The arrows step through the synth, your saved sounds, then samples. On a saved sound the disc becomes a bin, to delete it

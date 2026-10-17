@@ -441,7 +441,7 @@ p.save("seq/ockm-monoseq.pd","#N canvas 150 150 1800 760 12;")
 # ---------------- main patch ----------------
 # six drum slots: (slot, default sound number)
 SLOTS=[("d1",0),("d2",1),("d3",2),("d4",4),("d5",5),("d6",7),("d7",3),("d8",6)]
-VERB=[0,0.25,0.35,0.2,0.1,0.15,0.2,0.25]   # default reverb send per sound
+VERB=[0,0.25,0.1,0.2,0.1,0.15,0.2,0.25]    # default reverb send per sound (the clap has its own room built in, so it sends little)
 DLY=[0,0,0,0.25,0,0,0,0.3]                 # default delay send per sound
 MONO=["note","on","acc","slide"]; CHORD=["on","deg"]
 def show(h): return "ockm-show-"+h[5:]
