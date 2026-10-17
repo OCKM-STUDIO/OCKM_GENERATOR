@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.66 (17 October 2026)
+
+- **Save your own drum sounds.** The disc next to the sound box keeps the slot's synth sound (named like "kick 1") in my-settings.lua, so any project can use it. The arrows step through the synth, your saved sounds, then samples. On a saved sound the disc becomes a bin, to delete it
+- **Random and wild put morph back to 0,** since each picks a new morph path. Character stays where you set it
+- **New kit is gone,** and the sound box is narrower
+
 ## v0.65 (17 October 2026)
 
 - **Drums tab: hear it as you change it.** While stopped, moving any drum slider plays the sound

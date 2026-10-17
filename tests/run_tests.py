@@ -1692,26 +1692,48 @@ def samples_load_and_play_on_drum_slots(work):
 
 @test
 def touchscreen_picks_samples_and_kits(work):
-    """Drums tab: arrows step through the folder (and stop at the end), the box plays it, and 'new kit' picks for every slot that has samples."""
+    """Drums tab: arrows step through the folder (and stop at the end), and the box plays it."""
     if not PDLUA:
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     kd = os.path.join(work, "samples", "kick")
     write_tone(os.path.join(kd, "01.wav"), 110, 0.2); write_tone(os.path.join(kd, "02.wav"), 220, 0.2)
-    write_tone(os.path.join(work, "samples", "perc", "01.wav"), 330, 0.2)
-    h = Harness(); h.show("ockm-d1-sample", "ockm-d1-audition", "ockm-d6-sample", "ockm-d7-sample", "ockm-d1-sound")
+    h = Harness(); h.show("ockm-d1-sample", "ockm-d1-audition")
     h.at(100, "ockm-ui-test tap 539 36")      # drums tab: counts the folders
-    h.at(400, "ockm-ui-test tap 366 380")     # the synth kick -> sample 1
-    h.at(500, "ockm-ui-test tap 366 380")     # 2
-    h.at(700, "ockm-ui-test tap 366 380")     # only 2 kicks: stays put
+    h.at(400, "ockm-ui-test tap 354 380")     # the synth kick -> sample 1
+    h.at(500, "ockm-ui-test tap 354 380")     # 2
+    h.at(700, "ockm-ui-test tap 354 380")     # only 2 kicks: stays put
     h.at(900, "ockm-ui-test tap 200 380")     # tap the box: hear it
-    h.at(1300, "ockm-ui-test tap 430 380")    # new kit: perc 1 and perc 2 get the perc sample
-    f = os.path.join(work, "t_samples_ui.pd"); h.finish(1500, f)
+    f = os.path.join(work, "t_samples_ui.pd"); h.finish(1300, f)
     out = run(work, f)
     d1 = [int(float(v)) for v in printed(out, "ockm-d1-sample")]
     picked = [v for v in d1 if v > 0]
-    assert picked[:2] == [1, 2] and len(picked) <= 3, f"sample steps wrong (the last one is new kit's pick): {d1}"
+    assert picked == [1, 2], f"sample steps wrong: {d1}"
     assert len(printed(out, "ockm-d1-audition")) >= 3, f"should play on each change and on tapping the box: {printed(out, 'ockm-d1-audition')}"
-    assert printed(out, "ockm-d6-sample") == ["1"] and printed(out, "ockm-d7-sample") == ["1"], "new kit should give both perc slots a sample"
+
+@test
+def touchscreen_saves_drum_sounds(work):
+    """Drums tab: the save icon keeps the kick's synth sound as one of your sounds ("kick 1"). Change the sound and
+    the arrows bring it back; on a saved sound the icon deletes it. Random and wild put morph back to 0."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness(); h.show("ockm-d1-labrseed", "ockm-d1-labmorph", "ockm-d1-tune")
+    h.at(100, "ockm-ui-test tap 539 36 ; ockm-d1-sample 0 ; ockm-d1-labrseed 4242 ; ockm-d1-labramt 0.35 ; ockm-d1-tune 3")
+    h.at(300, "ockm-ui-test tap 404 380")     # save: kick 1
+    h.at(400, "ockm-d1-labrseed 0 ; ockm-d1-labramt 0 ; ockm-d1-tune 0")
+    h.at(500, "ockm-ui-test tap 354 380")     # arrow right: kick 1
+    h.at(600, "ockm-ui-test dump")
+    h.at(700, "ockm-ui-test tap 404 380")     # on kick 1 the icon is delete
+    h.at(800, "ockm-ui-test dump")
+    h.at(900, "ockm-d1-labmorph 0.6")
+    h.at(1000, "ockm-ui-test tap 301 419")    # random: morph goes back to 0
+    f = os.path.join(work, "t_save_sound.pd"); h.finish(1200, f)
+    out = run(work, f)
+    seeds = [int(float(v)) for v in printed(out, "ockm-d1-labrseed")]
+    assert 4242 in seeds[2:], f"the arrow should bring the saved sound back: {seeds}"
+    assert printed(out, "ockm-d1-tune")[-1] in ("3", "3.0"), "with its tune"
+    assert "box mine kick 1" in out, "the box should show the saved sound's name"
+    assert out.count("box mine kick 1") == 1, "delete should remove it"
+    assert float(printed(out, "ockm-d1-labmorph")[-1]) == 0, "random puts morph back to 0"
 
 @test
 def touchscreen_drum_synth_random_and_reset(work):

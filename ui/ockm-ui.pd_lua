@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.65"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.66"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -312,7 +312,67 @@ function ui:sample_count(slot)
   local snd = math.floor(self.v["ockm-"..SLOTS[slot].."-sound"] or 0)
   return (self.scount or {})[SOUND_DIR[snd + 1]] or 0
 end
--- where a slot is in its list: first its synth sound(s) (one, or rim / conga / shaker for perc), then sample 1 and up
+-- your saved drum sounds: the slot settings each one keeps
+local SOUND_KEYS = { "labchar", "labmorph", "labrseed", "labramt", "labpseed", "tune", "decay", "tone", "drive" }
+local SOUND_DEF = { labchar = 0, labmorph = 0, labrseed = 0, labramt = 0, labpseed = 1, tune = 0, decay = 100, tone = 0, drive = 0 }
+-- which lab voice a slot plays (closed and open hats share the hat)
+function ui:voice_type(slot)
+  local n = self:synth_name(slot)
+  return (n == "closed hat" or n == "open hat") and "hat" or n
+end
+-- the saved sounds a slot can play: its voice, or for perc any of rim, conga and shaker
+function ui:presets_for(slot)
+  local snd = math.floor(self.v["ockm-"..SLOTS[slot].."-sound"] or 0)
+  local ok = {}
+  if LAB_PERC[snd] then for _, t in ipairs(LAB_PERC[snd]) do ok[t] = true end else ok[self:voice_type(slot)] = true end
+  local out = {}
+  for i, p in ipairs((self.me and self.me.sounds) or {}) do if ok[p.type] then out[#out + 1] = i end end
+  return out
+end
+-- the saved sound this slot is playing right now, if any (index into self.me.sounds)
+function ui:current_preset(slot)
+  local nm = SLOTS[slot]
+  if math.floor(self.v["ockm-"..nm.."-sample"] or 0) > 0 then return nil end
+  local t = self:voice_type(slot)
+  for _, i in ipairs(self:presets_for(slot)) do
+    local p = self.me.sounds[i]
+    if p.type == t then
+      local same = true
+      for _, k in ipairs(SOUND_KEYS) do
+        if math.abs((self.v["ockm-"..nm.."-"..k] or SOUND_DEF[k]) - (p[k] or SOUND_DEF[k])) > 0.001 then same = false; break end
+      end
+      if same then return i end
+    end
+  end
+  return nil
+end
+function ui:apply_preset(slot, i)
+  local nm, p = SLOTS[slot], self.me.sounds[i]
+  local snd = math.floor(self.v["ockm-"..nm.."-sound"] or 0)
+  self:send("ockm-"..nm.."-sample", 0)
+  if LAB_PERC[snd] then for j, t in ipairs(LAB_PERC[snd]) do if t == p.type then self:send("ockm-"..nm.."-synth", j - 1) end end end
+  for _, k in ipairs(SOUND_KEYS) do self:send("ockm-"..nm.."-"..k, p[k] or SOUND_DEF[k]) end
+end
+-- save this slot's synth sound, named by its voice and the next free number ("kick 3")
+function ui:save_sound(slot)
+  local nm, t = SLOTS[slot], self:voice_type(slot)
+  local used, n = {}, 1
+  for _, p in ipairs(self.me.sounds) do used[p.name] = true end
+  while used[t .. " " .. n] do n = n + 1 end
+  local p = { name = t .. " " .. n, type = t }
+  for _, k in ipairs(SOUND_KEYS) do p[k] = self.v["ockm-"..nm.."-"..k] or SOUND_DEF[k] end
+  table.insert(self.me.sounds, p)
+  self:save_settings()
+  self:flash_btn("save")
+end
+function ui:delete_sound(i)
+  table.remove(self.me.sounds, i)
+  self:save_settings()
+  self:flash_btn("save")
+end
+
+-- where a slot is in its list: first its synth sound(s) (one, or rim / conga / shaker for perc), then your saved
+-- sounds for it, then sample 1 and up
 function ui:synth_count(slot)
   return LAB_PERC[math.floor(self.v["ockm-"..SLOTS[slot].."-sound"] or 0)] and 3 or 1
 end
@@ -325,17 +385,24 @@ end
 function ui:drum_pos(slot)
   local nm = SLOTS[slot]
   local smp = math.floor(self.v["ockm-"..nm.."-sample"] or 0)
-  local ns = self:synth_count(slot)
-  if smp > 0 then return smp + ns - 1 end
+  local ns, ps = self:synth_count(slot), self:presets_for(slot)
+  if smp > 0 then return smp + ns + #ps - 1 end
+  local cur = self:current_preset(slot)
+  if cur then for j, i in ipairs(ps) do if i == cur then return ns + j - 1 end end end
   return clamp(math.floor(self.v["ockm-"..nm.."-synth"] or 0), 0, ns - 1)
 end
 function ui:set_drum_pos(slot, pos)
   local nm = SLOTS[slot]
-  local ns = self:synth_count(slot)
+  local ns, ps = self:synth_count(slot), self:presets_for(slot)
+  local was = self:drum_pos(slot)
   if pos < ns then
+    -- back to a synth sound from a saved one: start from the lab's sound
+    if was >= ns and was < ns + #ps then for _, k in ipairs(SOUND_KEYS) do self:send("ockm-"..nm.."-"..k, SOUND_DEF[k]) end end
     self:send("ockm-"..nm.."-sample", 0); self:send("ockm-"..nm.."-synth", pos)
+  elseif pos < ns + #ps then
+    self:apply_preset(slot, ps[pos - ns + 1])
   else
-    self:send("ockm-"..nm.."-sample", pos - ns + 1)
+    self:send("ockm-"..nm.."-sample", pos - ns - #ps + 1)
   end
   self:audition_soon(slot)
 end
@@ -345,6 +412,7 @@ function ui:lab_random(slot, amt)
   self:snapshot("randomise")
   self:send("ockm-"..nm.."-labrseed", math.random(1, 99999)); self:send("ockm-"..nm.."-labramt", amt)
   self:send("ockm-"..nm.."-labpseed", math.random(1, 99999))
+  self:send("ockm-"..nm.."-labmorph", 0)     -- a new path: morph starts again from the new sound
   self:flash_btn((amt >= 1) and "wild" or "random")
   self:audition_soon(slot)
 end
@@ -373,18 +441,6 @@ function ui:set_sample(slot, n)
   self:send("ockm-"..SLOTS[slot].."-sample", n)
   self:audition_soon(slot)
 end
--- a fresh kit: a random sample for every slot whose folder has any
-function ui:random_kit()
-  self:snapshot("new kit")
-  local n = 0
-  for i = 1, 8 do
-    local c = self:sample_count(i)
-    if c > 0 then self:send("ockm-"..SLOTS[i].."-sample", math.random(1, c)); n = n + 1 end
-  end
-  if n == 0 then self:say("no samples yet: add some to the samples folder")
-  else self:say_undo("new kit: " .. n .. " samples picked") end
-end
-
 function ui:finalize()
   for _, r in ipairs(self.recv or {}) do r:destruct() end
   if self.clock then self.clock:destruct() end
@@ -903,6 +959,7 @@ local MACRO_NAMES = { "build", "wash", "strip", "sink", "dub out", "lift", "blur
                       "tunnel", "pressure", "drop out", "air", "grit" }
 local function default_settings()
   return {
+    sounds = {},     -- your saved drum sounds: { name, type, and the slot settings in SOUND_KEYS }
     macros = {
       { name = "build", moves = { { t = "filter", v = 0.6, how = 4, back = 1 }, { t = "reverb", v = 0.65, how = 1, back = 2 },
                                   { t = "delay", v = 0.45, how = 1, back = 1 }, { t = "pump", v = 1, how = 1, back = 1 } } },
@@ -1296,15 +1353,23 @@ function ui:layout_drums(add)
   local ns = self:synth_count(slot)
   local sname = self:synth_name(slot)
   add{ kind="text", x=16, y=346, w=half, h=12, size=10,
-       label=(cnt == 0) and ("drum lab synth; no samples in the " .. folder .. " folder yet") or "sound: tap to hear it, arrows to change (the synth, then your samples)" }
-  local bw = half - 44 * 2 - 12 - 84
+       label="sound: tap to hear it, arrows to change (the synth, your saved sounds, then samples)" }
+  -- the sound box: arrows either side, then save (your own sound) or, on one of your saved sounds, delete
+  local cur = self:current_preset(slot)
+  local nps = #self:presets_for(slot)
+  local last = ns + nps + cnt - 1
+  local bw = 260
   add{ kind="arrow", x=16, y=362, w=44, h=36, dir=-1, on=(pos > 0), tap=function() if pos > 0 then self:set_drum_pos(slot, pos - 1) end end }
   add{ kind="preset", x=66, y=362, w=bw, h=36, inline=true, sel=(smp > 0),
-       num=(smp == 0) and "synth" or string.format("%02d", smp),
-       label=(smp == 0) and sname or ("of " .. cnt .. "  " .. folder),
+       num=(smp > 0) and string.format("%02d", smp) or (cur and "mine" or "synth"),
+       label=(smp > 0) and ("of " .. cnt .. "  " .. folder) or (cur and self.me.sounds[cur].name or sname),
        tap=function() self:audition(slot) end }
-  add{ kind="arrow", x=66 + bw + 6, y=362, w=44, h=36, dir=1, on=(pos < cnt + ns - 1), tap=function() if pos < cnt + ns - 1 then self:set_drum_pos(slot, pos + 1) end end }
-  add{ kind="btn", x=16 + half - 84, y=362, w=84, h=36, label="new kit", small=true, tap=function() self:random_kit() end }
+  add{ kind="arrow", x=66 + bw + 6, y=362, w=44, h=36, dir=1, on=(pos < last), tap=function() if pos < last then self:set_drum_pos(slot, pos + 1) end end }
+  if cur then
+    add{ kind="bin", x=66 + bw + 56, y=362, w=44, h=36, lit=(self.flashing == "save"), tap=function() self:delete_sound(cur) end }
+  else
+    add{ kind="disc", x=66 + bw + 56, y=362, w=44, h=36, lit=(self.flashing == "save"), off=(smp > 0) or nil, tap=function() self:save_sound(slot) end }
+  end
   -- the synth's shape: character (its lab recipe) and morph sweep several settings at once; randomise and reset.
   -- Greyed out while the slot plays a sample
   local off = (smp > 0) or nil
@@ -2540,6 +2605,7 @@ function ui:test(sel, a)
   elseif sel == "dump" then
     local L = self:layout()
     pd.post(string.format("ockm-ui: screen %s page %d widgets %d", self.screen, self.page, #L))
+    for _, w in ipairs(L) do if w.kind == "preset" and w.inline then pd.post("ockm-ui: box " .. tostring(w.num) .. " " .. tostring(w.label)) end end
   end
 end
 
@@ -2654,13 +2720,22 @@ function ui:draw(g, w)
   elseif k == "disc" then
     -- save: a floppy disc, orange when there's something unsaved
     local on = self.unsaved
+    if w.lit ~= nil then on = w.lit end
     self:col(g, on and "acc" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
-    local c = on and "#ffffff" or "txt"
+    local c = on and "#ffffff" or (w.off and "mute" or "txt")
     local cx, cy = w.x + w.w / 2, w.y + w.h / 2
     self:col(g, c); g:stroke_rounded_rect(cx - 11, cy - 11, 22, 22, 3, 2)
     g:fill_rect(cx - 6, cy - 11, 12, 7)
     self:col(g, on and "acc" or "off"); g:fill_rect(cx - 2, cy - 10, 4, 5)
     self:col(g, c); g:fill_rect(cx - 7, cy + 3, 14, 6)
+  elseif k == "bin" then
+    -- delete one of your saved sounds: a small bin
+    self:col(g, w.lit and "acc" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
+    local cx, cy = w.x + w.w / 2, w.y + w.h / 2
+    self:col(g, w.lit and "#ffffff" or "txt")
+    g:fill_rect(cx - 9, cy - 8, 18, 2); g:fill_rect(cx - 3, cy - 11, 6, 3)
+    g:stroke_rounded_rect(cx - 7, cy - 5, 14, 16, 2, 2)
+    g:fill_rect(cx - 2, cy - 2, 1, 10); g:fill_rect(cx + 1, cy - 2, 1, 10)
   elseif k == "menubtn" then
     self:col(g, w.sel and "on" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
     self:col(g, w.sel and "bg" or "txt")

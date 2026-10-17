@@ -125,7 +125,7 @@ Everything is on the screens now, so `pd test-panel` is only for testing.
 
 **Projects** (the **project** button, top right). A project is one loop plus the drum kit, tempo and effects. It opens on the one you used last.
 - **Save** writes the loop and the project. **Back to last save** throws away everything since
-- **Undo** (one step): arrange, a groove, clear, new kit and de-mud each put an **undo** button in the message that follows. It takes everything (the loop, kit, EQ, tempo) back to just before. Only the last one can be undone, and opening another project or going back to last save forgets it. The copy lives in `undo/` beside `projects/`
+- **Undo** (one step): arrange, a groove, clear and de-mud each put an **undo** button in the message that follows. It takes everything (the loop, kit, EQ, tempo) back to just before. Only the last one can be undone, and opening another project or going back to last save forgets it. The copy lives in `undo/` beside `projects/`
 - **New blank project** starts from nothing: an empty loop, the default kit and sounds. It's named for you with two random words and the date, like "velvet heron · 14 Oct"
 - **Save as a copy** keeps the project you were in as it was last saved, and carries on in a copy
 - **Your projects**, newest first. Tap one, then **save mine, then open**, **open without saving**, or **delete** (tap twice). Deleting moves the files to a `trash` folder next to `projects/`, so nothing is lost by accident
@@ -414,13 +414,14 @@ The synth sounds are the drum lab's voices, each slot running its own copy, so t
 
 - **Level, tune, decay, tone, drive.** Tune moves the sound's pitches; decay stretches its lengths
 - **Character:** the lab's named recipe for that sound (punch, crack, room, metal, boom, wood, slap, shake), moving several settings at once, some up and some down
-- **Morph:** walks a smooth path through nearby sounds. Each **random** press picks a new path
+- **Morph:** walks a smooth path through nearby sounds. Random and wild pick a new path and put morph back to 0
 - **Random** shifts the sound a little from where it starts; **wild** goes anywhere. **Reset** goes back to the starting sound
 - These sit above the sliders and grey out while the slot plays a sample. While stopped, moving any slider plays the sound
+- **Save** (the disc next to the sound box) keeps the sound as one of yours, named like "kick 1", in `my-settings.lua`, so every project can use it. The arrows step through the synth, your saved sounds, then samples. On a saved sound the disc becomes a bin, to delete it. Perc slots share rim, conga and shaker sounds; closed and open hats share hat sounds
 
 All of it is saved with the project as seeds and slider positions, so a project always gets the same sound back.
 
-The sliders change with the source. **Synth:** as above. **Sample:** level, pitch, length, tone, start (skips up to 40% into the sample, to trim a slow attack). Reverb and delay sends are on the mixer. **New kit** picks a random sample for every slot that has some.
+The sliders change with the source. **Synth:** as above. **Sample:** level, pitch, length, tone, start (skips up to 40% into the sample, to trim a slow attack). Reverb and delay sends are on the mixer.
 
 - Samples are numbered in file-name order, so `01.wav` is sample 1. WAV and AIFF, mono or stereo (only the left channel plays), any sample rate
 - Tune changes the playback speed, like an MPC: +12 is an octave up and twice as short. Decay below 100 fades the tail early; at 100 or more the whole sample plays
