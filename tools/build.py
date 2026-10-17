@@ -457,7 +457,7 @@ for nm,snd in SLOTS:
 for _t in [n for n,_ in SLOTS]+["bass","lead","chord"]:
     PROJECT_KEYS+=[(f"ockm-{_t}-{k}",v,None) for k,v in EQ_DEF.items()]
 LFO_DEF={"lfo-shape":0,"lfo-rate":4,"lfo-depth":0,"lfo-target":1,"chorus":0}   # sine, one bar, off, the first knob; chorus off
-SYNTH_DEFAULTS={"bass":dict(engine=0,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.37,k2=0.9,k3=0.31,k4=0.55,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
+SYNTH_DEFAULTS={"bass":dict(engine=5,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.42,k2=0.25,k3=0.45,k4=0.45,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
                 "lead":dict(engine=4,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
                 "chord":dict(engine=0,mode=0,level=1,k1=0.45,k2=0.5,k3=0.4,k4=0.3,type=0,smooth=1,verb=0,delay=0,rhythm=0,prog=0,voicing=0,strum=0,**LFO_DEF)}
 PATTERN_KEYS=[("ockm-end",0,None),("ockm-impact",0,None),("ockm-pump",0,None),("ockm-bass-on",1,None),("ockm-lead-on",1,None),("ockm-chord-on",1,None),("ockm-rise",0,None),("ockm-drum-len",16,None),("ockm-bass-len",64,None),("ockm-lead-len",64,None),("ockm-chord-len",64,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None),("ockm-leader",0,None),("ockm-drum-groove",-1,None),("ockm-fill-every",0,None),("ockm-fill-style",0,None)]
@@ -669,14 +669,14 @@ def row(y,label,items):
         fa=sub.add(f"#X floatatom {x} {y} 5 {lo} {hi} 0 - - {hook};")
         m=sub.add(f"#X obj {x+45} {y-18} r {show(hook)};"); sub.con(m,0,fa,0)
 row(80,"key",[("root",9,0,11,"ockm-root",False),("scale",0,0,5,"ockm-scale",False)])
-row(140,"bass",[("engine",0,0,6,"ockm-bass-engine",True),("k1",0.37,0,1,"ockm-bass-k1",True),("k2",0.9,0,1,"ockm-bass-k2",True),("k3",0.31,0,1,"ockm-bass-k3",True),
-                ("k4",0.55,0,1,"ockm-bass-k4",True),("drive",0,0,1,"ockm-bass-drive",True),("rhythm",3,0,7,"ockm-bass-rhythm",False),("notes",3,0,11,"ockm-bass-notes",False)])
+row(140,"bass",[("engine",5,0,6,"ockm-bass-engine",True),("k1",0.42,0,1,"ockm-bass-k1",True),("k2",0.25,0,1,"ockm-bass-k2",True),("k3",0.45,0,1,"ockm-bass-k3",True),
+                ("k4",0.45,0,1,"ockm-bass-k4",True),("drive",0,0,1,"ockm-bass-drive",True),("rhythm",3,0,7,"ockm-bass-rhythm",False),("notes",3,0,11,"ockm-bass-notes",False)])
 row(200,"lead",[("engine",4,0,6,"ockm-lead-engine",True),("k1",0.55,0,1,"ockm-lead-k1",True),("k2",0.3,0,1,"ockm-lead-k2",True),("k3",0.4,0,1,"ockm-lead-k3",True),
                 ("k4",0.45,0,1,"ockm-lead-k4",True),("drive",0,0,1,"ockm-lead-drive",True),("rhythm",6,0,7,"ockm-lead-rhythm",False),("notes",8,0,11,"ockm-lead-notes",False)])
 row(260,"chord",[("engine",0,0,5,"ockm-chord-engine",True),("k1",0.45,0,1,"ockm-chord-k1",True),("k2",0.5,0,1,"ockm-chord-k2",True),("k3",0.4,0,1,"ockm-chord-k3",True),
                  ("k4",0.3,0,1,"ockm-chord-k4",True),("type",0,0,7,"ockm-chord-type",True),("smooth",1,0,1,"ockm-chord-smooth",True),("rhythm",0,0,9,"ockm-chord-rhythm",False),("prog",0,0,9,"ockm-chord-prog",False)])
 sub.add("#X text 20 300 key root: 0 C ... 9 A ... 11 B. Scale: 0 minor 1 major 2 dorian 3 phrygian 4 mixolydian 5 harmonic minor;")
-sub.add("#X text 20 320 bass and lead engines: 0 acid 1 sub 2 FM 3 reese 4 pluck 5 saw 6 house. Chord engines: 0 stab 1 organ 2 pad 3 piano 4 rhodes 5 strings. Chord type: 0 triad 1 seventh 2 sus2 3 power 4 sus4 5 sixth 6 ninth 7 eleventh;")
+sub.add("#X text 20 320 bass engines: 0 acid 1 sub/808 2 FM 3 reese 4 pluck 5 analogue (default) 6 donk. Chord engines: 0 stab 1 organ 2 pad 3 piano 4 rhodes 5 strings. Chord type: 0 triad 1 seventh 2 sus2 3 power 4 sus4 5 sixth 6 ninth 7 eleventh;")
 sub.add("#X text 20 340 bass/lead rhythm: 0 offbeat 1 rolling 2 gallop 3 acid 4 dub 5 bounce 6 acid16 7 trip-hop. Notes: 0 root 1 octaves 2 root-fifth 3 acid-riff 4 walk-up 5 stab 6 dub 7 pedal 8 arp-up 9 arp-updown 10 call 11 descend;")
 sub.add("#X text 20 360 chord rhythm 0-9 and progression 0-9: the names are on the synths screen and in tools/build.py (PRE and PROGS). Smooth 1 = chords move by small steps.;")
 p.L.append(sub.text("#N canvas 260 160 1000 400 synth-settings 0;").rstrip("\n"))
@@ -833,13 +833,17 @@ def acid(q,core,ks,out):
     q.add("#X text 200 110 k1 cutoff / k2 resonance / k3 envelope amount;")
 
 def sub(q,core,ks,out):
-    em=q.add("#X obj 300 200 *~ 12;"); pl=q.add("#X obj 30 230 +~;"); mt=q.add("#X obj 30 260 mtof~;"); osc=q.add("#X obj 30 290 osc~;")
+    # sub and 808: a driven sine. The pitch drop is quick whatever the decay; with a long decay (k4 up) the note rings
+    # on past the step like an 808 boom, with a short one it ends with the step
+    em=q.add(f"#X obj 300 200 expr~ pow(min(1\\, max(0\\, {D}v1))\\, 12)*{D}f2;"); pl=q.add("#X obj 30 230 +~;"); mt=q.add("#X obj 30 260 mtof~;"); osc=q.add("#X obj 30 290 osc~;")
     gn=q.add("#X obj 30 320 *~ 1;"); th=q.add(f"#X obj 30 350 expr~ tanh({D}v1);"); lp=q.add("#X obj 30 380 lop~ 400;")
+    ae=q.add(f"#X obj 200 380 expr~ max({D}v1\\, pow(min(1\\, max(0\\, {D}v2))\\, 1.5));")
     am=q.add("#X obj 30 410 *~;"); g=q.add("#X obj 30 440 *~ 0.9;")
-    k1=q.add(f"#X obj 200 140 expr 60*pow(2\\,7*{D}f1);"); k2=q.add(f"#X obj 310 140 expr 1+6*{D}f1;"); k3=q.add("#X obj 420 140 * 24;")
-    for c in [(core,1,em,0),(core,0,pl,0),(em,0,pl,1),(pl,0,mt,0),(mt,0,osc,0),(osc,0,gn,0),(gn,0,th,0),(th,0,lp,0),(lp,0,am,0),(core,2,am,1),(am,0,g,0),(g,0,out,0),
+    k1=q.add(f"#X obj 200 140 expr 60*pow(2\\,7*{D}f1);"); k2=q.add(f"#X obj 310 140 expr 1+6*{D}f1;"); k3=q.add("#X obj 420 140 * 30;")
+    for c in [(core,1,em,0),(core,0,pl,0),(em,0,pl,1),(pl,0,mt,0),(mt,0,osc,0),(osc,0,gn,0),(gn,0,th,0),(th,0,lp,0),(lp,0,am,0),
+              (core,2,ae,0),(core,1,ae,1),(ae,0,am,1),(am,0,g,0),(g,0,out,0),
               (ks[0],0,k1,0),(k1,0,lp,1),(ks[1],0,k2,0),(k2,0,gn,1),(ks[2],0,k3,0),(k3,0,em,1)]: q.con(*c)
-    q.add("#X text 200 110 k1 tone / k2 drive / k3 pitch drop on each note;")
+    q.add("#X text 200 110 k1 tone / k2 drive / k3 pitch drop on each note (up to 30 semitones \\, quick) / k4 decay: turn it up for an 808 that rings on;")
 
 def fm(q,core,ks,out):
     mt=q.add("#X obj 30 200 mtof~;"); rm=q.add("#X obj 160 240 *~ 1;"); mo=q.add("#X obj 160 270 osc~;")
@@ -857,7 +861,7 @@ def reese(q,core,ks,out):
     s1=q.add("#X obj 30 290 +~;"); s2=q.add("#X obj 30 315 +~;"); sc=q.add("#X obj 30 340 *~ 0.667;"); ce=q.add("#X obj 30 365 -~ 1;")
     em=q.add("#X obj 350 200 *~ 3000;"); ad=q.add("#X obj 350 230 +~ 300;"); cl=q.add("#X obj 350 260 clip~ 30 12000;")
     bob=q.add("#X obj 30 400 bob~;"); rs=q.add("#X msg 450 300 1.2;"); lb=q.add("#X obj 450 270 loadbang;")
-    am=q.add("#X obj 30 430 *~;"); g=q.add("#X obj 30 460 *~ 1.2;")
+    am=q.add("#X obj 30 430 *~;"); g=q.add("#X obj 30 460 *~ 3;")   # v0.71: level-matched with the other bass engines
     k1=q.add(f"#X obj 200 140 expr 40*pow(2\\,8*{D}f1);"); k2=q.add(f"#X obj 310 140 expr 0.003+0.02*{D}f1 \; 0.003+0.02*{D}f1;")
     up=q.add("#X obj 310 170 + 1;"); dn=q.add("#X obj 380 170 expr 1-$f1;".replace("$","\\$")); k3=q.add("#X obj 420 140 * 6000;")
     for c in [(core,0,mt,0),(mt,0,p1,0),(mt,0,ua,0),(mt,0,db,0),(ua,0,p2,0),(db,0,p3,0),(p1,0,s1,0),(p2,0,s1,1),(s1,0,s2,0),(p3,0,s2,1),
@@ -889,53 +893,48 @@ engine("voices/ockm-mono-acid.pd",0,"Acid engine: saw wave into a resonant filte
 engine("voices/ockm-mono-sub.pd",1,"Sub engine: a driven sine wave with a pitch drop. Deep and clean",sub)
 engine("voices/ockm-mono-fm.pd",2,"FM engine: one sine wave bending another. Punchy and metallic",fm)
 engine("voices/ockm-mono-reese.pd",3,"Reese engine: three detuned saws beating against each other. Dark and wide",reese)
-def house(q,core,ks,out):
-    # classic deep house / garage bass: a clean square plus a sine an octave down, through a warm low-pass with a short pluck
-    mt=q.add("#X obj 30 200 mtof~;"); sq=q.add("#X obj 30 230 ockm-blsquare;"); sqg=q.add("#X obj 30 260 *~ 0.55;")
-    hz=q.add("#X obj 160 230 *~ 0.5;"); so=q.add("#X obj 160 260 osc~;"); sog=q.add("#X obj 160 290 *~;")
-    em=q.add("#X obj 450 230 *~ 2500;"); ad=q.add("#X obj 450 260 +~ 200;"); cl=q.add("#X obj 450 290 clip~ 40 8000;")
-    bob=q.add("#X obj 30 330 bob~;"); rs=q.add("#X msg 600 300 0.4;"); lb=q.add("#X obj 600 270 loadbang;")
-    mix=q.add("#X obj 30 370 +~;"); am=q.add("#X obj 30 400 *~;"); g=q.add("#X obj 30 430 *~ 0.9;")
-    k1=q.add(f"#X obj 200 140 expr 60*pow(2\\,6*{D}f1);"); k2=q.add("#X obj 310 140 * 0.8;"); k3=q.add("#X obj 420 140 * 4000;")
-    for c in [(core,0,mt,0),(mt,0,sq,0),(sq,0,sqg,0),(mt,0,hz,0),(hz,0,so,0),(so,0,sog,0),
-              (core,1,em,0),(em,0,ad,0),(ad,0,cl,0),(cl,0,bob,1),(lb,0,rs,0),(rs,0,bob,2),
-              (sqg,0,bob,0),(bob,0,mix,0),(sog,0,mix,1),(mix,0,am,0),(core,2,am,1),(am,0,g,0),(g,0,out,0),
-              (ks[0],0,k1,0),(k1,0,ad,1),(ks[1],0,k2,0),(k2,0,sog,1),(ks[2],0,k3,0),(k3,0,em,1)]: q.con(*c)
-    q.add("#X text 200 110 k1 tone / k2 body (sub sine) / k3 pluck (filter snap on each note);")
-
 engine("voices/ockm-mono-pluck.pd",4,"Pluck engine: short and bright. Good for rolling riffs",pluck)
 
-def sawe(q,core,ks,out):
-    # raw sawtooth: optional second detuned saw and sub saw, tone control, full-level notes that end hard (k4 sets how long).
-    # v0.70: brighter by default and lightly saturated for weight
-    mt=q.add("#X obj 30 200 mtof~;")
-    p1=q.add("#X obj 30 240 phasor~;"); dt=q.add("#X obj 150 210 *~ 1;"); p2=q.add("#X obj 150 240 phasor~;")
-    sb=q.add("#X obj 270 210 *~ 0.5;"); p3=q.add("#X obj 270 240 phasor~;")
-    g2=q.add("#X obj 150 270 *~ 0;"); g3=q.add("#X obj 270 270 *~ 0;")
-    m1=q.add("#X obj 30 300 +~;"); m2=q.add("#X obj 30 325 +~;")
-    nm=q.add(f"#X obj 30 355 expr~ ({D}v1-0.5*(1+{D}f2+{D}f3))*2/(1+{D}f2+{D}f3);")
-    lp1=q.add("#X obj 30 390 lop~ 20000;"); lp2=q.add("#X obj 30 415 lop~ 20000;")
-    am=q.add(f"#X obj 30 450 expr~ tanh(1.8*{D}v1*min(1\\, max(0\\, {D}v2*4)))/tanh(1.8);")
-    g=q.add("#X obj 30 480 *~ 0.62;")
-    k1=q.add(f"#X obj 200 140 expr 737*pow(2\\,4.76*{D}f1);")
-    k2=q.add(f"#X obj 310 140 expr 1+0.02*{D}f1 \\; if({D}f1>0 \\, 0.7 \\, 0);")
-    k3=q.add("#X obj 420 170 * 0.8;")
-    for c in [(core,0,mt,0),(mt,0,p1,0),(mt,0,dt,0),(dt,0,p2,0),(mt,0,sb,0),(sb,0,p3,0),(p2,0,g2,0),(p3,0,g3,0),
-              (p1,0,m1,0),(g2,0,m1,1),(m1,0,m2,0),(g3,0,m2,1),(m2,0,nm,0),(nm,0,lp1,0),(lp1,0,lp2,0),
-              (lp2,0,am,0),(core,1,am,1),(am,0,g,0),(g,0,out,0),
-              (ks[0],0,k1,0),(k1,0,lp1,1),(k1,0,lp2,1),(ks[1],0,k2,0),(k2,0,dt,1),(k2,1,g2,1),(k2,1,nm,1),
-              (ks[2],0,k3,0),(k3,0,g3,1),(k3,0,nm,2)]: q.con(*c)
-    q.add("#X text 200 110 k1 tone (dark to fully raw \\, bright by default) / k2 second saw detune (0 = single saw) / k3 sub saw an octave down / k4 note length. Notes play at full level then stop hard \\, lightly saturated.;")
+def analogue(q,core,ks,out):
+    # the workhorse mono bass (Minimoog, SH-101, Pro-One): saw blending to square, a square sub an octave down, two
+    # resonant low-pass stages (24 dB) opened by the filter envelope, a little drive. Plain Pd only (vcf~), no bob~
+    mt=q.add("#X obj 30 200 mtof~;"); sw=q.add("#X obj 30 230 ockm-blsaw;"); sq=q.add("#X obj 150 230 ockm-blsquare;")
+    hz=q.add("#X obj 270 200 *~ 0.5;"); sb=q.add("#X obj 270 230 ockm-blsquare;")
+    mx=q.add(f"#X obj 30 270 expr~ {D}v1*(1-{D}f4) - {D}v2*{D}f4*0.8 - {D}v3*0.3;")   # the squares flipped so their fundamental adds to the saw's, not cancels
+    co=q.add(f"#X obj 450 270 expr~ min(12000\\, max(40\\, {D}f2*(1 + {D}v1*{D}f3)));")
+    f1=q.add("#X obj 30 310 vcf~ 1.2;"); f2=q.add("#X obj 30 340 vcf~ 0.9;")
+    dr=q.add(f"#X obj 30 375 expr~ tanh(4*{D}v1)/tanh(4);"); am=q.add("#X obj 30 405 *~;"); g=q.add("#X obj 30 435 *~ 0.65;")
+    k1=q.add(f"#X obj 200 140 expr 60*pow(2\\,7.5*{D}f1);"); k3=q.add("#X obj 420 140 * 10;")
+    for c in [(core,0,mt,0),(mt,0,sw,0),(mt,0,sq,0),(mt,0,hz,0),(hz,0,sb,0),(sw,0,mx,0),(sq,0,mx,1),(sb,0,mx,2),
+              (core,1,co,0),(co,0,f1,1),(co,0,f2,1),(mx,0,f1,0),(f1,1,f2,0),(f2,1,dr,0),(dr,0,am,0),(core,2,am,1),(am,0,g,0),(g,0,out,0),
+              (ks[0],0,k1,0),(k1,0,co,1),(ks[1],0,mx,3),(ks[2],0,k3,0),(k3,0,co,2)]: q.con(*c)
+    q.add("#X text 200 110 k1 cutoff / k2 saw to square / k3 filter envelope (how far each note opens it) / k4 decay. With a square sub an octave down.;")
 
-engine("voices/ockm-mono-house.pd",6,"House engine: clean square plus a sub sine through a warm filter with a short pluck. Deep house and garage",house)
-engine("voices/ockm-mono-saw.pd",5,"Saw engine: a raw sawtooth. No squelch \\, just a hard buzzy bass",sawe)
+def donk(q,core,ks,out):
+    # donk and organ bass (bassline house \\, UK garage \\, the Korg M1 organ bass): a hollow tone with a quick pitch
+    # bounce down onto the note, rings out over its own decay. k1 brightness (more of the organ harmonics), k2 bounce,
+    # k3 hollow (odd harmonics: woodier), k4 decay
+    pe=q.add(f"#X obj 300 200 expr~ pow(min(1\\, max(0\\, {D}v1))\\, 12)*{D}f2;"); pl=q.add("#X obj 30 230 +~;"); mt=q.add("#X obj 30 260 mtof~;")
+    o1=q.add("#X obj 30 290 osc~;"); m2=q.add("#X obj 150 260 *~ 2;"); o2=q.add("#X obj 150 290 osc~;"); m3=q.add("#X obj 270 260 *~ 3;"); o3=q.add("#X obj 270 290 osc~;")
+    sq=q.add("#X obj 390 290 ockm-blsquare;"); sl=q.add("#X obj 390 320 lop~ 1200;")
+    mx=q.add(f"#X obj 30 350 expr~ {D}v1 + {D}f5*(0.5*{D}v2 + 0.3*{D}v3) + {D}f6*0.7*{D}v4;")
+    th=q.add(f"#X obj 30 380 expr~ tanh(1.4*{D}v1)/tanh(1.4);")
+    ae=q.add(f"#X obj 200 380 expr~ pow(min(1\\, max(0\\, {D}v1))\\, 2);"); am=q.add("#X obj 30 410 *~;"); g=q.add("#X obj 30 440 *~ 0.8;")
+    k2=q.add("#X obj 310 140 * 14;")
+    for c in [(core,1,pe,0),(core,0,pl,0),(pe,0,pl,1),(pl,0,mt,0),(mt,0,o1,0),(mt,0,m2,0),(m2,0,o2,0),(mt,0,m3,0),(m3,0,o3,0),(mt,0,sq,0),(sq,0,sl,0),
+              (o1,0,mx,0),(o2,0,mx,1),(o3,0,mx,2),(sl,0,mx,3),(mx,0,th,0),(th,0,am,0),(core,1,ae,0),(ae,0,am,1),(am,0,g,0),(g,0,out,0),
+              (ks[0],0,mx,4),(ks[1],0,k2,0),(k2,0,pe,1),(ks[2],0,mx,5)]: q.con(*c)
+    q.add("#X text 200 110 k1 brightness (organ harmonics) / k2 bounce (pitch drop onto the note) / k3 hollow (woodier) / k4 decay. Rings out on its own.;")
+
+engine("voices/ockm-mono-analogue.pd",5,"Analogue engine: saw to square with a sub \\, through a resonant 24 dB low-pass. The workhorse house and techno bass (the default)",analogue)
+engine("voices/ockm-mono-donk.pd",6,"Donk engine: a hollow tone that bounces down onto each note and rings out. Bassline house \\, garage \\, M1 organ bass",donk)
 
 # ================= bass wrapper =================
 q=P()
 q.add("#X text 20 10 Mono synth (bass or lead): six engines \\, one plays at a time (ockm-<track>-engine 0 to 5). Knobs k1-k4 and drive come in on hooks.;")
 inl=q.add("#X obj 30 50 inlet;")
 ks=[q.add(f"#X obj {200+i*130} 50 r ockm-{D}1-k{i+1}-m;") for i in range(4)]
-names=["acid","sub","fm","reese","pluck","saw","house"]
+names=["acid","sub","fm","reese","pluck","analogue","donk"]
 eng=[q.add(f"#X obj {30+i*130} 130 ockm-mono-{n} {D}1;") for i,n in enumerate(names)]
 sm=q.add("#X obj 30 200 +~;")
 for i,e in enumerate(eng):

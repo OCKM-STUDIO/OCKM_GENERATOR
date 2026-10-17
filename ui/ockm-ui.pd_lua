@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.70"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.71"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -44,7 +44,9 @@ local TRACKS  = { "d1","d2","d3","d4","d5","d6","d7","d8","bass","lead","chord" 
 local NOTES   = { "C","C#","D","D#","E","F","F#","G","G#","A","A#","B" }
 local SCALES  = { {0,2,3,5,7,8,10}, {0,2,4,5,7,9,11}, {0,2,3,5,7,9,10}, {0,1,3,5,7,8,10}, {0,2,4,5,7,9,10}, {0,2,3,5,7,8,11} }
 local SCALE_NAMES = { "minor","major","dorian","phrygian","mixo","harm min" }
-local MONO_ENG  = { "acid","sub","fm","reese","pluck","saw","house" }
+local MONO_ENG  = { "acid","sub 808","fm","reese","pluck","analogue","donk" }
+-- the order the bass engines are shown in: analogue (the default) first, then by family
+local MONO_ORDER = { 5, 1, 0, 3, 2, 4, 6 }
 -- the lead has its own engines. Numbers match ockm-lead-engine; LEAD_ORDER is the order they're shown in
 local LEAD_ENG  = { "acid","juno","dx","sync","mini" }
 local LEAD_ORDER = { 4, 1, 2, 0, 3 }
@@ -52,12 +54,12 @@ local CHORD_ENG = { "stab","organ","pad","piano","rhodes","strings" }
 local function engines_of(part) if part == "chord" then return CHORD_ENG elseif part == "lead" then return LEAD_ENG end return MONO_ENG end
 local KNOBS = {
   acid  = {"cutoff","resonance","env amount","decay"},
-  sub   = {"tone","drive","pitch drop","decay"},
+  ["sub 808"] = {"tone","drive","pitch drop","decay"},
   fm    = {"brightness","ratio","env","decay"},
   reese = {"cutoff","detune","env amount","decay"},
   pluck = {"brightness","saw-square","snap","decay"},
-  saw   = {"tone","detune","sub","decay"},
-  house = {"tone","body","pluck","decay"},
+  analogue = {"cutoff","saw-square","envelope","decay"},
+  donk  = {"brightness","bounce","hollow","decay"},
   stab  = {"brightness","detune","snap","length"},
   organ = {"drawbars","click","sub","length"},
   pad   = {"brightness","detune","attack","length"},
@@ -1527,7 +1529,7 @@ function ui:layout_synth_sound(add, part, mono)
   local eng = engines_of(part)
   local ew = rw / #eng
   for i = 1, #eng do
-    local e = (part == "lead") and LEAD_ORDER[i] or (i - 1)
+    local e = (part == "lead") and LEAD_ORDER[i] or (part == "bass") and MONO_ORDER[i] or (i - 1)
     add{ kind="choice", x=rx + (i - 1) * ew, y=330, w=ew - 4, h=40, label=eng[e + 1], small=true, sel=(self.v["ockm-"..part.."-engine"] == e),
          tap=function() self:send("ockm-"..part.."-engine", e) end }
   end

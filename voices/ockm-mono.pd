@@ -10,8 +10,8 @@
 #X obj 290 130 ockm-mono-fm \$1;
 #X obj 420 130 ockm-mono-reese \$1;
 #X obj 550 130 ockm-mono-pluck \$1;
-#X obj 680 130 ockm-mono-saw \$1;
-#X obj 810 130 ockm-mono-house \$1;
+#X obj 680 130 ockm-mono-analogue \$1;
+#X obj 810 130 ockm-mono-donk \$1;
 #X obj 30 200 +~;
 #X obj 400 200 r ockm-\$1-drive;
 #X obj 400 230 expr 1+\$f1*9;

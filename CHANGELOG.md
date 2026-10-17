@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.71 (17 October 2026)
+
+- **New bass line-up, by family:** **analogue** (Minimoog, SH-101, Pro-One: saw to square, a sub, a resonant 24 dB filter) is the new default; **donk** (bassline house, garage, M1 organ bass) is new; **sub** becomes **sub 808**, ringing on like an 808 when the decay is up, with a quicker, deeper pitch drop. Saw and house are folded into analogue
+- Reese is louder, level-matched with the others
+- Projects that used house now use analogue, set close to how they were. Your starter project starts on analogue
+
 ## v0.70 (17 October 2026)
 
 - **Saw bass earns its slot:** brighter by default (the tone knob was starting it dark), lightly saturated for weight, and level-matched to the other bass engines

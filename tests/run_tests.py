@@ -497,7 +497,7 @@ def chord_engines_sound(work):
 
 @test
 def bass_engines_play_in_tune(work):
-    for eng, name in enumerate(["acid", "sub", "fm", "reese", "pluck", "saw", "house"]):
+    for eng, name in enumerate(["acid", "sub", "fm", "reese", "pluck", "analogue", "donk"]):
         h = Harness(dut="ockm-mono zz")
         h.record(os.path.join(work, f"b_{name}.wav"), source="dut")
         h.at(20, f"ockm-zz-engine {eng} ; ockm-zz-k1-m 0.5 ; ockm-zz-k2-m 0.3 ; ockm-zz-k3-m 0 ; ockm-zz-k4-m 0.9 ; ockm-zz-drive 0")

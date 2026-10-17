@@ -337,7 +337,7 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 | `ockm-bass-edit`, `ockm-lead-edit` | Set one bass or lead step: step (0 to 127), note (MIDI), on, accent, slide. For example `0 33 1 1 0` |
 | `ockm-chord-edit` | Set one chord step: step, 0 off / 1 on / 2 accent, chord root as a scale step (0 is the key's root). For example `4 1 5` |
 | `ockm-accent` | Accent amount, 0 to 1 |
-| `ockm-<synth>-engine` | bass and lead: 0 acid, 1 sub, 2 FM, 3 reese, 4 pluck, 5 saw, 6 house. chord: 0 stab, 1 organ, 2 pad |
+| `ockm-<synth>-engine` | bass: 0 acid, 1 sub 808, 2 FM, 3 reese, 4 pluck, 5 analogue (default), 6 donk. chord: 0 stab, 1 organ, 2 pad |
 | `ockm-<synth>-k1` to `-k4` | Synth knobs, 0 to 1. What they do depends on the engine (see below) |
 | `ockm-bass-drive`, `ockm-lead-drive` | Distortion, 0 to 1 |
 | `ockm-filter` | Master DJ filter, -1 to 1. Below 0 cuts the top, above 0 cuts the bottom, 0 is off. Smoothed, so moves don't click |
@@ -435,17 +435,19 @@ The sliders change with the source. **Synth:** as above. **Sample:** level, pitc
 
 The bass has seven engines. Only the chosen engine runs, so the others cost no processing power. Every engine uses the same four knobs, 0 to 1. k4 is always decay.
 
+The screen shows them by family: analogue first (the default), then sub 808, acid, reese, FM, pluck and donk.
+
 | Engine | k1 | k2 | k3 | Character |
 |---|---|---|---|---|
 | 0 acid | cutoff | resonance | envelope amount | The 303 squelch |
-| 1 sub | tone | drive | pitch drop | Deep and clean, 808-ish |
+| 1 sub 808 | tone | drive | pitch drop (quick, up to 30 semitones) | Deep and clean. Turn the decay up and it rings on past the step like an 808 boom |
 | 2 FM | brightness | ratio | envelope on brightness | Punchy, metallic, plucky |
 | 3 reese | cutoff | detune (width) | envelope amount | Dark and wide |
 | 4 pluck | brightness | saw to square | filter snap | Rings out and fades over the decay time, with a sub an octave down. Ignores the short 303-style note length |
-| 5 saw | tone (dark to fully raw; bright by default) | second saw detune (0 = single saw) | sub saw an octave down | Hard and buzzy, lightly saturated. Notes play at full level for the decay time, then stop |
-| 6 house | tone | body (sub sine an octave down) | pluck (filter snap) | Deep house and garage: a clean square and a sub sine through a warm filter |
+| 5 analogue | cutoff | saw to square | filter envelope | The workhorse house and techno bass (Minimoog, SH-101, Pro-One): saw to square with a square sub an octave down, through a resonant 24 dB low-pass. The default |
+| 6 donk | brightness (organ harmonics) | bounce (pitch drop onto the note) | hollow (woodier) | Bassline house, garage and the M1 organ bass: a hollow tone that bounces onto each note and rings out |
 
-The drive comes after the engine, so it works on all of them. At 0 it's completely clean; it only colours the sound as you turn it up. The bass starts on acid.
+The drive comes after the engine, so it works on all of them. At 0 it's completely clean; it only colours the sound as you turn it up. The bass starts on analogue.
 
 ## Lead engines
 
