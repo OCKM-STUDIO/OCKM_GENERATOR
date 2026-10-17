@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.67"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.68"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -71,6 +71,7 @@ local KNOBS = {
 }
 -- BEGIN PRESETS (written by tools/build.py from its preset lists: edit them there, not here)
 local RHYTHMS = { { "offbeat" }, { "rolling" }, { "gallop" }, { "acid classic" }, { "sparse dub" }, { "tech bounce" }, { "acid 16ths" }, { "trip hop" }, { "hook" }, { "sparse melody" }, { "phrase" }, { "question answer" }, { "pickup" }, { "arp gate" } }
+local BASS_RHYTHMS = { { "offbeat donk" }, { "straight 8ths" }, { "rolling 16ths" }, { "dotted 8ths" }, { "octave jump" }, { "sustained" }, { "quarters" }, { "dembow" }, { "two step" }, { "3 2 3 cluster" }, { "round the kick" }, { "gallop" }, { "acid classic" }, { "acid 16ths" }, { "tech bounce" }, { "sparse dub" }, { "trip hop" } }
 local MONO_NOTES = { "root", "octaves", "root fifth", "acid riff", "walk up", "minor stab", "dub", "pedal", "arp up", "arp updown", "call", "descend", "melody", "melody steps", "melody high", "motif", "motif call", "motif high", "arp evolve" }
 local CHORD_RHY = { { "bar pads" }, { "two beat" }, { "offbeat" }, { "dub stabs" }, { "house organ" }, { "tresillo" }, { "syncopated" }, { "garage skip" }, { "call answer" }, { "eighths" } }
 local PROGS = { { "one chord", "i" }, { "vamp", "i iv" }, { "dub techno", "i . . VII" }, { "deep house", "i iv VI v" }, { "garage", "i VI iv v" }, { "pop", "i VI III VII" }, { "uplift", "VI VII i" }, { "andalusian", "i VII VI V" }, { "trip hop", "i VII VI v" }, { "soul", "ii V I" } }
@@ -81,6 +82,8 @@ local GROOVE_BANKS = { { "classics", 0 }, { "house + garage", 13 }, { "techno + 
 local CHORD_TYPES = { { 0, 2, 4, -1 }, { 0, 2, 4, 6 }, { 0, 1, 4, -1 }, { 0, 4, 7, -1 }, { 0, 3, 4, -1 }, { 0, 2, 4, 5 }, { 0, 2, 6, 8 }, { 0, 6, 8, 10 } }
 local PROG_SHAPES = { { { 0, 16 } }, { { 0, 16 }, { 3, 16 } }, { { 0, 48 }, { 6, 16 } }, { { 0, 16 }, { 3, 16 }, { 5, 16 }, { 4, 16 } }, { { 0, 8 }, { 5, 8 }, { 3, 8 }, { 4, 8 } }, { { 0, 16 }, { 5, 16 }, { 2, 16 }, { 6, 16 } }, { { 5, 16 }, { 6, 16 }, { 0, 32 } }, { { 0, 16 }, { 6, 16 }, { 5, 16 }, { 4, 16 } }, { { 0, 32 }, { 6, 32 }, { 5, 32 }, { 4, 32 } }, { { 1, 16 }, { 4, 16 }, { 0, 32 } } }
 -- END PRESETS
+-- the rhythm list for a part (the bass has its own, the classic dance bass rhythms)
+local function rhythms_for(part) return (part == "bass") and BASS_RHYTHMS or RHYTHMS end
 local ROMAN = { "i","ii","iii","iv","v","vi","vii" }
 local OCT_OFFSET = { bass = 0, lead = 24 }   -- matches ockm-monogen args
 local LFO_SHAPES = { "sine", "triangle", "square", "saw", "random" }
@@ -1456,7 +1459,7 @@ function ui:auto_summary(part)
   local parts = {}
   if mono then
     parts[#parts + 1] = (MONO_NOTES[(self.v["ockm-"..part.."-notes"] or 0) + 1] or "")
-    parts[#parts + 1] = ((RHYTHMS[(self.v["ockm-"..part.."-rhythm"] or 0) + 1] or {""})[1])
+    parts[#parts + 1] = ((rhythms_for(part)[(self.v["ockm-"..part.."-rhythm"] or 0) + 1] or {""})[1])
     parts[#parts + 1] = ((self.v["ockm-"..part.."-sync"] or 0) > 0) and "follows chords" or "follows key"
   else
     parts[#parts + 1] = ((PROGS[(self.v["ockm-chord-prog"] or 0) + 1] or {""})[1])
@@ -1664,14 +1667,14 @@ function ui:suggest_chords()
 end
 
 -- a stepper: back, the current choice (number, name, detail), forward
-function ui:stepper(add, x, y, w, h, list, hook)
+function ui:stepper(add, x, y, w, h, list, hook, after)
   local n = #list
   local v = math.floor(self.v[hook] or 0)
-  add{ kind="arrow", x=x, y=y, w=44, h=h, dir=-1, on=(v > 0), tap=function() if v > 0 then self:send(hook, v - 1) end end }
+  add{ kind="arrow", x=x, y=y, w=44, h=h, dir=-1, on=(v > 0), tap=function() if v > 0 then self:send(hook, v - 1); if after then after(v - 1) end end end }
   local item = list[v + 1] or { "" }
   add{ kind="preset", x=x + 50, y=y, w=w - 100, h=h, num=v + 1, label=type(item) == "table" and item[1] or item,
        sub=type(item) == "table" and item[2] or nil, sel=true }
-  add{ kind="arrow", x=x + w - 44, y=y, w=44, h=h, dir=1, on=(v < n - 1), tap=function() if v < n - 1 then self:send(hook, v + 1) end end }
+  add{ kind="arrow", x=x + w - 44, y=y, w=44, h=h, dir=1, on=(v < n - 1), tap=function() if v < n - 1 then self:send(hook, v + 1); if after then after(v + 1) end end end }
 end
 
 function ui:layout_compose(add)
@@ -1764,7 +1767,10 @@ function ui:gen_controls(add, p, ix, cy, iw, k)
     add{ kind="text", x=ix, y=cy + k * 52, w=iw, h=k * 12, label="notes", size=10 }
     self:stepper(add, ix, cy + k * 66, iw, k * 52, notes, "ockm-"..p.."-notes")
     add{ kind="text", x=ix, y=cy + k * 124, w=iw, h=k * 12, label="rhythm", size=10 }
-    self:stepper(add, ix, cy + k * 138, iw, k * 40, RHYTHMS, "ockm-"..p.."-rhythm")
+    self:stepper(add, ix, cy + k * 138, iw, k * 40, rhythms_for(p), "ockm-"..p.."-rhythm", function(v)
+      -- the octave jump is a rhythm and a note pattern together: it brings the octaves notes with it
+      if p == "bass" and (BASS_RHYTHMS[v + 1] or {})[1] == "octave jump" then self:send("ockm-bass-notes", 1) end
+    end)
     local lkey = "ockm-"..p.."-lock"
     local lw3 = (iw - 12) / 3
     for li, nm in ipairs({ "own rhythm", "on the kick", "fill gaps" }) do

@@ -311,7 +311,7 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 | `ockm-master` | The final audio mix |
 | `ockm-root` | Key for all synths, 0 to 11 (0 = C, 9 = A). Rebuilds bass and lead, and re-voices chords |
 | `ockm-scale` | Scale for all synths, 0 to 5 |
-| `ockm-bass-rhythm`, `ockm-lead-rhythm` | Rhythm preset, 0 to 7, and rebuild that track |
+| `ockm-bass-rhythm`, `ockm-lead-rhythm` | Rhythm preset (bass 0 to 16, lead 0 to 13; each has its own list), and rebuild that track |
 | `ockm-bass-notes`, `ockm-lead-notes` | Note pattern, 0 to 11, and rebuild that track |
 | `ockm-bass-gen`, `ockm-lead-gen`, `ockm-chord-gen` | Rebuild that track with the current settings |
 | `ockm-bass-lock`, `ockm-lead-lock` | 0 own rhythm, 1 play on the kick, 2 fill the gaps between kicks |
@@ -512,7 +512,9 @@ Audio is recorded as it plays, so you hear the export; the effects get 2.5 secon
 
 **Chords** are built from a progression and a chord rhythm. Each progression has its own length (1, 2, 4 or 8 bars) and its own timing: some change chord every half bar, some hold a chord for two. If the pattern is shorter than the progression, picking it makes the pattern longer. It never makes a pattern shorter.
 
-**Rhythms** (when it plays): 0 offbeat, 1 rolling, 2 gallop, 3 acid classic, 4 sparse dub, 5 tech bounce, 6 acid 16ths, 7 trip hop, 8 hook, 9 sparse melody. Four bars long: 10 phrase (says it, says it again, changes it, lands), 11 question answer (busy then sparse, twice), 12 pickup (notes that lead into the next bar), 13 arp gate (16ths with gaps, fuller in bar 3)
+**Bass rhythms** (the bass has its own list, the classic dance bass rhythms first): 0 offbeat donk (on the "and" of every beat, between the kicks), 1 straight 8ths, 2 rolling 16ths (a continuous motor, accents on the offbeats), 3 dotted 8ths (a note every three 16ths, a forward bounce), 4 octave jump (8ths, root then octave: picking it brings the octaves notes with it), 5 sustained (one note held across the bar, sliding on, then a fresh note next bar), 6 quarters (on the four beats), 7 dembow (3-3-2, reggaeton and moombahton), 8 two step (asymmetric garage, four bars), 9 3-2-3 cluster (rolling groups of three, two and three 16ths). Then the older ones: 10 round the kick (16ths in the gaps around the kick), 11 gallop, 12 acid classic, 13 acid 16ths, 14 tech bounce, 15 sparse dub, 16 trip hop. Older projects keep the bass they had; picking a rhythm uses the new list
+
+**Lead rhythms** (when it plays): 0 offbeat, 1 rolling, 2 gallop, 3 acid classic, 4 sparse dub, 5 tech bounce, 6 acid 16ths, 7 trip hop, 8 hook, 9 sparse melody. Four bars long: 10 phrase (says it, says it again, changes it, lands), 11 question answer (busy then sparse, twice), 12 pickup (notes that lead into the next bar), 13 arp gate (16ths with gaps, fuller in bar 3)
 
 **Note patterns** (what it plays, used in turn on each note): 0 root, 1 octaves, 2 root and fifth, 3 acid riff, 4 walk up, 5 minor stab, 6 dub, 7 pedal, 8 arp up, 9 arp up-down, 10 call, 11 descend, 12 melody, 13 melody steps, 14 melody high. The melodies wander over the chord tones (root, 3rd, 5th, 7th of the chord playing), mostly in small steps, and come home to the root or fifth every 8 notes; "steps" adds passing notes. They run 64 notes before repeating, and mutate starts them somewhere else. Four-bar melodies that follow the bar, with a pitch for every step so the shape lines up with the phrase whatever the rhythm: 15 motif (a short idea in bar 1, again in bar 2, changed in bar 3, home to the root in bar 4: made for singing along), 16 motif call (bars 1 and 2 end up on the fifth, bars 3 and 4 answer on the root), 17 motif high (motif an octave up), 18 arp evolve (an arpeggio over the chord playing, the same shape twice, then lifted or changed). Each has 8 versions: mutate steps through them (the ninth comes back round to the original)
 

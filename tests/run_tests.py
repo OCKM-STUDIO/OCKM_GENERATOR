@@ -299,8 +299,8 @@ def bass_generator(work):
         h.con(g, t)
         h.at(ms, f"test-{label} bang")
     h.at(100, "ockm-bass-notes 0 ; ockm-bass-rhythm 0"); grab(150, "a")
-    h.at(200, "ockm-bass-notes 3 ; ockm-bass-rhythm 3"); grab(250, "b")
-    h.at(300, "ockm-root 0 ; ockm-scale 3 ; ockm-bass-notes 6 ; ockm-bass-rhythm 1"); grab(350, "c")
+    h.at(200, "ockm-bass-notes 3 ; ockm-bass-rhythm 12"); grab(250, "b")    # acid classic
+    h.at(300, "ockm-root 0 ; ockm-scale 3 ; ockm-bass-notes 6 ; ockm-bass-rhythm 10"); grab(350, "c")   # round the kick
     f = os.path.join(work, "t_gen.pd"); h.finish(450, f)
     out = run(work, f)
     got = {v.split()[0]: [int(float(x)) for x in v.split()[1:]] for v in printed(out, "GEN")}
@@ -309,6 +309,36 @@ def bass_generator(work):
     assert hits("a") == [33] * 4, "root notes in A minor should all be 33"
     assert hits("b") == [33, 33, 45, 33, 36, 33, 43, 40, 33, 33, 45, 33, 36], f"acid riff wrong: {hits('b')}"
     assert hits("c") == [36, 36, 31, 32] * 3, f"dub pattern in C phrygian wrong: {hits('c')}"
+
+@test
+def bass_classic_rhythms(work):
+    """The bass's own rhythm list: the offbeat donk lands on the "and"s, straight 8ths and quarters as named, and the
+    sustained bass holds one note across the bar (the same note, sliding on, no new note until the next bar)."""
+    h = Harness()
+    def grab(ms, label):
+        g = h.add(f"#X obj 10 300 r test-{label};"); t = h.add("#X obj 10 330 t b b b b;")
+        for i, nm in enumerate(["note", "on", "acc", "slide"]):
+            a = h.add(f"#X obj 10 360 array get ockm-pat-bass-{nm} 0 32;"); l = h.add(f"#X obj 10 390 list prepend {label}-{nm};")
+            p = h.add("#X obj 10 420 list trim;"); pr = h.add("#X obj 10 450 print GEN;")
+            h.con(t, a, 3 - i); h.con(a, l); h.con(l, p); h.con(p, pr)
+        h.con(g, t)
+        h.at(ms, f"test-{label} bang")
+    h.at(100, "ockm-bass-sync 0 ; ockm-root 9 ; ockm-scale 0 ; ockm-bass-notes 2 ; ockm-bass-rhythm 0"); grab(150, "donk")
+    h.at(200, "ockm-bass-rhythm 1"); grab(250, "eighths")
+    h.at(300, "ockm-bass-rhythm 6"); grab(350, "quarters")
+    h.at(400, "ockm-bass-rhythm 5"); grab(450, "held")
+    f = os.path.join(work, "t_bassrhy.pd"); h.finish(550, f)
+    out = run(work, f)
+    got = {v.split()[0]: [int(float(x)) for x in v.split()[1:]] for v in printed(out, "GEN")}
+    ons = lambda k: [i for i, o in enumerate(got[k + "-on"][:16]) if o]
+    assert ons("donk") == [2, 6, 10, 14], f"offbeat donk: {ons('donk')}"
+    assert ons("eighths") == list(range(0, 16, 2)), f"straight 8ths: {ons('eighths')}"
+    assert ons("quarters") == [0, 4, 8, 12], f"quarters: {ons('quarters')}"
+    assert ons("held") == list(range(16)), f"sustained: every step sounds: {ons('held')}"
+    notes = got["held-note"]
+    assert len(set(notes[:16])) == 1 and notes[16] != notes[15] or len(set(notes[:16])) == 1, f"one note held across the bar: {notes[:16]}"
+    sl = got["held-slide"][:16]
+    assert sl[:15] == [1] * 15 and sl[15] == 0, f"slides on through the bar, then lets the next bar start fresh: {sl}"
 
 @test
 def bass_generator_fills_long_patterns(work):
@@ -758,7 +788,7 @@ def bass_follows_chords_and_manual_stays_put(work):
 def bass_lock_density_and_mutate(work):
     h = Harness()
     kick = "1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0"
-    h.at(100, f"ockm-resync bang ; ockm-pat-d1 0 {kick} ; ockm-bass-sync 0 ; ockm-bass-notes 3 ; ockm-bass-rhythm 6 ; ockm-length 16")
+    h.at(100, f"ockm-resync bang ; ockm-pat-d1 0 {kick} ; ockm-bass-sync 0 ; ockm-bass-notes 3 ; ockm-bass-rhythm 13 ; ockm-length 16")
     g = h.add("#X obj 10 300 r test-get;"); t = h.add("#X obj 10 325 t b b;")
     a1 = h.add("#X obj 10 350 array get ockm-pat-bass-on 0 16;"); p1 = h.add("#X obj 10 375 print ON;")
     a2 = h.add("#X obj 200 350 array get ockm-pat-bass-note 0 16;"); p2 = h.add("#X obj 200 375 print NOTE;")
@@ -1069,7 +1099,7 @@ def synths_sit_at_similar_levels(work):
     def rms(x): return math.sqrt(sum(v * v for v in x) / max(1, len(x)))
     tracks = ["d1","d2","d3","d4","d5","d6","d7","d8","bass","lead","chord"]
     levels = {}
-    for part, setup, eng in [("bass", "ockm-bass-rhythm 3 ; ockm-bass-notes 3", None),   # the acid riff: a busy, typical bass line ("chord", "ockm-chord-prog 3 ; ockm-chord-rhythm 4", 0),
+    for part, setup, eng in [("bass", "ockm-bass-rhythm 12 ; ockm-bass-notes 3", None),   # the acid riff: a busy, typical bass line ("chord", "ockm-chord-prog 3 ; ockm-chord-rhythm 4", 0),
                              ("chord", "ockm-chord-prog 3 ; ockm-chord-rhythm 4", 1), ("chord", "ockm-chord-prog 3 ; ockm-chord-rhythm 4", 2)]:
         h = Harness(); name = f"lv-{part}{eng}"; h.record(os.path.join(work, name + ".wav"))
         mutes = " ; ".join(f"ockm-{t}-mute {0 if t == part else 1}" for t in tracks)

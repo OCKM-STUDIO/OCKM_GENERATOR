@@ -1243,10 +1243,24 @@ def _arp4(seed):
         out+=[shape[j % len(shape)] for j in range(16)]
     return out
 def _bank(fn): return " ".join(str(v) for k in range(8) for v in fn(k))
+def _brh(*bars):
+    """Bass rhythms, one or four bars of 16 steps: X accent, x note, s/S note (accent) that slides into the next,
+    - holds the note before it (no new note: it carries on). A note or hold followed by a hold slides on into it."""
+    assert len(bars) in (1,4) and all(len(b)==16 for b in bars)
+    c="".join(bars); out=[]
+    for i,ch in enumerate(c):
+        nxt=c[(i+1)%len(c)]
+        if ch=="-": out.append(5 if nxt=="-" else 6)          # 5 hold (and keep holding), 6 the last step of a hold
+        elif ch==".": out.append(0)
+        else:
+            v={"x":1,"X":2,"s":3,"S":4}[ch]
+            if nxt=="-" and v<3: v+=2                            # held on: slide into the hold
+            out.append(v)
+    return " ".join(str(v) for v in out)
 def _rhy4(*bars):
     assert len(bars)==4 and all(len(b)==16 for b in bars)
     return " ".join(str({".":0,"x":1,"X":2,"s":3,"S":4}[c]) for b in bars for c in b)
-PRE={"rhythm":[("offbeat","0 0 2 0 0 0 1 0 0 0 2 0 0 0 1 0"),("rolling","0 2 1 1 0 2 1 1 0 2 1 1 0 2 1 1"),("gallop","0 0 2 1 0 1 2 0 0 0 2 1 0 1 2 0"),
+PRE={"leadrhythm":[("offbeat","0 0 2 0 0 0 1 0 0 0 2 0 0 0 1 0"),("rolling","0 2 1 1 0 2 1 1 0 2 1 1 0 2 1 1"),("gallop","0 0 2 1 0 1 2 0 0 0 2 1 0 1 2 0"),
                ("acid-classic","2 1 0 1 3 4 1 0 2 1 3 1 0 2 1 3"),("sparse-dub","2 0 0 0 0 0 0 1 0 0 1 0 0 0 0 0"),("tech-bounce","0 0 2 0 0 1 0 0 0 0 2 0 0 1 0 1"),
                ("acid-16ths","2 1 3 1 2 1 1 3 2 1 3 1 2 3 1 1"),("trip-hop","2 0 0 0 0 0 3 1 0 0 0 0 0 0 1 0"),("hook","2 0 0 1 0 0 1 0 0 0 1 0 1 0 0 0"),("sparse-melody","2 0 0 0 0 0 1 0 0 3 0 0 1 0 0 0"),
                # four bars long (v0.52): phrases that breathe
@@ -1254,6 +1268,17 @@ PRE={"rhythm":[("offbeat","0 0 2 0 0 0 1 0 0 0 2 0 0 0 1 0"),("rolling","0 2 1 1
                ("question-answer",_rhy4("X.x.x..xX.x.....","x.......X.......","X.x.x..xX.x.....","x...x...X.......")),
                ("pickup",_rhy4("X.....x.....x.x.","X.......x...x.x.","X.....x.....x.x.","X...x...X.......")),
                ("arp-gate",_rhy4("XxxxXxx.XxxxXxx.","XxxxXxx.XxxxXxx.","XxxxXxxxXxxxXxxx","Xxx.Xxx.X.x.X..."))],
+     # the bass has its own list: the classic dance bass rhythms first, then the older ones
+     "bassrhythm":[("offbeat-donk",_brh("..X...x...X...x.")),("straight-8ths",_brh("X.x.x.x.X.x.x.x.")),
+                   ("rolling-16ths",_brh("xxXxxxXxxxXxxxXx")),("dotted-8ths",_brh("X..x..x..X..x..x")),
+                   ("octave-jump",_brh("x.X.x.X.x.X.x.X.")),("sustained",_brh("X---------------")),
+                   ("quarters",_brh("X...x...X...x...")),("dembow",_brh("X..x..x.X..x..x.")),
+                   ("two-step",_brh("X.....x...X..x..","..x..x....X...x.","X.....x...X..x..","..x..x..X...x...")),
+                   ("3-2-3-cluster",_brh("Xxx.xx.Xxx..xx..")),
+                   ("round-the-kick","0 2 1 1 0 2 1 1 0 2 1 1 0 2 1 1"),("gallop","0 0 2 1 0 1 2 0 0 0 2 1 0 1 2 0"),
+                   ("acid-classic","2 1 0 1 3 4 1 0 2 1 3 1 0 2 1 3"),("acid-16ths","2 1 3 1 2 1 1 3 2 1 3 1 2 3 1 1"),
+                   ("tech-bounce","0 0 2 0 0 1 0 0 0 0 2 0 0 1 0 1"),("sparse-dub","2 0 0 0 0 0 0 1 0 0 1 0 0 0 0 0"),
+                   ("trip-hop","2 0 0 0 0 0 3 1 0 0 0 0 0 0 1 0")],
      "notes":[("root","0"),("octaves","0 7"),("root-fifth","0 4"),("acid-riff","0 0 7 0 2 0 6 4"),("walk-up","0 1 2 4"),("minor-stab","0 2 4 2"),
               ("dub","0 0 -3 -2"),("pedal","0 0 0 1"),("arp-up","0 2 4 7"),("arp-updown","0 2 4 7 4 2"),("call","4 4 2 0 2 4 5 4"),("descend","7 6 4 2"),
               ("melody",_tune(1,False,0)),("melody-steps",_tune(2,True,0)),("melody-high",_tune(3,False,7)),
@@ -1354,7 +1379,8 @@ _ui_src=os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if os.path.exists(_ui_src):
     _t=open(_ui_src).read()
     _a=_t.index("-- BEGIN PRESETS"); _a=_t.index("\n",_a)+1; _b=_t.index("-- END PRESETS")
-    _block=("local RHYTHMS = "+_lua_list([(n.replace("-"," "),) for n,_ in PRE["rhythm"]])+"\n"
+    _block=("local RHYTHMS = "+_lua_list([(n.replace("-"," "),) for n,_ in PRE["leadrhythm"]])+"\n"
+            "local BASS_RHYTHMS = "+_lua_list([(n.replace("-"," "),) for n,_ in PRE["bassrhythm"]])+"\n"
             "local MONO_NOTES = { "+", ".join(f'"{n.replace("-"," ")}"' for n,_ in PRE["notes"])+" }\n"
             "local CHORD_RHY = "+_lua_list([(n.replace("-"," "),) for n,_ in PRE["chordrhythm"]])+"\n"
             "local PROGS = "+_lua_list([(n.replace("-"," "),lab) for n,lab,_ in PROGS])+"\n"
@@ -1488,7 +1514,7 @@ p.con(regen,4,store[3],0); p.con(store[3],0,ts,0); p.con(ts,0,lsp,0); p.con(lsp,
 tn=p.add("#X obj 360 380 text get ockm-presets-notes;"); ln=p.add("#X obj 360 410 list split 1;"); tl=p.add("#X obj 360 440 t l l;")
 ll=p.add("#X obj 420 470 list length;"); an=p.add(f"#X obj 360 500 array set {D}0-n;")
 p.con(regen,3,store[1],0); p.con(store[1],0,tn,0); p.con(tn,0,ln,0); p.con(ln,1,tl,0); p.con(tl,1,ll,0); p.con(tl,0,an,0)
-tr=p.add("#X obj 170 380 text get ockm-presets-rhythm;"); lr=p.add("#X obj 170 410 list split 1;"); ar=p.add(f"#X obj 170 440 array set {D}0-r;")
+tr=p.add(f"#X obj 170 380 text get ockm-presets-{D}1rhythm;"); lr=p.add("#X obj 170 410 list split 1;"); ar=p.add(f"#X obj 170 440 array set {D}0-r;")
 trl=p.add("#X obj 230 425 t l l;"); rll=p.add("#X obj 270 455 list length;")
 p.con(regen,2,store[0],0); p.con(store[0],0,tr,0); p.con(tr,0,lr,0); p.con(lr,1,trl,0); p.con(trl,1,rll,0); p.con(trl,0,ar,0)
 rx=p.add(f"#X obj 20 410 expr if(36+{D}f1>40 \\, 24+{D}f1 \\, 36+{D}f1);"); ro=p.add(f"#X obj 20 440 + {D}2;")
@@ -1508,8 +1534,8 @@ m16=p.add("#X obj 20 700 mod 16;"); rd=p.add(f"#X obj 20 720 tabread {D}0-r;")
 kick=p.add("#X obj 1000 700 tabread ockm-pat-d1;")
 lockx=p.add(f"#X obj 160 720 expr if({D}f3==1 \\, if({D}f2>0 \\, if({D}f1==2 || {D}f1==4 || {D}f2>=2 \\, 2 \\, 1) \\, 0) \\, if({D}f3==2 \\, if({D}f2>0 \\, 0 \\, {D}f1) \\, {D}f1));")
 H=f"(abs(sin({D}f4*12.9898+{D}f3*78.233+1.7)*43758.5453)-floor(abs(sin({D}f4*12.9898+{D}f3*78.233+1.7)*43758.5453)))"
-dens=p.add(f"#X obj 160 735 expr if({D}f1>0 && {D}f2<1 && {D}f1!=2 && {D}f1!=4 && {H}>{D}f2 \\, 0 \\, if({D}f1==0 && {D}f2>1 && {H}<({D}f2-1)*0.5 \\, 1 \\, {D}f1));")
-cx=p.add(f"#X obj 20 745 expr {D}f1>0 \; {D}f1==2 || {D}f1==4 \; {D}f1>=3;")
+dens=p.add(f"#X obj 160 735 expr if({D}f1>0 && {D}f1<5 && {D}f2<1 && {D}f1!=2 && {D}f1!=4 && {H}>{D}f2 \\, 0 \\, if({D}f1==0 && {D}f2>1 && {H}<({D}f2-1)*0.5 \\, 1 \\, {D}f1));")
+cx=p.add(f"#X obj 20 745 expr {D}f1>0 \\; {D}f1==2 || {D}f1==4 \\; {D}f1>=3 && {D}f1!=6 \\; {D}f1>0 && {D}f1<5 \\; {D}f1>=5;")
 p.con(rll,0,m16,1)   # a four-bar rhythm repeats every 64 steps
 for c in [(ti,0,m16,0),(m16,0,rd,0),(rd,0,lockx,0),(lockx,0,dens,0),(dens,0,cx,0),(cx,2,tws["slide"],0),(cx,1,tws["acc"],0),
           (ti,1,kick,0),(kick,0,lockx,1),(var["lock"],1,lockx,2),(var["density"],1,dens,1),(one_d,0,dens,1),(var["seed"],1,dens,2),(ti,1,dens,3)]: p.con(*c)
@@ -1524,7 +1550,10 @@ _R=f"((int({D}f1)%7+7)%7)"
 snap=p.add(f"#X obj 400 860 expr if({D}f3>0 && int({D}f2)%4==0 \\, {D}f1 - ({_R}==1 || {_R}==3 || {_R}==5) + ({_R}==6) \\, {D}f1);")
 fsn=p.add(f"#X obj 560 820 f {D}7;"); p.con(lbm,0,fsn,0); p.con(fsn,0,snap,2); p.con(ti,1,snap,1)
 nx=p.add(f"#X obj 400 930 expr {D}f2 + 12*floor({D}f1/7) + {D}f3;")
-for c in [(cx,0,to,0),(to,1,tws["on"],0),(to,0,s1,0),(s1,0,fh,0),(fh,0,th,0),(th,1,ph,0),(ph,0,fh,1),(th,0,ix,0),(ll,0,ix,1),(ix,0,rn,0),(rn,0,ojump,0),(ojump,0,snap,0),(snap,0,addc,0),(fold,0,addc,1),(addc,0,td,0),
+# a hold writes the note before it again (the same pitch, sliding on), without moving on through the note list
+hsel=p.add("#X obj 700 780 sel 1;"); hlast=p.add("#X obj 700 805 f;")
+for c in [(cx,4,hsel,0),(hsel,0,hlast,0),(hlast,0,tws["note"],0),(nx,0,hlast,1)]: p.con(*c)
+for c in [(cx,0,tws["on"],0),(cx,3,s1,0),(s1,0,fh,0),(fh,0,th,0),(th,1,ph,0),(ph,0,fh,1),(th,0,ix,0),(ll,0,ix,1),(ix,0,rn,0),(rn,0,ojump,0),(ojump,0,snap,0),(snap,0,addc,0),(fold,0,addc,1),(addc,0,td,0),
           (td,1,sx,0),(sx,0,rs,0),(rs,0,nx,2),(td,0,nx,0),(ro,0,nx,1),(nx,0,tws["note"],0)]: p.con(*c)
 p.add("#X text 20 980 hooks: ockm-<track>-rhythm 0-7 \\, ockm-<track>-notes 0-11 \\, ockm-<track>-gen (rebuild) \\, ockm-<track>-mode (0 auto \\, 1 manual) \\, ockm-<track>-sync (follow the chords) \\, ockm-<track>-lock (0 own rhythm \\, 1 lock to kick \\, 2 fill the gaps) \\, ockm-<track>-density (0-2 \\, 1 = the preset) \\, ockm-<track>-seed (mutate: 0 = the original) \\, and the shared ockm-root 0-11 and ockm-scale 0-5. Args: track \\, octave \\, rhythm \\, notes \\, default mode \\, default sync.;")
 p.save("seq/ockm-monogen.pd","#N canvas 120 120 1100 1020 12;")

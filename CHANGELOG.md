@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.68 (17 October 2026)
+
+- **The bass gets its own rhythm list, the classics first:** offbeat donk, straight 8ths, rolling 16ths, dotted 8ths, octave jump, sustained, quarters, dembow, two step and 3-2-3 cluster, then the older ones. The lead keeps its list
+- **Held notes:** rhythms can now hold a note across steps (the sustained bass holds one note for the bar). Octave jump brings the octaves notes with it
+
 ## v0.67 (17 October 2026)
 
 - **Tapping a drum at the top plays it** while stopped
