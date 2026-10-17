@@ -92,7 +92,7 @@ class Harness:
         open(path, "w").write("\n".join(lines) + "\n")
 
 
-def run(work, harness_file, with_main=True, timeout=60, main="OCKM_GENERATOR.pd"):
+def run(work, harness_file, with_main=True, timeout=90, main="OCKM_GENERATOR.pd"):
     cmd = [PD, "-nogui", "-nosound", "-nomidi", "-stderr"]
     if PDLUA:
         cmd += ["-path", PDLUA, "-lib", "pdlua"]
@@ -930,8 +930,13 @@ def drum_lab_renders_claps_and_snares(work):
     h.at(300, "lab-clap-render bang")
     h.at(3200, "lab-snare-render bang")
     h.at(5600, "lab-hat-render bang")
-    h.at(7600, "lab-clap-rand-wild bang ; lab-test dump")
-    f = os.path.join(work, "t_lab.pd"); h.finish(7800, f)
+    h.at(7600, "lab-kick-render bang")
+    h.at(10000, "lab-tom-render bang")
+    h.at(12200, "lab-conga-render bang")
+    h.at(13200, "lab-rim-render bang")
+    h.at(13500, "lab-shaker-render bang")
+    h.at(14000, "lab-clap-rand-wild bang ; lab-test dump")
+    f = os.path.join(work, "t_lab.pd"); h.finish(14200, f)
     out = run(work, f, main="OCKM_DRUM_LAB.pd")
     errs = [l for l in out.splitlines() if "error" in l.lower() and "audio" not in l.lower()]
     assert not errs, f"the lab should load cleanly: {errs[:4]}"
@@ -958,6 +963,18 @@ def drum_lab_renders_claps_and_snares(work):
     assert nc[0].replace("-closed", "") == no[0].replace("-open", ""), f"the hat pair should share a name: {nc} {no}"
     assert len(o) > 3 * len(c), f"the open hat should be much longer than the closed one: {len(c) / sr:.2f}s vs {len(o) / sr:.2f}s"
     assert max(abs(x) for x in c) > 0.2 and max(abs(x) for x in o) > 0.2, "both hats should be at a decent level"
+    # the rest of the kit: a kick, a tom set (low, mid, high), and congas (low, high), a rim and a shaker in perc
+    def lab_files(folder): return sorted(n for n in os.listdir(os.path.join(work, "samples", folder)) if n.startswith("lab-"))
+    assert len(lab_files("kick")) == 1, f"one kick: {lab_files('kick')}"
+    toms = lab_files("tom")
+    assert [t.rsplit("-", 1)[1] for t in toms] == ["high.wav", "low.wav", "mid.wav"] and len({t.rsplit("-", 1)[0] for t in toms}) == 1, f"a matching tom set: {toms}"
+    perc = lab_files("perc")
+    assert sum(n.startswith("lab-conga") for n in perc) == 2 and any(n.startswith("lab-rim") for n in perc) and any(n.startswith("lab-shaker") for n in perc), f"congas, rim and shaker in perc: {perc}"
+    for folder in ("kick", "tom", "perc"):
+        for n in lab_files(folder):
+            w = wave.open(os.path.join(work, "samples", folder, n)); raw = w.readframes(w.getnframes())
+            pk = max(abs(int.from_bytes(raw[i:i + 3], "little", signed=True)) for i in range(0, len(raw), 3)) / 8388608
+            assert 0.2 < pk < 1.0, f"{n}: should be a decent level, not clipped ({pk:.2f})"
     dump = [l for l in out.splitlines() if "ockm-lab: clap" in l]
     assert len(dump) == 13, f"every clap setting should be listed: {dump[:3]}"
 

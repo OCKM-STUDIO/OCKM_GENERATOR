@@ -43,10 +43,14 @@ Tap a track's name on Perform A or the mixer to jump straight to it.
 - **Master effects:** rise, pump, drop and throw; a big filter with hold; drive and master volume; delay and reverb
 - **Macros:** three slots, A, B and C. Hold one to play it; let go and everything goes back (a macro with a move that stays lights up and waits: tap it again to let go). The small **v** on each picks which of your six macros is on that slot. Out of the box: build, wash and strip
 
-**Drum lab** (its own patch: open `OCKM_DRUM_LAB.pd` in plugdata on the Mac). For designing claps, snares and hats of your own, then rendering them as samples:
+**Drum lab** (its own patch: open `OCKM_DRUM_LAB.pd` in plugdata on the Mac). For designing a whole kit of your own, then rendering it as samples. Eight sounds, in two rows of four:
 - **Clap:** how many bursts, the gap between them and how loose it is, burst length, two noise colours (body and air) with their focus and balance, a separate tail with its own tone, a small room, snap and drive
 - **Snare:** two tuned tones with a pitch drop, a noise "wires" layer with its own tone, focus and decay, a click, the body-to-wires balance, and drive
 - **Hats:** one metallic sound (six clashing square waves, the 808 recipe, mixed with noise) with metal pitch, noise to metal, tone and focus, low cut, drive, and two lengths: **closed** and **open**. Play either; the loop puts closed hats on the offbeats with an open one before the 1. **Render closed and open** saves a matching pair with the same name: the closed one in `samples/hat`, the open one in `samples/open-hat`
+- **Kick, toms, congas, rim:** tuned drums built the same way: a sine diving in pitch (pitch, drop, drop time, decay), an overtone (amount and ratio) and a noise layer (the kick's click, the tom's skin, the conga's slap) with its own tone, focus and length. Toms play and render as a **low, mid and high** set; congas as **low and high**
+- **Shaker:** band-passed noise with an attack (the swell) and a decay, low cut and grit
+- Where renders go: kick to `samples/kick`, toms to `samples/tom`, congas, rim and shaker to `samples/perc`. Sets share a name, ending in low, mid, high (or closed, open)
+- The loop (at 120): kicks on the beat (your lab kick if its loop is on), clap or snare on 2 and 4, hats on the offbeats, shaker on every half beat, rim and congas off the beat, and a tom run at the end of the bar. Turn on as many loops as you like
 - **play**, **loop with kick** (a kick on every beat, the clap or snare on 2 and 4), **randomise** small, medium or wild (around the sound you have), and **reset**
 - **render** records one hit to `samples/clap` or `samples/snare` as a 24-bit mono WAV, named `lab-clap-` or `lab-snare-` plus the date and time. Pick it on the drums tab like any other sample (it's yours, so it can go on the SP-404 or into Ableton too)
 - Nothing in the instrument depends on the lab: it only writes WAVs

@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.62 (17 October 2026)
+
+- **Drum lab: the full kit.** Kick, toms (a low, mid and high set), congas (low and high), rim and shaker join the clap, snare and hats. Each renders into the right samples folder; sets render as matching files. The loop plays the whole kit together
+
 ## v0.61 (17 October 2026)
 
 - **Drum lab: hats.** One metallic hat sound with closed and open lengths. Play either, loop them on the offbeats, and render a matching pair in one go: closed into `samples/hat`, open into `samples/open-hat`, sharing a name
