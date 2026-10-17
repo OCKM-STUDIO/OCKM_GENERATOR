@@ -15,8 +15,13 @@ LAB_SNARE = [
     ("wwidth", 0.3, 3, 0.9, "wires focus"), ("wdecay", 40, 400, 170, "wires decay (ms)"), ("click", 0, 1, 0.4, "click"),
     ("mix", 0, 1, 0.55, "body to wires"), ("drive", 0, 1, 0.3, "drive"), ("level", 0, 1, 0.8, "level"),
 ]
+LAB_HAT = [   # one metallic sound, played short (closed) or long (open)
+    ("pitch", 0.5, 2, 1, "metal pitch"), ("ring", 0, 1, 0.55, "noise to metal"), ("tone", 4000, 12000, 8000, "tone (Hz)"),
+    ("focus", 0.4, 3, 1, "tone focus"), ("bright", 3000, 10000, 6000, "low cut (Hz)"), ("closed", 10, 120, 45, "closed length (ms)"),
+    ("open", 150, 900, 420, "open length (ms)"), ("drive", 0, 1, 0.25, "drive"), ("level", 0, 1, 0.7, "level"),
+]
 os.makedirs(os.path.join(R, "lab"), exist_ok=True)
-MK_CLAP, MK_SNARE = 1.4, 1.0      # makeup gain before the drive (set by ear and by measuring renders)
+MK_CLAP, MK_SNARE, MK_HAT = 1.4, 1.0, 2.6      # makeup gain before the drive (set by measuring renders)      # makeup gain before the drive (set by ear and by measuring renders)
 
 # ---- a band-pass whose frequency and focus come from two receive names (RBJ, 0 dB at the centre)
 q = P()
@@ -100,19 +105,43 @@ for c in [(rfq, 0, vf, 0), (vf, 0, o1, 0), (vf, 0, mr, 0), (rrt, 0, mr, 1), (mr,
 drive_out(q, 30, 490, s2, "snare", MK_SNARE)
 q.save("lab/ockm-lab-snare.pd", "#N canvas 200 200 900 640 12;")
 
+# ---- hat: six square waves at clashing (808-style) pitches, mixed with noise, band-passed and high-passed.
+# One envelope (lab-hat-env): short for closed, long for open, so the pair always match
+q = P()
+q.add("#X text 20 10 Lab hat: six squares at clashing pitches (the 808 recipe) plus noise \\, band-passed (tone \\, focus) and high-passed (low cut) \\, then drive. Closed and open share it: only the length changes.;")
+rp = q.add("#X obj 30 40 r lab-hat-pitch;")
+sq = None
+for i, f in enumerate([205.3, 304.4, 369.6, 522.7, 540.0, 800.0]):
+    x = 30 + i * 110
+    m = q.add(f"#X obj {x} 70 * {f};"); ph = q.add(f"#X obj {x} 100 phasor~ {f};"); sw = q.add(f"#X obj {x} 130 expr~ ({D}v1>0.5)*2-1;")
+    q.con(rp, 0, m, 0); q.con(m, 0, ph, 0); q.con(ph, 0, sw, 0)
+    if sq is None: sq = sw
+    else:
+        a = q.add(f"#X obj 30 {160 + i * 4} +~;"); q.con(sq, 0, a, 0); q.con(sw, 0, a, 1); sq = a
+mg = q.add("#X obj 30 200 *~ 0.17;"); nz = q.add("#X obj 400 200 noise~;")
+rr = q.add("#X obj 700 170 r lab-hat-ring;"); trr = q.add("#X obj 700 195 t f f;"); inr = q.add(f"#X obj 760 220 expr 1-{D}f1;")
+gm = q.add("#X obj 30 230 *~ 0.55;"); gn = q.add("#X obj 400 230 *~ 0.45;"); mx = q.add("#X obj 30 260 +~;")
+bp = q.add("#X obj 30 290 ockm-lab-bp lab-hat-tone lab-hat-focus;")
+rb = q.add("#X obj 300 300 r lab-hat-bright;"); h1 = q.add("#X obj 30 330 hip~ 6000;"); h2 = q.add("#X obj 30 360 hip~ 6000;")
+he = env_sq(q, 700, 300, "lab-hat-env"); hm = q.add("#X obj 30 400 *~;")
+for c in [(sq, 0, mg, 0), (mg, 0, gm, 0), (nz, 0, gn, 0), (rr, 0, trr, 0), (trr, 1, gm, 1), (trr, 0, inr, 0), (inr, 0, gn, 1),
+          (gm, 0, mx, 0), (gn, 0, mx, 1), (mx, 0, bp, 0), (bp, 0, h1, 0), (h1, 0, h2, 0), (rb, 0, h1, 1), (rb, 0, h2, 1), (h2, 0, hm, 0), (he, 0, hm, 1)]: q.con(*c)
+drive_out(q, 30, 440, hm, "hat", MK_HAT)
+q.save("lab/ockm-lab-hat.pd", "#N canvas 200 200 900 600 12;")
+
 # ---- the brain: burst timing, envelopes, randomise, loop against a kick, render to WAV (Lua)
 def lua_params(lst): return "{ " + ", ".join(f'{{ "{n}", {lo}, {hi}, {st} }}' for n, lo, hi, st, _ in lst) + " }"
 open(os.path.join(R, "lab", "ockm-lab.pd_lua"), "w").write('''-- OCKM Drum Lab brain: plays the clap and snare (their envelopes), randomises around the sound you have,
 -- loops them against a kick, and renders a hit to a WAV in samples/clap or samples/snare.
 -- Written by tools/build_lab.py: change it there.
 local lab = pd.Class:new():register("ockm-lab")
-local PARAMS = { clap = ''' + lua_params(LAB_CLAP) + ''', snare = ''' + lua_params(LAB_SNARE) + ''' }
+local PARAMS = { clap = ''' + lua_params(LAB_CLAP) + ''', snare = ''' + lua_params(LAB_SNARE) + ''', hat = ''' + lua_params(LAB_HAT) + ''' }
 
 function lab:initialize(sel, atoms)
   self.inlets, self.outlets = 1, 0
-  self.v = { clap = {}, snare = {} }
+  self.v = { clap = {}, snare = {}, hat = {} }
   for which, list in pairs(PARAMS) do for _, p in ipairs(list) do self.v[which][p[1]] = p[4] end end
-  self.loop = { clap = false, snare = false }
+  self.loop = { clap = false, snare = false, hat = false }
   self.beat = 0
   math.randomseed(os.time())
   return true
@@ -137,6 +166,7 @@ function lab:postinitialize()
       listen("lab-" .. which .. "-rand-" .. k, function(o) o:randomise(which, amt) end)
     end
   end
+  listen("lab-hat-play-open", function(o) o:play("hat", true) end)
   listen("lab-test", function(o, sel, a) o:test(sel, a) end)
   self.stopclock = pd.Clock:new():register(self, "render_stop")
   self.loopclock = pd.Clock:new():register(self, "loop_tick")
@@ -164,9 +194,12 @@ end
 
 local function seg(name, target, time, delay) pd.send(name, "list", { target, time, delay }) end
 
-function lab:play(which)
+function lab:play(which, open)
   local v = self.v[which]
-  if which == "clap" then
+  if which == "hat" then
+    -- the same hat, short or long
+    seg("lab-hat-env", 0, 0, 0); seg("lab-hat-env", 1, 0.2, 0); seg("lab-hat-env", 0, open and v.open or v.closed, 0.2)
+  elseif which == "clap" then
     -- the bursts: each a quick hit of the two noise colours, a gap apart (looser with jitter); then the tail
     local t, n = 0, math.max(1, math.floor(v.bursts + 0.5))
     seg("lab-clap-burst", 0, 0, 0); seg("lab-clap-tailenv", 0, 0, 0)
@@ -186,8 +219,9 @@ function lab:play(which)
 end
 
 -- how long a hit lasts, so a render catches all of it
-function lab:length(which)
+function lab:length(which, open)
   local v = self.v[which]
+  if which == "hat" then return (open and v.open or v.closed) * 1.6 + 40 end
   if which == "clap" then return math.min(2500, v.bursts * v.gap * 1.5 + v.tail * 1.6 + v.room * 400 + 60) end
   return math.min(2000, math.max(v.bodydec, v.wdecay) * 1.6 + 60)
 end
@@ -211,40 +245,56 @@ end
 
 -- loop: a kick on every beat, the clap or snare on 2 and 4, at 120
 function lab:loop_check()
-  local on = self.loop.clap or self.loop.snare
+  local on = self.loop.clap or self.loop.snare or self.loop.hat
   if on and not self.looping then self.looping = true; self.beat = 0; self:loop_tick()
   elseif not on then self.looping = false; self.loopclock:unset() end
 end
 function lab:loop_tick()
   if not self.looping or self.rendering then return end
-  pd.send("lab-kick", "float", { 1 })
-  if self.beat % 2 == 1 then
+  local b = self.beat                       -- half beats, 0 to 7
+  if b % 2 == 0 then pd.send("lab-kick", "float", { 1 }) end
+  if b == 2 or b == 6 then
     if self.loop.clap then self:play("clap") end
     if self.loop.snare then self:play("snare") end
   end
-  self.beat = (self.beat + 1) % 4
-  self.loopclock:delay(500)
+  if self.loop.hat and b % 2 == 1 then self:play("hat", b == 7) end
+  self.beat = (b + 1) % 8
+  self.loopclock:delay(250)
 end
 
 -- render: record one hit to samples/<clap or snare>/lab-<which>-<date and time>.wav (24-bit mono)
+-- (the hat renders twice: closed into samples/hat, open into samples/open-hat, with the same name)
 function lab:render(which)
   if self.rendering then return end
-  local folder = (which == "clap") and "clap" or "snare"
-  local name = "lab-" .. which .. "-" .. os.date("%Y%m%d-%H%M%S") .. ".wav"
-  self.rendering = { which = which, path = "samples/" .. folder .. "/" .. name }
-  pd.send("lab-rec", "open", { "-bytes", 3, self.rendering.path })
+  local stamp = os.date("%Y%m%d-%H%M%S")
+  if which == "hat" then
+    self.queue = { { which = "hat", open = false, path = "samples/hat/lab-hat-" .. stamp .. "-closed.wav" },
+                   { which = "hat", open = true, path = "samples/open-hat/lab-hat-" .. stamp .. "-open.wav" } }
+  else
+    self.queue = { { which = which, path = "samples/" .. which .. "/lab-" .. which .. "-" .. stamp .. ".wav" } }
+  end
+  self.saved = {}
+  self:render_next()
+end
+function lab:render_next()
+  local job = table.remove(self.queue or {}, 1)
+  if not job then return end
+  self.rendering = job
+  pd.send("lab-rec", "open", { "-bytes", 3, job.path })
   pd.send("lab-rec", "start", {})
-  self:play(which)
-  self.stopclock:delay(self:length(which))
+  self:play(job.which, job.open)
+  self.stopclock:delay(self:length(job.which, job.open))
 end
 function lab:render_stop()
   local r = self.rendering
   if not r then return end
   pd.send("lab-rec", "stop", {})
   self.rendering = nil
-  self:status("saved " .. r.path)
   pd.post("ockm-lab: saved " .. r.path)
-  if self.looping then self.loopclock:delay(500) end
+  self.saved[#self.saved + 1] = r.path
+  if self.queue and #self.queue > 0 then self:render_next(); return end
+  self:status("saved " .. table.concat(self.saved, " and "))
+  if self.looping then self.loopclock:delay(250) end
 end
 function lab:status(s) pd.send("lab-status", "symbol", { s }) end
 
@@ -260,26 +310,32 @@ end
 # ---- the lab patch: two columns of controls, the sounds, a kick for the loop, the recorder
 q = P()
 q.raw("#X declare -path lab -path voices;")
-q.add("#X text 20 10 OCKM DRUM LAB: design claps and snares \\, then render them into samples/clap and samples/snare for OCKM (or the SP-404). Click to play \\, drag the sliders \\, randomise around what you have.;")
-brain = q.add("#X obj 820 60 ockm-lab;")
-clap = q.add("#X obj 820 120 ockm-lab-clap;"); snare = q.add("#X obj 980 120 ockm-lab-snare;")
-rk = q.add("#X obj 1140 90 r lab-kick;"); kick = q.add("#X obj 1140 120 ockm-kick labkick;")
-mixs = q.add("#X obj 820 170 +~;"); allm = q.add("#X obj 820 200 +~;"); vol = q.add("#X obj 820 230 *~ 0.8;"); dac = q.add("#X obj 820 260 dac~;")
-rec = q.add("#X obj 1000 200 writesf~ 1;"); rrec = q.add("#X obj 1000 170 r lab-rec;")
-kg = q.add("#X obj 1140 150 *~ 0.7;")
-lbd = q.add("#X obj 1140 200 loadbang;"); dsp = q.add("#X msg 1140 225 \\; pd dsp 1;")
-for c in [(clap, 0, mixs, 0), (snare, 0, mixs, 1), (mixs, 0, allm, 0), (rk, 0, kick, 0), (kick, 0, kg, 0), (kg, 0, allm, 1), (allm, 0, vol, 0),
+q.add("#X text 20 10 OCKM DRUM LAB: design claps \\, snares and hats \\, then render them into the samples folders for OCKM (or the SP-404). Click to play \\, drag the sliders \\, randomise around what you have.;")
+X0 = 1240   # the plumbing, to the right of the three columns
+brain = q.add(f"#X obj {X0} 60 ockm-lab;")
+clap = q.add(f"#X obj {X0} 120 ockm-lab-clap;"); snare = q.add(f"#X obj {X0+150} 120 ockm-lab-snare;"); hat = q.add(f"#X obj {X0+300} 120 ockm-lab-hat;")
+rk = q.add(f"#X obj {X0+420} 90 r lab-kick;"); kick = q.add(f"#X obj {X0+420} 120 ockm-kick labkick;")
+mix0 = q.add(f"#X obj {X0} 150 +~;"); mixs = q.add(f"#X obj {X0} 175 +~;"); allm = q.add(f"#X obj {X0} 200 +~;"); vol = q.add(f"#X obj {X0} 230 *~ 0.8;"); dac = q.add(f"#X obj {X0} 260 dac~;")
+rec = q.add(f"#X obj {X0+180} 200 writesf~ 1;"); rrec = q.add(f"#X obj {X0+180} 170 r lab-rec;")
+kg = q.add(f"#X obj {X0+420} 150 *~ 0.7;")
+lbd = q.add(f"#X obj {X0+420} 200 loadbang;"); dsp = q.add(f"#X msg {X0+420} 225 \\; pd dsp 1;")
+q.con(clap, 0, mix0, 0); q.con(snare, 0, mix0, 1); q.con(mix0, 0, mixs, 0); q.con(hat, 0, mixs, 1)
+for c in [(mixs, 0, allm, 0), (rk, 0, kick, 0), (kick, 0, kg, 0), (kg, 0, allm, 1), (allm, 0, vol, 0),
           (vol, 0, dac, 0), (vol, 0, dac, 1), (mixs, 0, rec, 0), (rrec, 0, rec, 0), (lbd, 0, dsp, 0)]: q.con(*c)
 COL = "#fcfcfc #000000 #000000"
 def column(x, which, title, params):
     q.add(f"#X text {x} 50 {title};")
     btn = lambda bx, by, send, label: q.add(f"#X obj {bx} {by} bng 30 250 50 0 {send} empty {label} 36 15 0 12 {COL};")
-    btn(x, 80, f"lab-{which}-play", "play")
-    q.add(f"#X obj {x+120} 80 tgl 30 0 lab-{which}-loop empty loop_with_kick 36 15 0 12 {COL} 0 1;")
+    if which == "hat":
+        btn(x, 80, "lab-hat-play", "closed"); btn(x + 120, 80, "lab-hat-play-open", "open")
+        q.add(f"#X obj {x+230} 80 tgl 30 0 lab-hat-loop empty loop 36 15 0 12 {COL} 0 1;")
+    else:
+        btn(x, 80, f"lab-{which}-play", "play")
+        q.add(f"#X obj {x+120} 80 tgl 30 0 lab-{which}-loop empty loop_with_kick 36 15 0 12 {COL} 0 1;")
     q.add(f"#X text {x} 128 randomise:;")
     for i, (k, lab_) in enumerate([("small", "small"), ("medium", "medium"), ("wild", "wild")]):
         btn(x + 100 + i * 90, 122, f"lab-{which}-rand-{k}", lab_)
-    btn(x, 164, f"lab-{which}-render", "render_to_samples/" + which)
+    btn(x, 164, f"lab-{which}-render", "render_closed_and_open" if which == "hat" else "render_to_samples/" + which)
     btn(x + 260, 164, f"lab-{which}-reset", "reset")
     y = 230
     for name, lo, hi, st, label in params:
@@ -289,6 +345,7 @@ def column(x, which, title, params):
         y += 46
 column(20, "clap", "CLAP", LAB_CLAP)
 column(420, "snare", "SNARE", LAB_SNARE)
+column(820, "hat", "HATS (one sound: closed and open)", LAB_HAT)
 q.add("#X text 20 840 last:;")
 q.add("#X symbolatom 70 840 70 0 0 0 - lab-status -;")
-q.save("OCKM_DRUM_LAB.pd", "#N canvas 40 40 1300 900 12;")
+q.save("OCKM_DRUM_LAB.pd", "#N canvas 40 40 1180 900 12;")

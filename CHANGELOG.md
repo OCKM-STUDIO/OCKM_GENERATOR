@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.61 (17 October 2026)
+
+- **Drum lab: hats.** One metallic hat sound with closed and open lengths. Play either, loop them on the offbeats, and render a matching pair in one go: closed into `samples/hat`, open into `samples/open-hat`, sharing a name
+
 ## v0.60 (17 October 2026)
 
 - **Chorus on every synth:** Juno-style, with off, I, II and I+II, on the bass, lead and chord tabs. Off is exactly the dry sound, and it's saved with the loop

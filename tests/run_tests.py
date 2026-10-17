@@ -921,21 +921,24 @@ def settings_macro_library_and_slots(work):
 @test
 def drum_lab_renders_claps_and_snares(work):
     """The drum lab (its own patch): render a clap and a snare into samples/clap and samples/snare. Both files are
-    real hits: loud enough, not clipped, and they die away. Randomise moves the settings within their ranges."""
+    real hits: loud enough, not clipped, and they die away. The hat renders a matching closed and open pair.
+    Randomise moves the settings within their ranges."""
     if not PDLUA:
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     import wave, struct
     h = Harness(); h.show("lab-status")
     h.at(300, "lab-clap-render bang")
     h.at(3200, "lab-snare-render bang")
-    h.at(5600, "lab-clap-rand-wild bang ; lab-test dump")
-    f = os.path.join(work, "t_lab.pd"); h.finish(5800, f)
+    h.at(5600, "lab-hat-render bang")
+    h.at(7600, "lab-clap-rand-wild bang ; lab-test dump")
+    f = os.path.join(work, "t_lab.pd"); h.finish(7800, f)
     out = run(work, f, main="OCKM_DRUM_LAB.pd")
     errs = [l for l in out.splitlines() if "error" in l.lower() and "audio" not in l.lower()]
     assert not errs, f"the lab should load cleanly: {errs[:4]}"
-    def read(folder):
+    def read(folder, name_out=None):
         d = os.path.join(work, "samples", folder)
         names = [n for n in os.listdir(d) if n.startswith("lab-") and n.endswith(".wav")]
+        if name_out is not None and names: name_out.append(names[0])
         assert names, f"no render in samples/{folder}: {printed(out, 'lab-status')}"
         w = wave.open(os.path.join(d, names[0]))
         assert w.getnchannels() == 1 and w.getsampwidth() == 3, "renders should be 24-bit mono"
@@ -949,6 +952,12 @@ def drum_lab_renders_claps_and_snares(work):
         rms = (sum(x * x for x in head) / len(head)) ** 0.5
         assert 0.05 < rms and peak < 1.0, f"{folder}: the hit should be loud but not clipped (rms {rms:.3f}, peak {peak:.3f})"
         assert max(abs(x) for x in tail) < 0.2 * peak, f"{folder}: the render should catch the whole hit as it dies away"
+    # the hat: one render makes a matching pair, closed (short) in samples/hat and open (long) in samples/open-hat
+    nc, no = [], []
+    (c, sr), (o, _) = read("hat", nc), read("open-hat", no)
+    assert nc[0].replace("-closed", "") == no[0].replace("-open", ""), f"the hat pair should share a name: {nc} {no}"
+    assert len(o) > 3 * len(c), f"the open hat should be much longer than the closed one: {len(c) / sr:.2f}s vs {len(o) / sr:.2f}s"
+    assert max(abs(x) for x in c) > 0.2 and max(abs(x) for x in o) > 0.2, "both hats should be at a decent level"
     dump = [l for l in out.splitlines() if "ockm-lab: clap" in l]
     assert len(dump) == 13, f"every clap setting should be listed: {dump[:3]}"
 
