@@ -692,6 +692,9 @@
 #X obj 400 850 ockm-monogen lead 24 0 0 0 1 1;
 #X obj 530 850 ockm-chordgen chord 0;
 #X obj 700 850 ockm-grooves;
+#X obj 830 850 ockm-lfo-bass;
+#X obj 940 850 ockm-lfo-lead;
+#X obj 1050 850 ockm-lfo-chord;
 #X obj 110 880 ockm-drumgen d1 0;
 #X obj 230 880 ockm-drumgen d2 1;
 #X obj 350 880 ockm-drumgen d3 2;

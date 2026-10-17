@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.59 (17 October 2026)
+
+- **An LFO on every synth** (bass, lead, chords): moves one of the four knobs in time with the loop. Five shapes, from a 16th to 8 bars, with depth. At depth 0 the knob is exactly where you left it
+- **Chord voicing:** close, open or wide
+- **Strum:** the notes of each chord come in one after another, from tight to a slow strum
+
 ## v0.58 (17 October 2026)
 
 - **New projects start everything at 1:** bass and lead notes and rhythms start on the first preset, like the chords. Settings > new projects can still start the lead as motif, call and answer, or arp

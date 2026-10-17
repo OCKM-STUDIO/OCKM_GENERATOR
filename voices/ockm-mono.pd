@@ -1,10 +1,10 @@
 #N canvas 140 140 900 340 12;
 #X text 20 10 Mono synth (bass or lead): six engines \, one plays at a time (ockm-<track>-engine 0 to 5). Knobs k1-k4 and drive come in on hooks.;
 #X obj 30 50 inlet;
-#X obj 200 50 r ockm-\$1-k1;
-#X obj 330 50 r ockm-\$1-k2;
-#X obj 460 50 r ockm-\$1-k3;
-#X obj 590 50 r ockm-\$1-k4;
+#X obj 200 50 r ockm-\$1-k1-m;
+#X obj 330 50 r ockm-\$1-k2-m;
+#X obj 460 50 r ockm-\$1-k3-m;
+#X obj 590 50 r ockm-\$1-k4-m;
 #X obj 30 130 ockm-mono-acid \$1;
 #X obj 160 130 ockm-mono-sub \$1;
 #X obj 290 130 ockm-mono-fm \$1;

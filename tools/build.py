@@ -649,9 +649,10 @@ for nm,snd in SLOTS:
                    (f"ockm-{nm}-level",1,None),(f"ockm-{nm}-verb",VERB[snd],None),(f"ockm-{nm}-delay",DLY[snd],None)]
 for _t in [n for n,_ in SLOTS]+["bass","lead","chord"]:
     PROJECT_KEYS+=[(f"ockm-{_t}-{k}",v,None) for k,v in EQ_DEF.items()]
-SYNTH_DEFAULTS={"bass":dict(engine=0,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.37,k2=0.9,k3=0.31,k4=0.55,drive=0,verb=0,delay=0,rhythm=0,notes=0),
-                "lead":dict(engine=4,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0.2,delay=0.25,rhythm=0,notes=0),
-                "chord":dict(engine=0,mode=0,level=1,k1=0.45,k2=0.5,k3=0.4,k4=0.3,type=0,smooth=1,verb=0.3,delay=0.35,rhythm=0,prog=0)}
+LFO_DEF={"lfo-shape":0,"lfo-rate":4,"lfo-depth":0,"lfo-target":1}   # sine, one bar, off, the first knob
+SYNTH_DEFAULTS={"bass":dict(engine=0,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.37,k2=0.9,k3=0.31,k4=0.55,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
+                "lead":dict(engine=4,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0.2,delay=0.25,rhythm=0,notes=0,**LFO_DEF),
+                "chord":dict(engine=0,mode=0,level=1,k1=0.45,k2=0.5,k3=0.4,k4=0.3,type=0,smooth=1,verb=0.3,delay=0.35,rhythm=0,prog=0,voicing=0,strum=0,**LFO_DEF)}
 PATTERN_KEYS=[("ockm-end",0,None),("ockm-impact",0,None),("ockm-pump",0,None),("ockm-bass-on",1,None),("ockm-lead-on",1,None),("ockm-chord-on",1,None),("ockm-rise",0,None),("ockm-drum-len",16,None),("ockm-bass-len",64,None),("ockm-lead-len",64,None),("ockm-chord-len",64,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None),("ockm-leader",0,None),("ockm-drum-groove",-1,None),("ockm-fill-every",0,None),("ockm-fill-style",0,None)]
 for t,d in SYNTH_DEFAULTS.items():
     PATTERN_KEYS+=[(f"ockm-{t}-{k}",v,None) for k,v in d.items()]
@@ -846,6 +847,7 @@ p.add(f"#X obj 230 {gy} ockm-monogen bass 0 0 0 0 1 0;")
 p.add(f"#X obj 400 {gy} ockm-monogen lead 24 0 0 0 1 1;")
 p.add(f"#X obj 530 {gy} ockm-chordgen chord 0;")
 p.add(f"#X obj 700 {gy} ockm-grooves;")
+for i,nm in enumerate(("bass","lead","chord")): p.add(f"#X obj {830+i*110} {gy} ockm-lfo-{nm};")
 for i,(nm,snd) in enumerate(SLOTS): p.add(f"#X obj {110+i*120} {gy+30} ockm-drumgen {nm} {snd};")
 # synth settings subpatch: key, engines, knobs, generator choices
 sub=P()
@@ -1123,7 +1125,7 @@ engine("voices/ockm-mono-saw.pd",5,"Saw engine: a raw sawtooth. No squelch \\, j
 q=P()
 q.add("#X text 20 10 Mono synth (bass or lead): six engines \\, one plays at a time (ockm-<track>-engine 0 to 5). Knobs k1-k4 and drive come in on hooks.;")
 inl=q.add("#X obj 30 50 inlet;")
-ks=[q.add(f"#X obj {200+i*130} 50 r ockm-{D}1-k{i+1};") for i in range(4)]
+ks=[q.add(f"#X obj {200+i*130} 50 r ockm-{D}1-k{i+1}-m;") for i in range(4)]
 names=["acid","sub","fm","reese","pluck","saw","house"]
 eng=[q.add(f"#X obj {30+i*130} 130 ockm-mono-{n} {D}1;") for i,n in enumerate(names)]
 sm=q.add("#X obj 30 200 +~;")
@@ -1243,7 +1245,7 @@ for i,(nm,fnb,title) in enumerate([
 q=P()
 q.add("#X text 20 10 Lead synth: its own engines \\, one plays at a time (ockm-lead-engine: "+" ".join(f"{i} {n}" for i,n in enumerate(LEAD_ENGINES))+"). Glides on slide steps and adds vibrato to held notes.;")
 inl=q.add("#X obj 30 50 inlet;")
-ks=[q.add(f"#X obj {200+i*130} 50 r ockm-{D}1-k{i+1};") for i in range(4)]
+ks=[q.add(f"#X obj {200+i*130} 50 r ockm-{D}1-k{i+1}-m;") for i in range(4)]
 eng=[q.add(f"#X obj {30+i*130} 130 ockm-lead-{n} {D}1;") for i,n in enumerate(LEAD_ENGINES)]
 sm=q.add("#X obj 30 200 +~;")
 for i,e in enumerate(eng):
@@ -1719,6 +1721,56 @@ for c in [(cx,0,to,0),(to,1,tws["on"],0),(to,0,s1,0),(s1,0,fh,0),(fh,0,th,0),(th
 p.add("#X text 20 980 hooks: ockm-<track>-rhythm 0-7 \\, ockm-<track>-notes 0-11 \\, ockm-<track>-gen (rebuild) \\, ockm-<track>-mode (0 auto \\, 1 manual) \\, ockm-<track>-sync (follow the chords) \\, ockm-<track>-lock (0 own rhythm \\, 1 lock to kick \\, 2 fill the gaps) \\, ockm-<track>-density (0-2 \\, 1 = the preset) \\, ockm-<track>-seed (mutate: 0 = the original) \\, and the shared ockm-root 0-11 and ockm-scale 0-5. Args: track \\, octave \\, rhythm \\, notes \\, default mode \\, default sync.;")
 p.save("seq/ockm-monogen.pd","#N canvas 120 120 1100 1020 12;")
 
+# ================= LFO (one per synth) =================
+# Sits between a synth's four knobs and the synth: ockm-<part>-k1..k4 (your settings) in, ockm-<part>-k1-m..k4-m out.
+# With depth 0, or for the knobs it isn't moving, the knob passes straight through. Its phase restarts with the loop,
+# so it stays in time. Shapes: 0 sine 1 triangle 2 square 3 saw 4 sample-and-hold. Rate: 0 1/16, 1 1/8, 2 1/4, 3 1/2,
+# 4 1 bar, 5 2 bars, 6 4 bars, 7 8 bars. Target 1-4: which knob. Depth 0-1 (1 swings the knob by half its range each way).
+for PT in ("bass","lead","chord"):
+    p=P()
+    p.add(f"#X text 20 10 LFO for the {PT}: moves one of its four knobs in time with the loop.;")
+    for k in range(1,5):
+        x=20+(k-1)*200
+        rk=p.add(f"#X obj {x} 60 r ockm-{PT}-k{k};"); tk=p.add(f"#X obj {x} 85 t f f;"); vk=p.add(f"#X obj {x+60} 110 v ockm_{PT}_b{k};")
+        ok=p.add(f"#X obj {x} 140 expr if(ockm_{PT}_lt=={k} \\, min(1 \\, max(0 \\, {D}f1+ockm_{PT}_mv)) \\, {D}f1);")
+        sk=p.add(f"#X obj {x} 170 s ockm-{PT}-k{k}-m;")
+        for c in [(rk,0,tk,0),(tk,1,vk,0),(tk,0,ok,0),(ok,0,sk,0)]: p.con(*c)
+    for nm,dflt in [("shape",0),("rate",4),("depth",0)]:
+        x={"shape":20,"rate":220,"depth":420}[nm]
+        rr=p.add(f"#X obj {x} 230 r ockm-{PT}-lfo-{nm};"); vv=p.add(f"#X obj {x} 255 v ockm_{PT}_l{nm[0]};")
+        lb=p.add(f"#X obj {x+100} 205 loadbang;"); dm=p.add(f"#X msg {x+100} 230 {dflt};")
+        for c in [(rr,0,vv,0),(lb,0,dm,0),(dm,0,vv,0)]: p.con(*c)
+    # a new target: the knob it was moving goes back to its setting
+    rt=p.add(f"#X obj 620 230 r ockm-{PT}-lfo-target;"); tt=p.add("#X obj 620 255 t f f;"); fo=p.add("#X obj 680 280 f 1;"); vt=p.add(f"#X obj 620 305 v ockm_{PT}_lt;")
+    lbt=p.add("#X obj 760 205 loadbang;"); d1=p.add("#X msg 760 230 1;")
+    sel=p.add("#X obj 680 330 sel 1 2 3 4;")
+    for c in [(rt,0,tt,0),(tt,1,fo,0),(tt,0,fo,1),(tt,0,vt,0),(fo,0,sel,0),(lbt,0,d1,0),(d1,0,vt,0)]: p.con(*c)
+    for k in range(1,5):
+        bx=p.add(f"#X obj {600+k*90} 360 expr ockm_{PT}_b{k};"); bs=p.add(f"#X obj {600+k*90} 385 s ockm-{PT}-k{k}-m;")
+        p.con(sel,k-1,bx,0); p.con(bx,0,bs,0)
+    # the clock: every 20 ms, move the phase on by 20 ms worth of the rate; the loop starting puts it back to 0
+    lbm=p.add("#X obj 20 420 loadbang;"); met=p.add("#X obj 20 445 metro 20;")
+    ph=p.add(f"#X obj 20 470 expr fmod(ockm_{PT}_ph+20/max(1 \\, ockm_stepms*pow(2 \\, int(ockm_{PT}_lr))) \\, 1) \\; ockm_{PT}_ph;")
+    tph=p.add("#X obj 20 500 t f f;"); vph=p.add(f"#X obj 100 530 v ockm_{PT}_ph;")
+    # a wrap (new phase below the old) picks a new sample-and-hold value
+    wr=p.add("#X obj 220 500 <;"); wsel=p.add("#X obj 220 525 sel 1;"); rnd=p.add("#X obj 220 550 random 2001;"); rsc=p.add(f"#X obj 220 575 expr {D}f1/1000-1;"); vsh=p.add(f"#X obj 220 600 v ockm_{PT}_sh;")
+    shp=p.add(f"#X obj 20 560 expr if(int(ockm_{PT}_ls)==1 \\, 4*abs({D}f1-0.5)-1 \\, if(int(ockm_{PT}_ls)==2 \\, if({D}f1<0.5 \\, 1 \\, -1) \\, if(int(ockm_{PT}_ls)==3 \\, 2*{D}f1-1 \\, if(int(ockm_{PT}_ls)==4 \\, ockm_{PT}_sh \\, sin(6.2831853*{D}f1)))));")
+    mv=p.add(f"#X obj 20 590 expr {D}f1*ockm_{PT}_ld*0.5;"); vmv=p.add(f"#X obj 20 620 v ockm_{PT}_mv;")
+    # send the moving knob (only while there's some depth, plus once more as depth reaches 0)
+    go=p.add(f"#X obj 20 650 expr ockm_{PT}_lt;"); sel2=p.add("#X obj 20 680 sel 1 2 3 4;")
+    gate=p.add(f"#X obj 20 625 expr ockm_{PT}_ld>0 || ockm_{PT}_was>0;"); spg=p.add("#X obj 20 640 sel 0;")
+    tgw=p.add("#X obj 120 620 t b b;"); wasx=p.add(f"#X obj 260 625 expr ockm_{PT}_ld;")   # send first, then remember the depth
+    vwas=p.add(f"#X obj 160 650 v ockm_{PT}_was;")
+    tb1=p.add("#X obj 120 605 t b f;"); tb2=p.add("#X obj 120 645 t b;")   # store the swing, then the expressions that read it (they want a bang)
+    for k in range(1,5):
+        mx=p.add(f"#X obj {20+(k-1)*120} 710 expr min(1 \\, max(0 \\, ockm_{PT}_b{k}+ockm_{PT}_mv));"); ms=p.add(f"#X obj {20+(k-1)*120} 735 s ockm-{PT}-k{k}-m;")
+        p.con(sel2,k-1,mx,0); p.con(mx,0,ms,0)
+    rst=p.add("#X obj 400 420 r ockm-step;"); s0=p.add("#X obj 400 445 sel 0;"); z=p.add("#X msg 400 470 0;"); vz=p.add(f"#X obj 400 495 v ockm_{PT}_ph;")
+    for c in [(lbm,0,met,0),(met,0,ph,0),(ph,1,wr,1),(ph,0,tph,0),(tph,1,vph,0),(tph,1,wr,0),(wr,0,wsel,0),(wsel,0,rnd,0),(rnd,0,rsc,0),(rsc,0,vsh,0),
+              (tph,0,shp,0),(shp,0,mv,0),(mv,0,tb1,0),(tb1,1,vmv,0),(tb1,0,tgw,0),(tgw,1,gate,0),(tgw,0,wasx,0),(wasx,0,vwas,0),(gate,0,spg,0),(spg,1,tb2,0),(tb2,0,go,0),(go,0,sel2,0),
+              (rst,0,s0,0),(s0,0,z,0),(z,0,vz,0)]: p.con(*c)
+    p.save(f"seq/ockm-lfo-{PT}.pd","#N canvas 120 120 1100 780 12;")
+
 # ================= chord sequencer =================
 p=P()
 p.add("#X text 20 10 Chord pattern. Each step has on/accent and a chord root (scale step). Notes are worked out as it plays \\, so key \\, scale and chord type changes apply straight away.;")
@@ -1729,6 +1781,7 @@ lb=p.add("#X obj 700 40 loadbang;"); lbt=p.add("#X obj 700 65 t b b b;")
 d0a=p.add("#X msg 700 90 0;"); d0b=p.add("#X msg 760 90 0;"); d9=p.add("#X msg 820 90 9;")
 rsc=p.add("#X obj 700 120 r ockm-scale;"); tsc=p.add("#X obj 700 150 text get ockm-presets-scale;"); lsc=p.add("#X obj 700 175 list split 1;"); asc=p.add(f"#X obj 700 200 array set {D}0-sc;")
 rty=p.add(f"#X obj 900 120 r ockm-{D}1-type;"); tty=p.add("#X obj 900 150 text get ockm-presets-chordtype;"); lty=p.add("#X obj 900 175 list split 1;"); aty=p.add(f"#X obj 900 200 array set {D}0-ty;")
+rvo=p.add(f"#X obj 1400 120 r ockm-{D}1-voicing;")   # 0 close, 1 open, 2 wide
 rsm=p.add(f"#X obj 1250 120 r ockm-{D}1-smooth;"); one_sm=p.add("#X msg 1250 90 1;"); p.con(lb,0,one_sm,0)   # smooth voicing on by default
 rro=p.add("#X obj 1100 120 r ockm-root;"); rox=p.add(f"#X obj 1100 150 expr if({D}f1<=7 \\, 48+{D}f1 \\, 36+{D}f1);")
 for c in [(lb,0,lbt,0),(lbt,2,d0a,0),(lbt,1,d0b,0),(lbt,0,d9,0),(d0a,0,tsc,0),(d0b,0,tty,0),(d9,0,rox,0),
@@ -1748,7 +1801,10 @@ for k in range(4):
     # smooth voicing: fold the note into the octave above the key's root, so chords move by small steps
     fo=p.add(f"#X obj {x} 560 expr if({D}f1<=0 \\, 0 \\, if({D}f2 \\, {D}f1-12*floor(({D}f1-{D}f3)/12) \\, {D}f1));")
     for c in [(t4,k,mk,0),(mk,0,rt,0),(rt,0,tt,0),(tt,1,nx,3),(tt,0,ad,0),(ad,0,td,0),(td,1,sx,0),(sx,0,rs,0),(rs,0,nx,2),(td,0,nx,0),(rox,0,nx,1),(rdeg,0,ad,1),
-              (nx,0,fo,0),(rsm,0,fo,1),(one_sm,0,fo,1),(rox,0,fo,2),(fo,0,pk,k)]: p.con(*c)
+              (nx,0,fo,0),(rsm,0,fo,1),(one_sm,0,fo,1),(rox,0,fo,2)]: p.con(*c)
+    off={0:f"-12*({D}f2==2)",1:f"12*({D}f2>=1)",2:f"0*{D}f2",3:f"12*({D}f2==2)"}[k]
+    vo=p.add(f"#X obj {x} 600 expr if({D}f1<=0 \\, 0 \\, {D}f1+{off});")
+    p.con(fo,0,vo,0); p.con(rvo,0,vo,1); p.con(vo,0,pk,k)
 # store / load / edit / extend
 re=p.add(f"#X obj 1300 600 r ockm-{D}1-edit;"); tl=p.add("#X obj 1300 630 t l l;"); ls=p.add("#X obj 1480 660 list split 1;"); up=p.add("#X obj 1300 690 unpack f f f;")
 p.con(re,0,tl,0); p.con(tl,1,ls,0); p.con(tl,0,up,0)
@@ -1864,7 +1920,7 @@ def chord_voice(sp,kind):
     fv=sp.add("#X obj 400 50 f;"); sp.con(vi,0,fv,1)
     mo=sp.add("#X obj 20 50 moses 1;"); tb=sp.add("#X obj 20 80 t b f;"); mt=sp.add("#X obj 80 110 mtof;")
     roff=sp.add(f"#X obj 600 20 r {D}0-off;"); moff=sp.add("#X msg 600 50 0 30;")
-    k=[sp.add(f"#X obj {600+i*90} 100 r ockm-{D}1-k{i+1};") for i in range(4)]
+    k=[sp.add(f"#X obj {600+i*90} 100 r ockm-{D}1-k{i+1}-m;") for i in range(4)]
     am=sp.add("#X obj 20 330 *~;"); av=sp.add("#X obj 200 300 vline~;")
     for c in [(ni,0,mo,0),(mo,1,tb,0),(tb,1,mt,0),(roff,0,moff,0),(moff,0,av,0),(av,0,am,1),(am,0,out,0)]: sp.con(*c)
     if kind=="stab":
@@ -1962,6 +2018,9 @@ for idx,(kind,title) in enumerate(CHORD_ENGINES):
     q=P(); q.add(f"#X text 20 10 Chord engine {idx}. {title}. k1-k4 0 to 1.;")
     inl=q.add("#X obj 30 50 inlet;"); sp_=q.add("#X obj 30 80 spigot 1;"); ro=q.add("#X obj 30 110 route off;")
     so=q.add(f"#X obj 30 140 s {D}0-off;"); up=q.add("#X obj 120 140 unpack f f f f f;")
+    rsx=q.add(f"#X obj 500 50 r ockm-{D}1-strum;")
+    strum={v: q.add(f"#X obj {500+v*60} 80 * {round(25*v,1)};") for v in (1,2,3)}
+    for v in (1,2,3): q.con(rsx,0,strum[v],0)
     re=q.add(f"#X obj 700 50 r ockm-{D}1-engine;"); eq=q.add(f"#X obj 700 80 == {idx};"); tf=q.add("#X obj 700 110 t f f;")
     sw=q.add("#X obj 700 170 switch~;"); s0=q.add("#X obj 760 140 sel 0;"); bo=q.add(f"#X obj 760 170 s {D}0-off;")
     for c in [(inl,0,sp_,0),(sp_,0,ro,0),(ro,0,so,0),(ro,1,up,0),(re,0,eq,0),(eq,0,tf,0),(tf,1,sw,0),(tf,0,s0,0),(s0,0,bo,0),(tf,0,sp_,1)]: q.con(*c)
@@ -1970,14 +2029,18 @@ for idx,(kind,title) in enumerate(CHORD_ENGINES):
         sp=P(); chord_voice(sp,kind)
         q.L.append(sp.text(f"#N canvas 0 0 980 460 v{v} 0;").rstrip("\n"))
         o=q.add(f"#X restore {120+v*90} 200 pd v{v};"); vs.append(o)
-        q.con(up,v,o,0); q.con(up,4,o,1)
+        q.con(up,4,o,1)
+        if v == 0: q.con(up,v,o,0)
+        else:
+            pp=q.add(f"#X obj {120+v*90} 170 pipe 0;"); q.con(up,v,pp,0); q.con(pp,0,o,0)
+            q.con(strum[v],0,pp,1)
     s1=q.add("#X obj 120 260 +~;"); s2=q.add("#X obj 120 280 +~;"); s3=q.add("#X obj 120 300 +~;"); g=q.add(f"#X obj 120 330 *~ {CHORD_GAIN[kind]};"); out=q.add("#X obj 120 370 outlet~;")
     for c in [(vs[0],0,s1,0),(vs[1],0,s1,1),(s1,0,s2,0),(vs[2],0,s2,1),(s2,0,s3,0),(vs[3],0,s3,1),(s3,0,g,0),(g,0,out,0)]: q.con(*c)
     if kind=="strings":
         # ensemble: three delay taps swept by slow sines a third of a cycle apart (k2 sets the depth)
         q.C=[c for c in q.C if c!=(g,0,out,0)]
         dw=q.add(f"#X obj 300 330 delwrite~ {D}0-ens 40;"); dry=q.add("#X obj 120 400 *~ 0.5;"); mix=q.add("#X obj 120 450 +~;")
-        lb=q.add("#X obj 500 250 loadbang;"); kd=q.add(f"#X obj 700 250 r ockm-{D}1-k2;"); kx=q.add(f"#X obj 700 275 expr 0.5+{D}f1*3;")
+        lb=q.add("#X obj 500 250 loadbang;"); kd=q.add(f"#X obj 700 250 r ockm-{D}1-k2-m;"); kx=q.add(f"#X obj 700 275 expr 0.5+{D}f1*3;")
         for c in [(g,0,dw,0),(g,0,dry,0),(dry,0,mix,0),(mix,0,out,0),(kd,0,kx,0)]: q.con(*c)
         for j in range(3):
             lo=q.add(f"#X obj {300+j*130} 360 osc~ 0.6;"); ph=q.add(f"#X msg {380+j*130} 335 {round(j/3,3)};"); dp=q.add(f"#X obj {300+j*130} 385 *~ 2;")

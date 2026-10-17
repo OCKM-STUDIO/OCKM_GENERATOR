@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.58"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.59"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -83,6 +83,8 @@ local PROG_SHAPES = { { { 0, 16 } }, { { 0, 16 }, { 3, 16 } }, { { 0, 48 }, { 6,
 -- END PRESETS
 local ROMAN = { "i","ii","iii","iv","v","vi","vii" }
 local OCT_OFFSET = { bass = 0, lead = 24 }   -- matches ockm-monogen args
+local LFO_SHAPES = { "sine", "triangle", "square", "saw", "random" }
+local LFO_RATES = { "1/16", "1/8", "beat", "1/2 bar", "bar", "2 bars", "4 bars", "8 bars" }
 
 -- every drum slot setting the screen listens to; the sliders shown depend on synth or sample
 local DRUM_PARAMS = {
@@ -164,6 +166,7 @@ function ui:defaults()
   end
   for _, t in ipairs(SYNTHS) do
     for _, k in ipairs({"engine","k1","k2","k3","k4","drive","verb","delay","rhythm","notes","type","prog"}) do v["ockm-"..t.."-"..k] = 0 end
+    v["ockm-"..t.."-lfo-shape"] = 0; v["ockm-"..t.."-lfo-rate"] = 4; v["ockm-"..t.."-lfo-depth"] = 0; v["ockm-"..t.."-lfo-target"] = 1
   end
 end
 
@@ -176,7 +179,8 @@ function ui:hooks()
   for _, t in ipairs({"bass","lead"}) do
     for _, k in ipairs({"engine","k1","k2","k3","k4","drive","verb","delay","rhythm","notes"}) do h[#h+1] = "ockm-"..t.."-"..k end
   end
-  for _, k in ipairs({"engine","k1","k2","k3","k4","type","smooth","verb","delay","rhythm","prog"}) do h[#h+1] = "ockm-chord-"..k end
+  for _, k in ipairs({"engine","k1","k2","k3","k4","type","smooth","verb","delay","rhythm","prog","voicing","strum"}) do h[#h+1] = "ockm-chord-"..k end
+  for _, t in ipairs(SYNTHS) do for _, k in ipairs({ "lfo-shape", "lfo-rate", "lfo-depth", "lfo-target" }) do h[#h+1] = "ockm-"..t.."-"..k end end
   for _, t in ipairs(TRACKS) do h[#h+1] = "ockm-"..t.."-mute"; h[#h+1] = "ockm-"..t.."-solo" end
   for _, t in ipairs(SYNTHS) do h[#h+1] = "ockm-"..t.."-level"; h[#h+1] = "ockm-"..t.."-mode" end
   for _, t in ipairs(SYNTHS) do h[#h+1] = "ockm-"..t.."-on" end
@@ -1402,14 +1406,30 @@ function ui:layout_synth_sound(add, part, mono)
   local kw = (rw - 6) / 2
   for k = 1, 4 do
     local col, row = (k - 1) % 2, math.floor((k - 1) / 2)
-    add{ kind="hbar", x=rx + col * (kw + 6), y=380 + row * 54, w=kw, h=48, hook="ockm-"..part.."-k"..k, lo=0, hi=1, label=kn[k], bold=true }
+    add{ kind="hbar", x=rx + col * (kw + 6), y=376 + row * 44, w=kw, h=40, hook="ockm-"..part.."-k"..k, lo=0, hi=1, label=kn[k], bold=true }
   end
   local third = {}
   if mono then third[#third + 1] = { "drive", "drive" } end
   third[#third + 1] = { "verb", "reverb" }; third[#third + 1] = { "delay", "delay" }; third[#third + 1] = { "level", "level" }
   local tw = (rw - 6 * (#third - 1)) / #third
   for j, t in ipairs(third) do
-    add{ kind="hbar", x=rx + (j - 1) * (tw + 6), y=494, w=tw, h=48, hook="ockm-"..part.."-"..t[1], lo=0, hi=1, label=t[2], bold=true }
+    add{ kind="hbar", x=rx + (j - 1) * (tw + 6), y=466, w=tw, h=40, hook="ockm-"..part.."-"..t[1], lo=0, hi=1, label=t[2], bold=true }
+  end
+  -- movement: an LFO on one of the four knobs, in time with the loop. Tap a box to step through it
+  local key = function(k) return "ockm-"..part.."-lfo-"..k end
+  local shape, rate, tgt = math.floor(self.v[key("shape")] or 0), math.floor(self.v[key("rate")] or 4), math.floor(self.v[key("target")] or 1)
+  local lw = (rw - 18) / 4
+  add{ kind="btn", x=rx, y=512, w=lw, h=36, small=true, label="lfo " .. LFO_SHAPES[shape + 1], tap=function() self:send(key("shape"), (shape + 1) % #LFO_SHAPES) end }
+  add{ kind="btn", x=rx + (lw + 6), y=512, w=lw, h=36, small=true, label="on " .. (kn[tgt] or "?"), tap=function() self:send(key("target"), tgt % 4 + 1) end }
+  add{ kind="btn", x=rx + 2 * (lw + 6), y=512, w=lw, h=36, small=true, label="every " .. LFO_RATES[rate + 1], tap=function() self:send(key("rate"), (rate + 1) % #LFO_RATES) end }
+  add{ kind="hbar", x=rx + 3 * (lw + 6), y=512, w=lw, h=36, hook=key("depth"), lo=0, hi=1, label="depth", bold=true }
+  if part == "chord" then
+    local vo = math.floor(self.v["ockm-chord-voicing"] or 0)
+    local cw = (rw - 24) / 5
+    for i, nm in ipairs({ "close", "open", "wide" }) do
+      add{ kind="choice", x=rx + (i - 1) * (cw + 6), y=554, w=cw, h=36, label=nm, small=true, sel=(vo == i - 1), tap=function() self:send("ockm-chord-voicing", i - 1) end }
+    end
+    add{ kind="hbar", x=rx + 3 * (cw + 6), y=554, w=2 * cw + 6, h=36, hook="ockm-chord-strum", lo=0, hi=1, label="strum", bold=true }
   end
 end
 

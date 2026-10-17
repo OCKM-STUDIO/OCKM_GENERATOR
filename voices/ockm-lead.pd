@@ -1,10 +1,10 @@
 #N canvas 140 140 900 340 12;
 #X text 20 10 Lead synth: its own engines \, one plays at a time (ockm-lead-engine: 0 acid 1 juno 2 dx 3 sync 4 mini). Glides on slide steps and adds vibrato to held notes.;
 #X obj 30 50 inlet;
-#X obj 200 50 r ockm-\$1-k1;
-#X obj 330 50 r ockm-\$1-k2;
-#X obj 460 50 r ockm-\$1-k3;
-#X obj 590 50 r ockm-\$1-k4;
+#X obj 200 50 r ockm-\$1-k1-m;
+#X obj 330 50 r ockm-\$1-k2-m;
+#X obj 460 50 r ockm-\$1-k3-m;
+#X obj 590 50 r ockm-\$1-k4-m;
 #X obj 30 130 ockm-lead-acid \$1;
 #X obj 160 130 ockm-lead-juno \$1;
 #X obj 290 130 ockm-lead-dx \$1;

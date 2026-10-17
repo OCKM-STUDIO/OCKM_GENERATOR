@@ -366,6 +366,36 @@ def lead_motifs_follow_the_bar(work):
     assert hits0 != hits1, "new should give a different line"
 
 @test
+def chord_voicing_opens_and_widens(work):
+    """Voicing: close as it is; open lifts the third an octave; wide drops the root and lifts the third and seventh."""
+    h = Harness(dut="ockm-chordseq zz")
+    h.add("#X obj 400 120 ockm-presets;")
+    pr = h.add("#X obj 400 90 print CHORD;"); h.con(h.dut, pr)
+    h.at(100, "ockm-pat-zz-on 0 1 ; ockm-pat-zz-deg 0 0 ; ockm-zz-smooth 0 ; ockm-zz-type 1")
+    h.at(120, "test-in 0")
+    h.at(140, "ockm-zz-voicing 1"); h.at(150, "test-in 0")
+    h.at(170, "ockm-zz-voicing 2"); h.at(180, "test-in 0")
+    f = os.path.join(work, "t_voicing.pd"); h.finish(250, f)
+    got = [[float(x) for x in v.split()] for v in printed(run(work, f, with_main=False), "CHORD")]
+    want = [[45, 48, 52, 55, 0.75], [45, 60, 52, 55, 0.75], [33, 60, 52, 67, 0.75]]
+    assert got == want, f"voicings wrong (A minor 7: close, open, wide): {got}"
+
+@test
+def lfo_moves_a_knob_in_time_and_lets_go(work):
+    """An LFO on the lead's first knob swings it around your setting; at depth 0 it goes back to exactly your setting.
+    Knobs it isn't moving pass straight through."""
+    h = Harness(); h.show("ockm-lead-k1-m", "ockm-lead-k2-m")
+    h.at(100, "ockm-lead-k1 0.5 ; ockm-lead-k2 0.3 ; ockm-lead-lfo-rate 2 ; ockm-lead-lfo-target 1 ; ockm-lead-lfo-depth 1 ; ockm-play 1")
+    h.at(1600, "ockm-lead-lfo-depth 0")
+    h.at(1800, "ockm-play 0")
+    f = os.path.join(work, "t_lfo.pd"); h.finish(1900, f)
+    out = run(work, f)
+    k1 = [float(x) for x in printed(out, "ockm-lead-k1-m")]; k2 = [float(x) for x in printed(out, "ockm-lead-k2-m")]
+    assert len(k1) > 30 and min(k1) < 0.15 and max(k1) > 0.85, f"the LFO should swing knob 1 widely around 0.5: {min(k1) if k1 else None}..{max(k1) if k1 else None} ({len(k1)} values)"
+    assert abs(k1[-1] - 0.5) < 1e-6, f"at depth 0, knob 1 should be back on its setting: {k1[-3:]}"
+    assert k2 and all(abs(x - 0.3) < 1e-6 for x in k2), f"knob 2 isn't on the LFO, so it should just pass through: {k2[:5]}"
+
+@test
 def chord_notes_follow_key_scale_and_type(work):
     h = Harness(dut="ockm-chordseq zz")
     h.add("#X obj 400 120 ockm-presets;")
@@ -404,7 +434,7 @@ def chord_engines_sound(work):
     for eng, name in enumerate(["stab", "organ", "pad"]):
         h = Harness(dut="ockm-chord zz")
         h.record(os.path.join(work, f"c_{name}.wav"), source="dut")
-        h.at(20, f"ockm-zz-engine {eng} ; ockm-zz-k1 0.5 ; ockm-zz-k2 0.5 ; ockm-zz-k3 0.2 ; ockm-zz-k4 0.5")
+        h.at(20, f"ockm-zz-engine {eng} ; ockm-zz-k1-m 0.5 ; ockm-zz-k2-m 0.5 ; ockm-zz-k3-m 0.2 ; ockm-zz-k4-m 0.5")
         h.at(60, "test-in 45 48 52 0 1")
         _, (s, sr) = play(work, h, f"t_chord_{name}", with_main=False, ms=900)
         x = s[int(0.08 * sr):int(0.4 * sr)]
@@ -415,7 +445,7 @@ def bass_engines_play_in_tune(work):
     for eng, name in enumerate(["acid", "sub", "fm", "reese", "pluck", "saw", "house"]):
         h = Harness(dut="ockm-mono zz")
         h.record(os.path.join(work, f"b_{name}.wav"), source="dut")
-        h.at(20, f"ockm-zz-engine {eng} ; ockm-zz-k1 0.5 ; ockm-zz-k2 0.3 ; ockm-zz-k3 0 ; ockm-zz-k4 0.9 ; ockm-zz-drive 0")
+        h.at(20, f"ockm-zz-engine {eng} ; ockm-zz-k1-m 0.5 ; ockm-zz-k2-m 0.3 ; ockm-zz-k3-m 0 ; ockm-zz-k4-m 0.9 ; ockm-zz-drive 0")
         h.at(50, "test-in 33 0 0 1")
         _, (s, sr) = play(work, h, f"t_bass_{name}", with_main=False, ms=650)
         x = s[int(0.15 * sr):int(0.5 * sr)]
@@ -431,7 +461,7 @@ def lead_engines_play_in_tune_and_level(work):
         h = Harness(dut="ockm-lead zz")
         h.record(os.path.join(work, f"l_{name}.wav"), source="dut")
         k1, k3 = (0, 0) if name == "sync" else (0.5, 0.3)   # sync: zero sync, so the pitch counter sees the fundamental
-        h.at(20, f"ockm-zz-engine {eng} ; ockm-zz-k1 {k1} ; ockm-zz-k2 0.1 ; ockm-zz-k3 {k3} ; ockm-zz-k4 0.9 ; ockm-zz-drive 0")
+        h.at(20, f"ockm-zz-engine {eng} ; ockm-zz-k1-m {k1} ; ockm-zz-k2-m 0.1 ; ockm-zz-k3-m {k3} ; ockm-zz-k4-m 0.9 ; ockm-zz-drive 0")
         h.at(50, "test-in 45 0 0 1")
         _, (x, sr) = play(work, h, f"t_lead_{name}", with_main=False, ms=650)
         seg = x[int(0.1 * sr):int(0.35 * sr)]
@@ -450,7 +480,7 @@ def chord_engines_sound_and_sit_together(work):
     for eng, name in enumerate(["stab", "organ", "pad", "piano", "rhodes", "strings"]):
         h = Harness(dut="ockm-chord zz")
         h.record(os.path.join(work, f"c_{name}.wav"), source="dut")
-        h.at(20, f"ockm-zz-engine {eng} ; ockm-zz-k1 0.5 ; ockm-zz-k2 0.3 ; ockm-zz-k3 0.3 ; ockm-zz-k4 0.6")
+        h.at(20, f"ockm-zz-engine {eng} ; ockm-zz-k1-m 0.5 ; ockm-zz-k2-m 0.3 ; ockm-zz-k3-m 0.3 ; ockm-zz-k4-m 0.6")
         h.at(50, "test-in 57 0 0 0 1")        # just the root, to check the pitch
         h.at(700, "test-in off")
         h.at(1000, "test-in 57 60 64 0 1")    # the chord, for the level
