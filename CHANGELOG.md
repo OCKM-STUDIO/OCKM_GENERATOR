@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.65 (17 October 2026)
+
+- **Drums tab: hear it as you change it.** While stopped, moving any drum slider plays the sound
+- **Character, morph, random, wild and reset moved to the top,** above the sliders, and greyed out when the slot plays a sample. Character and morph show an orange line at their position; random, wild and reset light up when tapped, with no message
+
 ## v0.64 (17 October 2026)
 
 - **The drum lab's sounds are now GNRTR's synth drums,** replacing 909, 808 and industrial. Every slot plays the lab voice for its sound; perc 1 and perc 2 choose rim, conga or shaker

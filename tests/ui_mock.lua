@@ -34,6 +34,7 @@ pd.Clock = {}
 function pd.Clock:new() return setmetatable({}, { __index = pd.Clock }) end
 function pd.Clock:register(obj, method) self.obj, self.method = obj, method; return self end
 function pd.Clock:delay(ms) self.armed = true end
+function pd.Clock:unset() self.armed = false end
 function pd.Clock:destruct() end
 
 pd.Table = {}

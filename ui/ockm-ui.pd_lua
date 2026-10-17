@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.64"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.65"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -290,6 +290,8 @@ function ui:postinitialize()
   self.clock = pd.Clock:new():register(self, "redraw")
   self.msgclock = pd.Clock:new():register(self, "clear_msg")
   self.audclock = pd.Clock:new():register(self, "audition")
+  self.flashclock = pd.Clock:new():register(self, "flash_off")
+  self.prevclock = pd.Clock:new():register(self, "preview_fire")
   self.jobclock = pd.Clock:new():register(self, "job_step")
   self.expclock = pd.Clock:new():register(self, "export_end")
   self.tickclock = pd.Clock:new():register(self, "tick")
@@ -343,16 +345,30 @@ function ui:lab_random(slot, amt)
   self:snapshot("randomise")
   self:send("ockm-"..nm.."-labrseed", math.random(1, 99999)); self:send("ockm-"..nm.."-labramt", amt)
   self:send("ockm-"..nm.."-labpseed", math.random(1, 99999))
+  self:flash_btn((amt >= 1) and "wild" or "random")
   self:audition_soon(slot)
-  self:say_undo(self:synth_name(slot) .. ((amt >= 1) and ": a wild new sound" or ": a new sound near the last one"))
 end
 function ui:lab_reset(slot)
   local nm = SLOTS[slot]
   self:snapshot("reset sound")
   for _, k in ipairs({ "labrseed", "labramt", "labchar", "labmorph" }) do self:send("ockm-"..nm.."-"..k, 0) end
+  self:flash_btn("reset")
   self:audition_soon(slot)
-  self:say_undo(self:synth_name(slot) .. ": back to the starting sound")
 end
+-- a button lights up for a moment when tapped, so you can see it took
+function ui:flash_btn(key)
+  self.flashing = key
+  if self.flashclock then self.flashclock:delay(250) end
+end
+function ui:flash_off() self.flashing = nil; self:dirty() end
+-- while stopped, moving a drum slider plays the sound (at most every 200 ms while dragging, and once on letting go)
+function ui:preview(slot, final)
+  if self.playing ~= 0 then return end
+  self.prev_slot = slot
+  if final then self.prev_busy = nil; if self.prevclock then self.prevclock:unset() end; self:audition_soon(slot); return end
+  if not self.prev_busy then self.prev_busy = true; if self.prevclock then self.prevclock:delay(200) end end
+end
+function ui:preview_fire() self.prev_busy = nil; self:audition(self.prev_slot) end
 function ui:set_sample(slot, n)
   self:send("ockm-"..SLOTS[slot].."-sample", n)
   self:audition_soon(slot)
@@ -374,6 +390,8 @@ function ui:finalize()
   if self.clock then self.clock:destruct() end
   if self.msgclock then self.msgclock:destruct() end
   if self.audclock then self.audclock:destruct() end
+  if self.flashclock then self.flashclock:destruct() end
+  if self.prevclock then self.prevclock:destruct() end
   if self.jobclock then self.jobclock:destruct() end
   if self.expclock then self.expclock:destruct() end
   if self.tickclock then self.tickclock:destruct() end
@@ -1287,19 +1305,17 @@ function ui:layout_drums(add)
        tap=function() self:audition(slot) end }
   add{ kind="arrow", x=66 + bw + 6, y=362, w=44, h=36, dir=1, on=(pos < cnt + ns - 1), tap=function() if pos < cnt + ns - 1 then self:set_drum_pos(slot, pos + 1) end end }
   add{ kind="btn", x=16 + half - 84, y=362, w=84, h=36, label="new kit", small=true, tap=function() self:random_kit() end }
-  local sl = (smp > 0) and SAMPLE_SLIDERS or SYNTH_SLIDERS
-  local gap = (smp > 0) and 36 or 29
-  for j, p in ipairs(sl) do
-    add{ kind="slider", x=16, y=406 + (j - 1) * gap, w=half, h=(smp > 0) and 30 or 25, hook="ockm-"..nm.."-"..p[1], lo=p[2], hi=p[3], label=p[4] or p[1] }
-  end
-  if smp == 0 then
-    -- the synth's shape: character (its lab recipe) and morph sweep several settings at once; randomise and reset
-    local y = 406 + 5 * gap + 2
-    add{ kind="hbar", x=16, y=y, w=128, h=30, hook="ockm-"..nm.."-labchar", lo=-1, hi=1, label=LAB_CHAR[sname] or "character" }
-    add{ kind="hbar", x=150, y=y, w=110, h=30, hook="ockm-"..nm.."-labmorph", lo=0, hi=1, label="morph" }
-    add{ kind="btn", x=266, y=y, w=70, h=30, small=true, label="random", tap=function() self:lab_random(slot, 0.35) end }
-    add{ kind="btn", x=342, y=y, w=56, h=30, small=true, label="wild", tap=function() self:lab_random(slot, 1) end }
-    add{ kind="btn", x=404, y=y, w=half - 388, h=30, small=true, quiet=true, label="reset", tap=function() self:lab_reset(slot) end }
+  -- the synth's shape: character (its lab recipe) and morph sweep several settings at once; randomise and reset.
+  -- Greyed out while the slot plays a sample
+  local off = (smp > 0) or nil
+  local y = 404
+  add{ kind="hbar", x=16, y=y, w=128, h=30, hook="ockm-"..nm.."-labchar", lo=-1, hi=1, label=off and "character" or (LAB_CHAR[sname] or "character"), bold=true, off=off, preview=slot }
+  add{ kind="hbar", x=150, y=y, w=110, h=30, hook="ockm-"..nm.."-labmorph", lo=0, hi=1, label="morph", bold=true, off=off, preview=slot }
+  add{ kind="btn", x=266, y=y, w=70, h=30, small=true, label="random", off=off, flash="random", tap=function() self:lab_random(slot, 0.35) end }
+  add{ kind="btn", x=342, y=y, w=56, h=30, small=true, label="wild", off=off, flash="wild", tap=function() self:lab_random(slot, 1) end }
+  add{ kind="btn", x=404, y=y, w=half - 388, h=30, small=true, quiet=true, label="reset", off=off, flash="reset", tap=function() self:lab_reset(slot) end }
+  for j, p in ipairs((smp > 0) and SAMPLE_SLIDERS or SYNTH_SLIDERS) do
+    add{ kind="slider", x=16, y=442 + (j - 1) * 29, w=half, h=25, hook="ockm-"..nm.."-"..p[1], lo=p[2], hi=p[3], label=p[4] or p[1], preview=slot }
   end
   local gx = 16 + half + 16
   -- grooves, in banks of 12 (plus clear)
@@ -2393,7 +2409,7 @@ function ui:hit(x, y)
   local L = self:layout()
   for k = #L, 1, -1 do
     local w = L[k]
-    if inside(w, x, y) and (w.tap or w.swipe or w.kind == "slider" or w.kind == "bpm" or w.kind == "vfader" or w.kind == "hbar" or w.kind == "ms"
+    if not w.off and inside(w, x, y) and (w.tap or w.swipe or w.kind == "slider" or w.kind == "bpm" or w.kind == "vfader" or w.kind == "hbar" or w.kind == "ms"
        or w.kind == "dstep" or w.kind == "mstep" or w.kind == "cstep" or w.kind == "pad" or w.kind == "vlane" or w.kind == "hold") then return w end
   end
   return nil
@@ -2435,7 +2451,9 @@ function ui:slide(w, x, y)
   if w.log then v = math.floor(w.lo * (w.hi / w.lo) ^ f + 0.5) end
   if w.hi - w.lo > 4 then v = math.floor(v + 0.5) else v = math.floor(v * 100 + 0.5) / 100 end
   if w.edit then self.v[w.hook] = v; w.edit(v); return end
+  local changed = (self.v[w.hook] ~= v)
   self:send(w.hook, v)
+  if w.preview and changed then self:preview(w.preview) end
 end
 
 function ui:move(x, y)
@@ -2487,6 +2505,8 @@ function ui:release(x, y)
   elseif t.mode == "hold" then w.up()
   elseif t.mode == "slider" and w.spring then
     self:filter_spring()     -- let go: snap back to off
+  elseif t.mode == "slider" and w.preview then
+    self:preview(w.preview, true)
   elseif t.mode == "swipe" then
     local dx = x - t.x0
     self:set_page(self.page + ((dx < 0) and 1 or -1))
@@ -2593,8 +2613,9 @@ function ui:draw(g, w)
     self:col(g, "txt"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 19)
     self:ctext(g, w.label, w, 13, "bg")
   elseif k == "btn" then
-    self:col(g, w.accent and "acc" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
-    self:ctext(g, w.label, w, w.small and 12 or 14, w.accent and "#ffffff" or (w.quiet and "mute" or "txt"))
+    local lit = w.accent or (w.flash and self.flashing == w.flash and not w.off)
+    self:col(g, lit and "acc" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
+    self:ctext(g, w.label, w, w.small and 12 or 14, lit and "#ffffff" or ((w.quiet or w.off) and "mute" or "txt"))
   elseif k == "tab" then
     self:col(g, w.sel and "on" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
     self:ctext(g, w.label, w, 12, w.sel and "bg" or "txt")
@@ -2725,7 +2746,9 @@ function ui:draw(g, w)
     local v = self.v[w.hook] or 0
     local f = clamp((v - w.lo) / (w.hi - w.lo), 0, 1)
     self:col(g, "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 4)
-    if w.bold then
+    if w.off then
+      -- not in use: no value shown
+    elseif w.bold then
       -- grey fill up to the value (from the middle for controls centred on zero), orange line at the value
       local vx = w.x + w.w * f
       local x0 = (w.lo < 0) and (w.x + w.w * (-w.lo) / (w.hi - w.lo)) or w.x
@@ -2738,7 +2761,7 @@ function ui:draw(g, w)
       self:ctext(g, w.label, { x=w.x, y=w.y + w.h / 2 - 16, w=w.w, h=14 }, 12, "txt")
       self:ctext(g, fmt(v), { x=w.x, y=w.y + w.h / 2 + 2, w=w.w, h=12 }, 10, "txt")
     else
-      self:ctext(g, w.label, w, 10, "txt")
+      self:ctext(g, w.label, w, 10, w.off and "mute" or "txt")
     end
   elseif k == "vfader" then
     local v = self.v[w.hook] or 0

@@ -415,7 +415,8 @@ The synth sounds are the drum lab's voices, each slot running its own copy, so t
 - **Level, tune, decay, tone, drive.** Tune moves the sound's pitches; decay stretches its lengths
 - **Character:** the lab's named recipe for that sound (punch, crack, room, metal, boom, wood, slap, shake), moving several settings at once, some up and some down
 - **Morph:** walks a smooth path through nearby sounds. Each **random** press picks a new path
-- **Random** shifts the sound a little from where it starts; **wild** goes anywhere. Both have undo. **Reset** goes back to the starting sound
+- **Random** shifts the sound a little from where it starts; **wild** goes anywhere. **Reset** goes back to the starting sound
+- These sit above the sliders and grey out while the slot plays a sample. While stopped, moving any slider plays the sound
 
 All of it is saved with the project as seeds and slider positions, so a project always gets the same sound back.
 

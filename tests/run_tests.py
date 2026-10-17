@@ -1721,9 +1721,9 @@ def touchscreen_drum_synth_random_and_reset(work):
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness(); h.show("ockm-d1-labrseed", "ockm-d1-labramt", "ockm-d1-labchar")
     h.at(100, "ockm-ui-test tap 539 36 ; ockm-d1-sample 0 ; ockm-d1-labchar 0.5")
-    h.at(300, "ockm-ui-test tap 301 568")     # random
-    h.at(500, "ockm-ui-test tap 370 568")     # wild
-    h.at(700, "ockm-ui-test tap 438 568")     # reset
+    h.at(300, "ockm-ui-test tap 301 419")     # random
+    h.at(500, "ockm-ui-test tap 370 419")     # wild
+    h.at(700, "ockm-ui-test tap 438 419")     # reset
     f = os.path.join(work, "t_labui.pd"); h.finish(900, f)
     out = run(work, f)
     seeds = [int(float(v)) for v in printed(out, "ockm-d1-labrseed")]
@@ -1731,6 +1731,23 @@ def touchscreen_drum_synth_random_and_reset(work):
     assert len(seeds) >= 3 and seeds[-3] > 0 and seeds[-2] > 0 and seeds[-1] == 0, f"random, wild, then reset: {seeds}"
     assert amts[-3:] == [0.35, 1.0, 0.0], f"how far each goes: {amts}"
     assert float(printed(out, "ockm-d1-labchar")[-1]) == 0, "reset puts the character back"
+
+@test
+def touchscreen_drum_slider_previews_when_stopped(work):
+    """Drums tab, stopped: dragging a slider plays the sound (while dragging and on letting go), with no message.
+    While playing it doesn't. A slot playing a sample greys out character, morph, random, wild and reset."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness(); h.show("ockm-d1-audition", "ockm-d1-labrseed")
+    h.at(100, "ockm-ui-test tap 539 36 ; ockm-d1-sample 0")
+    h.at(300, "ockm-ui-test drag 200 519 360 519")       # drag the decay slider
+    h.at(800, "ockm-d1-sample 1")
+    h.at(900, "ockm-ui-test tap 301 419")                # random, greyed out: nothing
+    f = os.path.join(work, "t_preview.pd"); h.finish(1200, f)
+    out = run(work, f)
+    aud = printed(out, "ockm-d1-audition")
+    assert len(aud) >= 1, f"dragging a slider while stopped should play the sound: {aud}"
+    assert not printed(out, "ockm-d1-labrseed"), "random is greyed out while the slot plays a sample"
 
 def main():
     if not PD:
