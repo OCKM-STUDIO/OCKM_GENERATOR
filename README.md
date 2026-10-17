@@ -88,7 +88,7 @@ Tap a track's name on Perform A or the mixer to jump straight to it.
 - Chord steps show the chord on that step of the scale (i, ii, iii...)
 - The **auto | manual** switch, and a line saying where the notes come from
 - **Notes** (bottom left): the same generator settings as this part's column on compose, so a change in either place shows in both
-- **Sound** (bottom right): engine, its four knobs (named for the engine), drive, reverb and delay sends, level
+- **Sound** (bottom right): engine, its four knobs (named for the engine), drive, reverb and delay sends, level, and **chorus** (tap: off, I, II, I+II, like a Juno's buttons; off is exactly the dry sound. The juno lead engine also has its own chorus knob)
 - **Movement** (under the sound): an LFO on one of the four knobs. Tap the boxes to step through the shape (sine, triangle, square, saw, random), which knob it moves, and how often (from a 16th to 8 bars, in time with the loop); drag depth to set how far it swings. At depth 0 the knob is exactly where you set it. It's saved with the loop
 - **Chords only:** **voicing** (close; open, with the third up an octave; or wide, with the root down and the third and seventh up) and **strum** (each note of the chord a little later than the last, up to about 75 ms across the chord)
 - On manual: the note (or chord) picker for the selected step, and slide
@@ -333,6 +333,7 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 | `ockm-<track>-mute-q` | Ask for a mute (0 or 1) that lands on the next beat or bar, by `ockm-mute-quant` (0 now, 1 beat, 2 bar) |
 | `ockm-beat` | Sent by the engine on every beat, before that step's hits (like `ockm-bar`) |
 | `ockm-<synth>-lfo-shape`, `-lfo-rate`, `-lfo-depth`, `-lfo-target` | The synth's LFO: shape 0-4 (sine, triangle, square, saw, random), rate 0-7 (1/16 to 8 bars), depth 0-1, target 1-4 (which knob). Engines read `ockm-<synth>-k1-m` to `-k4-m`, the knobs after the LFO |
+| `ockm-<synth>-chorus` | 0 off, 1 I, 2 II, 3 I+II |
 | `ockm-chord-voicing`, `ockm-chord-strum` | Voicing 0 close, 1 open, 2 wide; strum 0-1 |
 | `ockm-drop` | 1: nothing new plays (effects ring on). 0: everything comes back on the next bar (straight away when stopped) |
 | `ockm-filter-now` | Sent by the engine: where the filter actually is (what gets saved) |

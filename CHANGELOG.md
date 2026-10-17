@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.60 (17 October 2026)
+
+- **Chorus on every synth:** Juno-style, with off, I, II and I+II, on the bass, lead and chord tabs. Off is exactly the dry sound, and it's saved with the loop
+
 ## v0.59 (17 October 2026)
 
 - **An LFO on every synth** (bass, lead, chords): moves one of the four knobs in time with the loop. Five shapes, from a 16th to 8 bars, with depth. At depth 0 the knob is exactly where you left it

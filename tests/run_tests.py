@@ -396,6 +396,24 @@ def lfo_moves_a_knob_in_time_and_lets_go(work):
     assert k2 and all(abs(x - 0.3) < 1e-6 for x in k2), f"knob 2 isn't on the LFO, so it should just pass through: {k2[:5]}"
 
 @test
+def chorus_widens_but_off_is_dry(work):
+    """The chorus: off is exactly the dry sound; I adds swept delayed copies (the sound changes, at a similar level)."""
+    def take(mode):
+        h = Harness(dut="ockm-chorus zz")
+        osc = h.add("#X obj 400 40 osc~ 220;"); h.con(osc, h.dut)
+        h.record(os.path.join(work, f"ch{mode}.wav"), source="dut")
+        h.at(20, f"ockm-zz-chorus {mode}")
+        _, (x, sr) = play(work, h, f"t_ch{mode}", with_main=False, ms=900)
+        return x[int(0.3 * sr):int(0.8 * sr)], sr
+    dry, sr = take(0); wet, _ = take(1)
+    n = min(len(dry), len(wet))
+    ref = [math.sin(2 * math.pi * 220 * (i + int(0.3 * sr)) / sr) for i in range(n)]
+    def rms(v): return math.sqrt(sum(a * a for a in v) / len(v))
+    assert abs(rms(dry) - rms(ref)) < 0.02, f"chorus off should pass the sound straight through: {rms(dry):.3f}"
+    diff = rms([dry[i] - wet[i] for i in range(n)])
+    assert diff > 0.1 and 0.5 < rms(wet) / rms(dry) < 1.5, f"chorus I should change the sound at a similar level: diff {diff:.3f}, level {rms(wet):.3f} vs {rms(dry):.3f}"
+
+@test
 def chord_notes_follow_key_scale_and_type(work):
     h = Harness(dut="ockm-chordseq zz")
     h.add("#X obj 400 120 ockm-presets;")

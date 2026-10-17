@@ -649,7 +649,7 @@ for nm,snd in SLOTS:
                    (f"ockm-{nm}-level",1,None),(f"ockm-{nm}-verb",VERB[snd],None),(f"ockm-{nm}-delay",DLY[snd],None)]
 for _t in [n for n,_ in SLOTS]+["bass","lead","chord"]:
     PROJECT_KEYS+=[(f"ockm-{_t}-{k}",v,None) for k,v in EQ_DEF.items()]
-LFO_DEF={"lfo-shape":0,"lfo-rate":4,"lfo-depth":0,"lfo-target":1}   # sine, one bar, off, the first knob
+LFO_DEF={"lfo-shape":0,"lfo-rate":4,"lfo-depth":0,"lfo-target":1,"chorus":0}   # sine, one bar, off, the first knob; chorus off
 SYNTH_DEFAULTS={"bass":dict(engine=0,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.37,k2=0.9,k3=0.31,k4=0.55,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
                 "lead":dict(engine=4,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0.2,delay=0.25,rhythm=0,notes=0,**LFO_DEF),
                 "chord":dict(engine=0,mode=0,level=1,k1=0.45,k2=0.5,k3=0.4,k4=0.3,type=0,smooth=1,verb=0.3,delay=0.35,rhythm=0,prog=0,voicing=0,strum=0,**LFO_DEF)}
@@ -829,7 +829,8 @@ for r,(nm,seqo,voi) in enumerate(SYN):
     pon=p.add(f"#X obj 360 {y} spigot 1;"); ron=p.add(f"#X obj 420 {y-18} r ockm-{nm}-on;"); ton=p.add(f"#X obj 420 {y+6} t f f;")
     s0n=p.add(f"#X obj 480 {y+6} sel 0;"); ofn=p.add(f"#X msg 480 {y+24} off;")
     for c in [(lq,0,pon,0),(pon,0,sq,0),(ron,0,ton,0),(ton,1,pon,1),(ton,0,s0n,0),(s0n,0,ofn,0),(ofn,0,vo,0)]: p.con(*c)
-    p.con(sq,0,vo,0); p.con(vo,0,gt0,0); p.con(gt,0,mix,0)
+    cho=p.add(f"#X obj 560 {y+20} ockm-chorus {nm};")
+    p.con(sq,0,vo,0); p.con(vo,0,cho,0); p.con(cho,0,gt0,0); p.con(gt,0,mix,0)
     p.con(gt,0,p.add(f"#X obj 700 {y+22} throw~ ockm-stem-{nm};"),0)
     vs=p.add(f"#X obj 760 {y} *~ 0;"); vt=p.add(f"#X obj 830 {y} throw~ ockm-revbus;"); vr=p.add(f"#X obj 760 {y-18} r ockm-{nm}-verb;")
     p.con(gt,0,vs,0); p.con(vs,0,vt,0); p.con(vr,0,vs,1)
@@ -1770,6 +1771,30 @@ for PT in ("bass","lead","chord"):
               (tph,0,shp,0),(shp,0,mv,0),(mv,0,tb1,0),(tb1,1,vmv,0),(tb1,0,tgw,0),(tgw,1,gate,0),(tgw,0,wasx,0),(wasx,0,vwas,0),(gate,0,spg,0),(spg,1,tb2,0),(tb2,0,go,0),(go,0,sel2,0),
               (rst,0,s0,0),(s0,0,z,0),(z,0,vz,0)]: p.con(*c)
     p.save(f"seq/ockm-lfo-{PT}.pd","#N canvas 120 120 1100 780 12;")
+
+# ================= chorus (one per synth) =================
+# Juno-style: two delay taps swept in opposite directions by one slow LFO, mixed with the dry sound.
+# ockm-<part>-chorus: 0 off (dry only) \, 1 I (slow) \, 2 II (deeper) \, 3 I+II (fast and shallow)
+q=P()
+q.add("#X text 20 10 Chorus for a synth (ockm-<part>-chorus 0 off \\, 1 I \\, 2 II \\, 3 I+II). Off is exactly the dry sound.;")
+inl=q.add("#X obj 30 40 inlet~;"); dw=q.add(f"#X obj 200 80 delwrite~ {D}0-ch 40;")
+rc=q.add(f"#X obj 400 40 r ockm-{D}1-chorus;"); sel=q.add("#X obj 400 65 sel 0 1 2 3;")
+modes=[(0.5,0,1,0),(0.513,1.6,0.8,0.65),(0.863,2.3,0.8,0.65),(8.5,0.25,0.85,0.55)]   # rate Hz, depth ms, dry, wet
+ms=[q.add(f"#X msg {400+i*110} 95 {rt} {dp} {dr} {wt};") for i,(rt,dp,dr,wt) in enumerate(modes)]
+up=q.add("#X obj 400 130 unpack f f f f;")
+lfo=q.add("#X obj 200 140 osc~ 0.5;"); dep=q.add("#X obj 200 170 *~;")
+c1=q.add("#X obj 200 200 +~ 5;"); inv=q.add("#X obj 320 200 *~ -1;"); c2=q.add("#X obj 320 225 +~ 5;")
+v1=q.add(f"#X obj 200 260 vd~ {D}0-ch;"); v2=q.add(f"#X obj 320 260 vd~ {D}0-ch;")
+ws=q.add("#X obj 200 290 +~;"); wg=q.add("#X obj 200 320 *~;"); wl=q.add("#X obj 520 290 line~;"); wpk=q.add("#X obj 520 265 pack f 30;")
+dg=q.add("#X obj 30 320 *~;"); dl=q.add("#X obj 640 290 line~;"); dpk=q.add("#X obj 640 265 pack f 30;")
+dpl=q.add("#X obj 760 265 pack f 30;"); dpln=q.add("#X obj 760 290 line~;")
+sm=q.add("#X obj 30 360 +~;"); out=q.add("#X obj 30 390 outlet~;")
+lb=q.add("#X obj 640 200 loadbang;"); one=q.add("#X msg 640 225 1;")
+for c in [(inl,0,dw,0),(inl,0,dg,0),(rc,0,sel,0),(up,0,lfo,0),(up,1,dpk,0),(dpk,0,dl,0),(up,2,dpl,0),(dpl,0,dpln,0),(up,3,wpk,0),(wpk,0,wl,0),
+          (lfo,0,dep,0),(dl,0,dep,1),(dep,0,c1,0),(dep,0,inv,0),(inv,0,c2,0),(c1,0,v1,0),(c2,0,v2,0),(v1,0,ws,0),(v2,0,ws,1),
+          (ws,0,wg,0),(wl,0,wg,1),(dpln,0,dg,1),(dg,0,sm,0),(wg,0,sm,1),(sm,0,out,0),(lb,0,one,0),(one,0,dpl,0)]: q.con(*c)
+for i,m in enumerate(ms): q.con(sel,i,m,0); q.con(m,0,up,0)
+q.save("voices/ockm-chorus.pd","#N canvas 160 160 900 420 12;")
 
 # ================= chord sequencer =================
 p=P()
