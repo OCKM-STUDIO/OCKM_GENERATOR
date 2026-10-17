@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.72 (17 October 2026)
+
+- **Analogue bass: the filter opens up like a real one.** Raising the cutoff or envelope now makes it brighter and fuller, never quieter. The old filter (Pd's vcf~) lost level as the cutoff rose and went silent above a quarter of the sample rate; it's now a flat-response state-variable filter
+
 ## v0.71 (17 October 2026)
 
 - **New bass line-up, by family:** **analogue** (Minimoog, SH-101, Pro-One: saw to square, a sub, a resonant 24 dB filter) is the new default; **donk** (bassline house, garage, M1 organ bass) is new; **sub** becomes **sub 808**, ringing on like an 808 when the decay is up, with a quicker, deeper pitch drop. Saw and house are folded into analogue

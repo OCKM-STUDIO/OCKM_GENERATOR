@@ -895,18 +895,34 @@ engine("voices/ockm-mono-fm.pd",2,"FM engine: one sine wave bending another. Pun
 engine("voices/ockm-mono-reese.pd",3,"Reese engine: three detuned saws beating against each other. Dark and wide",reese)
 engine("voices/ockm-mono-pluck.pd",4,"Pluck engine: short and bright. Good for rolling riffs",pluck)
 
+def svf(Q):
+    """A resonant low-pass you can sweep with a signal, flat (unity gain) from the bottom to the top: the topology-preserving
+    state-variable filter, one sample at a time. Inlets: audio, cutoff in Hz (signal), sample rate. Outlet 3 is the low-pass."""
+    k=round(1/Q,4)
+    g=f"tan(3.14159265*min({D}x2[0]\\, 0.45*{D}f3)/max({D}f3\\, 1))"
+    a1=f"(1/(1+{g}*({g}+{k})))"; a2=f"({g}*{a1})"; a3=f"({g}*{a2})"
+    v3=f"({D}x1[0]-{D}y2[-1])"
+    y1=f"2*({a1}*{D}y1[-1] + {a2}*{v3}) - {D}y1[-1]"
+    v2=f"({D}y2[-1] + {a2}*{D}y1[-1] + {a3}*{v3})"
+    y2=f"2*{v2} - {D}y2[-1]"
+    return f"fexpr~ {y1} \\; {y2} \\; {v2}"
+
 def analogue(q,core,ks,out):
     # the workhorse mono bass (Minimoog, SH-101, Pro-One): saw blending to square, a square sub an octave down, two
-    # resonant low-pass stages (24 dB) opened by the filter envelope, a little drive. Plain Pd only (vcf~), no bob~
+    # resonant low-pass stages (24 dB) opened by the filter envelope, a little drive. Plain Pd only, no bob~.
+    # v0.72: the filter is a state-variable filter (svf below) with unity gain all the way up: vcf~ got quieter as the
+    # cutoff rose and went silent above a quarter of the sample rate
     mt=q.add("#X obj 30 200 mtof~;"); sw=q.add("#X obj 30 230 ockm-blsaw;"); sq=q.add("#X obj 150 230 ockm-blsquare;")
     hz=q.add("#X obj 270 200 *~ 0.5;"); sb=q.add("#X obj 270 230 ockm-blsquare;")
     mx=q.add(f"#X obj 30 270 expr~ {D}v1*(1-{D}f4) - {D}v2*{D}f4*0.8 - {D}v3*0.3;")   # the squares flipped so their fundamental adds to the saw's, not cancels
-    co=q.add(f"#X obj 450 270 expr~ min(12000\\, max(40\\, {D}f2*(1 + {D}v1*{D}f3)));")
-    f1=q.add("#X obj 30 310 vcf~ 1.2;"); f2=q.add("#X obj 30 340 vcf~ 0.9;")
-    dr=q.add(f"#X obj 30 375 expr~ tanh(4*{D}v1)/tanh(4);"); am=q.add("#X obj 30 405 *~;"); g=q.add("#X obj 30 435 *~ 0.65;")
+    co=q.add(f"#X obj 450 270 expr~ min(18000\\, max(30\\, {D}f2*(1 + {D}v1*{D}f3)));")
+    f1=q.add(f"#X obj 30 310 {svf(1.1)};"); f2=q.add(f"#X obj 30 340 {svf(0.8)};")
+    srn=q.add("#X obj 600 230 loadbang;"); srs=q.add("#X obj 600 255 samplerate~;")
+    dc=q.add("#X obj 30 290 hip~ 15;")   # the oscillators carry some DC: take it out before the filter (which passes DC)
+    dr=q.add(f"#X obj 30 375 expr~ tanh(1.5*{D}v1)/tanh(1.5);"); am=q.add("#X obj 30 405 *~;"); g=q.add("#X obj 30 435 *~ 0.55;")
     k1=q.add(f"#X obj 200 140 expr 60*pow(2\\,7.5*{D}f1);"); k3=q.add("#X obj 420 140 * 10;")
     for c in [(core,0,mt,0),(mt,0,sw,0),(mt,0,sq,0),(mt,0,hz,0),(hz,0,sb,0),(sw,0,mx,0),(sq,0,mx,1),(sb,0,mx,2),
-              (core,1,co,0),(co,0,f1,1),(co,0,f2,1),(mx,0,f1,0),(f1,1,f2,0),(f2,1,dr,0),(dr,0,am,0),(core,2,am,1),(am,0,g,0),(g,0,out,0),
+              (core,1,co,0),(co,0,f1,1),(co,0,f2,1),(mx,0,dc,0),(dc,0,f1,0),(f1,2,f2,0),(f2,2,dr,0),(srn,0,srs,0),(srs,0,f1,2),(srs,0,f2,2),(dr,0,am,0),(core,2,am,1),(am,0,g,0),(g,0,out,0),
               (ks[0],0,k1,0),(k1,0,co,1),(ks[1],0,mx,3),(ks[2],0,k3,0),(k3,0,co,2)]: q.con(*c)
     q.add("#X text 200 110 k1 cutoff / k2 saw to square / k3 filter envelope (how far each note opens it) / k4 decay. With a square sub an octave down.;")
 
