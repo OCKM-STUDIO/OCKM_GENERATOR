@@ -55,9 +55,13 @@ def drive_out(p, x, y, src, pre, makeup):
     rd = p.add(f"#X obj {x+150} {y} r {D}1-drive;"); dx = p.add(f"#X obj {x+150} {y+25} expr 1+{D}f1*4;")
     th = p.add(f"#X obj {x} {y+50} expr~ tanh({D}v1*{D}f2)/tanh({D}f2);")
     lv = p.add(f"#X obj {x} {y+80} *~ 0.8;"); rl = p.add(f"#X obj {x+150} {y+55} r {D}1-level;")
-    o = p.add(f"#X obj {x} {y+110} outlet~;")
+    # how hard it was hit: a plain volume after everything else, so a soft hit is the same sound, quieter
+    rv = p.add(f"#X obj {x+150} {y+85} r {D}1-vel;"); mv = p.add(f"#X msg {x+150} {y+110} {D}1 1;"); ln = p.add(f"#X obj {x+150} {y+135} line~;")
+    vg = p.add(f"#X obj {x} {y+110} *~;")
+    o = p.add(f"#X obj {x} {y+140} outlet~;")
     lb = p.add(f"#X obj {x+300} {y} loadbang;"); one = p.add(f"#X msg {x+300} {y+25} 1;")
-    for c in [(src, 0, mk, 0), (mk, 0, th, 0), (rd, 0, dx, 0), (dx, 0, th, 1), (lb, 0, one, 0), (one, 0, th, 1), (th, 0, lv, 0), (rl, 0, lv, 1), (lv, 0, o, 0)]: p.con(*c)
+    for c in [(src, 0, mk, 0), (mk, 0, th, 0), (rd, 0, dx, 0), (dx, 0, th, 1), (lb, 0, one, 0), (one, 0, th, 1), (th, 0, lv, 0), (rl, 0, lv, 1),
+              (lv, 0, vg, 0), (rv, 0, mv, 0), (one, 0, mv, 0), (mv, 0, ln, 0), (ln, 0, vg, 1), (vg, 0, o, 0)]: p.con(*c)
 
 # ---- clap: bursts of two noise bands, a tail of its own, a little room
 q = P()
@@ -229,14 +233,14 @@ MORPH_SCALE = {"level": 0, "pitch": 0.2, "ratio": 0.25, "bursts": 0.3, "drive": 
 
 # ---- how each sound is played (its envelopes), shared by the lab's brain and the instrument's drum slots (Lua)
 PLAY_LUA = '''
-local VEL_CURVE = { kick = 0.66, snare = 0.56, clap = 0.51, hat = 0.5, tom = 0.61, rim = 0.8, conga = 0.63, shaker = 0.65 }
 local function seg(name, target, time, delay) pd.send(name, "list", { target, time, delay }) end
 -- play one hit. pre: where the voice listens (lab-kick, ockm-d1-kick); v: its settings; var: which of a set
 -- (hats 1 closed 2 open; toms low mid high; congas low high); vel: how hard (0 to 1)
 local function play_voice(pre, which, v, var, vel, k)
-  -- every voice squares its envelopes (for the curve) and its drive squashes loud hits, so each sound has a power
-  -- that makes its loudness follow vel (a half-strength hit about half as loud), measured by the tests
-  var, vel = var or 1, math.max(0, vel or 1) ^ (VEL_CURVE[which] or 0.6)
+  -- how hard: a plain volume after the voice's drive, so a soft hit is the same sound, just quieter.
+  -- (Scaling the envelopes instead pushed less into the drive and lost the snap.) The envelopes always run full
+  pd.send(pre .. "-vel", "float", { math.max(0, math.min(1, vel or 1)) })
+  var, vel = var or 1, 1
   if which == "hat" then
     seg(pre .. "-env", 0, 0, 0); seg(pre .. "-env", vel, 0.2, 0); seg(pre .. "-env", 0, (var == 2) and v.open or v.closed, 0.2)
   elseif which == "clap" then

@@ -441,8 +441,8 @@ p.save("seq/ockm-monoseq.pd","#N canvas 150 150 1800 760 12;")
 # ---------------- main patch ----------------
 # six drum slots: (slot, default sound number)
 SLOTS=[("d1",0),("d2",1),("d3",2),("d4",4),("d5",5),("d6",7),("d7",3),("d8",6)]
-VERB=[0,0.25,0.1,0.2,0.1,0.15,0.2,0.25]    # default reverb send per sound (the clap has its own room built in, so it sends little)
-DLY=[0,0,0,0.25,0,0,0,0.3]                 # default delay send per sound
+VERB=[0]*8   # default reverb send per sound: new projects start dry, you add it
+DLY=[0]*8    # default delay send per sound: likewise
 MONO=["note","on","acc","slide"]; CHORD=["on","deg"]
 def show(h): return "ockm-show-"+h[5:]
 # Settings registry: (hook, default, hook the store listens to if different)
@@ -458,8 +458,8 @@ for _t in [n for n,_ in SLOTS]+["bass","lead","chord"]:
     PROJECT_KEYS+=[(f"ockm-{_t}-{k}",v,None) for k,v in EQ_DEF.items()]
 LFO_DEF={"lfo-shape":0,"lfo-rate":4,"lfo-depth":0,"lfo-target":1,"chorus":0}   # sine, one bar, off, the first knob; chorus off
 SYNTH_DEFAULTS={"bass":dict(engine=0,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.37,k2=0.9,k3=0.31,k4=0.55,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
-                "lead":dict(engine=4,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0.2,delay=0.25,rhythm=0,notes=0,**LFO_DEF),
-                "chord":dict(engine=0,mode=0,level=1,k1=0.45,k2=0.5,k3=0.4,k4=0.3,type=0,smooth=1,verb=0.3,delay=0.35,rhythm=0,prog=0,voicing=0,strum=0,**LFO_DEF)}
+                "lead":dict(engine=4,mode=0,sync=1,lock=0,density=1,seed=0,level=1,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
+                "chord":dict(engine=0,mode=0,level=1,k1=0.45,k2=0.5,k3=0.4,k4=0.3,type=0,smooth=1,verb=0,delay=0,rhythm=0,prog=0,voicing=0,strum=0,**LFO_DEF)}
 PATTERN_KEYS=[("ockm-end",0,None),("ockm-impact",0,None),("ockm-pump",0,None),("ockm-bass-on",1,None),("ockm-lead-on",1,None),("ockm-chord-on",1,None),("ockm-rise",0,None),("ockm-drum-len",16,None),("ockm-bass-len",64,None),("ockm-lead-len",64,None),("ockm-chord-len",64,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None),("ockm-leader",0,None),("ockm-drum-groove",-1,None),("ockm-fill-every",0,None),("ockm-fill-style",0,None)]
 for t,d in SYNTH_DEFAULTS.items():
     PATTERN_KEYS+=[(f"ockm-{t}-{k}",v,None) for k,v in d.items()]

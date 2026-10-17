@@ -112,6 +112,7 @@ New projects, this device and macros are yours, not a project's: they're kept in
 
 **Mixer**
 - One strip per track: reverb and delay sends at the top, a level fader, then **M** and **S**. Tap a strip's name to open that track
+- New projects start dry: every reverb and delay send at 0. The reverb and delay themselves are set up, so turning a send up is all it takes
 - **Master** on the right: the reverb and delay return levels, the master volume, and **clear** to undo every mute and solo
 - **EQ** on every strip opens that track's EQ: low cut, a low shelf at 100 Hz, a mid bell you can move, and a high shelf at 8 kHz (each ±12 dB). A curve shows what you've set. While the song plays, bars behind the curve show where that track's sound sits, so you can see what to cut. The EQ button lights when it isn't flat. EQ belongs to the project
 - **De-mud** on the master strip clears low-mid fog. Press it while playing and it listens to the mix for 4 seconds, then gives each track (except the kick and bass) a low cut just below where its own sound starts. If the mix piles up around 250 to 500 Hz, the chords, lead and snare get a small scoop there too. Stopped, it sets safe starting low cuts instead. **Undo** takes it back
@@ -192,6 +193,7 @@ The Pi runs the same app as the Mac, drawn at double size (`--ui-scale 2`), so t
 14. ~~Song mode, MPC style~~ (v0.26). ~~Arrange: turn pattern 1 into a whole track~~ (v0.40, beta: needs more work on transitions and drops). ~~Export: mix, stems, MIDI and live recording~~ (v0.41)
 15. ~~A usability pass~~ (v0.26). Keep going after each round of playing
 16. ~~A setup screen for tempo, swing, accents, volume and MIDI clock~~ (v0.26)
+17. **iPad app, once the screens and sounds are right on the Mac and Pi.** The sound engine moves across on libpd; the screens get a native drawing layer fed by the same widget list; pdlua (GPL) is replaced for the App Store. Until then: keep screen logic apart from drawing, add no new Lua inside Pd unless it earns its place, keep file paths in one place, and keep Mac/Pi-only things (USB scan, kiosk) at the edges
 
 ## Decisions made
 

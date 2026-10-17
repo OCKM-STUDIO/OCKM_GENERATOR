@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.69 (17 October 2026)
+
+- **New projects start dry:** every reverb and delay send (drums, bass, lead, chords) starts at 0. Your saved projects keep theirs
+- **Soft drum hits keep their snap.** Velocity is now a plain volume after each sound's drive, so a normal (unaccented) hit is the same sound as an accent, just quieter. Before, soft hits pushed less into the drive and the claps lost their crack
+
 ## v0.68 (17 October 2026)
 
 - **The bass gets its own rhythm list, the classics first:** offbeat donk, straight 8ths, rolling 16ths, dotted 8ths, octave jump, sustained, quarters, dembow, two step and 3-2-3 cluster, then the older ones. The lead keeps its list

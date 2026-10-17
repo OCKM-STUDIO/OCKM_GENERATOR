@@ -17,14 +17,14 @@ local CHARACTER = { clap = { name = "room", w = { tail = 0.6, room = 0.7, jitter
 local MORPH_SCALE = { level = 0, pitch = 0.2, ratio = 0.25, bursts = 0.3, drive = 0.3, sweep = 0.3 }
 local MORPH_POINTS = 4
 
-local VEL_CURVE = { kick = 0.66, snare = 0.56, clap = 0.51, hat = 0.5, tom = 0.61, rim = 0.8, conga = 0.63, shaker = 0.65 }
 local function seg(name, target, time, delay) pd.send(name, "list", { target, time, delay }) end
 -- play one hit. pre: where the voice listens (lab-kick, ockm-d1-kick); v: its settings; var: which of a set
 -- (hats 1 closed 2 open; toms low mid high; congas low high); vel: how hard (0 to 1)
 local function play_voice(pre, which, v, var, vel, k)
-  -- every voice squares its envelopes (for the curve) and its drive squashes loud hits, so each sound has a power
-  -- that makes its loudness follow vel (a half-strength hit about half as loud), measured by the tests
-  var, vel = var or 1, math.max(0, vel or 1) ^ (VEL_CURVE[which] or 0.6)
+  -- how hard: a plain volume after the voice's drive, so a soft hit is the same sound, just quieter.
+  -- (Scaling the envelopes instead pushed less into the drive and lost the snap.) The envelopes always run full
+  pd.send(pre .. "-vel", "float", { math.max(0, math.min(1, vel or 1)) })
+  var, vel = var or 1, 1
   if which == "hat" then
     seg(pre .. "-env", 0, 0, 0); seg(pre .. "-env", vel, 0.2, 0); seg(pre .. "-env", 0, (var == 2) and v.open or v.closed, 0.2)
   elseif which == "clap" then
