@@ -695,7 +695,7 @@ def touchscreen_drives_the_engine(work):
     tap(290, 262, 36)                    # perform tab
     tap(310, 629, 500)                   # master fx: filter, middle
     tap(320, 477, 36)                    # song tab
-    tap(335, 324, 331)                   # harmony: next progression
+    tap(335, 324, 345)                   # harmony: next progression
     tap(338, 725, 36)                    # chord tab
     tap(340, 298, 421)                   # colour: 9ths
     tap(345, 262, 36); tap(348, 126, 137)  # perform tab, mute the kick lane
@@ -817,12 +817,12 @@ def touchscreen_song_parts_in_and_out(work):
     h = Harness(); h.show("ockm-drums-on", "ockm-bass-on", "ockm-chord-on", "ockm-lead-on", "ockm-turn-every", "ockm-bass-mute")
     tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
     tap(150, 477, 36)                    # song
-    tap(200, 129, 228)                   # drums out
-    tap(250, 363, 228)                   # bass out
-    tap(300, 597, 228)                   # chords out
-    tap(350, 831, 228)                   # lead out
-    tap(400, 129, 228)                   # drums back in
-    tap(450, 836, 391)                   # turnaround every 8
+    tap(200, 129, 250)                   # drums out
+    tap(250, 363, 250)                   # bass out
+    tap(300, 597, 250)                   # chords out
+    tap(350, 831, 250)                   # lead out
+    tap(400, 129, 250)                   # drums back in
+    tap(450, 836, 402)                   # turnaround every 8
     tap(500, 601, 36)                    # bass tab
     tap(550, 916, 283)                   # on/off switch: back on
     tap(600, 338, 36)                    # perform B
@@ -1402,7 +1402,7 @@ def suggest_chords_fit_the_melody(work):
         on = " ".join("1" if i % 4 == 0 else "0" for i in range(64))
         nt = " ".join(str(notes[(i // 4) % len(notes)]) for i in range(64))
         lines = ui_preview.run(["send ockm-length float 64", f"array ockm-pat-lead-on {on}", f"array ockm-pat-lead-note {nt}",
-                                "send ockm-lead-mode float 1", "test tap 477 36", "test tap 324 391", "test tap 324 391"])
+                                "send ockm-lead-mode float 1", "test tap 477 36", "test tap 324 402", "test tap 324 402"])
         return [int(float(l.split()[3])) for l in lines if l.startswith("sent ockm-chord-prog")]
     a_minor = picks([57, 60, 64])           # A C E: the home chord
     assert a_minor[0] == 0, f"a melody on A C E should suggest one chord first: {a_minor}"
@@ -1410,7 +1410,7 @@ def suggest_chords_fit_the_melody(work):
     # a melody that walks A minor, F, C, G one bar each: the pop progression (i VI III VII) should come first
     pop = picks([57, 60, 64, 57, 65, 69, 72, 65, 60, 64, 67, 60, 67, 71, 74, 67])
     assert ui_preview_shapes()[pop[0]] == [(0, 16), (5, 16), (2, 16), (6, 16)], f"expected the pop progression first: {pop}"
-    empty = ui_preview.run(["test tap 477 36", "test tap 324 391"])
+    empty = ui_preview.run(["test tap 477 36", "test tap 324 402"])
     assert not any(l.startswith("sent ockm-chord-prog") for l in empty), "no melody, no suggestion"
 
 @test
@@ -1428,15 +1428,25 @@ def song_styles_set_the_lot(work):
                 v = l.split()
                 out[v[1]] = float(v[3]) if len(v) > 3 else None
         return out
-    t = sent(ui_preview.run(["test tap 477 36", "test tap 340 145"]))
+    t = sent(ui_preview.run(["test tap 477 36", "test tap 558 142"]))
     assert t["ockm-bpm"] == 132 and t["ockm-swing"] == 50 and t["ockm-drum-groove"] == 5, t
     assert t["ockm-d1-drive"] == 0.5 and t["ockm-d1-tune"] == -2, "the kick gets harder and lower"
     assert t["ockm-lead-on"] == 0 and t["ockm-bass-on"] == 1 and t["ockm-bass-rhythm"] == 10 and t["ockm-bass-sync"] == 0, t
     assert t["ockm-style"] == 3, t
-    d = sent(ui_preview.run(["test tap 477 36", "test tap 899 145"]))
+    d = sent(ui_preview.run(["test tap 477 36", "test tap 558 174"]))
     assert d["ockm-bpm"] == 174 and d["ockm-bass-half"] == 1 and d["ockm-chord-half"] == 1 and d["ockm-bass-engine"] == 3, d
-    smp = sent(ui_preview.run(["send ockm-d1-sample float 2", "test tap 477 36", "test tap 340 145"]))
+    smp = sent(ui_preview.run(["send ockm-d1-sample float 2", "test tap 477 36", "test tap 558 142"]))
     assert "ockm-d1-drive" not in smp, "a kick playing a sample keeps its sound"
+    # kits: drum + bass plays kit-breaks where the folder has one (kick, snare), the synth kit elsewhere (hat).
+    # Then techno takes the kit slots back to the synth sound
+    kit = ["send ockm-sample-counts list 31 6 0 0 0 0 0", "send ockm-sample-name list 0 31 kit-breaks", "send ockm-sample-name list 1 5 kit-breaks",
+           "send ockm-sample-name list 1 6 kit-boom", "test tap 477 36", "test tap 558 174"]
+    k = sent(ui_preview.run(kit))
+    assert k["ockm-d1-sample"] == 31 and k["ockm-d2-sample"] == 5, f"the breaks kit's kick and snare: {k.get('ockm-d1-sample')} {k.get('ockm-d2-sample')}"
+    assert "ockm-d4-sample" not in k and k["ockm-d4-tune"] == 2, "no kit hat: the synth hat, voiced for the style"
+    lines = ui_preview.run(kit + ["test tap 558 142"])
+    after = [l for l in lines[[i for i, l in enumerate(lines) if l.startswith("sent ockm-style")][0] + 1:] if l.startswith("sent ockm-d1-sample")]
+    assert after and after[-1].split()[3] in ("0", "0.0"), f"techno: off the kit, back to the synth kick: {after}"
 
 @test
 def refit_my_line_when_the_harmony_moves(work):
@@ -1818,6 +1828,17 @@ def samples_load_and_play_on_drum_slots(work):
     def audible(a, b): return sum(1 for v in seg(a, b) if abs(v) > 0.01) / sr
     full, cut = audible(0.4, 0.95), audible(4.5, 5.05)
     assert 0.5 < cut / full < 0.7, f"start 1 should skip 40% of the sample ({full:.2f} s vs {cut:.2f} s)"
+
+@test
+def sample_library_names_the_files(work):
+    """The sample library reports each file's name with its number, so a style can find a kit (kit-<name>) in each folder."""
+    kd, sd = os.path.join(work, "samples", "kick"), os.path.join(work, "samples", "snare")
+    write_tone(os.path.join(kd, "01.wav"), 110, 0.1); write_tone(os.path.join(kd, "kit-breaks.wav"), 110, 0.1)
+    write_tone(os.path.join(sd, "kit-boom.wav"), 300, 0.1)
+    h = Harness(); h.show("ockm-sample-name"); h.at(100, "ockm-samples-scan bang")
+    f = os.path.join(work, "t_names.pd"); h.finish(400, f)
+    names = printed(run(work, f), "ockm-sample-name")
+    assert "0 2 kit-breaks" in names and "1 1 kit-boom" in names, f"kick 2 and snare 1 named: {names}"
 
 @test
 def touchscreen_picks_samples_and_kits(work):

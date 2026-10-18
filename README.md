@@ -11,7 +11,7 @@ Open `OCKM_GENERATOR.pd` in plugdata. Keep the folder together: the main patch f
 The window is the instrument: three touch screens, drawn in Lua (plugdata has Lua built in). Click with the mouse on the Mac, tap with a finger on the Pi. If clicks do nothing, the patch is in edit mode: press Cmd+E.
 
 **How every screen is laid out**, top to bottom:
-1. **Top bar:** play, tempo, then the screens as tabs in three groups: playing (**Perform A, Perform B, mixer**), making (**song, drums, bass, lead, chord**) and **arrange**. On the right, **save** (a disc, orange when there's something to save) and **☰**, the menu: project, export, settings, revert (and quit to desktop on the Pi). The version number sits next to the tempo
+1. **Top bar:** play, tempo, then the screens as tabs in three groups: playing (**Perform A, Perform B, mixer**), making (**builder, drums, bass, lead, chord**) and **arrange**. On the right, **save** (a disc, orange when there's something to save) and **☰**, the menu: project, export, settings, revert (and quit to desktop on the Pi). The version number sits next to the tempo
 2. **Navigation strip:** on the left, right above the steps, the **steps** navigator: back and forward arrows either side of the steps you're looking at (for example "17-32"). The dots show every block of 16: white is the one on screen, orange is the one playing. You can also swipe the step row sideways. In the middle, how long the loop is and which part sets it, like "loop 4 bars (bass, lead, chords)". On the drums, bass, lead and chord tabs, the right of the strip has that part's **length** (1, 2, 4, 8 or 16 bars) and **double**. See "Part lengths" below
 3. **What you're editing:** the steps (and, on the drums screen, which of the 8 drum slots)
 4. **Sound shaping** at the bottom
@@ -68,8 +68,8 @@ Tap a track's name on Perform A or the mixer to jump straight to it.
 - **Grooves** (right of the sliders): tap one to fill all 8 drums at once. Each slot gets the part for the sound it plays, so a groove's hats land on whichever slot is your hat. A groove is one bar, so it makes the drums 1 bar long (go longer and it repeats), and sets a swing to suit. In four banks (the chips above them): classics, house + garage, techno + breaks, and hard + fast. **Clear** empties the drums. A groove replaces your drum steps, so the message that pops up has an **undo** button
 - **Fills** (under the grooves): **fill on the last bar of every** 4, 8 or 16 bars, counted from when you press play. Styles: **snare roll** (builds through the second half of the bar), **tom run**, **drop** (kick and claps out for the last half bar, hats out for the last beat, so the next downbeat lands harder), **build** (snare 16ths rising over the whole bar), **breakbeat** (the whole bar becomes a breakbeat: broken kick and snare with ghost notes, straight hats, the rest quiet). A fill only replaces the drums it uses; everything else keeps playing your pattern, and your steps are never changed. Saved with each pattern, so a breakdown can have fills off
 
-**Song** (where compose used to be): what's in this pattern, and the harmony everything follows.
-- **Styles** (along the top): house, deep house, tech house, techno, hard house, acid, dub techno, garage, speed garage and drum + bass. One tap sets the tempo, swing and groove, the kick and clap (or snare) character, which parts are in, what each one plays and on which sound, the progression and chord colour, the sends and half-time. Techno gets a straight, harder, lower kick, a bass round the kick on the home note and no lead; drum + bass goes to 174 with a reese and pads at half-time. A drum slot playing a sample or one of your saved sounds keeps it. The message that pops up has **undo**. The last style you picked stays lit; it's a starting point, so tweak away
+**Builder** (where compose used to be): what's in this pattern, and the harmony everything follows.
+- **Styles** (two rows along the top): house, deep house, tech house, techno, hard house, acid, dub techno, garage, speed garage, drum + bass, boom bap and lofi. One tap sets the tempo, swing and groove, the kick and clap (or snare) character, which parts are in, what each one plays and on which sound, the progression and chord colour, the sends and half-time. Techno gets a straight, harder, lower kick, a bass round the kick on the home note and no lead; drum + bass goes to 174 with a reese and pads at half-time. Drum + bass, boom bap and lofi load a sampled **kit** (breaks, boom, dusty) where the samples folders have one; without it they voice the synth kit instead. Other styles leave a drum slot that plays one of your own samples or saved sounds alone, and take slots off a style's kit back to the synth sound. The message that pops up has **undo**. The last style you picked stays lit; it's a starting point, so tweak away
 - **Four tiles: drums, bass, chords, lead.** Tap one to take that part **out** of this pattern, tap again to put it back **in**. Out is different from muted: an out part is silent, its tiles on Perform A and B go dim and say "out of this pattern", and nothing on Perform (mutes, scenes, all in, macros) brings it back. Saved with each pattern, so an intro can leave the bass out. Each part's own tab has the same **on/off** switch, top right
 - **The harmony:** the progression, the key and the scale. The bass, chords and lead all follow it, and it keeps steering even when the chords are out (so the bass still moves with it). The progression lives here now, not on the chord tab
 - **Or fit the chords to my bass / my lead:** when you've written a line of your own, this picks the progression that fits it best (it scores every progression against your notes; tap again for the next best). Only lit when that part is yours
@@ -85,7 +85,7 @@ Tap a track's name on Perform A or the mixer to jump straight to it.
 **Bass, lead and chord** (a tab each)
 - **Steps**: tap cycles off, on, accent. **Drag a step up or down** to change its note. Or tap a step, then pick its note from the row underneath (the dimmed one is the key's root). **Slide** applies to the selected step. Editing any step makes the part yours
 - Chord steps show the chord on that step of the scale (i, ii, iii...)
-- **On/off** (top right): the part in or out of this pattern, the same as its tile on the song screen
+- **On/off** (top right): the part in or out of this pattern, the same as its tile on the builder
 - **Bass:** **riff** (which notes it plays inside each chord: root, octaves, root and fifth, acid riff and so on), **rhythm**, and **movement**: **pedal** (the riff stays on the key's home note while the chords move above it), **follows** (moves with each chord) or **walks** (follows, and the last notes of a bar step a semitone below the next chord's root, walking into the change)
 - **Lead:** **tune** (the shape of the line: root, arps, motifs and so on), **rhythm**, and **freedom**: **chord notes** (every note lands on the chord), **passing notes** (the notes on the beat do, the ones between can pass) or **free** (it just stays in key)
 - **Half-time** (top right, next to on/off): the part plays its own pattern at half speed, one of its steps every two, so a 16-step riff takes two loops (first half, then second half). Under drums at full speed it's the drum and bass feel, or a breakdown that suddenly opens out. Saved with each pattern
@@ -321,7 +321,8 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 | `ockm-lead-freedom` | 0 every note on the chord, 1 the notes on the beat (the default), 2 free (key only) |
 | `ockm-drums-on`, `ockm-bass-on`, `ockm-lead-on`, `ockm-chord-on` | 1 in this pattern, 0 out (silent; Perform can't bring it back). Saved with each pattern |
 | `ockm-turn-every` | Turnaround: 0 off, or 4, 8, 16: the last bar of every so many (counted from play) goes to V major |
-| `ockm-style` | The last style picked on the song screen (0-9), -1 for none. Only lights its chip: the screen sends the style's settings |
+| `ockm-sample-name` | From the sample library after each scan: folder (0-6), sample number, file name without the extension. One message per file |
+| `ockm-style` | The last style picked on the builder (0-11), -1 for none. Only lights its chip: the screen sends the style's settings |
 | `ockm-leader` | Retired in v0.74 (there are no modes). Older patterns saved with one open with the lead following the harmony |
 | `ockm-pattern-copy <from> <to>` | Copy a pattern (0-7) to another slot |
 | `ockm-pattern-clear <n>` | Empty a pattern |
@@ -402,6 +403,10 @@ Every part has its own length: the drums (all 8 rows together), bass, lead and c
 - **Double** copies the part's bars (steps, velocity and timing) after themselves: 1 bar becomes 2, up to 16
 - **New projects** start with drums at 1 bar and the bass, lead and chords at 4 bars
 - **Generators write their natural length:** a groove makes the drums 1 bar; a chord progression sets the chords to the progression's length. A bass or melody that follows the chords takes the chords' length too
+
+### Kits
+
+A kit is one file in each sound folder named `kit-<name>`: `samples/kick/kit-breaks.wav`, `samples/snare/kit-breaks.wav` and so on. Styles load them by name (drum + bass uses breaks, boom bap boom, lofi dusty), and the drums tab shows "breaks kit" instead of a number. Names starting with a letter sort after numbered files, so adding a kit never renumbers your samples. A kit can leave sounds out: those slots stay on the synth. The three kits are built from the CM Lofi packs (kick, snare, clap, closed and open hat).
 
 ### Grooves
 

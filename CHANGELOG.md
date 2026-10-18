@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.77 (18 October 2026)
+
+- **Song is now Builder**
+- **Kits:** a style can load a sampled kit, one file per sound folder called kit-<name>. Three kits from the CM Lofi packs: breaks (drum + bass), boom (boom bap), dusty (lofi). The drums tab names a kit sample ("breaks kit"). Without the files, the style voices the synth kit instead
+- **Two new styles: boom bap and lofi.** Trap is parked (it needs hat rolls and gliding 808s)
+- **Drum + bass** plays the breaks kit, with a harder synth fallback
+- **Speed garage reworked:** a skippy, shuffled top end over the 4/4 kick (rim and snare ghosts, offset hats), and a new speed garage bass rhythm: held notes pushed off the kick, sliding at the end of the phrase, on a driven sub with a pitch drop
+- **Deep house** at 123 (was 120), less swing, a bass that pushes
+- The sample library reports file names (ockm-sample-name)
+
 ## v0.76 (18 October 2026)
 
 - **Styles on the song screen:** house, deep house, tech house, techno, hard house, acid, dub techno, garage, speed garage, drum + bass. One tap sets tempo, swing, groove, kick and clap (or snare) character, which parts are in, their sounds, rhythms and riffs, the progression, sends and half-time. Samples and saved drum sounds are left alone. Undo puts it all back

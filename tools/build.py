@@ -137,7 +137,13 @@ for i,d in enumerate(SAMPLE_DIRS):
     la=p.add(f"#X obj {x} 225 list append {d} *;"); fj=p.add(f"#X obj {x} 250 file join;"); t3=p.add(f"#X obj {x} 275 t b s b;")
     z=p.add(f"#X msg {x+150} 300 0;"); gi,go=audio_glob(p,x,320)
     tb=p.add(f"#X obj {x} 560 t b;"); cnt=p.add(f"#X obj {x} 585 f;"); inc=p.add(f"#X obj {x+50} 585 + 1;"); rd=p.add(f"#X obj {x} 700 f;")
-    for c in [(hb,0,la,0),(la,0,fj,0),(fj,0,t3,0),(t3,2,z,0),(z,0,cnt,1),(z,0,rd,1),(t3,1,gi,0),(go,0,tb,0),(tb,0,cnt,0),(cnt,0,inc,0),(inc,0,cnt,1),(inc,0,rd,1),(t3,0,rd,0),(rd,0,pkc,i)]: p.con(*c)
+    for c in [(hb,0,la,0),(la,0,fj,0),(fj,0,t3,0),(t3,2,z,0),(z,0,cnt,1),(z,0,rd,1),(t3,1,gi,0),(tb,0,cnt,0),(cnt,0,inc,0),(inc,0,cnt,1),(inc,0,rd,1),(t3,0,rd,0),(rd,0,pkc,i)]: p.con(*c)
+    # each file's name too (v0.77): ockm-sample-name <folder 0-6> <sample number> <file name without extension>. Kits are found by name
+    tn=p.add(f"#X obj {x} 610 t b s;"); spn=p.add(f"#X obj {x+60} 635 file splitname;"); ls1=p.add(f"#X obj {x+60} 660 list split 1;")
+    spe=p.add(f"#X obj {x+60} 685 file splitext;"); ls2=p.add(f"#X obj {x+60} 710 list split 1;")
+    pkn=p.add(f"#X obj {x+120} 610 list append;"); lpn=p.add(f"#X obj {x+120} 760 list prepend {i};"); ltn=p.add(f"#X obj {x+120} 785 list trim;")
+    snm=p.add(f"#X obj {x+120} 810 s ockm-sample-name;")
+    for c in [(go,0,tn,0),(tn,1,spn,0),(spn,0,ls1,0),(ls1,1,spe,0),(spe,0,ls2,0),(ls2,0,pkn,1),(tn,0,tb,0),(inc,0,pkn,0),(pkn,0,lpn,0),(lpn,0,ltn,0),(ltn,0,snm,0)]: p.con(*c)
 p.save("seq/ockm-samplelib.pd","#N canvas 150 150 1900 880 12;")
 
 # ---------------- transition sounds: a riser and an impact ----------------
@@ -1330,7 +1336,9 @@ PRE={"leadrhythm":[("offbeat","0 0 2 0 0 0 1 0 0 0 2 0 0 0 1 0"),("rolling","0 2
                    ("round-the-kick","0 2 1 1 0 2 1 1 0 2 1 1 0 2 1 1"),("gallop","0 0 2 1 0 1 2 0 0 0 2 1 0 1 2 0"),
                    ("acid-classic","2 1 0 1 3 4 1 0 2 1 3 1 0 2 1 3"),("acid-16ths","2 1 3 1 2 1 1 3 2 1 3 1 2 3 1 1"),
                    ("tech-bounce","0 0 2 0 0 1 0 0 0 0 2 0 0 1 0 1"),("sparse-dub","2 0 0 0 0 0 0 1 0 0 1 0 0 0 0 0"),
-                   ("trip-hop","2 0 0 0 0 0 3 1 0 0 0 0 0 0 1 0")],
+                   ("trip-hop","2 0 0 0 0 0 3 1 0 0 0 0 0 0 1 0"),
+                   # v0.77: speed garage, held notes pushed off the kick, sliding at the end of the phrase
+                   ("speed-garage",_brh("X-.x..X-.x..x.x.","X-.x..X-..x.S-x.","X-.x..X-.x..x.x.","X-.x..X-.x.xS-.."))],
      "notes":[("root","0"),("octaves","0 7"),("root-fifth","0 4"),("acid-riff","0 0 7 0 2 0 6 4"),("walk-up","0 1 2 4"),("minor-stab","0 2 4 2"),
               ("dub","0 0 -3 -2"),("pedal","0 0 0 1"),("arp-up","0 2 4 7"),("arp-updown","0 2 4 7 4 2"),("call","4 4 2 0 2 4 5 4"),("descend","7 6 4 2"),
               ("melody",_tune(1,False,0)),("melody-steps",_tune(2,True,0)),("melody-high",_tune(3,False,7)),
@@ -1377,7 +1385,7 @@ GROOVES=[
  ("afro-house",56,dict(kick="X...X...X...X...",clap="....x.......x...",hat=".x.x.x.x.x.x.x.x",perc1="x..x..x...x.x...",perc2="..x...x.x...x..x")),
  ("lofi-house",62,dict(kick="X.....x.X.......",snare="....X.......X...",hat="x.x.x.x.x.x.x.x.",ohat=".......x........")),
  ("2-step",64,dict(kick="X.....x...X.....",snare="....X.......X...",hat="x.x.x.x.x.x.x.x.",perc2="..x.......x..x..")),
- ("speed-garage",58,dict(kick="X...X...X...X...",snare="....X.......X...",ohat="..X...X...X...X.",hat="x.xxx.xxx.xxx.xx",perc1="......x.......x.")),
+ ("speed-garage",60,dict(kick="X...X...X...X...",clap="....X.......X...",snare="...x..x.x..x..xx",ohat="..X...X...X...X.",hat="xx.xxx.xxx.xxx.x",perc1="..x....x..x...x.")),
  ("funky-house",56,dict(kick="X...X...X...X...",clap="....X.......X...",hat="xxXxxxXxxxXxxxXx",ohat="..x.......x.....",perc1=".x...x.x.x...x..",tom="...........x..x.")),
  ("ghetto-house",54,dict(kick="X...X..xX...X..x",clap="....X.......X...",hat="x.x.x.x.x.x.x.x.",perc2=".x...x...x...x..")),
  ("nu-disco",54,dict(kick="X...X...X...X...",snare="....X.......X...",hat="..x...x...x...x.",ohat="..........X.....",perc1="xxxxxxxxxxxxxxxx",tom="..............x.")),

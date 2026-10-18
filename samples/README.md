@@ -9,3 +9,5 @@ One folder per drum sound: kick, snare, clap, perc, hat, open-hat, tom. Perc 1 a
 - Up to about 64 per folder keeps browsing quick on the 10-inch screen
 
 Audio files in here aren't saved to git (they're big). Back the folder up yourself.
+
+**Kits:** a file called `kit-<name>` in a folder belongs to that kit (`kick/kit-breaks.wav`, `snare/kit-breaks.wav`). Styles on the builder load kits by name. Letters sort after numbers, so kit files come after your numbered samples and never shift them.

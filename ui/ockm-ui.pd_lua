@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.76"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.77"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -73,7 +73,7 @@ local KNOBS = {
 }
 -- BEGIN PRESETS (written by tools/build.py from its preset lists: edit them there, not here)
 local RHYTHMS = { { "offbeat" }, { "rolling" }, { "gallop" }, { "acid classic" }, { "sparse dub" }, { "tech bounce" }, { "acid 16ths" }, { "trip hop" }, { "hook" }, { "sparse melody" }, { "phrase" }, { "question answer" }, { "pickup" }, { "arp gate" } }
-local BASS_RHYTHMS = { { "offbeat donk" }, { "straight 8ths" }, { "rolling 16ths" }, { "dotted 8ths" }, { "octave jump" }, { "sustained" }, { "quarters" }, { "dembow" }, { "two step" }, { "3 2 3 cluster" }, { "round the kick" }, { "gallop" }, { "acid classic" }, { "acid 16ths" }, { "tech bounce" }, { "sparse dub" }, { "trip hop" } }
+local BASS_RHYTHMS = { { "offbeat donk" }, { "straight 8ths" }, { "rolling 16ths" }, { "dotted 8ths" }, { "octave jump" }, { "sustained" }, { "quarters" }, { "dembow" }, { "two step" }, { "3 2 3 cluster" }, { "round the kick" }, { "gallop" }, { "acid classic" }, { "acid 16ths" }, { "tech bounce" }, { "sparse dub" }, { "trip hop" }, { "speed garage" } }
 local MONO_NOTES = { "root", "octaves", "root fifth", "acid riff", "walk up", "minor stab", "dub", "pedal", "arp up", "arp updown", "call", "descend", "melody", "melody steps", "melody high", "motif", "motif call", "motif high", "arp evolve" }
 local CHORD_RHY = { { "bar pads" }, { "two beat" }, { "offbeat" }, { "dub stabs" }, { "house organ" }, { "tresillo" }, { "syncopated" }, { "garage skip" }, { "call answer" }, { "eighths" } }
 local PROGS = { { "one chord", "i" }, { "vamp", "i iv" }, { "dub techno", "i . . VII" }, { "deep house", "i iv VI v" }, { "garage", "i VI iv v" }, { "pop", "i VI III VII" }, { "uplift", "VI VII i" }, { "andalusian", "i VII VI V" }, { "trip hop", "i VII VI v" }, { "soul", "ii V I" } }
@@ -245,7 +245,23 @@ function ui:postinitialize()
   listen("ockm-sample-counts", function(o, sel, a)
     o.scount = {}
     for k = 1, #FOLDERS do o.scount[k] = math.floor(tonumber(a[k]) or 0) end
+    o.snames = o.snames or {}
+    for k = 1, #FOLDERS do   -- forget names past the end (files removed since the last scan)
+      local t = o.snames[k] or {}
+      for n in pairs(t) do if n > o.scount[k] then t[n] = nil end end
+      o.snames[k] = t
+    end
     o:dirty()
+  end)
+  -- each sample's file name (v0.77): folder 0-6, sample number, name. Kits are files called kit-<name>
+  listen("ockm-sample-name", function(o, sel, a)
+    local f, n = math.floor(tonumber(a[1]) or -1) + 1, math.floor(tonumber(a[2]) or 0)
+    if f < 1 or f > #FOLDERS or n < 1 then return end
+    local parts = {}
+    for k = 3, #a do parts[#parts + 1] = tostring(a[k]) end
+    o.snames = o.snames or {}
+    o.snames[f] = o.snames[f] or {}
+    o.snames[f][n] = table.concat(parts, " ")
   end)
   listen("ockm-spec", function(o, sel, a)
     -- "d4 7 63.5" arrives with the track name as the selector
@@ -608,7 +624,7 @@ end
 -- the tabs, in three groups: playing (perform A, perform B, mixer), making (compose and the four parts), arranging.
 -- { screen, label, part, width, gap before }
 local TABS = { { "perform", "perform A", nil, 72 }, { "live", "perform B", nil, 72 }, { "mixer", "mixer", nil, 58 },
-               { "compose", "song", nil, 58, 8 }, { "drums", "drums", nil, 58 }, { "synth", "bass", 1, 58 }, { "synth", "lead", 2, 58 }, { "synth", "chord", 3, 58 },
+               { "compose", "builder", nil, 58, 8 }, { "drums", "drums", nil, 58 }, { "synth", "bass", 1, 58 }, { "synth", "lead", 2, 58 }, { "synth", "chord", 3, 58 },
                { "arrange", "arrange", nil, 58, 8 } }
 local NAV_Y, NAV_H = 70, 36
 local KIOSK = os.getenv and os.getenv("OCKM_KIOSK")
@@ -884,7 +900,7 @@ function ui:layout_live(add)
       local t = TRACKS[n]
       add{ kind="mtile", x=x, y=y, w=LV_COL_W, h=LV_ROW_H, track=t, label=self:track_name(n),
            tap=function()
-             if not self:track_in(t) then self:say(self:track_name(n) .. " is out of this pattern: put it back in on the song screen"); return end
+             if not self:track_in(t) then self:say(self:track_name(n) .. " is out of this pattern: put it back in on the builder"); return end
              self:qmute(t, (self:mute_target(t) > 0) and 0 or 1)
            end }
       add{ kind="ms", x=x + LV_COL_W - 40, y=y + LV_ROW_H - 36, w=34, h=30, label="S", hook="ockm-"..t.."-solo" }
@@ -1348,7 +1364,7 @@ function ui:layout_drums(add)
     end }
   end
   add{ kind="hbar", x=196, y=270, w=190, h=24, hook="ockm-swing", lo=50, hi=75, label="swing" }
-  -- the drums in or out of this pattern (the same as their tile on the song screen)
+  -- the drums in or out of this pattern (the same as their tile on the builder)
   add{ kind="onoff", x=W - 16 - 110, y=267, w=110, h=30, on=(self.v["ockm-drums-on"] or 1) > 0,
        tap=function() self:send("ockm-drums-on", ((self.v["ockm-drums-on"] or 1) > 0) and 0 or 1) end }
   add{ kind="vlane", x=0, y=300, w=W, h=38 }
@@ -1369,7 +1385,7 @@ function ui:layout_drums(add)
   add{ kind="arrow", x=16, y=346, w=44, h=36, dir=-1, on=(pos > 0), tap=function() if pos > 0 then self:set_drum_pos(slot, pos - 1) end end }
   add{ kind="preset", x=66, y=346, w=bw, h=36, inline=true, sel=(smp > 0),
        num=(smp > 0) and string.format("%02d", smp) or (cur and "mine" or "synth"),
-       label=(smp > 0) and ("of " .. cnt .. "  " .. folder) or (cur and self.me.sounds[cur].name or sname),
+       label=(smp > 0) and (self:kit_of(slot) and (self:kit_of(slot) .. " kit") or ("of " .. cnt .. "  " .. folder)) or (cur and self.me.sounds[cur].name or sname),
        tap=function() self:audition(slot) end }
   add{ kind="arrow", x=66 + bw + 6, y=346, w=44, h=36, dir=1, on=(pos < last), tap=function() if pos < last then self:set_drum_pos(slot, pos + 1) end end }
   if cur then
@@ -1499,7 +1515,7 @@ function ui:layout_synth(add)
       add{ kind="locked", x=16, y=216, w=W - 32, h=40, label=part .. " " .. self:follows_what(part) .. ": to edit the steps, set the mode to manual on compose", tap=function() self:open("compose") end }
     end
   end
-  -- yours or made for you; when the harmony has moved under your line, offer to refit it; on/off top right (as on the song screen)
+  -- yours or made for you; when the harmony has moved under your line, offer to refit it; on/off top right (as on the builder)
   local yours = self:part_yours(part)
   local HTX = W - 16 - 110 - 6 - 86 - 6 - 100   -- the half-time switch; slide and on/off sit to its right
   local hk = "ockm-"..part.."-half"
@@ -1514,7 +1530,7 @@ function ui:layout_synth(add)
     add{ kind="btn", x=HTX - 6 - 80 - 6 - 130, y=266, w=130, h=34, small=true, accent=true, label="refit my line", tap=function() self:refit(part) end }
     add{ kind="btn", x=HTX - 6 - 80, y=266, w=80, h=34, small=true, quiet=true, label="leave it", tap=function() self.claim_harm[part] = self:harm_sig() end }
   else
-    local info = self.msg or (yours and ("yours: " .. self:step_info()) or ((part == "chord") and "plays the harmony from the song screen. Edit a step and it becomes yours"
+    local info = self.msg or (yours and ("yours: " .. self:step_info()) or ((part == "chord") and "plays the harmony from the builder. Edit a step and it becomes yours"
       or "made for you: follows the harmony. Edit a step and it becomes yours"))
     add{ kind="text", x=16, y=276, w=HTX - 32, h=12, label=info, size=11, col=self.msg and "acc" or nil }
     if mono then
@@ -1682,6 +1698,26 @@ function ui:chord_name(d, turn)
   if third == 4 then rn = string.upper(rn) end
   return NOTES[((root + r) % 12) + 1] .. q .. ext, rn
 end
+-- kits (v0.77): a kit is one file per sound folder called kit-<name> (samples/kick/kit-breaks.wav and so on)
+function ui:sample_name(slot, n)
+  local snd = math.floor(self.v["ockm-"..SLOTS[slot].."-sound"] or 0)
+  local t = (self.snames or {})[SOUND_DIR[snd + 1]]
+  return t and t[n]
+end
+-- the sample number of this slot's sound in a kit, or nil when the kit has none for it
+function ui:kit_sample(slot, kit)
+  local snd = math.floor(self.v["ockm-"..SLOTS[slot].."-sound"] or 0)
+  for n, name in pairs((self.snames or {})[SOUND_DIR[snd + 1]] or {}) do
+    if name == "kit-" .. kit then return n end
+  end
+end
+-- the kit this slot is playing from, if any
+function ui:kit_of(slot)
+  local smp = math.floor(self.v["ockm-"..SLOTS[slot].."-sample"] or 0)
+  local name = smp > 0 and self:sample_name(slot, smp)
+  return name and name:match("^kit%-(.+)$")
+end
+
 -- styles (v0.76): one tap sets the tempo, swing, groove, the kick/clap/snare character, what each part plays and on
 -- which sound, the harmony, sends and half-time. Drum slots playing a sample or a saved sound keep it. Undo puts it all back.
 -- drums: per voice { tune, decay, drive, character }. Parts: false = out of the pattern. Bass move 0 pedal, 1 follows, 2 walks.
@@ -1691,9 +1727,9 @@ local STYLES = {
     bass={ engine=5, rhythm=0, notes=2, move=1 },
     chord={ engine=0, rhythm=2, verb=0.15, delay=0.15 },
     lead={ engine=1, rhythm=10, notes=15, freedom=1, verb=0.15, delay=0.2 } },
-  { "deep house", bpm=120, swing=58, groove=2, prog=3, type=6,
-    drums={ kick={ -1, 120, 0, -0.2 }, clap={ 0, 110, 0, 0.2 } },
-    bass={ engine=5, rhythm=3, notes=2, move=1, k={ 0.3, 0.2, 0.3, 0.5 } },
+  { "deep house", bpm=123, swing=56, groove=2, prog=3, type=6,
+    drums={ kick={ -1, 110, 0.1, 0 }, clap={ 0, 100, 0, 0.1 } },
+    bass={ engine=5, rhythm=9, notes=2, move=1, k={ 0.35, 0.2, 0.4, 0.45 } },
     chord={ engine=4, rhythm=6, verb=0.25, delay=0.15 },
     lead=false },
   { "tech house", bpm=125, swing=54, groove=3, prog=0, type=1,
@@ -1725,30 +1761,42 @@ local STYLES = {
     bass={ engine=1, rhythm=8, notes=2, move=1 },
     chord={ engine=1, rhythm=7, verb=0.1 },
     lead=false },
-  { "speed garage", bpm=135, swing=58, groove=20, prog=1, type=1,
-    drums={ kick={ 0, 110, 0.3, 0.4 }, clap={ 0, 90, 0.1, -0.2 } },
-    bass={ engine=3, rhythm=0, notes=1, move=1 },
-    chord={ engine=1, rhythm=2, verb=0.1 },
+  { "speed garage", bpm=135, swing=60, groove=20, prog=1, type=1,
+    drums={ kick={ 0, 110, 0.3, 0.4 }, clap={ 0, 90, 0.1, -0.2 }, snare={ 1, 70, 0.1, 0.3 } },
+    bass={ engine=1, rhythm=17, notes=1, move=1, sidechain=0.2, k={ 0.55, 0.6, 0.5, 0.55 } },
+    chord={ engine=1, rhythm=7, verb=0.1 },
     lead=false },
-  { "drum + bass", bpm=174, swing=50, groove=39, prog=3, type=6,
-    drums={ kick={ 0, 90, 0.3, 0.4 }, snare={ 0, 90, 0.2, 0.5 } },
+  -- the drum + bass, boom bap and lofi kits are samples (kit-breaks, kit-boom, kit-dusty); without them, the synth kit as below
+  { "drum + bass", bpm=174, swing=50, groove=39, prog=3, type=6, kit="breaks",
+    drums={ kick={ 3, 70, 0.6, 0.9 }, snare={ 2, 80, 0.5, 0.9 }, hat={ 2, 40, 0, 0.5 } },
     bass={ engine=3, rhythm=5, notes=0, move=1, half=1 },
     chord={ engine=2, rhythm=0, half=1, verb=0.3 },
+    lead=false },
+  { "boom bap", bpm=90, swing=62, groove=9, prog=9, type=1, kit="boom",
+    drums={ kick={ -1, 160, 0.4, 0.6 }, snare={ -1, 110, 0.4, 0.6 }, hat={ 0, 60, 0, 0 } },
+    bass={ engine=1, rhythm=15, notes=2, move=1, k={ 0.35, 0.3, 0.2, 0.6 } },
+    chord={ engine=3, rhythm=8, verb=0.15 },
+    lead=false },
+  { "lofi", bpm=80, swing=64, groove=36, prog=3, type=6, kit="dusty",
+    drums={ kick={ -2, 140, 0.2, -0.3 }, snare={ -2, 100, 0.2, -0.3 }, hat={ -1, 60, 0, -0.5 } },
+    bass={ engine=1, rhythm=16, notes=2, move=1, k={ 0.25, 0.1, 0.1, 0.6 } },
+    chord={ engine=4, rhythm=6, verb=0.25, delay=0.1 },
     lead=false },
 }
 function ui:layout_compose(add)
   -- style: one tap sets the lot
   add{ kind="text", x=16, y=114, w=W - 32, h=12, size=10,
-       label="style: sets the tempo, groove, drum character, sounds and parts in one go (undo puts it back)" }
-  local stn = #STYLES
-  local stw = (W - 32 - (stn - 1) * 4) / stn
+       label="style: sets the tempo, groove, drums, sounds and parts in one go (undo puts it back)" }
+  local per = math.ceil(#STYLES / 2)
+  local stw = (W - 32 - (per - 1) * 4) / per
   local cst = math.floor(self.v["ockm-style"] or -1)
   for i, st in ipairs(STYLES) do
-    add{ kind="choice", x=16 + (i - 1) * (stw + 4), y=128, w=stw, h=34, small=true, label=st[1], sel=(cst == i - 1),
+    local col, row = (i - 1) % per, math.floor((i - 1) / per)
+    add{ kind="choice", x=16 + col * (stw + 4), y=128 + row * 32, w=stw, h=28, small=true, label=st[1], sel=(cst == i - 1),
          tap=function() self:apply_style(i) end }
   end
   -- in this pattern: four tiles
-  add{ kind="text", x=16, y=172, w=W - 32, h=12, size=10,
+  add{ kind="text", x=16, y=196, w=W - 32, h=12, size=10,
        label="in this pattern: tap a part to put it in or take it out (out is silent, and nothing on Perform brings it back)" }
   local tw = (W - 32 - 3 * 8) / 4
   local eng = function(part) local e = engines_of(part); return e[(math.floor(self.v["ockm-"..part.."-engine"] or 0)) + 1] or "" end
@@ -1764,38 +1812,38 @@ function ui:layout_compose(add)
       l1 = eng(p); l2 = self:part_yours(p) and "yours: you've edited it" or "made for you: follows the harmony"
     end
     if not on then l1 = "out of this pattern"; l2 = (p == "chords") and "silent: the harmony still steers" or "Perform won't bring it back" end
-    add{ kind="parttile", x=16 + (i - 1) * (tw + 8), y=186, w=tw, h=84, label=p, on=on, l1=l1, l2=l2, tap=function()
+    add{ kind="parttile", x=16 + (i - 1) * (tw + 8), y=210, w=tw, h=80, label=p, on=on, l1=l1, l2=l2, tap=function()
       self:send(PART_ON[p], on and 0 or 1)
     end }
   end
   -- the harmony
-  add{ kind="text", x=16, y=282, w=W - 32, h=12, size=10,
+  add{ kind="text", x=16, y=298, w=W - 32, h=12, size=10,
        label="harmony: the map the bass, chords and lead all follow (it steers even when the chords are out)" }
-  self:stepper(add, 16, 296, 330, 70, PROGS, "ockm-chord-prog", function() self.ranking = nil end)
+  self:stepper(add, 16, 312, 330, 66, PROGS, "ockm-chord-prog", function() self.ranking = nil end)
   local rx = 16 + 330 + 12
   local rw = W - 16 - rx
   local kw = (rw - 11 * 3) / 12
   for k = 0, 11 do
-    add{ kind="choice", x=rx + k * (kw + 3), y=296, w=kw, h=33, label=NOTES[k + 1], small=true, sel=(self.v["ockm-root"] == k),
+    add{ kind="choice", x=rx + k * (kw + 3), y=312, w=kw, h=31, label=NOTES[k + 1], small=true, sel=(self.v["ockm-root"] == k),
          tap=function() self:send("ockm-root", k) end }
   end
   local sw = (rw - 5 * 3) / 6
   for sc = 0, 5 do
-    add{ kind="choice", x=rx + sc * (sw + 3), y=333, w=sw, h=33, label=SCALE_NAMES[sc + 1], small=true, sel=(self.v["ockm-scale"] == sc),
+    add{ kind="choice", x=rx + sc * (sw + 3), y=347, w=sw, h=31, label=SCALE_NAMES[sc + 1], small=true, sel=(self.v["ockm-scale"] == sc),
          tap=function() self:send("ockm-scale", sc) end }
   end
   -- or fit the chords to a line of your own; and the turnaround
-  add{ kind="text", x=16, y=386, w=140, h=12, label="or fit the chords to", size=10 }
+  add{ kind="text", x=16, y=397, w=140, h=12, label="or fit the chords to", size=10 }
   for i, src in ipairs({ "bass", "lead" }) do
     local ok = self:part_yours(src)
-    add{ kind="choice", x=150 + (i - 1) * 118, y=376, w=112, h=30, small=true, disabled=not ok, sel=ok and self.rank_src == src and self.ranking ~= nil,
+    add{ kind="choice", x=150 + (i - 1) * 118, y=388, w=112, h=28, small=true, disabled=not ok, sel=ok and self.rank_src == src and self.ranking ~= nil,
          label=(self.rank_src == src and self.ranking) and ("next for my " .. src) or ("my " .. src),
          tap=ok and function() self:fit_chords(src) end or nil }
   end
-  add{ kind="text", x=W - 16 - 4 * 70 - 90, y=386, w=88, h=12, label="turnaround", size=10 }
+  add{ kind="text", x=W - 16 - 4 * 70 - 90, y=397, w=88, h=12, label="turnaround", size=10 }
   local te = math.floor(self.v["ockm-turn-every"] or 0)
   for i, e in ipairs({ 0, 4, 8, 16 }) do
-    add{ kind="choice", x=W - 16 - (5 - i) * 70, y=376, w=64, h=30, small=true, sel=(te == e), label=(e == 0) and "off" or ("every " .. e),
+    add{ kind="choice", x=W - 16 - (5 - i) * 70, y=388, w=64, h=28, small=true, sel=(te == e), label=(e == 0) and "off" or ("every " .. e),
          tap=function() self:send("ockm-turn-every", e) end }
   end
   -- the map, bar by bar
@@ -1811,14 +1859,14 @@ function ui:layout_compose(add)
   end
   local nb = math.min(#bars, 8)
   local key = NOTES[(math.floor(self.v["ockm-root"] or 9) % 12) + 1] .. " " .. SCALE_NAMES[(self.v["ockm-scale"] or 0) + 1]
-  add{ kind="text", x=16, y=416, w=W - 32, h=12, size=10,
+  add{ kind="text", x=16, y=426, w=W - 32, h=12, size=10,
        label="the map, bar by bar (" .. key .. ")" .. ((te > 0) and ("   turnaround: the last bar of every " .. te .. " goes to " .. self:chord_name(4, true)) or "") }
   local playing_bar = (self.playing ~= 0) and (math.floor((self.step or 0) % math.max(16, nb * 16) / 16) + 1) or nil
   local bw = (W - 32 - (nb - 1) * 6) / nb
   for i = 1, nb do
     local names, romans = {}, {}
     for _, c in ipairs(bars[i]) do names[#names + 1] = c.name; romans[#romans + 1] = c.roman end
-    add{ kind="bar", x=16 + (i - 1) * (bw + 6), y=430, w=bw, h=156, n=i, label=table.concat(names, "  "), sub=table.concat(romans, " "),
+    add{ kind="bar", x=16 + (i - 1) * (bw + 6), y=440, w=bw, h=146, n=i, label=table.concat(names, "  "), sub=table.concat(romans, " "),
          now=(playing_bar == i) }
   end
 end
@@ -1859,6 +1907,14 @@ function ui:apply_style(i)
   for slot = 1, #SLOTS do
     local nm, t = SLOTS[slot], self:voice_type(slot)
     local d = st.drums[t]
+    local ks = st.kit and self:kit_sample(slot, st.kit)
+    if ks then   -- the style's kit has this sound: play it as it is
+      self:send("ockm-"..nm.."-sample", ks); self:send("ockm-"..nm.."-tune", 0); self:send("ockm-"..nm.."-decay", 100)
+      self:send("ockm-"..nm.."-tone", 0); self:send("ockm-"..nm.."-verb", 0); self:send("ockm-"..nm.."-delay", 0)
+      d = nil
+    elseif self:kit_of(slot) then   -- on another style's kit: back to the synth sound (your own samples stay)
+      self:send("ockm-"..nm.."-sample", 0)
+    end
     if d and math.floor(self.v["ockm-"..nm.."-sample"] or 0) == 0 and not self:current_preset(slot) then
       self:send("ockm-"..nm.."-tune", d[1]); self:send("ockm-"..nm.."-decay", d[2])
       self:send("ockm-"..nm.."-drive", d[3]); self:send("ockm-"..nm.."-labchar", d[4])
@@ -1935,7 +1991,7 @@ function ui:gen_controls(add, p, ix, cy, iw, k)
       add{ kind="btn", x=ix, y=532, w=iw, h=34, accent=true, label=START.chord, tap=function() self:start_part("chord") end }
     end
     add{ kind="text", x=ix, y=548, w=iw, h=12, size=11,
-         label="the progression, key and scale are on the song screen" }
+         label="the progression, key and scale are on the builder" }
     return
   end
   local notes = {}

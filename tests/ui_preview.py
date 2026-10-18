@@ -106,7 +106,7 @@ SHOTS = [
     ("mixer", ["test tap 407 36"]),
     ("mixer-eq", ["send ockm-d4-lowcut float 300", "send ockm-d4-eqmid float -6", "send ockm-d4-eqmidf float 500", "send ockm-d4-eqhigh float 5", "test tap 407 36", "test tap 288 232"]),
     ("drums-long", ["test tap 750 546", "test tap 539 36", "test tap 861 88", "test tap 194 88"]),        # 64 steps, forward to the second block
-    ("compose-melody", ["test tap 477 36", "test tap 363 228", "test tap 831 228", "test tap 836 391"]),   # song: bass and lead out, turnaround every 8
+    ("compose-melody", ["test tap 477 36", "test tap 363 250", "test tap 831 250", "test tap 836 402"]),   # song: bass and lead out, turnaround every 8
     ("drums-samples", ["test tap 539 36", "test tap 354 364", "test tap 354 364", "test tap 354 364"]),   # drums tab, step to sample 3
     ("drums-perc", ["test tap 539 36", "test tap 776 134", "test tap 354 364"]),         # drums tab, perc 1, step to the conga
     ("drums-velocity", ["array ockm-pat-d1 2 0 0 0 1 0 0.5 0 2 0 0 0 1 0 0.3 0", "test tap 539 36"]),
@@ -118,7 +118,7 @@ SHOTS = [
     ("arrange", ["test tap 795 36"]),                                                     # arrange tab (being rebuilt)
     ("export", ["test tap 919 36", "test tap 830 95", "test tap 854 178"]),                                    # project screen, export...
     ("bass-manual", ["test tap 601 36", "test tap 900 283", "test tap 89 158"]),      # switch to manual, then edit step 2
-    ("song-style", ["test tap 836 544", "test tap 477 36", "test tap 899 145"]),   # drum and bass (last: it changes the tempo and groove)
+    ("song-style", ["test tap 836 544", "test tap 477 36", "test tap 558 174"]),   # drum and bass (last: it changes the tempo and groove)
 ]
 
 
