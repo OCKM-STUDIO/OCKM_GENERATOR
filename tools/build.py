@@ -808,7 +808,7 @@ mono_core("voices/ockm-mono-core.pd")
 mono_core("voices/ockm-lead-core.pd",lead=True)
 
 # ================= engines =================
-def engine(fn,idx,title,build,core_name="ockm-mono-core",hook="engine"):
+def engine(fn,idx,title,build,core_name="ockm-mono-core",hook="engine",decay=None):
     q=P(); q.add(f"#X text 20 10 {title};")
     inl=q.add("#X obj 30 50 inlet;")
     sp=q.add("#X obj 30 80 spigot 1;")
@@ -817,7 +817,8 @@ def engine(fn,idx,title,build,core_name="ockm-mono-core",hook="engine"):
     re=q.add(f"#X obj 700 50 r ockm-{D}1-{hook};"); eq=q.add(f"#X obj 700 80 == {idx};"); tf=q.add("#X obj 700 110 t f f;")
     sw=q.add("#X obj 700 170 switch~;"); s0=q.add("#X obj 760 140 sel 0;"); om=q.add("#X msg 760 170 off;")
     for c in [(inl,0,sp,0),(sp,0,core,0),(re,0,eq,0),(eq,0,tf,0),(tf,1,sw,0),(tf,0,s0,0),(s0,0,om,0),(om,0,core,0),(tf,0,sp,1)]: q.con(*c)
-    dx=q.add(f"#X obj 650 50 expr 20*pow(100\\,{D}f1);"); q.con(ks[3],0,dx,0); q.con(dx,0,core,1)
+    dexp=decay or ("20*pow(100\\,"+D+"f1)")   # k4: decay in ms (kept out of the f-string: older Pythons refuse backslashes there)
+    dx=q.add(f"#X obj 650 50 expr {dexp};"); q.con(ks[3],0,dx,0); q.con(dx,0,core,1)
     out=q.add("#X obj 30 560 outlet~;")
     build(q,core,ks,out)
     q.add("#X text 200 25 k1 / k2 / k3 / k4 (0 to 1) \\, k4 is always decay;")
@@ -935,7 +936,7 @@ def donk(q,core,ks,out):
     sq=q.add("#X obj 390 290 ockm-blsquare;"); sl=q.add("#X obj 390 320 lop~ 1200;")
     mx=q.add(f"#X obj 30 350 expr~ {D}v1 + {D}f5*(0.5*{D}v2 + 0.3*{D}v3) + {D}f6*0.7*{D}v4;")
     th=q.add(f"#X obj 30 380 expr~ tanh(1.4*{D}v1)/tanh(1.4);")
-    ae=q.add(f"#X obj 200 380 expr~ pow(min(1\\, max(0\\, {D}v1))\\, 2);"); am=q.add("#X obj 30 410 *~;"); g=q.add("#X obj 30 440 *~ 0.8;")
+    ae=q.add(f"#X obj 200 380 expr~ pow(min(1\\, max(0\\, {D}v1))\\, 1.3);"); am=q.add("#X obj 30 410 *~;"); g=q.add("#X obj 30 440 *~ 0.8;")
     k2=q.add("#X obj 310 140 * 14;")
     for c in [(core,1,pe,0),(core,0,pl,0),(pe,0,pl,1),(pl,0,mt,0),(mt,0,o1,0),(mt,0,m2,0),(m2,0,o2,0),(mt,0,m3,0),(m3,0,o3,0),(mt,0,sq,0),(sq,0,sl,0),
               (o1,0,mx,0),(o2,0,mx,1),(o3,0,mx,2),(sl,0,mx,3),(mx,0,th,0),(th,0,am,0),(core,1,ae,0),(ae,0,am,1),(am,0,g,0),(g,0,out,0),
@@ -943,7 +944,8 @@ def donk(q,core,ks,out):
     q.add("#X text 200 110 k1 brightness (organ harmonics) / k2 bounce (pitch drop onto the note) / k3 hollow (woodier) / k4 decay. Rings out on its own.;")
 
 engine("voices/ockm-mono-analogue.pd",5,"Analogue engine: saw to square with a sub \\, through a resonant 24 dB low-pass. The workhorse house and techno bass (the default)",analogue)
-engine("voices/ockm-mono-donk.pd",6,"Donk engine: a hollow tone that bounces down onto each note and rings out. Bassline house \\, garage \\, M1 organ bass",donk)
+engine("voices/ockm-mono-donk.pd",6,"Donk engine: a hollow tone that bounces down onto each note and rings out. Bassline house \\, garage \\, M1 organ bass",donk,
+       decay=f"120*pow(12\\,{D}f1)")   # its decay never gets shorter than a short donk (120 ms) and goes up to about 1.4 s
 
 # ================= bass wrapper =================
 q=P()

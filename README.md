@@ -193,7 +193,7 @@ The Pi runs the same app as the Mac, drawn at double size (`--ui-scale 2`), so t
 14. ~~Song mode, MPC style~~ (v0.26). ~~Arrange: turn pattern 1 into a whole track~~ (v0.40, beta: needs more work on transitions and drops). ~~Export: mix, stems, MIDI and live recording~~ (v0.41)
 15. ~~A usability pass~~ (v0.26). Keep going after each round of playing
 16. ~~A setup screen for tempo, swing, accents, volume and MIDI clock~~ (v0.26)
-17. **iPad app, once the screens and sounds are right on the Mac and Pi.** The sound engine moves across on libpd; the screens get a native drawing layer fed by the same widget list; pdlua (GPL) is replaced for the App Store. Until then: keep screen logic apart from drawing, add no new Lua inside Pd unless it earns its place, keep file paths in one place, and keep Mac/Pi-only things (USB scan, kiosk) at the edges
+17. **iPad app, once the screens and sounds are right on the Mac and Pi.** The sound engine moves across on libpd; the screens get a native drawing layer fed by the same widget list; pdlua (GPL) is replaced for the App Store. Until then: keep screen logic apart from drawing, add no new Lua inside Pd unless it earns its place, keep file paths in one place, and keep Mac/Pi-only things (USB scan, kiosk) at the edges. Reese and acid filter with bob~, which may not be in the iPad's Pd: move them onto the analogue engine's state-variable filter (core Pd only)
 
 ## Decisions made
 

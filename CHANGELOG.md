@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.73 (18 October 2026)
+
+- **Donk keeps its body when you cut the decay:** its decay now runs from a short donk (about 120 ms) up to about 1.4 s, and fades more gently, instead of vanishing at the bottom of the knob
+
 ## v0.72 (17 October 2026)
 
 - **Analogue bass: the filter opens up like a real one.** Raising the cutoff or envelope now makes it brighter and fuller, never quieter. The old filter (Pd's vcf~) lost level as the cutoff rose and went silent above a quarter of the sample rate; it's now a flat-response state-variable filter

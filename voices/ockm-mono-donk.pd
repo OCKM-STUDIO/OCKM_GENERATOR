@@ -13,7 +13,7 @@
 #X obj 700 170 switch~;
 #X obj 760 140 sel 0;
 #X msg 760 170 off;
-#X obj 650 50 expr 20*pow(100\,\$f1);
+#X obj 650 50 expr 120*pow(12\,\$f1);
 #X obj 30 560 outlet~;
 #X obj 300 200 expr~ pow(min(1\, max(0\, \$v1))\, 12)*\$f2;
 #X obj 30 230 +~;
@@ -27,7 +27,7 @@
 #X obj 390 320 lop~ 1200;
 #X obj 30 350 expr~ \$v1 + \$f5*(0.5*\$v2 + 0.3*\$v3) + \$f6*0.7*\$v4;
 #X obj 30 380 expr~ tanh(1.4*\$v1)/tanh(1.4);
-#X obj 200 380 expr~ pow(min(1\, max(0\, \$v1))\, 2);
+#X obj 200 380 expr~ pow(min(1\, max(0\, \$v1))\, 1.3);
 #X obj 30 410 *~;
 #X obj 30 440 *~ 0.8;
 #X obj 310 140 * 14;
