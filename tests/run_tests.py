@@ -690,17 +690,14 @@ def touchscreen_drives_the_engine(work):
     tap(250, 262, 36)                    # perform tab
     tap(255, 200, 438); tap(258, 129, 524)   # synth card: lead, then its first knob
     tap(260, 601, 36)                    # bass tab (bass is on auto)
-    tap(265, 45, 158)                    # tap a step on auto: locked, nothing is edited
-    tap(266, 477, 36); tap(267, 417, 154)   # compose: mode manual (every part yours)
-    tap(268, 601, 36)                    # back to the bass tab
-    tap(270, 45, 158)                    # now bass step 1 edits
+    tap(270, 45, 158)                    # bass step 1: made for you, but any step can be edited (it becomes yours)
     tap(280, 600, 236)                   # note picker: third note of the scale
     tap(290, 262, 36)                    # perform tab
     tap(310, 629, 500)                   # master fx: filter, middle
-    tap(320, 477, 36)                    # compose tab
-    tap(330, 71, 154)                    # mode: chord priority again (chords are yours)
-    tap(335, 283, 349)                   # chord column: next progression
-    tap(340, 200, 486)                   # spice 3 (ninth)
+    tap(320, 477, 36)                    # song tab
+    tap(335, 324, 300)                   # harmony: next progression
+    tap(338, 725, 36)                    # chord tab
+    tap(340, 298, 421)                   # colour: 9ths
     tap(345, 262, 36); tap(348, 126, 137)  # perform tab, mute the kick lane
     tap(349, 192 + 47 * 1 + 20, 165)     # perform: snare lane, step 2
     tap(350, 407, 36)                    # mixer tab
@@ -719,14 +716,14 @@ def touchscreen_drives_the_engine(work):
     lk = [float(x) for x in printed(out, "ockm-lead-k1")]
     assert any(0.4 < x < 0.6 for x in lk), f"perform strip: lead knob 1 should be about halfway: {lk}"
     assert any(abs(float(x)) < 0.1 for x in printed(out, "ockm-filter")), "perform strip: filter in the middle should be about 0"
-    assert printed(out, "ockm-chord-prog"), "compose: the progression arrow should pick the next progression"
+    assert printed(out, "ockm-chord-prog"), "song: the progression arrow should pick the next progression"
     assert any(e.startswith("d2 1 ") for e in edits), f"tapping the snare lane on perform should edit d2 step 2: {edits}"
-    assert "1" in printed(out, "ockm-bass-mode"), "editing the bass in manual mode should mark it as hand-edited"
+    assert "1" in printed(out, "ockm-bass-mode"), "editing the bass should make it yours"
     assert "1" in printed(out, "ockm-d1-mute"), "perform: M on the kick lane should mute d1"
     assert "1" in printed(out, "ockm-d2-mute"), "mixer: M on strip 2 should mute d2"
     bl = [float(x) for x in printed(out, "ockm-bass-level")]
     assert any(0.4 < x < 0.6 for x in bl), f"mixer: bass fader halfway should be about 0.5: {bl}"
-    assert "6" in printed(out, "ockm-chord-type"), f"compose: spice 3 should pick the ninth chord type (6): {printed(out, 'ockm-chord-type')}"
+    assert "6" in printed(out, "ockm-chord-type"), f"chord tab: colour 9ths should pick the ninth chord type (6): {printed(out, 'ockm-chord-type')}"
     assert not [l for l in out.splitlines() if "error" in l.lower()], "errors: " + " | ".join(l for l in out.splitlines() if "error" in l.lower())
 
 @test
@@ -812,31 +809,31 @@ def bass_lock_density_and_mutate(work):
     assert notes[5] == notes[0] and on[5] == on[0], "seed 0 should bring back the original"
 
 @test
-def touchscreen_mode_dial(work):
-    """Compose's mode dial: melody priority makes the melody yours and the bass follow; manual makes every part yours; chord priority hands bass and melody back to the generators."""
+def touchscreen_song_parts_in_and_out(work):
+    """Song screen: tapping a part's tile takes it out of the pattern and back (drums, bass, chords, lead); the part tab's
+    on/off switch is the same setting. Turnaround buttons set ockm-turn-every. Perform B can't bring an out part back."""
     if not PDLUA:
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
-    names = ["ockm-leader", "ockm-lead-sync", "ockm-bass-sync", "ockm-bass-mode", "ockm-lead-mode", "ockm-chord-mode"]
-    h = Harness(); h.show(*names)
+    h = Harness(); h.show("ockm-drums-on", "ockm-bass-on", "ockm-chord-on", "ockm-lead-on", "ockm-turn-every", "ockm-bass-mute")
     tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
-    tap(150, 477, 36)                   # compose
-    tap(200, 186, 154); h.at(250, "test-mark 1")    # melody priority
-    tap(300, 417, 154); h.at(350, "test-mark 2")    # manual
-    tap(400, 71, 154);  h.at(450, "test-mark 3")    # chord priority
-    mk = h.add("#X obj 10 300 r test-mark;"); pm = h.add("#X obj 10 325 print MARK;"); h.con(mk, pm)
-    f = os.path.join(work, "t_dial.pd"); h.finish(500, f)
+    tap(150, 477, 36)                    # song
+    tap(200, 129, 180)                   # drums out
+    tap(250, 363, 180)                   # bass out
+    tap(300, 597, 180)                   # chords out
+    tap(350, 831, 180)                   # lead out
+    tap(400, 129, 180)                   # drums back in
+    tap(450, 836, 365)                   # turnaround every 8
+    tap(500, 601, 36)                    # bass tab
+    tap(550, 916, 283)                   # on/off switch: back on
+    tap(600, 338, 36)                    # perform B
+    tap(650, 360, 190)                   # the lead's tile: it's out, so nothing changes
+    f = os.path.join(work, "t_song.pd"); h.finish(800, f)
     out = run(work, f)
-    state, snaps = {}, {}
-    for line in out.splitlines():
-        if line.startswith("MARK:"):
-            snaps[int(float(line.split()[-1]))] = dict(state)
-        for n in names:
-            if line.startswith(n + ":"):
-                state[n] = int(float(line.split()[-1]))
-    m, man, ch = snaps[1], snaps[2], snaps[3]
-    assert m["ockm-leader"] == 1 and m["ockm-lead-sync"] == 0 and m["ockm-bass-sync"] == 1 and m["ockm-bass-mode"] == 0, f"melody priority: {m}"
-    assert man["ockm-leader"] == 3 and man["ockm-bass-mode"] == 1 and man["ockm-lead-mode"] == 1 and man["ockm-chord-mode"] == 1, f"manual: {man}"
-    assert ch["ockm-leader"] == 0 and ch["ockm-bass-mode"] == 0 and ch["ockm-lead-mode"] == 0 and ch["ockm-bass-sync"] == 1, f"chord priority: {ch}"
+    v = lambda n: [int(float(x)) for x in printed(out, n)]
+    assert v("ockm-drums-on")[-2:] == [0, 1], f"drums out, then back in: {v('ockm-drums-on')}"
+    assert v("ockm-bass-on")[-2:] == [0, 1], f"bass out on the song screen, back on from its tab: {v('ockm-bass-on')}"
+    assert v("ockm-chord-on")[-1:] == [0] and v("ockm-lead-on")[-1:] == [0], "chords and lead out"
+    assert v("ockm-turn-every")[-1:] == [8], f"turnaround every 8: {v('ockm-turn-every')}"
 
 @test
 def dub_throw_rings_out_and_filter_springs_back(work):
@@ -1129,6 +1126,56 @@ def drum_fill_on_the_fourth_bar(work):
     assert seg(4 * bar + 0.15, 5 * bar - 0.05) < 0.01, "bar 5 should be back to normal (no snare)"
 
 @test
+def drum_breakbeat_fill(work):
+    """The breakbeat fill (style 4) swaps the whole of bar 4 for a breakbeat: the snare (silent in pattern 1) comes in on
+    the second beat of bar 4, and the clap that normally plays is quiet for that bar."""
+    h = Harness(); h.record(os.path.join(work, "bfill.wav"))
+    mutes = " ; ".join(f"ockm-{t}-mute 1" for t in ["d1","d3","d4","d5","d6","d7","d8","bass","lead","chord"])
+    h.at(100, f"ockm-bpm 200 ; ockm-verb-mix 0 ; ockm-delay-mix 0 ; ockm-swing 50 ; ockm-length 16 ; ockm-fill-style 4 ; ockm-fill-every 4 ; {mutes}")
+    h.at(200, "ockm-play 1"); h.at(6400, "ockm-play 0")
+    _, (snd, sr) = play(work, h, "t_bfill", ms=6400)
+    bar = 16 * 15000 / 200 / 1000.0
+    start = 0.2
+    def seg(a, b): return peak(snd[int((start + a) * sr):int((start + b) * sr)])
+    assert seg(0.05, 3 * bar - 0.05) < 0.01, f"bars 1-3 should have no snare: {seg(0.05, 3 * bar - 0.05):.3f}"
+    assert seg(3 * bar + 0.02, 3.2 * bar) < 0.01, "the breakbeat's snare starts on beat 2, not the 1"
+    assert seg(3.25 * bar, 4 * bar) > 0.05, f"bar 4 should have the breakbeat snare: {seg(3.25 * bar, 4 * bar):.3f}"
+    assert seg(4 * bar + 0.15, 5 * bar - 0.05) < 0.01, "bar 5 should be back to normal (no snare)"
+
+@test
+def turnaround_goes_to_five_major(work):
+    """Turnaround every 4 bars, one-chord progression in A minor, bar pads: bars 1-3 play A minor, bar 4 plays E major
+    (V, with the scale's 7th raised: G#), bar 5 is back on A minor."""
+    h = Harness(); h.show("ockm-chord-notes-out")
+    h.at(100, "ockm-bpm 200 ; ockm-root 9 ; ockm-scale 0 ; ockm-length 16 ; ockm-chord-len 16 ; ockm-chord-prog 0 ; ockm-chord-rhythm 0 ; ockm-chord-type 0 ; ockm-turn-every 4")
+    h.at(300, "ockm-play 1"); h.at(300 + int(5.2 * 16 * 75), "ockm-play 0")
+    f = os.path.join(work, "t_turn.pd"); h.finish(300 + int(5.4 * 16 * 75), f)
+    out = run(work, f)
+    chords = [sorted({int(float(n)) % 12 for n in v.split()[:4] if float(n) > 0}) for v in printed(out, "ockm-chord-notes-out")]   # 4 notes, then the velocity
+    assert len(chords) >= 5, f"expected a chord each bar: {chords}"
+    am, e = [0, 4, 9], [4, 8, 11]
+    assert chords[:5] == [am, am, am, e, am], f"bars 1-5 should be Am Am Am E Am: {chords[:5]}"
+
+@test
+def bass_turnaround_and_walk(work):
+    """A following bass moves to V on the turnaround bar (one chord, A minor: A, then E on bar 4). With walk on, over
+    i then iv (Am, Dm) the last offbeat of bar 1 steps a semitone below D (C#) instead of playing A."""
+    h = Harness(); h.show("ockm-bass-notes-out")
+    h.at(100, "ockm-bpm 200 ; ockm-root 9 ; ockm-scale 0 ; ockm-length 16 ; ockm-chord-len 16 ; ockm-chord-prog 0 ; ockm-turn-every 4 ; "
+              "ockm-bass-len 16 ; ockm-bass-sync 1 ; ockm-bass-mode 0 ; ockm-bass-walk 0 ; ockm-bass-notes 0 ; ockm-bass-rhythm 6")
+    h.at(300, "ockm-play 1"); h.at(300 + int(3.97 * 16 * 75), "ockm-play 0")
+    h.at(300 + int(5.0 * 16 * 75), "ockm-turn-every 0 ; ockm-length 32 ; ockm-chord-len 32 ; ockm-chord-prog 1 ; ockm-bass-len 32 ; ockm-bass-rhythm 0 ; ockm-bass-walk 1")
+    h.at(300 + int(5.3 * 16 * 75), "ockm-play 1"); h.at(300 + int(6.3 * 16 * 75), "ockm-play 0")
+    f = os.path.join(work, "t_bturn.pd"); h.finish(300 + int(6.5 * 16 * 75), f)
+    out = run(work, f)
+    notes = [int(float(v.split()[0])) for v in printed(out, "ockm-bass-notes-out") if v.split()[0] != "off"]
+    pcs = [n % 12 for n in notes]
+    first = pcs[:16]
+    assert first[:12] == [9] * 12 and first[12:16] == [4] * 4, f"quarters: A for 3 bars, then E on the turnaround bar: {first}"
+    walk = pcs[16:20]
+    assert walk[:3] == [9, 9, 9] and walk[3] == 1, f"offbeats in bar 1: A A A, then C# walking into Dm: {walk}"
+
+@test
 def drum_velocity_timing_and_loop(work):
     """Kick only, 120 bpm (a step is 125 ms). Hits on steps 0, 4, 8, 12: step 4 nudged a fifth of a step early, step 8 a fifth late,
     step 12 drawn at velocity 0.4. The drums loop is 1 bar under a 2-bar pattern, so bar 2 repeats bar 1, nudges and all."""
@@ -1321,7 +1368,8 @@ def drum_grooves_fill_every_slot(work):
 
 @test
 def suggest_chords_fit_the_melody(work):
-    """Melody leads: the screen scores every progression against the lead notes and picks the best fit."""
+    """Song screen, fit the chords to my lead: scores every progression against your lead's notes and picks the best fit;
+    a second tap gives the next one."""
     sys.path.insert(0, os.path.join(ROOT, "tests"))
     import ui_preview
     if not ui_preview.LUA:
@@ -1330,7 +1378,7 @@ def suggest_chords_fit_the_melody(work):
         on = " ".join("1" if i % 4 == 0 else "0" for i in range(64))
         nt = " ".join(str(notes[(i // 4) % len(notes)]) for i in range(64))
         lines = ui_preview.run(["send ockm-length float 64", f"array ockm-pat-lead-on {on}", f"array ockm-pat-lead-note {nt}",
-                                "send ockm-lead-mode float 1", "test tap 477 36", "test tap 186 154", "test tap 100 558"])
+                                "send ockm-lead-mode float 1", "test tap 477 36", "test tap 324 365", "test tap 324 365"])
         return [int(float(l.split()[3])) for l in lines if l.startswith("sent ockm-chord-prog")]
     a_minor = picks([57, 60, 64])           # A C E: the home chord
     assert a_minor[0] == 0, f"a melody on A C E should suggest one chord first: {a_minor}"
@@ -1338,8 +1386,27 @@ def suggest_chords_fit_the_melody(work):
     # a melody that walks A minor, F, C, G one bar each: the pop progression (i VI III VII) should come first
     pop = picks([57, 60, 64, 57, 65, 69, 72, 65, 60, 64, 67, 60, 67, 71, 74, 67])
     assert ui_preview_shapes()[pop[0]] == [(0, 16), (5, 16), (2, 16), (6, 16)], f"expected the pop progression first: {pop}"
-    empty = ui_preview.run(["test tap 477 36", "test tap 186 154"])
+    empty = ui_preview.run(["test tap 477 36", "test tap 324 365"])
     assert not any(l.startswith("sent ockm-chord-prog") for l in empty), "no melody, no suggestion"
+
+@test
+def refit_my_line_when_the_harmony_moves(work):
+    """A lead that's yours, all on A over A minor. The harmony changes to E minor under it: the lead tab says the notes no
+    longer fit, and refit moves each one to the nearest chord note (G), keeping the rhythm."""
+    sys.path.insert(0, os.path.join(ROOT, "tests"))
+    import ui_preview
+    if not ui_preview.LUA:
+        raise Skip("no lua to run the screen")
+    on = " ".join("1" if i % 4 == 0 else "0" for i in range(64))
+    nt = " ".join("57" for i in range(64))
+    lines = ui_preview.run(["send ockm-lead-len float 64", "send ockm-chord-len float 64", f"array ockm-pat-lead-on {on}", f"array ockm-pat-lead-note {nt}",
+                            "array ockm-pat-chord-deg " + " ".join("0" for _ in range(64)), "send ockm-lead-mode float 1",
+                            "test tap 663 36", "test tap 5 595",                     # lead tab: remembers the harmony it was written over
+                            "array ockm-pat-chord-deg " + " ".join("4" for _ in range(64)), "send ockm-chord-prog float 5",
+                            "test tap 663 36", "test tap 677 283"])                  # the harmony moved: refit my line
+    edits = [l.split()[3:] for l in lines if l.startswith("sent ockm-lead-edit")]
+    assert len(edits) == 16, f"every note on the beat should be refitted: {len(edits)} {edits[:2]}"
+    assert all(int(float(e[1])) == 55 for e in edits), f"A moves to G, the nearest note of E minor: {edits[:3]}"
 
 def ui_preview_shapes():
     """The progression shapes the screen uses, read back from its presets block."""
@@ -1542,23 +1609,6 @@ def undo_takes_back_the_last_big_change(work):
     lc = [float(v) for v in printed(out, "ockm-d4-lowcut")]
     hi = [i for i, v in enumerate(lc) if v >= 100]
     assert hi and lc[-1] == 20 and hi[-1] < len(lc) - 1, f"de-mud sets the hat's low cut, undo puts it back to 20: {lc}"
-
-@test
-def touchscreen_compose_mutes_and_solos(work):
-    """Compose: each part's card has M and S, the same mute and solo as perform and the mixer."""
-    if not PDLUA:
-        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
-    h = Harness(); h.show("ockm-bass-mute", "ockm-lead-solo", "ockm-chord-mute")
-    h.at(100, "ockm-ui-test tap 477 36")      # compose
-    h.at(200, "ockm-ui-test tap 425 278")     # bass M
-    h.at(300, "ockm-ui-test tap 778 278")     # lead S
-    h.at(400, "ockm-ui-test tap 112 278")     # chord M
-    h.at(500, "ockm-ui-test tap 425 278")     # bass M again: unmute
-    f = os.path.join(work, "t_compose_ms.pd"); h.finish(700, f)
-    out = run(work, f)
-    assert [int(float(v)) for v in printed(out, "ockm-bass-mute")] == [1, 0], f"bass M should mute, then unmute: {printed(out, 'ockm-bass-mute')}"
-    assert printed(out, "ockm-lead-solo")[-1:] == ["1"], "lead S should solo the lead"
-    assert printed(out, "ockm-chord-mute")[-1:] == ["1"], "chord M should mute the chords"
 
 @test
 def touchscreen_steps_act_on_press(work):

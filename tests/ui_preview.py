@@ -106,7 +106,7 @@ SHOTS = [
     ("mixer", ["test tap 407 36"]),
     ("mixer-eq", ["send ockm-d4-lowcut float 300", "send ockm-d4-eqmid float -6", "send ockm-d4-eqmidf float 500", "send ockm-d4-eqhigh float 5", "test tap 407 36", "test tap 288 232"]),
     ("drums-long", ["test tap 750 546", "test tap 539 36", "test tap 861 88", "test tap 194 88"]),        # 64 steps, forward to the second block
-    ("compose-melody", ["test tap 477 36", "test tap 186 154", "test tap 400 540"]),   # melody leads, ask for chords, then mutate the bass
+    ("compose-melody", ["test tap 477 36", "test tap 363 180", "test tap 831 180", "test tap 836 365"]),   # song: bass and lead out, turnaround every 8
     ("drums-samples", ["test tap 539 36", "test tap 354 364", "test tap 354 364", "test tap 354 364"]),   # drums tab, step to sample 3
     ("drums-perc", ["test tap 539 36", "test tap 776 134", "test tap 354 364"]),         # drums tab, perc 1, step to the conga
     ("drums-velocity", ["array ockm-pat-d1 2 0 0 0 1 0 0.5 0 2 0 0 0 1 0 0.3 0", "test tap 539 36"]),

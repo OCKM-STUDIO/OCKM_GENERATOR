@@ -11,7 +11,7 @@ Open `OCKM_GENERATOR.pd` in plugdata. Keep the folder together: the main patch f
 The window is the instrument: three touch screens, drawn in Lua (plugdata has Lua built in). Click with the mouse on the Mac, tap with a finger on the Pi. If clicks do nothing, the patch is in edit mode: press Cmd+E.
 
 **How every screen is laid out**, top to bottom:
-1. **Top bar:** play, tempo, then the screens as tabs in three groups: playing (**Perform A, Perform B, mixer**), making (**compose, drums, bass, lead, chord**) and **arrange**. On the right, **save** (a disc, orange when there's something to save) and **☰**, the menu: project, export, settings, revert (and quit to desktop on the Pi). The version number sits next to the tempo
+1. **Top bar:** play, tempo, then the screens as tabs in three groups: playing (**Perform A, Perform B, mixer**), making (**song, drums, bass, lead, chord**) and **arrange**. On the right, **save** (a disc, orange when there's something to save) and **☰**, the menu: project, export, settings, revert (and quit to desktop on the Pi). The version number sits next to the tempo
 2. **Navigation strip:** on the left, right above the steps, the **steps** navigator: back and forward arrows either side of the steps you're looking at (for example "17-32"). The dots show every block of 16: white is the one on screen, orange is the one playing. You can also swipe the step row sideways. In the middle, how long the loop is and which part sets it, like "loop 4 bars (bass, lead, chords)". On the drums, bass, lead and chord tabs, the right of the strip has that part's **length** (1, 2, 4, 8 or 16 bars) and **double**. See "Part lengths" below
 3. **What you're editing:** the steps (and, on the drums screen, which of the 8 drum slots)
 4. **Sound shaping** at the bottom
@@ -66,41 +66,32 @@ Tap a track's name on Perform A or the mixer to jump straight to it.
 - Move between blocks of 16 with the **steps** arrows in the navigation strip, or swipe the step row sideways
 - **Level, tune, decay, reverb, delay** for this slot. These belong to the kit, so they stay when you change pattern
 - **Grooves** (right of the sliders): tap one to fill all 8 drums at once. Each slot gets the part for the sound it plays, so a groove's hats land on whichever slot is your hat. A groove is one bar, so it makes the drums 1 bar long (go longer and it repeats), and sets a swing to suit. Twelve to pick from: four floor, house, deep house, tech house, minimal, techno, dub techno, garage, breakbeat, boom bap, trip hop, electro. **Clear** empties the drums. A groove replaces your drum steps, so the message that pops up has an **undo** button
-- **Fills** (under the grooves): **fill on the last bar of every** 4, 8 or 16 bars, counted from when you press play. Styles: **snare roll** (builds through the second half of the bar), **tom run**, **drop** (kick and claps out for the last half bar, hats out for the last beat, so the next downbeat lands harder), **build** (snare 16ths rising over the whole bar). A fill only replaces the drums it uses; everything else keeps playing your pattern, and your steps are never changed. Saved with each pattern, so a breakdown can have fills off
+- **Fills** (under the grooves): **fill on the last bar of every** 4, 8 or 16 bars, counted from when you press play. Styles: **snare roll** (builds through the second half of the bar), **tom run**, **drop** (kick and claps out for the last half bar, hats out for the last beat, so the next downbeat lands harder), **build** (snare 16ths rising over the whole bar), **breakbeat** (the whole bar becomes a breakbeat: broken kick and snare with ghost notes, straight hats, the rest quiet). A fill only replaces the drums it uses; everything else keeps playing your pattern, and your steps are never changed. Saved with each pattern, so a breakdown can have fills off
 
-**Compose** (next to perform): how the loop is put together. Each part's card (chord, bass, lead) has **M** and **S**, the same mute and solo as on perform and the mixer.
-- **Mode**, like a camera's priority modes: which part is yours. The others follow it
-  - **chord priority:** the chords are yours (a progression, or edit the chord steps). Bass and melody follow the chords
-  - **melody priority:** the melody is yours. The chords are picked to fit it (**suggest chords** tries all 10 progressions and picks the best; tap again for the next best), and the bass follows the chords
-  - **bass priority:** the same, starting from the bass line. The melody follows the chords
-  - **manual:** every part is yours, exactly as it was. Nothing is regenerated. Switch here when you want to hand-edit a part that was following
-- **Key and scale**, shared by every part
-- **The chain:** which part is yours and which follow
-- **A column each for chord, bass and lead** with their generator settings. Use the arrows to step through the presets. A change rewrites the part straight away
-  - Chord: progression, rhythm, spice and smooth voicing
-  - Bass and lead: notes and rhythm, then:
-  - **own rhythm | on the kick | fill gaps:** use the preset rhythm, play only where the kick plays, or play only where it doesn't. Locked parts redraw when you edit the kick
-  - **density:** drag left for fewer notes, right for more. The middle is the preset as written
-  - **mutate:** a new variation of the same idea (different note order, the odd octave jump). Tap again for another. **Original** goes back
+**Song** (where compose used to be): what's in this pattern, and the harmony everything follows.
+- **Four tiles: drums, bass, chords, lead.** Tap one to take that part **out** of this pattern, tap again to put it back **in**. Out is different from muted: an out part is silent, its tiles on Perform A and B go dim and say "out of this pattern", and nothing on Perform (mutes, scenes, all in, macros) brings it back. Saved with each pattern, so an intro can leave the bass out. Each part's own tab has the same **on/off** switch, top right
+- **The harmony:** the progression, the key and the scale. The bass, chords and lead all follow it, and it keeps steering even when the chords are out (so the bass still moves with it). The progression lives here now, not on the chord tab
+- **Or fit the chords to my bass / my lead:** when you've written a line of your own, this picks the progression that fits it best (it scores every progression against your notes; tap again for the next best). Only lit when that part is yours
+- **Turnaround: off, every 4, 8 or 16 bars.** On the last bar of every 4 (or 8, 16), counted from play, the harmony goes to the V chord, made major (E in A minor), which leads back round to the start. The chords play it, a following bass moves with it, and the lead's notes bend to fit. Saved with each pattern
+- **The map, bar by bar:** the progression's chords, named in your key (Am, Dm, F, Em), with the bar that's playing lit
 
-**Starting from empty.** A synth part with no notes says so: on perform its lane reads "empty: tap to start", and compose and its own tab show a **start** button. Start hands the part to its generator (auto) and makes notes straight away. For the lead you can also just write a tune by hand on the lead tab.
+**Made for you, or yours.** There are no modes any more. Every bass, lead or chord part is either:
+- **Made for you:** generated from its settings, and it follows the harmony: change the progression, key or scale and it rewrites itself to fit
+- **Yours:** as soon as you edit a step it's yours, and nothing rewrites it. If the harmony then changes under it, its tab says how many notes no longer fit, with **refit my line** (each of those notes moves to the nearest chord note, keeping your rhythm, accents and slides) or **leave it**. **Make it for me** hands a part back to its generator
 
-**The rule: the priority part is yours, the other two follow it.**
-- **Yours:** edit the steps freely, or use its presets as a starting point. Picking a preset replaces what's there
-- **Follows:** generated to fit. Its steps are drawn as outlines and locked, but you can still shape it with its settings (notes, rhythm, lock, density, mutate). To edit its steps, switch the mode to **manual**: you keep everything that was generated
-- Sound controls (engine, knobs, drive, sends, level) always work, whatever the mode
-- Going from manual back to a priority regenerates the following parts. An older pattern with hand-edited following parts opens in manual, so nothing is lost
+**Starting from empty.** A synth part with no notes says so: on perform its lane reads "empty: tap to start", and its tab shows a **start** button. For the lead you can also just write a tune by hand on the lead tab.
 
 **Bass, lead and chord** (a tab each)
-- **Key** and **scale** at the top, shared by all three
-- **Steps**: tap cycles off, on, accent. **Drag a step up or down** to change its note. Or tap a step, then pick its note from the row underneath (the dimmed one is the key's root). **Slide** applies to the selected step
+- **Steps**: tap cycles off, on, accent. **Drag a step up or down** to change its note. Or tap a step, then pick its note from the row underneath (the dimmed one is the key's root). **Slide** applies to the selected step. Editing any step makes the part yours
 - Chord steps show the chord on that step of the scale (i, ii, iii...)
-- The **auto | manual** switch, and a line saying where the notes come from
-- **Notes** (bottom left): the same generator settings as this part's column on compose, so a change in either place shows in both
+- **On/off** (top right): the part in or out of this pattern, the same as its tile on the song screen
+- **Bass:** **riff** (which notes it plays inside each chord: root, octaves, root and fifth, acid riff and so on), **rhythm**, and **movement**: **pedal** (the riff stays on the key's home note while the chords move above it), **follows** (moves with each chord) or **walks** (follows, and the last notes of a bar step a semitone below the next chord's root, walking into the change)
+- **Lead:** **tune** (the shape of the line: root, arps, motifs and so on), **rhythm**, and **freedom**: **chord notes** (every note lands on the chord), **passing notes** (the notes on the beat do, the ones between can pass) or **free** (it just stays in key)
+- Bass and lead also have: **own rhythm | on the kick | fill gaps** (use the preset rhythm, play only where the kick plays, or only where it doesn't); **density** (left for fewer notes, right for more; the middle is the preset as written); **mutate** (a new variation of the same idea), **back** (the variation before, as many times as you like), **original**, and **make it for me**
+- **Chords:** **rhythm**, **colour** (triads, 7ths, 9ths or 11ths) and smooth voicing
 - **Sound** (bottom right): engine, its four knobs (named for the engine), drive, reverb and delay sends, level, and **chorus** (tap: off, I, II, I+II, like a Juno's buttons; off is exactly the dry sound. The juno lead engine also has its own chorus knob)
 - **Movement** (under the sound): an LFO on one of the four knobs. Tap the boxes to step through the shape (sine, triangle, square, saw, random), which knob it moves, and how often (from a 16th to 8 bars, in time with the loop); drag depth to set how far it swings. At depth 0 the knob is exactly where you set it. It's saved with the loop
 - **Chords only:** **voicing** (close; open, with the third up an octave; or wide, with the root down and the third and seventh up) and **strum** (each note of the chord a little later than the last, up to about 75 ms across the chord)
-- On manual: the note (or chord) picker for the selected step, and slide
 
 **Settings** (☰, or tap the tempo). Four sections:
 - **This project** (saved with it): tempo with -5, -1, +1, +5 and a slider, swing, how strong accents are, reverb tone, and MIDI clock: lead (send clock out) or follow (play to incoming clock). Dragging the tempo up or down in the top bar still changes it directly
@@ -320,13 +311,17 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 | `ockm-bass-density`, `ockm-lead-density` | 0 to 2: fewer to more notes, 1 is the preset as written |
 | `ockm-bass-seed`, `ockm-lead-seed` | Variation number: 0 is the original, anything else a mutation |
 | `ockm-bass-mode`, `ockm-lead-mode`, `ockm-chord-mode` | 0 auto (generated), 1 manual (your notes) |
-| `ockm-bass-sync`, `ockm-lead-sync` | 1 follow the chords, 0 follow the key only |
-| `ockm-leader` | The mode: 0 chord priority, 1 melody priority, 2 bass priority, 3 manual |
+| `ockm-bass-sync`, `ockm-lead-sync` | 1 follow the chords, 0 follow the key only (the bass's pedal) |
+| `ockm-bass-walk` | 1: the last notes of each bar walk into the next chord (a semitone below its root) |
+| `ockm-lead-freedom` | 0 every note on the chord, 1 the notes on the beat (the default), 2 free (key only) |
+| `ockm-drums-on`, `ockm-bass-on`, `ockm-lead-on`, `ockm-chord-on` | 1 in this pattern, 0 out (silent; Perform can't bring it back). Saved with each pattern |
+| `ockm-turn-every` | Turnaround: 0 off, or 4, 8, 16: the last bar of every so many (counted from play) goes to V major |
+| `ockm-leader` | Retired in v0.74 (there are no modes). Older patterns saved with one open with the lead following the harmony |
 | `ockm-pattern-copy <from> <to>` | Copy a pattern (0-7) to another slot |
 | `ockm-pattern-clear <n>` | Empty a pattern |
 | `ockm-bar` | Sent by the clock at the start of every bar |
 | `ockm-fill-every` | 0 no fills, or 4, 8, 16: the last bar of every so many bars plays a drum fill |
-| `ockm-fill-style` | 0 snare roll, 1 tom run, 2 drop, 3 build |
+| `ockm-fill-style` | 0 snare roll, 1 tom run, 2 drop, 3 build, 4 breakbeat |
 | `ockm-drum-groove` | Fill every drum slot with a groove, 0 to 11, or 12 to clear. Sets the swing too |
 | `ockm-chord-rhythm` | Chord rhythm preset, 0 to 7, and rebuild |
 | `ockm-chord-prog` | Chord progression, 0 to 9, and rebuild |

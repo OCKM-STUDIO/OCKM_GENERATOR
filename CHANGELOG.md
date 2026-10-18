@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.74 (18 October 2026)
+
+- **Song replaces compose.** Four tiles say what's in this pattern (drums, bass, chords, lead): tap to take a part out or put it back. Out is silent, dims on Perform, and mutes, scenes and macros can't bring it back. Each part's tab has the same on/off switch, top right
+- **One harmony, no modes.** The progression, key and scale live on the song screen and every part follows them, even with the chords out. "Fit the chords to my bass / my lead" picks the progression for a line you've written. A bar-by-bar strip names the chords
+- **Turnaround:** the last bar of every 4, 8 or 16 goes to V major and leads back round; the chords, bass and lead all follow it
+- **Made for you, or yours:** editing any step makes a part yours and nothing rewrites it. If the harmony changes under it, the tab offers refit my line or leave it. Make it for me hands it back
+- **Bass:** riff, and movement: pedal, follows or walks (approach notes into each chord change)
+- **Lead:** tune, and freedom: chord notes, passing notes or free
+- **Chords:** colour (triads, 7ths, 9ths, 11ths) replaces spice
+- **Mutate has back:** step through earlier variations, as well as original
+- **Breakbeat fill:** a fifth fill choice on the drums tab that swaps the last bar for a one-bar breakbeat (broken kick and snare with ghost notes, straight hats, everything else quiet for the bar)
+
 ## v0.73 (18 October 2026)
 
 - **Donk keeps its body when you cut the decay:** its decay now runs from a short donk (about 120 ms) up to about 1.4 s, and fades more gently, instead of vanishing at the bottom of the knob
