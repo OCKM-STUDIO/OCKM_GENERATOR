@@ -466,7 +466,7 @@ MONO=["note","on","acc","slide"]; CHORD=["on","deg"]
 def show(h): return "ockm-show-"+h[5:]
 # Settings registry: (hook, default, hook the store listens to if different)
 PROJECT_KEYS=[("ockm-bpm",124,"ockm-tempo"),("ockm-volume",1,None),("ockm-accent",0.3,None),("ockm-filter",0,"ockm-filter-now"),("ockm-drive",0,None),
-    ("ockm-delay-mix",0.5,None),("ockm-delay-fb",0.4,None),("ockm-delay-steps",3,None),("ockm-verb-mix",0.5,None),
+    ("ockm-delay-mix",0.5,None),("ockm-delay-fb",0.4,None),("ockm-delay-steps",3,None),("ockm-verb-mix",0.3,None),
     ("ockm-verb-size",0.6,None),("ockm-verb-tone",0.5,None),("ockm-sync",0,None),("ockm-clock-out",1,None)]
 for nm,snd in SLOTS:
     PROJECT_KEYS+=[(f"ockm-{nm}-sound",snd,None),(f"ockm-{nm}-sample",0,None),(f"ockm-{nm}-synth",0,None),(f"ockm-{nm}-tone",0,None),
@@ -476,10 +476,10 @@ for nm,snd in SLOTS:
 for _t in [n for n,_ in SLOTS]+["bass","lead","chord"]:
     PROJECT_KEYS+=[(f"ockm-{_t}-{k}",v,None) for k,v in EQ_DEF.items()]
 LFO_DEF={"lfo-shape":0,"lfo-rate":4,"lfo-depth":0,"lfo-target":1,"chorus":0}   # sine, one bar, off, the first knob; chorus off
-SYNTH_DEFAULTS={"bass":dict(engine=5,mode=0,sync=1,walk=0,sidechain=0,lock=0,density=1,seed=0,level=1,k1=0.42,k2=0.25,k3=0.45,k4=0.45,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
-                "lead":dict(engine=4,mode=0,sync=1,sidechain=0,lock=0,density=1,seed=0,freedom=1,level=1,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
-                "chord":dict(engine=0,mode=0,sidechain=0,level=1,k1=0.45,k2=0.5,k3=0.4,k4=0.3,type=0,smooth=1,verb=0,delay=0,rhythm=0,prog=0,voicing=0,strum=0,**LFO_DEF)}
-PATTERN_KEYS=[("ockm-end",0,None),("ockm-impact",0,None),("ockm-pump",0,None),("ockm-bass-on",1,None),("ockm-lead-on",1,None),("ockm-chord-on",1,None),("ockm-rise",0,None),("ockm-drum-len",16,None),("ockm-bass-len",64,None),("ockm-lead-len",64,None),("ockm-chord-len",64,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None),("ockm-leader",0,None),("ockm-drum-groove",-1,None),("ockm-fill-every",0,None),("ockm-fill-style",0,None),("ockm-drums-on",1,None),("ockm-turn-every",0,None)]
+SYNTH_DEFAULTS={"bass":dict(engine=5,mode=0,sync=1,walk=0,sidechain=0,half=0,lock=0,density=1,seed=0,level=1,k1=0.42,k2=0.25,k3=0.45,k4=0.45,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
+                "lead":dict(engine=4,mode=0,sync=1,sidechain=0,half=0,lock=0,density=1,seed=0,freedom=1,level=1,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
+                "chord":dict(engine=0,mode=0,sidechain=0,half=0,level=1,k1=0.45,k2=0.5,k3=0.4,k4=0.3,type=0,smooth=1,verb=0,delay=0,rhythm=0,prog=0,voicing=0,strum=0,**LFO_DEF)}
+PATTERN_KEYS=[("ockm-end",0,None),("ockm-impact",0,None),("ockm-pump",0,None),("ockm-bass-on",1,None),("ockm-lead-on",1,None),("ockm-chord-on",1,None),("ockm-rise",0,None),("ockm-drum-len",16,None),("ockm-bass-len",64,None),("ockm-lead-len",64,None),("ockm-chord-len",64,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None),("ockm-leader",0,None),("ockm-drum-groove",-1,None),("ockm-fill-every",0,None),("ockm-fill-style",0,None),("ockm-drums-on",1,None),("ockm-turn-every",0,None),("ockm-style",-1,None)]
 for t,d in SYNTH_DEFAULTS.items():
     PATTERN_KEYS+=[(f"ockm-{t}-{k}",v,None) for k,v in d.items()]
 TABLES=[f"ockm-pat-{n}" for n,_ in SLOTS]+[f"ockm-pat-{n}-nudge" for n,_ in SLOTS]+[f"ockm-pat-{t}-{f}" for t in ("bass","lead") for f in MONO]+[f"ockm-pat-chord-{f}" for f in CHORD]
@@ -645,6 +645,12 @@ by=380+len(SLOTS)*40+10
 SYN=[("bass","ockm-monoseq bass","ockm-mono bass"),("lead","ockm-monoseq lead","ockm-lead lead"),("chord","ockm-chordseq chord","ockm-chord chord")]
 synth_voice={}
 rq4=p.add("#X obj 300 1500 r ockm-stepms;"); lq4=p.add("#X obj 300 1525 * 0.25;"); p.con(rq4,0,lq4,0)
+# half-time loop counter: counts each wrap to step 0, from 0 again when play starts
+rhl=p.add("#X obj 200 1500 r ockm-len;")
+hw0=p.add("#X obj 120 1500 sel 0;"); hwf=p.add("#X obj 120 1525 f 0;"); hwi=p.add("#X obj 160 1525 + 1;"); hwv=p.add("#X obj 120 1550 v ockm_hwrap;")
+p.con(gsp,0,hw0,0); p.con(hw0,0,hwf,0); p.con(hwf,0,hwi,0); p.con(hwi,0,hwf,1); p.con(hwf,0,hwv,0)
+hwp=p.add("#X obj 40 1500 r ockm-playing;"); hws=p.add("#X obj 40 1525 sel 1;"); hwz=p.add("#X msg 40 1550 0;")
+p.con(hwp,0,hws,0); p.con(hws,0,hwz,0); p.con(hwz,0,hwf,1)
 for r,(nm,seqo,voi) in enumerate(SYN):
     y=by+r*40
     p.add(f"#X text 20 {y+2} {nm};")
@@ -657,7 +663,13 @@ for r,(nm,seqo,voi) in enumerate(SYN):
     # this part on or off in this pattern (ockm-<part>-on): off stops its steps and silences it
     pon=p.add(f"#X obj 360 {y} spigot 1;"); ron=p.add(f"#X obj 420 {y-18} r ockm-{nm}-on;"); ton=p.add(f"#X obj 420 {y+6} t f f;")
     s0n=p.add(f"#X obj 480 {y+6} sel 0;"); ofn=p.add(f"#X msg 480 {y+24} off;")
-    for c in [(lq,0,pon,0),(pon,0,sq,0),(ron,0,ton,0),(ton,1,pon,1),(ton,0,s0n,0),(s0n,0,ofn,0),(ofn,0,vo,0)]: p.con(*c)
+    # half-time (ockm-<part>-half): the part plays its own pattern at half speed, one of its steps every two (odd steps drop out)
+    # over two loops: the first plays the pattern's first half, the second its second half
+    hx=p.add(f"#X obj 330 {y-18} expr if(ockm_{nm}_half > 0 \\, if(int({D}f1)%2==0 \\, int({D}f1)/2 + (ockm_hwrap%2)*int({D}f2/2) \\, -1) \\, {D}f1);"); hm=p.add(f"#X obj 330 {y-4} moses 0;")
+    p.con(rhl,0,hx,1)
+    rhf=p.add(f"#X obj 300 {y-40} r ockm-{nm}-half;"); p.con(rhf,0,p.add(f"#X obj 300 {y-28} v ockm_{nm}_half;"),0)
+    p.con(lq,0,hx,0); p.con(hx,0,hm,0)
+    for c in [(hm,1,pon,0),(pon,0,sq,0),(ron,0,ton,0),(ton,1,pon,1),(ton,0,s0n,0),(s0n,0,ofn,0),(ofn,0,vo,0)]: p.con(*c)
     cho=p.add(f"#X obj 560 {y+20} ockm-chorus {nm};")
     p.con(sq,0,vo,0); p.con(vo,0,cho,0); p.con(cho,0,gt0,0); p.con(gt,0,mix,0)
     p.con(gt,0,p.add(f"#X obj 700 {y+22} throw~ ockm-stem-{nm};"),0)
@@ -1348,9 +1360,9 @@ GROOVES=[
  ("house",56,dict(kick="X...x...X...x...",clap="....X.......X...",ohat="..x...x...x...x.",hat=".x.x.x.x.x.x.x.x")),
  ("deep-house",58,dict(kick="X...x...X...x...",clap="....x.......x...",ohat="..x...x...x...x.",perc1=".x....x..x....x.",hat="x...x...x...x...")),
  ("tech-house",54,dict(kick="X...x...X...x...",clap="....X.......X...",ohat="..X...X...X...X.",hat="xx.xxx.xxx.xxx.x",perc1="...x..x....x..x.",tom=".......x........")),
- ("minimal",54,dict(kick="X...x...X...x...",perc1="...x..x...x..x..",hat=".x.x.x.x.x.x.x.x",clap="............x...",tom=".........x......")),
+ ("minimal",54,dict(kick="X...X...X...X...",perc1="...x..x...x..x..",hat=".x.x.x.x.x.x.x.x",clap="............x...",tom=".........x......")),
  ("techno",50,dict(kick="X...X...X...X...",ohat="..x...x...x...x.",hat="xx.xxx.xxx.xxx.x",clap="....x.......x...",perc2="...x......x.....")),
- ("dub-techno",54,dict(kick="X...x...X...x...",perc1="...x.....x....x.",ohat="..x...x...x...x.",hat="x.x.x.x.x.x.x.x.")),
+ ("dub-techno",54,dict(kick="X...X...X...X...",perc1="...x.....x....x.",ohat="..x...x...x...x.",hat="x.x.x.x.x.x.x.x.")),
  ("garage",64,dict(kick="X.......x.x.....",snare="....X.......X...",hat="x.xxx.x.x.xxx.x.",perc1="......x......x..",ohat="..x.......x.....")),
  ("breakbeat",54,dict(kick="X.x.......xx....",snare="....X..x.x..X..x",hat="x.x.x.x.x.x.x.x.")),
  ("boom-bap",62,dict(kick="X......x..x.....",snare="....X.......X...",hat="x.x.x.x.x.x.x.x.",ohat="..............x.")),
@@ -1383,8 +1395,12 @@ GROOVES=[
  ("one-drop",58,dict(kick="........X.......",snare="........X.......",hat="x.x.x.x.x.x.x.x.",perc2="..x...x...x...x.")),
  ("half-time",56,dict(kick="X.........x.....",snare="........X.......",hat="x.x.x.x.x.x.x.x.",perc1="...x.......x....")),
  ("lofi-hip-hop",64,dict(kick="X......x..X.....",snare="....X.......X...",hat="x.x.x.x.x.x.x.x.",perc2=".......x........")),
+ # bank 4 (v0.76): hard and fast
+ ("hard-house",50,dict(kick="X...X...X...X...",clap="....X.......X...",ohat="..X...X...X...X.",hat="x.xxx.xxx.xxx.xx",snare="............xxXX")),
+ ("dnb-two-step",50,dict(kick="X.........X.....",snare="....X.......X...",hat="x.x.x.x.x.x.x.x.",ohat="..............x.")),
+ ("dnb-rolling",50,dict(kick="X.....X...X.....",snare="....X..x....X..x",hat="xxXxxxXxxxXxxxXx",perc2="..x.......x.....")),
 ]
-GROOVE_BANKS=[("classics",0),("house + garage",13),("techno + breaks",25)]   # name, first groove number
+GROOVE_BANKS=[("classics",0),("house + garage",13),("techno + breaks",25),("hard + fast",37)]   # name, first groove number
 _SND=["kick","snare","clap","perc1","hat","ohat","tom","perc2"]
 def _groove_line(sw,parts):
     for k,v in parts.items(): assert k in _SND and len(v)==16, (k,v)

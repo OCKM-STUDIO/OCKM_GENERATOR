@@ -695,7 +695,7 @@ def touchscreen_drives_the_engine(work):
     tap(290, 262, 36)                    # perform tab
     tap(310, 629, 500)                   # master fx: filter, middle
     tap(320, 477, 36)                    # song tab
-    tap(335, 324, 300)                   # harmony: next progression
+    tap(335, 324, 331)                   # harmony: next progression
     tap(338, 725, 36)                    # chord tab
     tap(340, 298, 421)                   # colour: 9ths
     tap(345, 262, 36); tap(348, 126, 137)  # perform tab, mute the kick lane
@@ -736,7 +736,7 @@ def touchscreen_screens_draw(work):
         raise Skip("Pillow not installed")
     p = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_preview.py"), os.path.join(work, "preview")], capture_output=True, text=True)
     assert p.returncode == 0, p.stderr[-800:]
-    assert len(os.listdir(os.path.join(work, "preview"))) == 29, "expected twenty-nine screen pictures"
+    assert len(os.listdir(os.path.join(work, "preview"))) == 30, "expected thirty screen pictures"
 
 @test
 def mute_solo_and_levels(work):
@@ -817,12 +817,12 @@ def touchscreen_song_parts_in_and_out(work):
     h = Harness(); h.show("ockm-drums-on", "ockm-bass-on", "ockm-chord-on", "ockm-lead-on", "ockm-turn-every", "ockm-bass-mute")
     tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
     tap(150, 477, 36)                    # song
-    tap(200, 129, 180)                   # drums out
-    tap(250, 363, 180)                   # bass out
-    tap(300, 597, 180)                   # chords out
-    tap(350, 831, 180)                   # lead out
-    tap(400, 129, 180)                   # drums back in
-    tap(450, 836, 365)                   # turnaround every 8
+    tap(200, 129, 228)                   # drums out
+    tap(250, 363, 228)                   # bass out
+    tap(300, 597, 228)                   # chords out
+    tap(350, 831, 228)                   # lead out
+    tap(400, 129, 228)                   # drums back in
+    tap(450, 836, 391)                   # turnaround every 8
     tap(500, 601, 36)                    # bass tab
     tap(550, 916, 283)                   # on/off switch: back on
     tap(600, 338, 36)                    # perform B
@@ -1176,6 +1176,29 @@ def bass_turnaround_and_walk(work):
     assert walk[:3] == [9, 9, 9] and walk[3] == 1, f"offbeats in bar 1: A A A, then C# walking into Dm: {walk}"
 
 @test
+def half_time_plays_the_pattern_over_two_loops(work):
+    """Half-time on the bass: the same 16-step riff plays one of its steps every two, so it takes two loops to get through
+    it (first half, then second half) and the notes come out in the same order, half as often."""
+    h = Harness(); h.show("ockm-bass-notes-out")
+    h.at(100, "ockm-bpm 200 ; ockm-root 9 ; ockm-scale 0 ; ockm-length 16 ; ockm-chord-len 16 ; ockm-chord-prog 0 ; ockm-turn-every 0 ; "
+              "ockm-bass-len 16 ; ockm-bass-sync 0 ; ockm-bass-mode 0 ; ockm-bass-notes 4 ; ockm-bass-rhythm 2 ; ockm-bass-half 0")
+    h.at(300, "ockm-play 1"); h.at(300 + int(0.97 * 16 * 75), "ockm-play 0")
+    h.at(300 + int(1.5 * 16 * 75), "test-mark 1 ; ockm-bass-half 1")
+    h.at(300 + int(1.6 * 16 * 75), "ockm-play 1"); h.at(300 + int(3.57 * 16 * 75), "ockm-play 0")
+    h.show("test-mark")
+    f = os.path.join(work, "t_half.pd"); h.finish(300 + int(4.0 * 16 * 75), f)
+    out = run(work, f)
+    seq, cur = {0: [], 1: []}, 0
+    for line in out.splitlines():
+        if line.startswith("test-mark:"): cur = 1
+        elif line.startswith("ockm-bass-notes-out:"):
+            v = line.split(":", 1)[1].split()
+            if v and v[0] != "off": seq[cur].append(int(float(v[0])))
+    assert len(seq[0]) == 16, f"normal: 16 notes in one loop, got {len(seq[0])}"
+    assert len(seq[1]) == 16, f"half-time: 16 notes over two loops, got {len(seq[1])}: {seq[1]}"
+    assert seq[1] == seq[0], f"half-time keeps the riff in order: {seq[1]} vs {seq[0]}"
+
+@test
 def drum_velocity_timing_and_loop(work):
     """Kick only, 120 bpm (a step is 125 ms). Hits on steps 0, 4, 8, 12: step 4 nudged a fifth of a step early, step 8 a fifth late,
     step 12 drawn at velocity 0.4. The drums loop is 1 bar under a 2-bar pattern, so bar 2 repeats bar 1, nudges and all."""
@@ -1379,7 +1402,7 @@ def suggest_chords_fit_the_melody(work):
         on = " ".join("1" if i % 4 == 0 else "0" for i in range(64))
         nt = " ".join(str(notes[(i // 4) % len(notes)]) for i in range(64))
         lines = ui_preview.run(["send ockm-length float 64", f"array ockm-pat-lead-on {on}", f"array ockm-pat-lead-note {nt}",
-                                "send ockm-lead-mode float 1", "test tap 477 36", "test tap 324 365", "test tap 324 365"])
+                                "send ockm-lead-mode float 1", "test tap 477 36", "test tap 324 391", "test tap 324 391"])
         return [int(float(l.split()[3])) for l in lines if l.startswith("sent ockm-chord-prog")]
     a_minor = picks([57, 60, 64])           # A C E: the home chord
     assert a_minor[0] == 0, f"a melody on A C E should suggest one chord first: {a_minor}"
@@ -1387,8 +1410,33 @@ def suggest_chords_fit_the_melody(work):
     # a melody that walks A minor, F, C, G one bar each: the pop progression (i VI III VII) should come first
     pop = picks([57, 60, 64, 57, 65, 69, 72, 65, 60, 64, 67, 60, 67, 71, 74, 67])
     assert ui_preview_shapes()[pop[0]] == [(0, 16), (5, 16), (2, 16), (6, 16)], f"expected the pop progression first: {pop}"
-    empty = ui_preview.run(["test tap 477 36", "test tap 324 365"])
+    empty = ui_preview.run(["test tap 477 36", "test tap 324 391"])
     assert not any(l.startswith("sent ockm-chord-prog") for l in empty), "no melody, no suggestion"
+
+@test
+def song_styles_set_the_lot(work):
+    """Song screen styles: techno sets 132 bpm, straight swing, the techno groove, a harder kick, takes the lead out and puts the
+    bass round the kick on the pedal; drum and bass goes to 174 with the bass and chords at half-time. A kick on a sample keeps it."""
+    sys.path.insert(0, os.path.join(ROOT, "tests"))
+    import ui_preview
+    if not ui_preview.LUA:
+        raise Skip("no lua to run the screen")
+    def sent(lines):
+        out = {}
+        for l in lines:
+            if l.startswith("sent "):
+                v = l.split()
+                out[v[1]] = float(v[3]) if len(v) > 3 else None
+        return out
+    t = sent(ui_preview.run(["test tap 477 36", "test tap 340 145"]))
+    assert t["ockm-bpm"] == 132 and t["ockm-swing"] == 50 and t["ockm-drum-groove"] == 5, t
+    assert t["ockm-d1-drive"] == 0.5 and t["ockm-d1-tune"] == -2, "the kick gets harder and lower"
+    assert t["ockm-lead-on"] == 0 and t["ockm-bass-on"] == 1 and t["ockm-bass-rhythm"] == 10 and t["ockm-bass-sync"] == 0, t
+    assert t["ockm-style"] == 3, t
+    d = sent(ui_preview.run(["test tap 477 36", "test tap 899 145"]))
+    assert d["ockm-bpm"] == 174 and d["ockm-bass-half"] == 1 and d["ockm-chord-half"] == 1 and d["ockm-bass-engine"] == 3, d
+    smp = sent(ui_preview.run(["send ockm-d1-sample float 2", "test tap 477 36", "test tap 340 145"]))
+    assert "ockm-d1-drive" not in smp, "a kick playing a sample keeps its sound"
 
 @test
 def refit_my_line_when_the_harmony_moves(work):
@@ -1404,7 +1452,7 @@ def refit_my_line_when_the_harmony_moves(work):
                             "array ockm-pat-chord-deg " + " ".join("0" for _ in range(64)), "send ockm-lead-mode float 1",
                             "test tap 663 36", "test tap 5 595",                     # lead tab: remembers the harmony it was written over
                             "array ockm-pat-chord-deg " + " ".join("4" for _ in range(64)), "send ockm-chord-prog float 5",
-                            "test tap 663 36", "test tap 677 283"])                  # the harmony moved: refit my line
+                            "test tap 663 36", "test tap 479 283"])                  # the harmony moved: refit my line
     edits = [l.split()[3:] for l in lines if l.startswith("sent ockm-lead-edit")]
     assert len(edits) == 16, f"every note on the beat should be refitted: {len(edits)} {edits[:2]}"
     assert all(int(float(e[1])) == 55 for e in edits), f"A moves to G, the nearest note of E minor: {edits[:3]}"
@@ -1437,7 +1485,7 @@ def touchscreen_velocity_timing_loop_and_banks(work):
     h.at(500, "ockm-ui-test drag 45 319 45 336")      # pull step 1 early
     h.at(600, "ockm-ui-test tap 612 88")              # drum length: 1 bar (navigation strip)
     h.at(700, "ockm-ui-test tap 909 88")              # double
-    h.at(800, "ockm-ui-test tap 716 354")             # bank 2
+    h.at(800, "ockm-ui-test tap 660 354")             # bank 2
     h.at(900, "ockm-ui-test tap 531 389")             # its first groove
     f = os.path.join(work, "t_lane_ui.pd"); h.finish(1000, f)
     out = run(work, f)

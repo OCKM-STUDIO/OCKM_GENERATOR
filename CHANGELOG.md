@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.76 (18 October 2026)
+
+- **Styles on the song screen:** house, deep house, tech house, techno, hard house, acid, dub techno, garage, speed garage, drum + bass. One tap sets tempo, swing, groove, kick and clap (or snare) character, which parts are in, their sounds, rhythms and riffs, the progression, sends and half-time. Samples and saved drum sounds are left alone. Undo puts it all back
+- **Half-time** for the bass, chords and lead: a switch on each tab. The part plays its own pattern at half speed over two loops
+- **New groove bank, hard + fast:** hard house, drum and bass two-step, drum and bass rolling. Minimal and dub techno now have a flat, even kick
+- **Master reverb** starts lower (0.3, was 0.5)
+- The song screen is a little tighter to make room for the styles
+
 ## v0.75 (18 October 2026)
 
 - **Sidechain on the bass, chords and lead:** each tab has a sidechain slider. Turned up, that part dips on every kick and swells back over an eighth note. The Pump button on Perform still pumps all three at once, on top

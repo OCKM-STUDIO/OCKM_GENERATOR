@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.75"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.76"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -79,8 +79,8 @@ local CHORD_RHY = { { "bar pads" }, { "two beat" }, { "offbeat" }, { "dub stabs"
 local PROGS = { { "one chord", "i" }, { "vamp", "i iv" }, { "dub techno", "i . . VII" }, { "deep house", "i iv VI v" }, { "garage", "i VI iv v" }, { "pop", "i VI III VII" }, { "uplift", "VI VII i" }, { "andalusian", "i VII VI V" }, { "trip hop", "i VII VI v" }, { "soul", "ii V I" } }
 local SPICE = { { 0, "triad" }, { 1, "7th" }, { 6, "9th" }, { 7, "11th" } }
 local FILLS = { "snare roll", "tom run", "drop", "build", "breakbeat" }
-local GROOVES = { "four floor", "house", "deep house", "tech house", "minimal", "techno", "dub techno", "garage", "breakbeat", "boom bap", "trip hop", "electro", "clear", "chicago", "jackin", "disco", "soulful", "afro house", "lofi house", "2 step", "speed garage", "funky house", "ghetto house", "nu disco", "rolling", "detroit", "berlin", "industrial", "hypnotic", "acid techno", "think break", "jungle", "big beat", "downtempo", "one drop", "half time", "lofi hip hop" }
-local GROOVE_BANKS = { { "classics", 0 }, { "house + garage", 13 }, { "techno + breaks", 25 } }
+local GROOVES = { "four floor", "house", "deep house", "tech house", "minimal", "techno", "dub techno", "garage", "breakbeat", "boom bap", "trip hop", "electro", "clear", "chicago", "jackin", "disco", "soulful", "afro house", "lofi house", "2 step", "speed garage", "funky house", "ghetto house", "nu disco", "rolling", "detroit", "berlin", "industrial", "hypnotic", "acid techno", "think break", "jungle", "big beat", "downtempo", "one drop", "half time", "lofi hip hop", "hard house", "dnb two step", "dnb rolling" }
+local GROOVE_BANKS = { { "classics", 0 }, { "house + garage", 13 }, { "techno + breaks", 25 }, { "hard + fast", 37 } }
 local CHORD_TYPES = { { 0, 2, 4, -1 }, { 0, 2, 4, 6 }, { 0, 1, 4, -1 }, { 0, 4, 7, -1 }, { 0, 3, 4, -1 }, { 0, 2, 4, 5 }, { 0, 2, 6, 8 }, { 0, 6, 8, 10 } }
 local PROG_SHAPES = { { { 0, 16 } }, { { 0, 16 }, { 3, 16 } }, { { 0, 48 }, { 6, 16 } }, { { 0, 16 }, { 3, 16 }, { 5, 16 }, { 4, 16 } }, { { 0, 8 }, { 5, 8 }, { 3, 8 }, { 4, 8 } }, { { 0, 16 }, { 5, 16 }, { 2, 16 }, { 6, 16 } }, { { 5, 16 }, { 6, 16 }, { 0, 32 } }, { { 0, 16 }, { 6, 16 }, { 5, 16 }, { 4, 16 } }, { { 0, 32 }, { 6, 32 }, { 5, 32 }, { 4, 32 } }, { { 1, 16 }, { 4, 16 }, { 0, 32 } } }
 -- END PRESETS
@@ -153,13 +153,14 @@ end
 function ui:defaults()
   local v = self.v
   v["ockm-chord-smooth"] = 1
-  v["ockm-volume"] = 1; v["ockm-verb-mix"] = 0.5; v["ockm-delay-mix"] = 0.5
+  v["ockm-volume"] = 1; v["ockm-verb-mix"] = 0.3; v["ockm-delay-mix"] = 0.5
   v["ockm-drive"] = 0; v["ockm-delay-fb"] = 0.4; v["ockm-delay-steps"] = 3; v["ockm-verb-size"] = 0.6; v["ockm-verb-tone"] = 0.5
   for _, t in ipairs(SYNTHS) do v["ockm-"..t.."-level"] = 1 end
   for _, t in ipairs(TRACKS) do
     v["ockm-"..t.."-lowcut"] = 20; v["ockm-"..t.."-eqlow"] = 0; v["ockm-"..t.."-eqmid"] = 0; v["ockm-"..t.."-eqmidf"] = 400; v["ockm-"..t.."-eqhigh"] = 0
   end
   v["ockm-bass-on"] = 1; v["ockm-lead-on"] = 1; v["ockm-chord-on"] = 1; v["ockm-drums-on"] = 1; v["ockm-turn-every"] = 0; v["ockm-bass-walk"] = 0; v["ockm-lead-freedom"] = 1; v["ockm-rise"] = 0; v["ockm-end"] = 0; v["ockm-impact"] = 0; v["ockm-pump"] = 0
+  v["ockm-style"] = -1; v["ockm-bass-half"] = 0; v["ockm-lead-half"] = 0; v["ockm-chord-half"] = 0
   v["ockm-bass-mode"] = 0; v["ockm-lead-mode"] = 0; v["ockm-chord-mode"] = 0   -- 0 auto, 1 manual
   v["ockm-bass-sync"] = 1; v["ockm-lead-sync"] = 1; v["ockm-leader"] = 0; v["ockm-drum-groove"] = -1
   v["ockm-drum-len"] = 16; v["ockm-bass-len"] = 64; v["ockm-lead-len"] = 64; v["ockm-chord-len"] = 64
@@ -201,7 +202,8 @@ function ui:hooks()
   end
   for _, k in ipairs({ "ockm-drum-len", "ockm-bass-len", "ockm-lead-len", "ockm-chord-len" }) do h[#h+1] = k end
   for _, k in ipairs({ "ockm-drum-loop", "ockm-swing", "ockm-accent", "ockm-sync", "ockm-fill-every", "ockm-fill-style" }) do h[#h+1] = k end
-  for _, k in ipairs({ "ockm-drums-on", "ockm-turn-every", "ockm-bass-walk", "ockm-lead-freedom", "ockm-bass-sidechain", "ockm-lead-sidechain", "ockm-chord-sidechain" }) do h[#h+1] = k end
+  for _, k in ipairs({ "ockm-drums-on", "ockm-turn-every", "ockm-bass-walk", "ockm-lead-freedom", "ockm-bass-sidechain", "ockm-lead-sidechain", "ockm-chord-sidechain",
+                         "ockm-style", "ockm-bass-half", "ockm-lead-half", "ockm-chord-half" }) do h[#h+1] = k end
   for _, k in ipairs({ "ockm-volume", "ockm-verb-mix", "ockm-delay-mix", "ockm-drive", "ockm-delay-fb", "ockm-delay-steps", "ockm-verb-size", "ockm-verb-tone" }) do h[#h+1] = k end
   return h
 end
@@ -1399,9 +1401,10 @@ function ui:layout_drums(add)
     self.bank = 1
     for b, bk in ipairs(GROOVE_BANKS) do if cur >= bk[2] then self.bank = b end end
   end
-  local bkw = (half - 2 * 6) / 3
+  local nb = #GROOVE_BANKS
+  local bkw = (half - (nb - 1) * 4) / nb
   for b, bk in ipairs(GROOVE_BANKS) do
-    add{ kind="choice", x=gx + (b - 1) * (bkw + 6), y=342, w=bkw, h=24, small=true, label=bk[1], sel=(self.bank == b), tap=function() self.bank = b end }
+    add{ kind="choice", x=gx + (b - 1) * (bkw + 4), y=342, w=bkw, h=24, small=true, label=bk[1], sel=(self.bank == b), tap=function() self.bank = b end }
   end
   local gw = (half - 4 * 6) / 5
   local first = GROOVE_BANKS[self.bank][2]
@@ -1498,17 +1501,22 @@ function ui:layout_synth(add)
   end
   -- yours or made for you; when the harmony has moved under your line, offer to refit it; on/off top right (as on the song screen)
   local yours = self:part_yours(part)
+  local HTX = W - 16 - 110 - 6 - 86 - 6 - 100   -- the half-time switch; slide and on/off sit to its right
+  local hk = "ockm-"..part.."-half"
+  local ht = (self.v[hk] or 0) > 0
+  add{ kind="choice", x=HTX, y=266, w=100, h=34, small=true, accent=true, sel=ht, label="half-time",
+       tap=function() self:send(hk, ht and 0 or 1); self:say(ht and (part .. " back to full speed") or (part .. " at half speed: its pattern over two loops")) end }
   local moved = (part ~= "chord") and self:harmony_moved(part)
   local clash = moved and self:clashes(part) or {}
   if #clash > 0 then
-    add{ kind="text", x=16, y=276, w=W - 520, h=12, size=11, col="acc",
+    add{ kind="text", x=16, y=276, w=W - 570, h=12, size=11, col="acc",
          label="the harmony changed: " .. #clash .. ((#clash == 1) and " note no longer fits" or " notes no longer fit") }
-    add{ kind="btn", x=W - 16 - 110 - 6 - 80 - 6 - 130, y=266, w=130, h=34, small=true, accent=true, label="refit my line", tap=function() self:refit(part) end }
-    add{ kind="btn", x=W - 16 - 110 - 6 - 80, y=266, w=80, h=34, small=true, quiet=true, label="leave it", tap=function() self.claim_harm[part] = self:harm_sig() end }
+    add{ kind="btn", x=HTX - 6 - 80 - 6 - 130, y=266, w=130, h=34, small=true, accent=true, label="refit my line", tap=function() self:refit(part) end }
+    add{ kind="btn", x=HTX - 6 - 80, y=266, w=80, h=34, small=true, quiet=true, label="leave it", tap=function() self.claim_harm[part] = self:harm_sig() end }
   else
     local info = self.msg or (yours and ("yours: " .. self:step_info()) or ((part == "chord") and "plays the harmony from the song screen. Edit a step and it becomes yours"
       or "made for you: follows the harmony. Edit a step and it becomes yours"))
-    add{ kind="text", x=16, y=276, w=W - 300, h=12, label=info, size=11, col=self.msg and "acc" or nil }
+    add{ kind="text", x=16, y=276, w=HTX - 32, h=12, label=info, size=11, col=self.msg and "acc" or nil }
     if mono then
       add{ kind="choice", x=W - 16 - 110 - 6 - 86, y=266, w=86, h=34, label="slide", accent=true, small=true, sel=self:mono_get(self.sel_step, "slide") > 0,
            tap=function() self:mono_toggle_slide() end }
@@ -1674,9 +1682,73 @@ function ui:chord_name(d, turn)
   if third == 4 then rn = string.upper(rn) end
   return NOTES[((root + r) % 12) + 1] .. q .. ext, rn
 end
+-- styles (v0.76): one tap sets the tempo, swing, groove, the kick/clap/snare character, what each part plays and on
+-- which sound, the harmony, sends and half-time. Drum slots playing a sample or a saved sound keep it. Undo puts it all back.
+-- drums: per voice { tune, decay, drive, character }. Parts: false = out of the pattern. Bass move 0 pedal, 1 follows, 2 walks.
+local STYLES = {
+  { "house", bpm=124, swing=56, groove=1, prog=1, type=1,
+    drums={ kick={ 0, 100, 0.1, 0.2 }, clap={ 0, 100, 0, 0 } },
+    bass={ engine=5, rhythm=0, notes=2, move=1 },
+    chord={ engine=0, rhythm=2, verb=0.15, delay=0.15 },
+    lead={ engine=1, rhythm=10, notes=15, freedom=1, verb=0.15, delay=0.2 } },
+  { "deep house", bpm=120, swing=58, groove=2, prog=3, type=6,
+    drums={ kick={ -1, 120, 0, -0.2 }, clap={ 0, 110, 0, 0.2 } },
+    bass={ engine=5, rhythm=3, notes=2, move=1, k={ 0.3, 0.2, 0.3, 0.5 } },
+    chord={ engine=4, rhythm=6, verb=0.25, delay=0.15 },
+    lead=false },
+  { "tech house", bpm=125, swing=54, groove=3, prog=0, type=1,
+    drums={ kick={ 0, 90, 0.3, 0.4 }, clap={ 0, 80, 0, -0.5 } },
+    bass={ engine=5, rhythm=14, notes=0, move=1, sidechain=0.3, k={ 0.35, 0.3, 0.5, 0.35 } },
+    chord={ engine=0, rhythm=3, delay=0.25 },
+    lead=false },
+  { "techno", bpm=132, swing=50, groove=5, prog=0, type=0,
+    drums={ kick={ -2, 150, 0.5, 0.5 }, clap={ 0, 70, 0.2, -0.6 } },
+    bass={ engine=5, rhythm=10, notes=0, move=0, sidechain=0.5, k={ 0.25, 0.2, 0.35, 0.3 } },
+    chord={ engine=0, rhythm=3, delay=0.35 },
+    lead=false },
+  { "hard house", bpm=145, swing=50, groove=37, prog=1, type=0,
+    drums={ kick={ 0, 110, 0.7, 0.8 }, clap={ 0, 90, 0.3, -0.3 } },
+    bass={ engine=6, rhythm=0, notes=1, move=1 },
+    chord=false,
+    lead={ engine=3, rhythm=0, notes=1, freedom=0, delay=0.15 } },
+  { "acid", bpm=128, swing=50, groove=29, prog=0, type=0,
+    drums={ kick={ 0, 110, 0.4, 0.4 }, clap={ 0, 90, 0.1, -0.3 } },
+    bass={ engine=0, rhythm=13, notes=3, move=0, delay=0.15 },
+    chord=false, lead=false },
+  { "dub techno", bpm=120, swing=52, groove=6, prog=2, type=1,
+    drums={ kick={ -1, 130, 0.2, 0 }, clap={ 0, 100, 0, 0.3 } },
+    bass={ engine=1, rhythm=5, notes=0, move=1 },
+    chord={ engine=0, rhythm=3, verb=0.3, delay=0.5 },
+    lead=false },
+  { "garage", bpm=132, swing=62, groove=7, prog=4, type=1,
+    drums={ kick={ 0, 90, 0.1, 0.3 }, clap={ 1, 90, 0, 0 } },
+    bass={ engine=1, rhythm=8, notes=2, move=1 },
+    chord={ engine=1, rhythm=7, verb=0.1 },
+    lead=false },
+  { "speed garage", bpm=135, swing=58, groove=20, prog=1, type=1,
+    drums={ kick={ 0, 110, 0.3, 0.4 }, clap={ 0, 90, 0.1, -0.2 } },
+    bass={ engine=3, rhythm=0, notes=1, move=1 },
+    chord={ engine=1, rhythm=2, verb=0.1 },
+    lead=false },
+  { "drum + bass", bpm=174, swing=50, groove=39, prog=3, type=6,
+    drums={ kick={ 0, 90, 0.3, 0.4 }, snare={ 0, 90, 0.2, 0.5 } },
+    bass={ engine=3, rhythm=5, notes=0, move=1, half=1 },
+    chord={ engine=2, rhythm=0, half=1, verb=0.3 },
+    lead=false },
+}
 function ui:layout_compose(add)
-  -- in this pattern: four tiles
+  -- style: one tap sets the lot
   add{ kind="text", x=16, y=114, w=W - 32, h=12, size=10,
+       label="style: sets the tempo, groove, drum character, sounds and parts in one go (undo puts it back)" }
+  local stn = #STYLES
+  local stw = (W - 32 - (stn - 1) * 4) / stn
+  local cst = math.floor(self.v["ockm-style"] or -1)
+  for i, st in ipairs(STYLES) do
+    add{ kind="choice", x=16 + (i - 1) * (stw + 4), y=128, w=stw, h=34, small=true, label=st[1], sel=(cst == i - 1),
+         tap=function() self:apply_style(i) end }
+  end
+  -- in this pattern: four tiles
+  add{ kind="text", x=16, y=172, w=W - 32, h=12, size=10,
        label="in this pattern: tap a part to put it in or take it out (out is silent, and nothing on Perform brings it back)" }
   local tw = (W - 32 - 3 * 8) / 4
   local eng = function(part) local e = engines_of(part); return e[(math.floor(self.v["ockm-"..part.."-engine"] or 0)) + 1] or "" end
@@ -1692,38 +1764,38 @@ function ui:layout_compose(add)
       l1 = eng(p); l2 = self:part_yours(p) and "yours: you've edited it" or "made for you: follows the harmony"
     end
     if not on then l1 = "out of this pattern"; l2 = (p == "chords") and "silent: the harmony still steers" or "Perform won't bring it back" end
-    add{ kind="parttile", x=16 + (i - 1) * (tw + 8), y=128, w=tw, h=104, label=p, on=on, l1=l1, l2=l2, tap=function()
+    add{ kind="parttile", x=16 + (i - 1) * (tw + 8), y=186, w=tw, h=84, label=p, on=on, l1=l1, l2=l2, tap=function()
       self:send(PART_ON[p], on and 0 or 1)
     end }
   end
   -- the harmony
-  add{ kind="text", x=16, y=246, w=W - 32, h=12, size=10,
+  add{ kind="text", x=16, y=282, w=W - 32, h=12, size=10,
        label="harmony: the map the bass, chords and lead all follow (it steers even when the chords are out)" }
-  self:stepper(add, 16, 262, 330, 76, PROGS, "ockm-chord-prog", function() self.ranking = nil end)
+  self:stepper(add, 16, 296, 330, 70, PROGS, "ockm-chord-prog", function() self.ranking = nil end)
   local rx = 16 + 330 + 12
   local rw = W - 16 - rx
   local kw = (rw - 11 * 3) / 12
   for k = 0, 11 do
-    add{ kind="choice", x=rx + k * (kw + 3), y=262, w=kw, h=36, label=NOTES[k + 1], small=true, sel=(self.v["ockm-root"] == k),
+    add{ kind="choice", x=rx + k * (kw + 3), y=296, w=kw, h=33, label=NOTES[k + 1], small=true, sel=(self.v["ockm-root"] == k),
          tap=function() self:send("ockm-root", k) end }
   end
   local sw = (rw - 5 * 3) / 6
   for sc = 0, 5 do
-    add{ kind="choice", x=rx + sc * (sw + 3), y=302, w=sw, h=36, label=SCALE_NAMES[sc + 1], small=true, sel=(self.v["ockm-scale"] == sc),
+    add{ kind="choice", x=rx + sc * (sw + 3), y=333, w=sw, h=33, label=SCALE_NAMES[sc + 1], small=true, sel=(self.v["ockm-scale"] == sc),
          tap=function() self:send("ockm-scale", sc) end }
   end
   -- or fit the chords to a line of your own; and the turnaround
-  add{ kind="text", x=16, y=360, w=140, h=12, label="or fit the chords to", size=10 }
+  add{ kind="text", x=16, y=386, w=140, h=12, label="or fit the chords to", size=10 }
   for i, src in ipairs({ "bass", "lead" }) do
     local ok = self:part_yours(src)
-    add{ kind="choice", x=150 + (i - 1) * 118, y=348, w=112, h=34, small=true, disabled=not ok, sel=ok and self.rank_src == src and self.ranking ~= nil,
+    add{ kind="choice", x=150 + (i - 1) * 118, y=376, w=112, h=30, small=true, disabled=not ok, sel=ok and self.rank_src == src and self.ranking ~= nil,
          label=(self.rank_src == src and self.ranking) and ("next for my " .. src) or ("my " .. src),
          tap=ok and function() self:fit_chords(src) end or nil }
   end
-  add{ kind="text", x=W - 16 - 4 * 70 - 90, y=360, w=88, h=12, label="turnaround", size=10 }
+  add{ kind="text", x=W - 16 - 4 * 70 - 90, y=386, w=88, h=12, label="turnaround", size=10 }
   local te = math.floor(self.v["ockm-turn-every"] or 0)
   for i, e in ipairs({ 0, 4, 8, 16 }) do
-    add{ kind="choice", x=W - 16 - (5 - i) * 70, y=348, w=64, h=34, small=true, sel=(te == e), label=(e == 0) and "off" or ("every " .. e),
+    add{ kind="choice", x=W - 16 - (5 - i) * 70, y=376, w=64, h=30, small=true, sel=(te == e), label=(e == 0) and "off" or ("every " .. e),
          tap=function() self:send("ockm-turn-every", e) end }
   end
   -- the map, bar by bar
@@ -1739,14 +1811,14 @@ function ui:layout_compose(add)
   end
   local nb = math.min(#bars, 8)
   local key = NOTES[(math.floor(self.v["ockm-root"] or 9) % 12) + 1] .. " " .. SCALE_NAMES[(self.v["ockm-scale"] or 0) + 1]
-  add{ kind="text", x=16, y=396, w=W - 32, h=12, size=10,
+  add{ kind="text", x=16, y=416, w=W - 32, h=12, size=10,
        label="the map, bar by bar (" .. key .. ")" .. ((te > 0) and ("   turnaround: the last bar of every " .. te .. " goes to " .. self:chord_name(4, true)) or "") }
   local playing_bar = (self.playing ~= 0) and (math.floor((self.step or 0) % math.max(16, nb * 16) / 16) + 1) or nil
   local bw = (W - 32 - (nb - 1) * 6) / nb
   for i = 1, nb do
     local names, romans = {}, {}
     for _, c in ipairs(bars[i]) do names[#names + 1] = c.name; romans[#romans + 1] = c.roman end
-    add{ kind="bar", x=16 + (i - 1) * (bw + 6), y=410, w=bw, h=176, n=i, label=table.concat(names, "  "), sub=table.concat(romans, " "),
+    add{ kind="bar", x=16 + (i - 1) * (bw + 6), y=430, w=bw, h=156, n=i, label=table.concat(names, "  "), sub=table.concat(romans, " "),
          now=(playing_bar == i) }
   end
 end
@@ -1773,6 +1845,46 @@ function ui:fit_chords(src)
   self.suggesting = false
   local fit = math.floor(clamp((pick[2] + 1) / 4, 0, 1) * 100 + 0.5)
   self:say(string.format("chords for your %s, %d of %d: %s (fits %d%%)", what, self.rank_at, #self.ranking, (PROGS[pick[1] + 1] or { "" })[1], fit))
+end
+
+function ui:apply_style(i)
+  local st = STYLES[i]
+  if not st then return end
+  self:snapshot(st[1])
+  self:send("ockm-bpm", st.bpm)
+  self:send("ockm-drums-on", 1)
+  self:send("ockm-drum-groove", st.groove)   -- the groove sets its own swing: the style's comes after
+  self:send("ockm-swing", st.swing)
+  self:send("ockm-turn-every", 0)
+  for slot = 1, #SLOTS do
+    local nm, t = SLOTS[slot], self:voice_type(slot)
+    local d = st.drums[t]
+    if d and math.floor(self.v["ockm-"..nm.."-sample"] or 0) == 0 and not self:current_preset(slot) then
+      self:send("ockm-"..nm.."-tune", d[1]); self:send("ockm-"..nm.."-decay", d[2])
+      self:send("ockm-"..nm.."-drive", d[3]); self:send("ockm-"..nm.."-labchar", d[4])
+    end
+    if d then self:send("ockm-"..nm.."-verb", 0); self:send("ockm-"..nm.."-delay", 0) end
+  end
+  self:send("ockm-chord-prog", st.prog)
+  self:send("ockm-chord-type", st.type)
+  for _, part in ipairs({ "bass", "chord", "lead" }) do
+    local ps = st[part]
+    self:send("ockm-"..part.."-on", ps and 1 or 0)
+    if ps then
+      self:send("ockm-"..part.."-engine", ps.engine)
+      if ps.k then for j = 1, 4 do self:send("ockm-"..part.."-k"..j, ps.k[j]) end end
+      self:send("ockm-"..part.."-rhythm", ps.rhythm)
+      if ps.notes then self:send("ockm-"..part.."-notes", ps.notes) end
+      if ps.move then self:set_bass_move(ps.move) end
+      if ps.freedom then self:send("ockm-lead-freedom", ps.freedom) end
+      self:send("ockm-"..part.."-half", ps.half or 0)
+      self:send("ockm-"..part.."-sidechain", ps.sidechain or 0)
+      self:send("ockm-"..part.."-verb", ps.verb or 0); self:send("ockm-"..part.."-delay", ps.delay or 0)
+      if part ~= "chord" then self:send("ockm-"..part.."-mode", 0) end   -- made for you again, so it follows the new style
+    end
+  end
+  self:send("ockm-style", i - 1)
+  self:say_undo(st[1] .. ": tempo, groove, sounds and parts set")
 end
 
 -- a part's settings on its own tab (v0.74): what it plays and how it sits on the harmony
@@ -2938,8 +3050,8 @@ function ui:draw(g, w)
     self:text(g, w.label, w.x + 14, w.y + 12, 20, w.on and "txt" or "mute", w.w - 80)
     self:col(g, w.on and "acc" or "off"); g:fill_rounded_rect(w.x + w.w - 58, w.y + 14, 44, 22, 11)
     self:ctext(g, w.on and "in" or "out", { x=w.x + w.w - 58, y=w.y + 14, w=44, h=22 }, 11, w.on and "bg" or "mute")
-    self:text(g, w.l1 or "", w.x + 14, w.y + 52, 11, "mute", w.w - 24)
-    self:text(g, w.l2 or "", w.x + 14, w.y + 72, 11, "mute", w.w - 24)
+    self:text(g, w.l1 or "", w.x + 14, w.y + w.h - 44, 11, "mute", w.w - 24)
+    self:text(g, w.l2 or "", w.x + 14, w.y + w.h - 25, 11, "mute", w.w - 24)
   elseif k == "bar" then
     self:col(g, w.now and "off" or "card"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 8)
     if w.now then self:col(g, "acc"); g:stroke_rounded_rect(w.x, w.y, w.w, w.h, 8, 2) end
