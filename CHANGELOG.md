@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.75 (18 October 2026)
+
+- **Sidechain on the bass, chords and lead:** each tab has a sidechain slider. Turned up, that part dips on every kick and swells back over an eighth note. The Pump button on Perform still pumps all three at once, on top
+- **Controls that belong together share a panel:** the LFO row and the reverb and delay sends on the bass, lead and chord tabs, the master delay (amount, feedback, time) and reverb (amount, size) on both Perform screens, and the sends on the drums tab
+- **Perform B's scene buttons** (drums only, no drums, kick + bass, all in) have an orange edge and light up when tapped
+- **The rhythm lock is gone** (own rhythm, on the kick, fill gaps): it fought the rhythm choice. A part made for you that used it goes back to its own rhythm
+
 ## v0.74 (18 October 2026)
 
 - **Song replaces compose.** Four tiles say what's in this pattern (drums, bass, chords, lead): tap to take a part out or put it back. Out is silent, dims on Perform, and mutes, scenes and macros can't bring it back. Each part's tab has the same on/off switch, top right

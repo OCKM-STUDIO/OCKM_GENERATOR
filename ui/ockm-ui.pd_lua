@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.74"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.75"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -201,7 +201,7 @@ function ui:hooks()
   end
   for _, k in ipairs({ "ockm-drum-len", "ockm-bass-len", "ockm-lead-len", "ockm-chord-len" }) do h[#h+1] = k end
   for _, k in ipairs({ "ockm-drum-loop", "ockm-swing", "ockm-accent", "ockm-sync", "ockm-fill-every", "ockm-fill-style" }) do h[#h+1] = k end
-  for _, k in ipairs({ "ockm-drums-on", "ockm-turn-every", "ockm-bass-walk", "ockm-lead-freedom" }) do h[#h+1] = k end
+  for _, k in ipairs({ "ockm-drums-on", "ockm-turn-every", "ockm-bass-walk", "ockm-lead-freedom", "ockm-bass-sidechain", "ockm-lead-sidechain", "ockm-chord-sidechain" }) do h[#h+1] = k end
   for _, k in ipairs({ "ockm-volume", "ockm-verb-mix", "ockm-delay-mix", "ockm-drive", "ockm-delay-fb", "ockm-delay-steps", "ockm-verb-size", "ockm-verb-tone" }) do h[#h+1] = k end
   return h
 end
@@ -808,10 +808,7 @@ function ui:layout_perform(add)
   add{ kind="hbar", x=mx + fw + 6, y=ay, w=iw - fw - 6, h=78, hook="ockm-drive", lo=0, hi=1, label="drive", bold=true }
   local ROW2 = { { "ockm-delay-mix", 0, 1, "delay" }, { "ockm-delay-fb", 0, 0.9, "feedback" }, { "ockm-delay-steps", 1, 8, "time" },
                  { "ockm-verb-mix", 0, 1, "reverb" }, { "ockm-verb-size", 0, 1, "size" } }
-  local w5 = (iw - 4 * 6) / 5
-  for i, m in ipairs(ROW2) do
-    add{ kind="hbar", x=mx + (i - 1) * (w5 + 6), y=548, w=w5, h=40, hook=m[1], lo=m[2], hi=m[3], label=m[4], bold=true }
-  end
+  self:fx_groups(add, ROW2, mx, 548, iw, 40)
 end
 
 -- let go of the filter: it snaps back to off. The screen shows it there at once rather than drawing the glide
@@ -905,7 +902,8 @@ function ui:layout_live(add)
                { "all in", function() return true end } }
   local sw = (436 - 18) / 4
   for i, sc in ipairs(SC) do
-    add{ kind="btn", x=22 + (i - 1) * (sw + 6), y=530, w=sw, h=52, small=true, label=sc[1], tap=function() self:scene(sc[2]) end }
+    add{ kind="btn", x=22 + (i - 1) * (sw + 6), y=530, w=sw, h=52, small=true, label=sc[1], edge=true, flash="scene" .. i,
+         tap=function() self:scene(sc[2]); self:flash_btn("scene" .. i) end }
   end
   -- master effects, big
   local mx, iw = rx + 6, half_w - 12
@@ -928,10 +926,7 @@ function ui:layout_live(add)
   add{ kind="hbar", x=mx + hw + 6, y=298, w=hw, h=56, hook="ockm-volume", lo=0, hi=1, label="volume", bold=true }
   local ROW2 = { { "ockm-delay-mix", 0, 1, "delay" }, { "ockm-delay-fb", 0, 0.9, "feedback" }, { "ockm-delay-steps", 1, 8, "time" },
                  { "ockm-verb-mix", 0, 1, "reverb" }, { "ockm-verb-size", 0, 1, "size" } }
-  local w5 = (iw - 24) / 5
-  for i, m in ipairs(ROW2) do
-    add{ kind="hbar", x=mx + (i - 1) * (w5 + 6), y=362, w=w5, h=56, hook=m[1], lo=m[2], hi=m[3], label=m[4], bold=true }
-  end
+  self:fx_groups(add, ROW2, mx, 362, iw, 56)
   local w3 = (iw - 12) / 3
   for i = 1, 3 do
     -- your three slots (pick them in settings, or with the small v on each)
@@ -1394,6 +1389,7 @@ function ui:layout_drums(add)
   end
   -- this drum's reverb and delay sends (the same as on the mixer)
   local sw = (half - 6) / 2
+  self:group(add, 16, 562, half, 30)
   add{ kind="hbar", x=16, y=562, w=sw, h=30, hook="ockm-"..nm.."-verb", lo=0, hi=1, label="reverb", bold=true, preview=slot }
   add{ kind="hbar", x=16 + sw + 6, y=562, w=sw, h=30, hook="ockm-"..nm.."-delay", lo=0, hi=1, label="delay", bold=true, preview=slot }
   local gx = 16 + half + 16
@@ -1544,33 +1540,40 @@ function ui:layout_synth_sound(add, part, mono)
     local col, row = (k - 1) % 2, math.floor((k - 1) / 2)
     add{ kind="hbar", x=rx + col * (kw + 6), y=376 + row * 44, w=kw, h=40, hook="ockm-"..part.."-k"..k, lo=0, hi=1, label=kn[k], bold=true }
   end
-  local third = {}
-  if mono then third[#third + 1] = { "drive", "drive" } end
-  third[#third + 1] = { "verb", "reverb" }; third[#third + 1] = { "delay", "delay" }; third[#third + 1] = { "level", "level" }
-  local n = #third + 1                  -- plus the chorus at the end
-  local tw = (rw - 6 * (n - 1)) / n
-  for j, t in ipairs(third) do
-    add{ kind="hbar", x=rx + (j - 1) * (tw + 6), y=466, w=tw, h=40, hook="ockm-"..part.."-"..t[1], lo=0, hi=1, label=t[2], bold=true }
+  -- drive on its own, the reverb and delay sends on one panel, then level and chorus
+  local n = mono and 5 or 4
+  local gaps = mono and (6 + 6 + 14 + 14) or (6 + 6 + 14)
+  local tw = (rw - gaps) / n
+  local x = rx
+  if mono then
+    add{ kind="hbar", x=x, y=466, w=tw, h=40, hook="ockm-"..part.."-drive", lo=0, hi=1, label="drive", bold=true }
+    x = x + tw + 14
   end
+  self:group(add, x, 466, 2 * tw + 6, 40)
+  add{ kind="hbar", x=x, y=466, w=tw, h=40, hook="ockm-"..part.."-verb", lo=0, hi=1, label="reverb", bold=true }
+  add{ kind="hbar", x=x + tw + 6, y=466, w=tw, h=40, hook="ockm-"..part.."-delay", lo=0, hi=1, label="delay", bold=true }
+  x = x + 2 * tw + 6 + 14
+  add{ kind="hbar", x=x, y=466, w=tw, h=40, hook="ockm-"..part.."-level", lo=0, hi=1, label="level", bold=true }
   -- chorus, Juno-style: tap to step through off, I, II, I+II
   local ch = math.floor(self.v["ockm-"..part.."-chorus"] or 0)
-  add{ kind="choice", x=rx + #third * (tw + 6), y=466, w=tw, h=40, small=true, accent=true, sel=(ch > 0), label="chorus " .. CHORUS[ch + 1],
+  add{ kind="choice", x=x + tw + 6, y=466, w=tw, h=40, small=true, accent=true, sel=(ch > 0), label="chorus " .. CHORUS[ch + 1],
        tap=function() self:send("ockm-"..part.."-chorus", (ch + 1) % #CHORUS) end }
   -- movement: an LFO on one of the four knobs, in time with the loop. Tap a box to step through it
   local key = function(k) return "ockm-"..part.."-lfo-"..k end
   local shape, rate, tgt = math.floor(self.v[key("shape")] or 0), math.floor(self.v[key("rate")] or 4), math.floor(self.v[key("target")] or 1)
   local lw = (rw - 18) / 4
-  add{ kind="btn", x=rx, y=512, w=lw, h=36, small=true, label="lfo " .. LFO_SHAPES[shape + 1], tap=function() self:send(key("shape"), (shape + 1) % #LFO_SHAPES) end }
-  add{ kind="btn", x=rx + (lw + 6), y=512, w=lw, h=36, small=true, label="on " .. (kn[tgt] or "?"), tap=function() self:send(key("target"), tgt % 4 + 1) end }
-  add{ kind="btn", x=rx + 2 * (lw + 6), y=512, w=lw, h=36, small=true, label="every " .. LFO_RATES[rate + 1], tap=function() self:send(key("rate"), (rate + 1) % #LFO_RATES) end }
-  add{ kind="hbar", x=rx + 3 * (lw + 6), y=512, w=lw, h=36, hook=key("depth"), lo=0, hi=1, label="depth", bold=true }
+  self:group(add, rx, 514, rw, 34)
+  add{ kind="btn", x=rx, y=514, w=lw, h=34, small=true, label="lfo " .. LFO_SHAPES[shape + 1], tap=function() self:send(key("shape"), (shape + 1) % #LFO_SHAPES) end }
+  add{ kind="btn", x=rx + (lw + 6), y=514, w=lw, h=34, small=true, label="on " .. (kn[tgt] or "?"), tap=function() self:send(key("target"), tgt % 4 + 1) end }
+  add{ kind="btn", x=rx + 2 * (lw + 6), y=514, w=lw, h=34, small=true, label="every " .. LFO_RATES[rate + 1], tap=function() self:send(key("rate"), (rate + 1) % #LFO_RATES) end }
+  add{ kind="hbar", x=rx + 3 * (lw + 6), y=514, w=lw, h=34, hook=key("depth"), lo=0, hi=1, label="depth", bold=true }
   if part == "chord" then
     local vo = math.floor(self.v["ockm-chord-voicing"] or 0)
     local cw = (rw - 24) / 5
     for i, nm in ipairs({ "close", "open", "wide" }) do
-      add{ kind="choice", x=rx + (i - 1) * (cw + 6), y=554, w=cw, h=36, label=nm, small=true, sel=(vo == i - 1), tap=function() self:send("ockm-chord-voicing", i - 1) end }
+      add{ kind="choice", x=rx + (i - 1) * (cw + 6), y=558, w=cw, h=34, label=nm, small=true, sel=(vo == i - 1), tap=function() self:send("ockm-chord-voicing", i - 1) end }
     end
-    add{ kind="hbar", x=rx + 3 * (cw + 6), y=554, w=2 * cw + 6, h=36, hook="ockm-chord-strum", lo=0, hi=1, label="strum", bold=true }
+    add{ kind="hbar", x=rx + 3 * (cw + 6), y=558, w=2 * cw + 6, h=34, hook="ockm-chord-strum", lo=0, hi=1, label="strum", bold=true }
   end
 end
 
@@ -1580,6 +1583,10 @@ function ui:check_roles()
   if self:mode() ~= 0 then
     self:send("ockm-leader", 0)
     self:send("ockm-lead-sync", 1)
+  end
+  -- the rhythm lock (on the kick, fill gaps) is gone: a part made for you goes back to its own rhythm
+  for _, p in ipairs({ "bass", "lead" }) do
+    if (self.v["ockm-"..p.."-lock"] or 0) ~= 0 and not self:part_yours(p) then self:send("ockm-"..p.."-lock", 0) end
   end
 end
 
@@ -1610,6 +1617,23 @@ function ui:score_prog(pi, src)
   end
   if weight == 0 then return nil end
   return total / weight
+end
+
+-- a group of controls that belong together sits on one panel (drawn first, so it's behind them)
+local GROUP_PAD = 3
+function ui:group(add, x, y, w, h)
+  add{ kind="group", x=x - GROUP_PAD, y=y - GROUP_PAD, w=w + 2 * GROUP_PAD, h=h + 2 * GROUP_PAD }
+end
+-- the master delay (amount, feedback, time) and reverb (amount, size), each on its own panel
+function ui:fx_groups(add, row, x, y, w, h)
+  local cw = (w - 3 * 6 - 14) / 5
+  local x2 = x + 3 * (cw + 6) + 8
+  self:group(add, x, y, 3 * cw + 12, h)
+  self:group(add, x2, y, 2 * cw + 6, h)
+  for i, m in ipairs(row) do
+    local cx = (i <= 3) and (x + (i - 1) * (cw + 6)) or (x2 + (i - 4) * (cw + 6))
+    add{ kind="hbar", x=cx, y=y, w=cw, h=h, hook=m[1], lo=m[2], hi=m[3], label=m[4], bold=true }
+  end
 end
 
 -- a stepper: back, the current choice (number, name, detail), forward
@@ -1794,8 +1818,9 @@ function ui:gen_controls(add, p, ix, cy, iw, k)
     end
     add{ kind="choice", x=ix, y=450, w=iw, h=34, label="smooth voicing", accent=true, small=true, sel=(self.v["ockm-chord-smooth"] or 1) > 0,
          tap=function() self:send("ockm-chord-smooth", ((self.v["ockm-chord-smooth"] or 1) > 0) and 0 or 1) end }
+    add{ kind="hbar", x=ix, y=494, w=iw, h=30, hook="ockm-chord-sidechain", lo=0, hi=1, label="sidechain from the kick", bold=true }
     if self:part_empty("chord") then
-      add{ kind="btn", x=ix, y=494, w=iw, h=40, accent=true, label=START.chord, tap=function() self:start_part("chord") end }
+      add{ kind="btn", x=ix, y=532, w=iw, h=34, accent=true, label=START.chord, tap=function() self:start_part("chord") end }
     end
     add{ kind="text", x=ix, y=548, w=iw, h=12, size=11,
          label="the progression, key and scale are on the song screen" }
@@ -1824,11 +1849,8 @@ function ui:gen_controls(add, p, ix, cy, iw, k)
       add{ kind="choice", x=ix + (i - 1) * (w3 + 6), y=400, w=w3, h=38, label=nm, small=true, sel=(fr == i - 1), tap=function() self:send("ockm-lead-freedom", i - 1) end }
     end
   end
-  local lkey = "ockm-"..p.."-lock"
-  for li, nm in ipairs({ "own rhythm", "on the kick", "fill gaps" }) do
-    add{ kind="choice", x=ix + (li - 1) * (w3 + 6), y=446, w=w3, h=30, label=nm, small=true,
-         sel=(math.floor(self.v[lkey] or 0) == li - 1), tap=function() self:send(lkey, li - 1) end }
-  end
+  -- sidechain: how far it dips each time the kick hits (the Perform pump does all the synths at once)
+  add{ kind="hbar", x=ix, y=446, w=iw, h=30, hook="ockm-"..p.."-sidechain", lo=0, hi=1, label="sidechain from the kick", bold=true }
   add{ kind="hbar", x=ix, y=482, w=iw, h=30, hook="ockm-"..p.."-density", lo=0, hi=2, label="density", bold=true }
   local skey = "ockm-"..p.."-seed"
   local seed = math.floor(self.v[skey] or 0)
@@ -2787,6 +2809,7 @@ function ui:draw(g, w)
   elseif k == "btn" then
     local lit = w.accent or (w.flash and self.flashing == w.flash and not w.off)
     self:col(g, lit and "acc" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
+    if w.edge and not lit then self:col(g, "acc"); g:stroke_rounded_rect(w.x + 1, w.y + 1, w.w - 2, w.h - 2, 6, 2) end
     self:ctext(g, w.label, w, w.small and 12 or 14, lit and "#ffffff" or ((w.quiet or w.off) and "mute" or "txt"))
   elseif k == "tab" then
     self:col(g, w.sel and "on" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
@@ -2900,6 +2923,9 @@ function ui:draw(g, w)
   elseif k == "locked" then
     self:col(g, "card"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
     self:ctext(g, w.label, w, 12, "mute")
+  elseif k == "group" then
+    self:col(g, "card"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 8)
+    self:col(g, "dim"); g:stroke_rounded_rect(w.x, w.y, w.w, w.h, 8, 1)
   elseif k == "onoff" then
     local hw = w.w / 2
     self:col(g, "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, w.h / 2)

@@ -1269,14 +1269,14 @@ def part_off_and_build_rise(work):
 @test
 def sidechain_pump_ducks_the_synths(work):
     """Held organ chords, a kick on every beat (muted, so only the chords are heard). Pump 1: the chords dip just after each kick
-    and swell back. Pump 0: they don't."""
+    and swell back. Pump 0: they don't. The chords' own sidechain (ockm-chord-sidechain 1) dips them too, with the pump off."""
     res = {}
-    for pump in (0, 1):
+    for pump in (0, 1, 2):     # 2: the pump off, but the chords' own sidechain all the way up
         h = Harness(); h.record(os.path.join(work, f"pump{pump}.wav"))
         mutes = " ; ".join(f"ockm-{t}-mute 1" for t in ["d1","d2","d3","d4","d5","d6","d7","d8","bass","lead"])
         h.at(100, f"ockm-bpm 120 ; ockm-length 16 ; ockm-verb-mix 0 ; ockm-delay-mix 0 ; ockm-swing 50 ; ockm-chord-engine 1 ; ockm-chord-mode 1 ; {mutes}")
         h.at(150, "ockm-pat-chord-on const 0 ; ockm-pat-chord-deg const 0 ; ockm-chord-edit 0 1 0 ; ockm-chord-k3 0 ; ockm-chord-k4 1")
-        h.at(170, "ockm-pat-d1 const 0 ; ockm-d1-sound 0 ; ockm-edit d1 0 2 ; ockm-edit d1 4 2 ; ockm-edit d1 8 2 ; ockm-edit d1 12 2 ; ockm-pump " + str(pump))
+        h.at(170, "ockm-pat-d1 const 0 ; ockm-d1-sound 0 ; ockm-edit d1 0 2 ; ockm-edit d1 4 2 ; ockm-edit d1 8 2 ; ockm-edit d1 12 2 ; ockm-pump " + str(min(pump, 1) if pump < 2 else 0) + " ; ockm-chord-sidechain " + str(1 if pump == 2 else 0))
         h.at(300, "ockm-play 1"); h.at(2400, "ockm-play 0")
         _, (x, sr) = play(work, h, f"t_pump{pump}", ms=2400)
         rms = lambda a, b: math.sqrt(sum(v * v for v in x[int(a * sr):int(b * sr)]) / max(1, int((b - a) * sr)))
@@ -1286,6 +1286,8 @@ def sidechain_pump_ducks_the_synths(work):
     d0, d1 = res[0][0] / res[0][1], res[1][0] / res[1][1]
     assert d0 > 0.85, f"no pump: the pads should hold steady ({d0:.2f})"
     assert d1 < 0.55, f"pump on: the pads should dip after the kick ({d1:.2f})"
+    d2 = res[2][0] / res[2][1]
+    assert d2 < 0.55, f"the chords' own sidechain should dip them after the kick ({d2:.2f})"
 
 @test
 def projects_new_open_saveas_list_delete(work):
@@ -1341,9 +1343,9 @@ def touchscreen_makes_and_opens_projects(work):
 
 @test
 def drum_grooves_fill_every_slot(work):
-    """A groove lands on each slot by the sound it plays, makes the drums 1 bar (a groove's natural length), sets the swing and moves a part locked to the kick."""
+    """A groove lands on each slot by the sound it plays, makes the drums 1 bar (a groove's natural length) and sets the swing."""
     h = Harness(); h.show("ockm-drum-len")
-    h.at(100, "ockm-resync bang ; ockm-length 32 ; ockm-bass-lock 1 ; ockm-bass-mode 0")
+    h.at(100, "ockm-resync bang ; ockm-length 32")
     h.at(150, "ockm-drum-groove 3")                              # tech house
     g = h.add("#X obj 10 300 r test-get;"); t = h.add("#X obj 10 325 t b b b b;")
     outs = []
@@ -1362,7 +1364,6 @@ def drum_grooves_fill_every_slot(work):
     assert printed(out, "ockm-drum-len")[-1] == "16", f"a groove makes the drums 1 bar: {printed(out, 'ockm-drum-len')}"
     assert rows["D4"][0][:16] == [1,1,0,1,1,1,0,1,1,1,0,1,1,1,0,1], f"slot 4 (hat) should get the hats: {rows['D4'][0]}"
     assert rows["D5"][0][:16] == [0,0,2,0,0,0,2,0,0,0,2,0,0,0,2,0], f"slot 5 (open hat) should get the open hats: {rows['D5'][0]}"
-    assert [1 if v else 0 for v in rows["BASS-ON"][0][:16]] == [1 if v else 0 for v in kick[:16]], f"bass locked to the kick should follow the new kick: {rows['BASS-ON'][0]}"
     assert "54" in [v.split()[0].split(".")[0] for v in printed(out, "SWING")], f"tech house should set swing 54: {printed(out, 'SWING')}"
     assert all(v == 0 for n in ("D1", "D4", "D5") for v in rows[n][1][:16]), "clear should empty every slot"
 

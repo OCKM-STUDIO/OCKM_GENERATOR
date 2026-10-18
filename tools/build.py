@@ -476,9 +476,9 @@ for nm,snd in SLOTS:
 for _t in [n for n,_ in SLOTS]+["bass","lead","chord"]:
     PROJECT_KEYS+=[(f"ockm-{_t}-{k}",v,None) for k,v in EQ_DEF.items()]
 LFO_DEF={"lfo-shape":0,"lfo-rate":4,"lfo-depth":0,"lfo-target":1,"chorus":0}   # sine, one bar, off, the first knob; chorus off
-SYNTH_DEFAULTS={"bass":dict(engine=5,mode=0,sync=1,walk=0,lock=0,density=1,seed=0,level=1,k1=0.42,k2=0.25,k3=0.45,k4=0.45,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
-                "lead":dict(engine=4,mode=0,sync=1,lock=0,density=1,seed=0,freedom=1,level=1,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
-                "chord":dict(engine=0,mode=0,level=1,k1=0.45,k2=0.5,k3=0.4,k4=0.3,type=0,smooth=1,verb=0,delay=0,rhythm=0,prog=0,voicing=0,strum=0,**LFO_DEF)}
+SYNTH_DEFAULTS={"bass":dict(engine=5,mode=0,sync=1,walk=0,sidechain=0,lock=0,density=1,seed=0,level=1,k1=0.42,k2=0.25,k3=0.45,k4=0.45,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
+                "lead":dict(engine=4,mode=0,sync=1,sidechain=0,lock=0,density=1,seed=0,freedom=1,level=1,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
+                "chord":dict(engine=0,mode=0,sidechain=0,level=1,k1=0.45,k2=0.5,k3=0.4,k4=0.3,type=0,smooth=1,verb=0,delay=0,rhythm=0,prog=0,voicing=0,strum=0,**LFO_DEF)}
 PATTERN_KEYS=[("ockm-end",0,None),("ockm-impact",0,None),("ockm-pump",0,None),("ockm-bass-on",1,None),("ockm-lead-on",1,None),("ockm-chord-on",1,None),("ockm-rise",0,None),("ockm-drum-len",16,None),("ockm-bass-len",64,None),("ockm-lead-len",64,None),("ockm-chord-len",64,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None),("ockm-leader",0,None),("ockm-drum-groove",-1,None),("ockm-fill-every",0,None),("ockm-fill-style",0,None),("ockm-drums-on",1,None),("ockm-turn-every",0,None)]
 for t,d in SYNTH_DEFAULTS.items():
     PATTERN_KEYS+=[(f"ockm-{t}-{k}",v,None) for k,v in d.items()]
@@ -593,12 +593,13 @@ for c in [(rdr,0,sdr,0),(sdr,0,don,0),(sdr,0,dclr,0),(sdr,1,dwait,0),(dwait,0,ds
 # transition sounds into the mix (and a little reverb)
 tfx=p.add("#X obj 400 1000 ockm-transfx;"); p.con(tfx,0,mix,0)
 tfs=p.add("#X obj 480 1030 *~ 0.35;"); p.con(tfx,0,tfs,0); p.con(tfs,0,p.add("#X obj 480 1055 throw~ ockm-revbus;"),0)
-# sidechain pump: each kick ducks the synths, by ockm-pump (0 off, 1 deep), and they swell back over an eighth note
+# sidechain (v0.74): each kick sends out an envelope (ockm-duck: up with the kick, back to 0 over an eighth note). Each synth
+# dips by it, by its own ockm-<part>-sidechain (0 off, 1 deep), or by the Perform pump (ockm-pump) when that's deeper
 rkh=p.add("#X obj 900 1000 r ockm-kick-hit;"); rpm=p.add("#X obj 1000 1000 r ockm-pump;")
-pmx=p.add(f"#X obj 900 1030 expr if(ockm_pumpv>0.001 \\, 1-0.75*ockm_pumpv*min({D}f1\\,1) \\, 1) \\; ockm_stepms*2;")
+pmx=p.add(f"#X obj 900 1030 expr min({D}f1\\,1) \\; ockm_stepms*2;")
 vpm=p.add("#X obj 1000 1025 v ockm_pumpv;"); p.con(rpm,0,vpm,0)
-pkp=p.add("#X obj 900 1060 pack f f;"); mpm=p.add(f"#X msg 900 1085 {D}1 4 \\, 1 {D}2 12;"); vlp=p.add("#X obj 900 1110 vline~;"); sdk=p.add("#X obj 900 1135 s~ ockm-duck;")
-lbd=p.add("#X obj 1100 1060 loadbang;"); one_d=p.add("#X msg 1100 1085 1;"); p.con(lbd,0,one_d,0); p.con(one_d,0,vlp,0)
+pkp=p.add("#X obj 900 1060 pack f f;"); mpm=p.add(f"#X msg 900 1085 {D}1 4 \\, 0 {D}2 12;"); vlp=p.add("#X obj 900 1110 vline~;"); sdk=p.add("#X obj 900 1135 s~ ockm-duck;")
+lbd=p.add("#X obj 1100 1060 loadbang;"); one_d=p.add("#X msg 1100 1085 0;"); p.con(lbd,0,one_d,0); p.con(one_d,0,vlp,0)
 for c in [(rkh,0,pmx,0),(pmx,1,pkp,1),(pmx,0,pkp,0),(pkp,0,mpm,0),(mpm,0,vlp,0),(vlp,0,sdk,0)]: p.con(*c)
 lbv=p.add("#X obj 820 1000 loadbang;"); onev=p.add("#X msg 820 1020 1;"); p.con(lbv,0,onev,0); p.con(onev,0,pvol,0)
 # the drums in or out of this pattern (ockm-drums-on): out stops every drum row
@@ -648,8 +649,8 @@ for r,(nm,seqo,voi) in enumerate(SYN):
     y=by+r*40
     p.add(f"#X text 20 {y+2} {nm};")
     sq=p.add(f"#X obj 110 {y} {seqo};"); vo=p.add(f"#X obj 560 {y} {voi};")
-    gt0=p.add(f"#X obj 660 {y} ockm-gate {nm} level;"); gdk=p.add(f"#X obj 660 {y+14} *~;"); p.con(gt0,0,gdk,0)
-    p.con(p.add(f"#X obj 740 {y+14} r~ ockm-duck;"),0,gdk,1)
+    gt0=p.add(f"#X obj 660 {y} ockm-gate {nm} level;"); p.con(gt0,0,(gdk:=p.add(f"#X obj 660 {y+14} expr~ {D}v1*(1 - {D}v2*max(0.9*{D}f3 \\, 0.75*ockm_pumpv));")),0)
+    p.con(p.add(f"#X obj 740 {y+14} r~ ockm-duck;"),0,gdk,1); p.con(p.add(f"#X obj 820 {y+14} r ockm-{nm}-sidechain;"),0,gdk,2)
     gt=p.add(f"#X obj 710 {y+14} ockm-eq {nm};"); p.con(gdk,0,gt,0)
     # a quarter step late, like the drums on time, so drum steps can be nudged early
     lq=p.add(f"#X obj 300 {y} pipe 0;"); p.con(gsp,0,lq,0); p.con(lq4,0,lq,1)

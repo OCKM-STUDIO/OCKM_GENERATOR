@@ -87,7 +87,8 @@ Tap a track's name on Perform A or the mixer to jump straight to it.
 - **On/off** (top right): the part in or out of this pattern, the same as its tile on the song screen
 - **Bass:** **riff** (which notes it plays inside each chord: root, octaves, root and fifth, acid riff and so on), **rhythm**, and **movement**: **pedal** (the riff stays on the key's home note while the chords move above it), **follows** (moves with each chord) or **walks** (follows, and the last notes of a bar step a semitone below the next chord's root, walking into the change)
 - **Lead:** **tune** (the shape of the line: root, arps, motifs and so on), **rhythm**, and **freedom**: **chord notes** (every note lands on the chord), **passing notes** (the notes on the beat do, the ones between can pass) or **free** (it just stays in key)
-- Bass and lead also have: **own rhythm | on the kick | fill gaps** (use the preset rhythm, play only where the kick plays, or only where it doesn't); **density** (left for fewer notes, right for more; the middle is the preset as written); **mutate** (a new variation of the same idea), **back** (the variation before, as many times as you like), **original**, and **make it for me**
+- Bass, lead and chords each have a **sidechain** slider: how far that part dips each time the kick hits (it swells back over an eighth note). The **pump** on Perform does all three at once
+- Bass and lead also have: **density** (left for fewer notes, right for more; the middle is the preset as written); **mutate** (a new variation of the same idea), **back** (the variation before, as many times as you like), **original**, and **make it for me**
 - **Chords:** **rhythm**, **colour** (triads, 7ths, 9ths or 11ths) and smooth voicing
 - **Sound** (bottom right): engine, its four knobs (named for the engine), drive, reverb and delay sends, level, and **chorus** (tap: off, I, II, I+II, like a Juno's buttons; off is exactly the dry sound. The juno lead engine also has its own chorus knob)
 - **Movement** (under the sound): an LFO on one of the four knobs. Tap the boxes to step through the shape (sine, triangle, square, saw, random), which knob it moves, and how often (from a 16th to 8 bars, in time with the loop); drag depth to set how far it swings. At depth 0 the knob is exactly where you set it. It's saved with the loop
@@ -307,7 +308,8 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 | `ockm-bass-rhythm`, `ockm-lead-rhythm` | Rhythm preset (bass 0 to 16, lead 0 to 13; each has its own list), and rebuild that track |
 | `ockm-bass-notes`, `ockm-lead-notes` | Note pattern, 0 to 11, and rebuild that track |
 | `ockm-bass-gen`, `ockm-lead-gen`, `ockm-chord-gen` | Rebuild that track with the current settings |
-| `ockm-bass-lock`, `ockm-lead-lock` | 0 own rhythm, 1 play on the kick, 2 fill the gaps between kicks |
+| `ockm-bass-lock`, `ockm-lead-lock` | Retired from the screen in v0.75 (0 own rhythm, 1 on the kick, 2 the gaps between kicks) |
+| `ockm-<synth>-sidechain` | How far bass, lead or chord dips on each kick, 0 to 1 |
 | `ockm-bass-density`, `ockm-lead-density` | 0 to 2: fewer to more notes, 1 is the preset as written |
 | `ockm-bass-seed`, `ockm-lead-seed` | Variation number: 0 is the original, anything else a mutation |
 | `ockm-bass-mode`, `ockm-lead-mode`, `ockm-chord-mode` | 0 auto (generated), 1 manual (your notes) |
