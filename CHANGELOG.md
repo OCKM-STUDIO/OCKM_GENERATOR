@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.00 (19 October 2026)
+
+Step 4 of the harmony and generator proposal: evolve.
+
+- **Evolve** (builder, under the phrase row): **off**, **gentle** or **lively**, and a tick for each part (drums, bass, lead, chords). At the start of every phrase one ticked part moves to a variation, in turn: the bass, then the lead, the chords, the drums, then round again. One change a phrase reads as arrangement, not a preset flipping
+- **It comes home.** Gentle plays A B A C A B A D for each part (every other change is the original), lively A B C D. A variation is a neighbour of the original: the bass and lead step their mutate seed, the chords move to the next of the style's chord rhythms, the drums to the next of its grooves (both need a style lit)
+- Parts that are yours are left alone, and evolve never touches engines, knobs or the progression
+- **keep** (Perform, beside mutes land, while evolve runs) makes what's playing the new original. Each part's tab says where it is: "evolving: variation B, home in about 4 phrases"
+- Saved with the loop (`ockm-evolve-every`, `ockm-evolve-mode`, `ockm-evolve-parts`); it uses the builder's phrase length and counts phrases from play, as the fills do
+
 ## v0.99 (19 October 2026)
 
 Step 3 of the harmony and generator proposal: rate and push, on the builder beside the progression.

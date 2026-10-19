@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.99"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v1.00"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -253,6 +253,7 @@ function ui:defaults()
   v["ockm-bass-mode"] = 0; v["ockm-lead-mode"] = 0; v["ockm-chord-mode"] = 0   -- 0 auto, 1 manual
   v["ockm-bass-sync"] = 1; v["ockm-lead-sync"] = 1; v["ockm-leader"] = 0; v["ockm-drum-groove"] = -1
   v["ockm-drum-len"] = 16; v["ockm-bass-len"] = 64; v["ockm-lead-len"] = 64; v["ockm-chord-len"] = 64
+  v["ockm-evolve-every"] = 0; v["ockm-evolve-mode"] = 1; v["ockm-evolve-parts"] = 15
   v["ockm-drum-loop"] = 0; v["ockm-fill-every"] = 0; v["ockm-fill-style"] = 0; v["ockm-swing"] = 56; v["ockm-accent"] = 0.3; v["ockm-sync"] = 0; v["ockm-volume"] = 1
   for _, p in ipairs({ "bass", "lead" }) do v["ockm-"..p.."-lock"] = 0; v["ockm-"..p.."-density"] = 1; v["ockm-"..p.."-seed"] = 0 end
   v["ockm-bpm"] = 124; v["ockm-len"] = 128; v["ockm-filter"] = 0; v["ockm-root"] = 9; v["ockm-scale"] = 0
@@ -296,7 +297,8 @@ function ui:hooks()
     for _, k in ipairs({ "lock", "density", "seed" }) do h[#h+1] = "ockm-"..p.."-"..k end
   end
   for _, k in ipairs({ "ockm-drum-len", "ockm-bass-len", "ockm-lead-len", "ockm-chord-len" }) do h[#h+1] = k end
-  for _, k in ipairs({ "ockm-drum-loop", "ockm-swing", "ockm-accent", "ockm-sync", "ockm-fill-every", "ockm-fill-style" }) do h[#h+1] = k end
+  for _, k in ipairs({ "ockm-drum-loop", "ockm-swing", "ockm-accent", "ockm-sync", "ockm-fill-every", "ockm-fill-style",
+                       "ockm-evolve-every", "ockm-evolve-mode", "ockm-evolve-parts" }) do h[#h+1] = k end
   for _, k in ipairs({ "ockm-drums-on", "ockm-turn-every", "ockm-bass-walk", "ockm-lead-outside", "ockm-bass-sidechain", "ockm-lead-sidechain", "ockm-chord-sidechain",
                          "ockm-style", "ockm-bass-half", "ockm-lead-half", "ockm-chord-half",
                          "ockm-bass-scshape", "ockm-lead-scshape", "ockm-chord-scshape", "ockm-drum-punch" }) do h[#h+1] = k end
@@ -329,6 +331,7 @@ function ui:postinitialize()
   listen("ockm-playing", function(o, sel, a)
     o.playing = tonumber(a[1]) or 0
     if o.playing == 0 and o.macro and o.macro.run then o:macro_finish() end   -- stopped: a running recipe lets go at once
+    if o.playing ~= 0 and o.evo then o.evo.bar = 0 end   -- evolve counts phrases from play, as the fills do
     o:dirty()
   end)
   for _, t in ipairs(TRACKS) do listen("ockm-"..t.."-mute", function(o) if o.mpend then o.mpend[t] = nil end end) end
@@ -1027,7 +1030,12 @@ function ui:layout_live(add)
   -- mutes: when they land
   add{ kind="text", x=24, y=89, w=90, h=12, label="mutes land", size=11 }
   local q = math.floor(self.v["ockm-mute-quant"] or 0)
-  local qw = (458 - 116 - 12) / 3
+  local evo_on = math.floor(self.v["ockm-evolve-every"] or 0) > 0
+  local qr = evo_on and (458 - 70) or 458   -- v1.00: keep (evolve's new original) takes the end of the row while evolve runs
+  local qw = (qr - 116 - 12) / 3
+  if evo_on then
+    add{ kind="btn", x=458 - 64, y=80, w=64, h=34, small=true, accent=true, label="keep", tap=function() self:evo_keep() end }
+  end
   for i, o in ipairs(QUANT) do
     add{ kind="choice", x=116 + (i - 1) * (qw + 6), y=80, w=qw, h=34, label=o[2], small=true, sel=(q == o[1]),
          tap=function() self.v["ockm-mute-quant"] = o[1]; pd.send("ockm-mute-quant", "float", { o[1] }) end }
@@ -1327,6 +1335,7 @@ function ui:macro_end()
   for tr, x in pairs(mc.saved.mutes) do if self:mute_target(tr) ~= x then self:qmute(tr, x) end end
 end
 function ui:on_bar()
+  self:evo_bar()
   local mc = self.macro
   if not (mc and mc.run) then return end
   if mc.ending then
@@ -1833,6 +1842,7 @@ function ui:layout_synth(add)
   else
     local info = self.msg or (yours and ("yours: " .. self:step_info()) or ((part == "chord") and "plays the harmony from the builder. Edit a step and it becomes yours"
       or "made for you: follows the harmony. Edit a step and it becomes yours"))
+    if not self.msg and not yours then info = self:evo_status(part) or info end
     add{ kind="text", x=16, y=276, w=HTX - 32, h=12, label=info, size=11, col=self.msg and "acc" or nil }
     if mono then
       add{ kind="choice", x=W - 16 - 110 - 6 - 86, y=266, w=86, h=34, label="slide", accent=true, small=true, sel=self:mono_get(self.sel_step, "slide") > 0,
@@ -2130,13 +2140,112 @@ local STYLES = {
     chord=false,
     lead={ engine={ 4, 5 }, rhythm={ 12, 1 }, notes={ 11, 3 }, outside=0.8, delay=0.3 } },
 }
+-- ------------------------------------------------------------------ evolve (v1.00)
+-- An ongoing mutate. At the start of every phrase one ticked part steps to a variation, in turn: bass, lead, chords,
+-- drums. Each part comes home: gentle plays A B A C A B A D (every other change is the original), lively A B C D. A
+-- variation is a neighbour of the original: the bass and lead mutate seed, the chords' rhythm and the drums' groove move
+-- to the next choice in the lit style's lists. Parts that are yours are never touched, nor are engines, knobs or the
+-- progression. keep makes what's playing the new original; the part tabs say where each part is
+local EVO_ORDER = { { "bass", 2 }, { "lead", 4 }, { "chord", 8 }, { "drum", 1 } }
+local EVO_SEQ = { { 1, 0, 2, 0, 1, 0, 3, 0 }, { 1, 2, 3, 0 } }   -- gentle, lively: the offsets from home, in turn
+local EVO_NAMES = { [0] = "A (home)", "B", "C", "D" }
+-- the part's value now, and how to set it: seed (bass, lead), chord rhythm or groove (from the style's own lists)
+function ui:evo_value(p)
+  if p == "bass" or p == "lead" then return math.floor(self.v["ockm-"..p.."-seed"] or 0) end
+  if p == "chord" then return math.floor(self.v["ockm-chord-rhythm"] or 0) end
+  return math.floor(self.v["ockm-drum-groove"] or -1)
+end
+function ui:evo_choices(p)
+  local st = STYLES[math.floor(self.v["ockm-style"] or -1) + 1]
+  if not st then return nil end
+  local l = (p == "chord") and (st.chord and st.chord.rhythm) or (p == "drum") and st.groove or nil
+  if type(l) ~= "table" or #l < 2 then return nil end
+  return l
+end
+function ui:evo_can(p)
+  if p == "drum" then return (self.v["ockm-drums-on"] or 1) > 0 and self:evo_value("drum") >= 0 and self:evo_choices("drum") ~= nil end
+  if (self.v["ockm-"..p.."-on"] or 1) == 0 or self:part_yours(p) then return false end
+  if p == "chord" then return self:evo_choices("chord") ~= nil end
+  return true
+end
+function ui:evo_set(p, off)
+  local e = self.evo
+  local home = e.home[p]
+  if home == nil then return end
+  if p == "bass" or p == "lead" then
+    self:send("ockm-"..p.."-seed", home + off)
+  else
+    local l = self:evo_choices(p)
+    if not l then return end
+    local pos = 1
+    for i, x in ipairs(l) do if x == home then pos = i end end
+    local val = l[((pos - 1 + off) % #l) + 1]
+    if p == "chord" then self:send("ockm-chord-rhythm", val) else self:send("ockm-drum-groove", val) end
+  end
+  e.off[p] = off
+end
+-- start (or restart) from what's playing now: that's home
+function ui:evo_reset()
+  self.evo = { home = {}, off = {}, k = {}, turn = 0, bar = 0 }
+  for _, o in ipairs(EVO_ORDER) do self.evo.home[o[1]] = self:evo_value(o[1]); self.evo.off[o[1]] = 0; self.evo.k[o[1]] = 0 end
+end
+function ui:evo_bar()
+  local n = math.floor(self.v["ockm-evolve-every"] or 0)
+  if n <= 0 or self.playing == 0 then return end
+  if not self.evo then self:evo_reset() end
+  local e = self.evo
+  e.bar = e.bar + 1
+  if e.bar <= 1 or (e.bar - 1) % n ~= 0 then return end   -- bar 1 is where play started: phrases start at 1, 1+n, 1+2n
+  local mask = math.floor(self.v["ockm-evolve-parts"] or 15)
+  local live = {}
+  for _, o in ipairs(EVO_ORDER) do
+    if math.floor(mask / o[2]) % 2 == 1 and self:evo_can(o[1]) then live[#live + 1] = o[1] end
+  end
+  if #live == 0 then return end
+  local p = live[(e.turn % #live) + 1]
+  e.turn = e.turn + 1
+  -- a part that moved by hand since its last turn starts again from where it is now
+  local expect = e.home[p]
+  if p == "bass" or p == "lead" then expect = (e.home[p] or 0) + (e.off[p] or 0) end
+  if e.home[p] == nil or (p ~= "chord" and p ~= "drum" and self:evo_value(p) ~= expect) then
+    e.home[p] = self:evo_value(p); e.off[p] = 0; e.k[p] = 0
+  end
+  local seq = EVO_SEQ[math.floor(self.v["ockm-evolve-mode"] or 1)] or EVO_SEQ[1]
+  e.k[p] = (e.k[p] or 0) + 1
+  self:evo_set(p, seq[((e.k[p] - 1) % #seq) + 1])
+  self:dirty()
+end
+-- keep: what's playing becomes the new original for every part
+function ui:evo_keep()
+  self:evo_reset()
+  self:say("kept: this is the new original")
+end
+-- where a part is, for its tab: "variation B, home in 2 phrases"
+function ui:evo_status(p)
+  local e = self.evo
+  if not e or math.floor(self.v["ockm-evolve-every"] or 0) == 0 then return nil end
+  local off = e.off[p] or 0
+  local seq = EVO_SEQ[math.floor(self.v["ockm-evolve-mode"] or 1)] or EVO_SEQ[1]
+  local mask = math.floor(self.v["ockm-evolve-parts"] or 15)
+  local nlive = 0
+  for _, o in ipairs(EVO_ORDER) do if math.floor(mask / o[2]) % 2 == 1 and self:evo_can(o[1]) then nlive = nlive + 1 end end
+  if nlive == 0 then return nil end
+  if off == 0 then return "evolving: variation A, the original" end
+  local turns = 0
+  for j = 1, #seq do turns = j; if seq[((e.k[p] or 0) + j - 1) % #seq + 1] == 0 then break end end
+  local ph = turns * nlive
+  return "evolving: variation " .. (EVO_NAMES[off] or "?") .. ", home in about " .. ph .. (ph == 1 and " phrase" or " phrases")
+end
+
 -- the phrase (v0.85): one length, set on the builder, for everything that happens at the end of a phrase. The engine still
 -- counts with ockm-fill-every (the drum fill) and ockm-turn-every (the turnaround); the phrase sets both, and each part's
 -- switch decides whether it does its thing. Both count bars from play, on the same counter
 function ui:phrase()
   local f, t = math.floor(self.v["ockm-fill-every"] or 0), math.floor(self.v["ockm-turn-every"] or 0)
+  local e = math.floor(self.v["ockm-evolve-every"] or 0)
   if f > 0 then return f end
   if t > 0 then return t end
+  if e > 0 then return e end
   return 0
 end
 function ui:set_phrase(n)
@@ -2145,6 +2254,7 @@ function ui:set_phrase(n)
   if self:phrase() == 0 then fill_on = true; turn_on = self.turn_wanted or false end   -- from off: fills on, the turnaround as you left it
   self:send("ockm-fill-every", (n > 0 and fill_on) and n or 0)
   self:send("ockm-turn-every", (n > 0 and turn_on) and n or 0)
+  if (self.v["ockm-evolve-every"] or 0) > 0 or (n == 0) then self:send("ockm-evolve-every", n) end
   self.last_phrase = (n > 0) and n or self.last_phrase
 end
 -- switch one end-of-phrase move on or off (the phrase comes on at its last length if it was off)
@@ -2251,14 +2361,36 @@ function ui:layout_compose(add)
   end
   local nb = math.min(#bars, 8)
   local key = NOTES[(math.floor(self.v["ockm-root"] or 9) % 12) + 1] .. " " .. SCALE_NAMES[(self.v["ockm-scale"] or 0) + 1]
-  add{ kind="text", x=16, y=426, w=W - 32, h=12, size=10,
+  -- v1.00 evolve: off, gentle, lively, and which parts it moves
+  local ev = math.floor(self.v["ockm-evolve-every"] or 0)
+  local em = math.floor(self.v["ockm-evolve-mode"] or 1)
+  local mask = math.floor(self.v["ockm-evolve-parts"] or 15)
+  add{ kind="text", x=16, y=433, w=60, h=12, label="evolve", size=10 }
+  for i, o in ipairs({ { 0, "off" }, { 1, "gentle" }, { 2, "lively" } }) do
+    local sel = (o[1] == 0 and ev == 0) or (o[1] > 0 and ev > 0 and em == o[1])
+    add{ kind="choice", x=70 + (i - 1) * 84, y=424, w=80, h=28, small=true, sel=sel, label=o[2], tap=function()
+      if o[1] == 0 then self:send("ockm-evolve-every", 0) else
+        local n = self:phrase(); if n == 0 then n = self.last_phrase or 8; self:set_phrase(n) end
+        self:send("ockm-evolve-mode", o[1]); self:send("ockm-evolve-every", n); self.evo = nil
+      end
+    end }
+  end
+  for i, o in ipairs({ { "drums", 1 }, { "bass", 2 }, { "lead", 4 }, { "chords", 8 } }) do
+    local on = math.floor(mask / o[2]) % 2 == 1
+    add{ kind="choice", x=330 + (i - 1) * 76, y=424, w=72, h=28, small=true, accent=true, sel=on and ev > 0, label=o[1],
+         tap=function() self:send("ockm-evolve-parts", on and (mask - o[2]) or (mask + o[2])) end }
+  end
+  add{ kind="text", x=640, y=433, w=W - 656, h=12, size=9,
+       label=(ev > 0) and ("one part a phrase, in turn; " .. ((em == 2) and "home every fourth" or "home every other") .. ". Yours are left alone")
+             or "every phrase, one part moves to a variation and comes back" }
+  add{ kind="text", x=16, y=458, w=W - 32, h=12, size=10,
        label="the map, bar by bar (" .. key .. ")" .. ((te > 0) and ("   turnaround: the last bar of every " .. te .. " goes to " .. self:chord_name(4, true)) or "") }
   local playing_bar = (self.playing ~= 0) and (math.floor((self.step or 0) % math.max(16, nb * 16) / 16) + 1) or nil
   local bw = (W - 32 - (nb - 1) * 6) / nb
   for i = 1, nb do
     local names, romans = {}, {}
     for _, c in ipairs(bars[i]) do names[#names + 1] = c.name; romans[#romans + 1] = c.roman end
-    add{ kind="bar", x=16 + (i - 1) * (bw + 6), y=440, w=bw, h=146, n=i, label=table.concat(names, "  "), sub=table.concat(romans, " "),
+    add{ kind="bar", x=16 + (i - 1) * (bw + 6), y=472, w=bw, h=114, n=i, label=table.concat(names, "  "), sub=table.concat(romans, " "),
          now=(playing_bar == i) }
   end
 end
@@ -2364,6 +2496,7 @@ function ui:apply_style(i, classic)
     end
   end
   self:send("ockm-style", i - 1)
+  self.evo = nil   -- evolve starts again from this take
   local key = NOTES[root + 1] .. " " .. SCALE_NAMES[scale + 1]
   self:say_undo(st[1] .. (classic and " (classic): " or ": ") .. key .. ", " .. ((PROGS[prog + 1] or { "" })[1]) .. ", " .. table.concat(said, " / "))
 end

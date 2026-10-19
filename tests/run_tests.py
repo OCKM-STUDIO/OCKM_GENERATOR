@@ -1781,6 +1781,38 @@ def retired_engines_move_on_and_engines_load_their_sweet_spot(work):
     assert "pluck" not in names and "reese" not in names, "pluck is retired; reese shows as wide"
 
 @test
+def evolve_moves_one_part_a_phrase_and_comes_home(work):
+    """v1.00 evolve, gentle, on deep house (phrase 8 bars). From play, phrases start at bars 9, 17, 25, 33, 41. One part moves
+    each phrase, in turn: the bass to its next variation (seed + 1), then the lead, then the chords (the next of the style's
+    chord rhythms), then the drums (the next of its grooves); then the bass again, which comes home (gentle: A B A C...)."""
+    sys.path.insert(0, os.path.join(ROOT, "tests"))
+    import ui_preview
+    if not ui_preview.LUA:
+        raise Skip("no lua to run the screen")
+    BAR = "send ockm-bar bang"
+    script = ["test tap 477 36", "test tap 83 142", "send ockm-lead-on float 1", "test tap 190 438", "send ockm-playing float 1", "mark start"]
+    for b in range(1, 42):
+        script += [BAR, f"mark bar{b}"]
+    L = ui_preview.run(script)
+    def sent_between(a, b, hook):
+        i, j = L.index("mark " + a), L.index("mark " + b)
+        return [float(l.split()[3]) for l in L[i:j] if l.startswith("sent " + hook + " ")]
+    def last_before(mark, hook):
+        v = [float(l.split()[3]) for l in L[:L.index("mark " + mark)] if l.startswith("sent " + hook + " ")]
+        return v[-1] if v else None
+    seed0 = last_before("start", "ockm-bass-seed"); lead0 = last_before("start", "ockm-lead-seed") or 0   # deep house has no lead: we switch it on
+    rhy0 = last_before("start", "ockm-chord-rhythm"); gr0 = last_before("start", "ockm-drum-groove")
+    assert "sent ockm-evolve-every float 8" in L and last_before("start", "ockm-evolve-mode") == 1, "gentle, on an 8-bar phrase"
+    assert not [l for l in L[L.index("mark start"):L.index("mark bar8")] if l.startswith("sent ockm-") and "seed" in l], "nothing moves in the first phrase"
+    assert sent_between("bar8", "bar9", "ockm-bass-seed") == [seed0 + 1], "phrase 2: the bass moves to its next variation"
+    assert sent_between("bar16", "bar17", "ockm-lead-seed") == [lead0 + 1], "phrase 3: the lead"
+    r = sent_between("bar24", "bar25", "ockm-chord-rhythm")
+    assert len(r) == 1 and r[0] != rhy0, f"phrase 4: the chords move to another of the style's rhythms: {r} (was {rhy0})"
+    g = sent_between("bar32", "bar33", "ockm-drum-groove")
+    assert len(g) == 1 and g[0] != gr0, f"phrase 5: the drums move to another of the style's grooves: {g} (was {gr0})"
+    assert sent_between("bar40", "bar41", "ockm-bass-seed") == [seed0], "phrase 6: the bass comes home"
+
+@test
 def refit_my_line_when_the_harmony_moves(work):
     """A lead that's yours, all on A over A minor. The harmony changes to E minor under it: the lead tab says the notes no
     longer fit, and refit moves each one to the nearest chord note (G), keeping the rhythm."""

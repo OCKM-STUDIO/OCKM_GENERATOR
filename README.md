@@ -535,6 +535,8 @@ Audio is recorded as it plays, so you hear the export; the effects get 2.5 secon
 
 **Chord rhythms**, simplest first: 1 bar pads, 2 two beat, 3 offbeat, 4 dub stabs, 5 house organ, 6 tresillo (3-3-2), 7 syncopated, 8 garage skip (2 bars), 9 call and answer (2 bars), 10 eighths
 
+**Evolve** (v1.00, on the builder under the phrase row): off, gentle or lively, plus a tick per part. At the start of each phrase one ticked part moves to a variation, in turn (bass, lead, chords, drums), and comes home: gentle plays A B A C A B A D, lively A B C D. The bass and lead step their mutate seed; the chords and drums step through the lit style's chord rhythms and grooves. Parts that are yours, engines, knobs and the progression are never touched. **keep** on Perform makes what's playing the new original; each part's tab shows its variation and when it's due home. Hooks: `ockm-evolve-every` (bars, 0 off), `ockm-evolve-mode` (1 gentle, 2 lively), `ockm-evolve-parts` (1 drums + 2 bass + 4 lead + 8 chords).
+
 **Rate and push** (v0.99, on the builder beside the progression): **rate** sets how long each chord lasts, half a bar, a bar (the table below) or two bars, so every progression comes at three speeds. **Push** lands every chord change an eighth early; a chord hit that fell on the change moves to just before the 1 and holds over it, and the bass follows. Both are saved with the loop (`ockm-chord-rate` 0, 1, 2; `ockm-chord-push` 0, 1) and set by styles.
 
 **Progressions**, simplest first (chords in the minor key, they follow whatever key and scale you pick):
