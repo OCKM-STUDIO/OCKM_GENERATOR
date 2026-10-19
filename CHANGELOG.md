@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.93 (19 October 2026)
+
+- **Performance recipes: mutes and effects together, with one finger.** A recipe can now have a length. **Breakdown** (new, on slot C) takes the drums out, sweeps the filter down over a bar, and brings up the reverb and delay. Tap it and it runs for 4 bars, then the drums and the effects all come back together on the 1. Or hold it as long as you like: let go and it drops on the next bar. Tap it again while it runs to drop early. Its mutes always land on the bar, whatever the live screen's mute setting. Set any recipe's length in settings, macros (no length, 1, 2, 4 or 8 bars)
+- If your saved macros still have **lift**, it becomes breakdown
+- **A starting mix like a real one:** kick 100, snare and clap 75, hats 50 to 55, percussion 60 to 65, bass 85, lead 70, chords 65. Every fader now goes to 150, so there's room to push things up. Styles set this mix too (undo puts yours back)
+
 ## v0.92 (19 October 2026)
 
 - **A fatter, more real piano.** The piano engine is rebuilt as a struck string: ten partials, each a touch sharp the way a stiff string's overtones are, the first four doubled by a second string 3 cents up so they beat. Harder hits put more into the upper partials, and the higher partials die sooner, so each note starts bright and mellows. Plus a hammer knock. About twice the energy in the body (150 to 1000 Hz) with the same top end. The knobs do the same jobs: brightness, octave (the even partials), snap, length (now up to 4 seconds)

@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.92"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.93"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -157,12 +157,12 @@ local LFO_RATES = { "1/16", "1/8", "beat", "1/2 bar", "bar", "2 bars", "4 bars",
 
 -- every drum slot setting the screen listens to; the sliders shown depend on synth or sample
 local DRUM_PARAMS = {
-  { "level", 0, 1 }, { "tune", -12, 12 }, { "decay", 10, 400 }, { "verb", 0, 1, "reverb" }, { "delay", 0, 1 },
+  { "level", 0, 1.5 }, { "tune", -12, 12 }, { "decay", 10, 400 }, { "verb", 0, 1, "reverb" }, { "delay", 0, 1 },
   { "tone", -1, 1 }, { "drive", 0, 1 }, { "start", 0, 1 }, { "synth", 0, 2 },
   { "labchar", -1, 1 }, { "labmorph", 0, 1 }, { "labrseed", 0, 99999 }, { "labramt", 0, 1 }, { "labpseed", 0, 99999 },
 }
-local SYNTH_SLIDERS  = { { "level", 0, 1 }, { "tune", -12, 12 }, { "decay", 10, 400 }, { "tone", -1, 1 }, { "drive", 0, 1 } }
-local SAMPLE_SLIDERS = { { "level", 0, 1 }, { "tune", -12, 12, "pitch" }, { "decay", 10, 100, "length" }, { "tone", -1, 1 }, { "start", 0, 1 } }
+local SYNTH_SLIDERS  = { { "level", 0, 1.5 }, { "tune", -12, 12 }, { "decay", 10, 400 }, { "tone", -1, 1 }, { "drive", 0, 1 } }
+local SAMPLE_SLIDERS = { { "level", 0, 1.5 }, { "tune", -12, 12, "pitch" }, { "decay", 10, 100, "length" }, { "tone", -1, 1 }, { "start", 0, 1 } }
 -- the built-in sounds are the drum lab's. Each drum has one; the perc slots choose rim, conga or shaker (ockm-<slot>-synth 0-2)
 local LAB_SOUND = { [0] = "kick", [1] = "snare", [2] = "clap", [4] = "closed hat", [5] = "open hat", [6] = "tom" }
 local LAB_PERC = { [3] = { "rim", "conga", "shaker" }, [7] = { "conga", "shaker", "rim" } }
@@ -213,12 +213,16 @@ function ui:initialize(sel, atoms)
   return true
 end
 
+-- v0.93: the starting mix, like a real one: kick loudest, hats and percussion tucked in, room above on every fader (to 1.5)
+local MIX_DRUM = { [0] = 1.0, [1] = 0.75, [2] = 0.75, [3] = 0.6, [4] = 0.55, [5] = 0.5, [6] = 0.65, [7] = 0.6 }   -- by sound
+local MIX_SYNTH = { bass = 0.85, lead = 0.7, chord = 0.65 }
+local LEVEL_MAX = 1.5
 function ui:defaults()
   local v = self.v
   v["ockm-chord-smooth"] = 1
   v["ockm-volume"] = 1; v["ockm-verb-mix"] = 0.3; v["ockm-delay-mix"] = 0.5
   v["ockm-drive"] = 0; v["ockm-delay-fb"] = 0.4; v["ockm-delay-steps"] = 3; v["ockm-verb-size"] = 0.6; v["ockm-verb-tone"] = 0.5
-  for _, t in ipairs(SYNTHS) do v["ockm-"..t.."-level"] = 1 end
+  for _, t in ipairs(SYNTHS) do v["ockm-"..t.."-level"] = MIX_SYNTH[t] end
   for _, t in ipairs(TRACKS) do
     v["ockm-"..t.."-lowcut"] = 20; v["ockm-"..t.."-eqlow"] = 0; v["ockm-"..t.."-eqmid"] = 0; v["ockm-"..t.."-eqmidf"] = 400; v["ockm-"..t.."-eqhigh"] = 0
   end
@@ -234,7 +238,7 @@ function ui:defaults()
   v["ockm-bpm"] = 124; v["ockm-len"] = 128; v["ockm-filter"] = 0; v["ockm-root"] = 9; v["ockm-scale"] = 0
   for i, nm in ipairs(SLOTS) do
     v["ockm-"..nm.."-sound"] = ({0,1,2,4,5,7,3,6})[i]
-    v["ockm-"..nm.."-level"] = 1; v["ockm-"..nm.."-tune"] = 0; v["ockm-"..nm.."-decay"] = 100
+    v["ockm-"..nm.."-level"] = MIX_DRUM[v["ockm-"..nm.."-sound"]] or 0.7; v["ockm-"..nm.."-tune"] = 0; v["ockm-"..nm.."-decay"] = 100
     v["ockm-"..nm.."-verb"] = 0; v["ockm-"..nm.."-delay"] = 0; v["ockm-"..nm.."-sample"] = 0; v["ockm-"..nm.."-synth"] = 0
     v["ockm-"..nm.."-tone"] = 0; v["ockm-"..nm.."-drive"] = 0; v["ockm-"..nm.."-start"] = 0
     v["ockm-"..nm.."-labchar"] = 0; v["ockm-"..nm.."-labmorph"] = 0; v["ockm-"..nm.."-labrseed"] = 0; v["ockm-"..nm.."-labramt"] = 0; v["ockm-"..nm.."-labpseed"] = 1
@@ -292,7 +296,11 @@ function ui:postinitialize()
     listen(hook, set)
     listen("ockm-show-" .. hook:sub(6), set)
   end
-  listen("ockm-playing", function(o, sel, a) o.playing = tonumber(a[1]) or 0; o:dirty() end)
+  listen("ockm-playing", function(o, sel, a)
+    o.playing = tonumber(a[1]) or 0
+    if o.playing == 0 and o.macro and o.macro.run then o:macro_finish() end   -- stopped: a running recipe lets go at once
+    o:dirty()
+  end)
   for _, t in ipairs(TRACKS) do listen("ockm-"..t.."-mute", function(o) if o.mpend then o.mpend[t] = nil end end) end
   listen("ockm-project-name", function(o, sel, a) o.project = tostring(a[1] or "default"); o:dirty() end)
   listen("ockm-project-list-start", function(o) o.incoming = {} end)
@@ -367,6 +375,7 @@ function ui:postinitialize()
     local n = tonumber(a[1]); if n and (o.playing ~= 0) and n ~= o.cur then o.want = n end; o:dirty() end)
   listen("ockm-page",    function(o, sel, a) o.page = math.floor(tonumber(a[1]) or 0); o:dirty() end)
   listen("ockm-step",    function(o, sel, a) o:on_step(math.floor(tonumber(a[1]) or 0)) end)
+  listen("ockm-bar",     function(o, sel, a) o:on_bar() end)
   for _, n in ipairs({ "ockm-refresh","ockm-edit","ockm-extend","ockm-bass-edit","ockm-lead-edit","ockm-chord-edit",
                        "ockm-bass-gen","ockm-lead-gen","ockm-chord-gen","ockm-drums-changed" }) do
     listen(n, function(o) o:dirty() end)
@@ -574,6 +583,7 @@ end
 function ui:redraw() self.frame_due = nil; self:repaint() end
 
 function ui:on_step(n)
+  if self.macro then self.macro.held = (self.macro.held or 0) + 1 end
   local old = math.floor(self.step / 16)
   self.step = n
   if math.floor(n / 16) ~= old then self:repaint() else self:repaint(2) end
@@ -953,7 +963,7 @@ local QUANT = { { 0, "now" }, { 1, "next beat" }, { 2, "next bar" } }
 -- ask for a mute: the engine applies it now or holds it for the beat or bar. The tile shows it waiting
 function ui:qmute(t, val)
   self.mpend = self.mpend or {}
-  local now = (self.playing == 0) or ((self.v["ockm-mute-quant"] or 0) == 0)
+  local now = (self.playing == 0) or ((self.v["ockm-mute-quant"] or 0) == 0 and not self.mute_bar)
   if not now and (self.v["ockm-"..t.."-mute"] or 0) ~= val then self.mpend[t] = val end
   psend("ockm-"..t.."-mute-q", "float", { val })
 end
@@ -1049,7 +1059,7 @@ function ui:layout_live(add)
     local x = mx + (i - 1) * (w3 + 6)
     local lit = self.macro and self.macro.slot == i
     add{ kind="hold", x=x, y=426, w=w3, h=156, label=(rc and #rc.moves > 0) and rc.name or "empty",
-         sub=(lit and self.macro.latched) and "tap to let go" or ("slot " .. string.char(64 + i)),
+         sub=self:macro_sub(i) or ((rc and (rc.bars or 0) > 0) and ("tap: " .. rc.bars .. " bars, or hold") or ("slot " .. string.char(64 + i))),
          on=lit, down=function() self:macro_down(i) end, up=function() self:macro_up(i) end }
     add{ kind="btn", x=x + w3 - 40, y=432, w=34, h=30, small=true, quiet=true, label="v", tap=function() self.pick_slot = i; self.sheet = "slotpick" end }
   end
@@ -1074,7 +1084,9 @@ local TARGETS = {
 local TARGET = {}; for _, t in ipairs(TARGETS) do TARGET[t.id] = t end
 local HOW = { { "jump", 0 }, { "1 beat", 4 }, { "1 bar", 16 }, { "2 bars", 32 }, { "4 bars", 64 } }   -- in steps
 local BACK = { "snap back", "glide back", "stay" }
-local MACRO_NAMES = { "build", "wash", "strip", "sink", "dub out", "lift", "blur", "freeze", "smash", "swell", "haze",
+-- v0.93: a recipe can run for a length: a tap plays it for that many bars, then everything comes back on the 1
+local RUN_BARS = { 0, 1, 2, 4, 8 }
+local MACRO_NAMES = { "build", "wash", "breakdown", "strip", "sink", "dub out", "lift", "blur", "freeze", "smash", "swell", "haze",
                       "tunnel", "pressure", "drop out", "air", "grit" }
 local function default_settings()
   return {
@@ -1088,9 +1100,12 @@ local function default_settings()
       { name = "sink", moves = { { t = "filter", v = -0.85, how = 3, back = 1 }, { t = "drive", v = 0.7, how = 3, back = 1 } } },
       { name = "dub out", moves = { { t = "throw", v = 1, how = 1, back = 1 }, { t = "feedback", v = 0.85, how = 1, back = 3 },
                                     { t = "delay", v = 0.8, how = 1, back = 3 } } },
-      { name = "lift", moves = { { t = "filter", v = 0.35, how = 3, back = 2 }, { t = "size", v = 0.95, how = 1, back = 2 } } },
+      -- v0.93: a performance recipe. Mutes and effects together: tap and it runs for 4 bars, then the drums and the
+      -- effects all come back on the 1; or hold it as long as you like and it drops on the next bar after you let go
+      { name = "breakdown", bars = 4, moves = { { t = "mutes", v = 3, how = 1, back = 1 }, { t = "filter", v = -0.6, how = 3, back = 1 },
+                                               { t = "reverb", v = 0.55, how = 2, back = 1 }, { t = "delay", v = 0.45, how = 2, back = 1 } } },
     },
-    slots = { 1, 2, 3 },
+    slots = { 1, 2, 6 },
     new = { drum = 16, synth = 64, lead = 1 },
     device = { theme = "dark", snap = 1, mutes = 0 },
   }
@@ -1128,6 +1143,13 @@ function ui:load_settings()
     end
   end
   self.me = d
+  local has = false
+  for _, r in ipairs(d.macros) do if r.name == "breakdown" then has = true end end
+  if not has then
+    for i, r in ipairs(d.macros) do
+      if r.name == "lift" then d.macros[i] = default_settings().macros[6]; break end
+    end
+  end
   local dev = d.device
   self.theme = THEMES[dev.theme] or self.theme
   SPRING_MS = SNAP_MS[dev.snap] or 50
@@ -1190,10 +1212,16 @@ local function keep_for(kind, kicks)
 end
 function ui:macro_down(slot)
   local mc = self.macro
+  if mc and mc.slot == slot and mc.run then   -- a recipe that's running: tap again to bring it back on the next bar
+    if not mc.ending then self:macro_end() end
+    return
+  end
   if mc and mc.slot == slot and mc.latched then self:macro_finish(); return end   -- a macro that stayed: tap again to let it go
   if mc then self:macro_finish() end
   local r = (slot == 4) and self.me.macros[self.try_sel or 1] or self.me.macros[self.me.slots[slot]]
   if not r then return end
+  local run = (r.bars or 0) > 0 and self.playing ~= 0
+  if run then self:set_mute_bar(true) end   -- its mutes go on the 1, not part way through a bar
   local saved = { set = {}, mutes = {}, filter = self.v["ockm-filter"] or 0 }
   for _, m in ipairs(r.moves) do
     local t = TARGET[m.t]
@@ -1212,17 +1240,18 @@ function ui:macro_down(slot)
       self:ramp(t.hook, t.switch and 1 or m.v, t.switch and 0 or ms)
     end
   end
-  self.macro = { slot = slot, recipe = r, saved = saved }
+  self.macro = { slot = slot, recipe = r, saved = saved, run = run and r.bars or nil, bars = 0, held = 0 }
 end
--- put moves back: on letting go, all but the ones that stay; when finishing, everything
-function ui:macro_restore(all)
+-- put moves back: on letting go, all but the ones that stay; when finishing, everything (force: a recipe with a length,
+-- where every move comes back together whatever it says)
+function ui:macro_restore(all, force)
   local mc = self.macro
   local r, saved = mc.recipe, mc.saved
   local stays = false
   for _, m in ipairs(r.moves) do
-    local back = m.back or 1
+    local back = force and 1 or (m.back or 1)
     if back == 3 and not all then stays = true
-    elseif not (all and back ~= 3 and mc.latched) then
+    elseif force or not (all and back ~= 3 and mc.latched) then
       local t = TARGET[m.t]
       local glide = (back == 2) and steps_ms(self, 16) or 0
       if t and t.choices then
@@ -1238,15 +1267,53 @@ function ui:macro_restore(all)
   end
   return stays
 end
+function ui:set_mute_bar(on) self.mute_bar = on or nil; pd.send("ockm-mute-bar", "float", { on and 1 or 0 }) end
+-- a recipe with a length, on its way out: ask for the mutes back now (they land on the next bar), and bring the
+-- effects back on that same bar (on_bar)
+function ui:macro_end()
+  local mc = self.macro
+  mc.ending = true
+  for tr, x in pairs(mc.saved.mutes) do if self:mute_target(tr) ~= x then self:qmute(tr, x) end end
+end
+function ui:on_bar()
+  local mc = self.macro
+  if not (mc and mc.run) then return end
+  if mc.ending then
+    self:macro_restore(true, true); self.macro = nil
+    self:set_mute_bar(false)
+    self:dirty(); return
+  end
+  mc.bars = mc.bars + 1   -- bar 1 is when its mutes land
+  if mc.latched and mc.bars >= mc.run then self:macro_end() end   -- tapped: after its bars, back on the next 1
+  self:dirty()
+end
 function ui:macro_up(slot)
   local mc = self.macro
   if not mc or mc.slot ~= slot or mc.latched then return end
+  if mc.run then
+    -- a tap (let go within a beat) runs it for its bars; a hold lasts while held, and drops on the next bar
+    if (mc.held or 0) < 4 then mc.latched = true else self:macro_end() end
+    return
+  end
   if self:macro_restore(false) then mc.latched = true else self.macro = nil end
 end
 function ui:macro_finish()
   if not self.macro then return end
+  if self.macro.run then self:set_mute_bar(false); self:macro_restore(true, true); self.macro = nil; return end
   self:macro_restore(true)
   self.macro = nil
+end
+-- what a recipe pad says while it plays
+function ui:macro_sub(i)
+  local mc = self.macro
+  if not (mc and mc.slot == i) then return nil end
+  if mc.run then
+    if mc.ending then return "back on the 1" end
+    if not mc.latched then return "hold: drops when you let go" end
+    return (mc.bars > 0) and ("bar " .. math.min(mc.bars, mc.run) .. " of " .. mc.run .. ": tap to drop") or "starts on the 1"
+  end
+  if mc.latched then return "tap to let go" end
+  return nil
 end
 
 -- ------------------------------------------------------------------ settings screen
@@ -1377,6 +1444,13 @@ function ui:layout_set_macros(add)
     add{ kind="btn", x=ix, y=154 + #r.moves * 54, w=iw, h=40, small=true, quiet=true, label="+ add a move (up to 4)", tap=function()
       r.moves[#r.moves + 1] = { t = "reverb", v = 0.6, how = 1, back = 1 }; self:save_settings() end }
   end
+  -- v0.93: how long a tap plays it (hold always lasts while held)
+  local rb = r.bars or 0
+  local ri = 1; for q, b in ipairs(RUN_BARS) do if b == rb then ri = q end end
+  add{ kind="text", x=ix, y=H - 118, w=iw, h=12, size=10,
+       label=(rb > 0) and ("a tap plays it for " .. rb .. (rb == 1 and " bar" or " bars") .. ", then it all comes back on the 1 (mutes land on the bar). Or hold it") or "plays while held (moves that stay keep it lit)" }
+  add{ kind="btn", x=ix + iw - 150, y=H - 104, w=150, h=24, small=true, label=(rb > 0) and ("runs " .. rb .. (rb == 1 and " bar" or " bars")) or "no length",
+       tap=function() r.bars = RUN_BARS[ri % #RUN_BARS + 1]; if r.bars == 0 then r.bars = nil end; self:save_settings() end }
   -- which slot on Perform B, and try it
   add{ kind="text", x=ix, y=H - 62, w=60, h=12, label="on slot", size=10 }
   for s = 1, 3 do
@@ -1680,7 +1754,7 @@ function ui:layout_synth_sound(add, part, mono)
   add{ kind="hbar", x=x, y=466, w=tw, h=40, hook="ockm-"..part.."-verb", lo=0, hi=1, label="reverb", bold=true }
   add{ kind="hbar", x=x + tw + 6, y=466, w=tw, h=40, hook="ockm-"..part.."-delay", lo=0, hi=1, label="delay", bold=true }
   x = x + 2 * tw + 6 + 14
-  add{ kind="hbar", x=x, y=466, w=tw, h=40, hook="ockm-"..part.."-level", lo=0, hi=1, label="level", bold=true }
+  add{ kind="hbar", x=x, y=466, w=tw, h=40, hook="ockm-"..part.."-level", lo=0, hi=LEVEL_MAX, label="level", bold=true }
   -- chorus, Juno-style: tap to step through off, I, II, I+II
   local ch = math.floor(self.v["ockm-"..part.."-chorus"] or 0)
   add{ kind="choice", x=x + tw + 6, y=466, w=tw, h=40, small=true, accent=true, sel=(ch > 0), label="chorus " .. CHORUS[ch + 1],
@@ -2096,6 +2170,12 @@ function ui:apply_style(i, shuf)
     end
     if d then self:send("ockm-"..nm.."-verb", 0); self:send("ockm-"..nm.."-delay", 0) end
   end
+  -- the starting mix (a style sets the lot; undo puts your mix back)
+  for slot = 1, #SLOTS do
+    local nm = SLOTS[slot]
+    self:send("ockm-"..nm.."-level", MIX_DRUM[math.floor(self.v["ockm-"..nm.."-sound"] or 0)] or 0.7)
+  end
+  for _, t in ipairs(SYNTHS) do self:send("ockm-"..t.."-level", MIX_SYNTH[t]) end
   local prog = spick(st.prog, shuf)
   self:send("ockm-chord-prog", prog)
   self:send("ockm-chord-type", spick(st.type, shuf))
@@ -2724,7 +2804,7 @@ function ui:layout_mixer(add)
       add{ kind="hbar", x=cx, y=top + 66, w=cw, h=26, hook="ockm-"..t.."-delay", lo=0, hi=1, label="dly" }
       add{ kind="choice", x=cx, y=top + 100, w=cw, h=32, small=true, label="EQ", sel=not self:eq_flat(t), accent=true,
            tap=function() self:eq_open(i) end }
-      add{ kind="vfader", x=cx, y=top + 140, w=cw, h=210, hook="ockm-"..t.."-level", lo=0, hi=1 }
+      add{ kind="vfader", x=cx, y=top + 140, w=cw, h=210, hook="ockm-"..t.."-level", lo=0, hi=LEVEL_MAX }
       add{ kind="ms", x=cx, y=top + 364, w=cw, h=50, label="M", hook="ockm-"..t.."-mute" }
       add{ kind="ms", x=cx, y=top + 420, w=cw, h=50, label="S", hook="ockm-"..t.."-solo" }
     else

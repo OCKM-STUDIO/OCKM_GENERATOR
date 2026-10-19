@@ -487,17 +487,20 @@ def show(h): return "ockm-show-"+h[5:]
 PROJECT_KEYS=[("ockm-drum-punch",0.5,None),("ockm-bpm",124,"ockm-tempo"),("ockm-volume",1,None),("ockm-accent",0.3,None),("ockm-filter",0,"ockm-filter-now"),("ockm-drive",0,None),
     ("ockm-delay-mix",0.5,None),("ockm-delay-fb",0.4,None),("ockm-delay-steps",3,None),("ockm-verb-mix",0.3,None),
     ("ockm-verb-size",0.6,None),("ockm-verb-tone",0.5,None),("ockm-sync",0,None),("ockm-clock-out",1,None)]
+# v0.93: a starting mix like a real one (kick loudest, hats and percussion tucked in), with room above on every fader (up to 1.5)
+MIX_DRUM={0:1.0,1:0.75,2:0.75,3:0.6,4:0.55,5:0.5,6:0.65,7:0.6}   # by sound: kick snare clap perc-1 hat open-hat tom perc-2
+MIX_SYNTH={"bass":0.85,"lead":0.7,"chord":0.65}
 for nm,snd in SLOTS:
     PROJECT_KEYS+=[(f"ockm-{nm}-sound",snd,None),(f"ockm-{nm}-sample",0,None),(f"ockm-{nm}-synth",0,None),(f"ockm-{nm}-tone",0,None),
                    (f"ockm-{nm}-drive",0,None),(f"ockm-{nm}-start",0,None),(f"ockm-{nm}-tune",0,None),(f"ockm-{nm}-decay",100,None),
-                   (f"ockm-{nm}-level",1,None),(f"ockm-{nm}-verb",VERB[snd],None),(f"ockm-{nm}-delay",DLY[snd],None),
+                   (f"ockm-{nm}-level",MIX_DRUM[snd],None),(f"ockm-{nm}-verb",VERB[snd],None),(f"ockm-{nm}-delay",DLY[snd],None),
                    (f"ockm-{nm}-labchar",0,None),(f"ockm-{nm}-labmorph",0,None),(f"ockm-{nm}-labrseed",0,None),(f"ockm-{nm}-labramt",0,None),(f"ockm-{nm}-labpseed",1,None)]
 for _t in [n for n,_ in SLOTS]+["bass","lead","chord"]:
     PROJECT_KEYS+=[(f"ockm-{_t}-{k}",v,None) for k,v in EQ_DEF.items()]
 LFO_DEF={"lfo-shape":0,"lfo-rate":4,"lfo-depth":0,"lfo-target":1,"chorus":0}   # sine, one bar, off, the first knob; chorus off
-SYNTH_DEFAULTS={"bass":dict(engine=5,mode=0,sync=1,walk=0,sidechain=0,scshape=1,half=0,lock=0,density=1,seed=0,level=1,k1=0.42,k2=0.25,k3=0.45,k4=0.45,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
-                "lead":dict(engine=4,mode=0,sync=1,sidechain=0,scshape=1,half=0,lock=0,density=1,seed=0,outside=0.35,level=1,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
-                "chord":dict(engine=0,mode=0,sidechain=0,scshape=1,half=0,level=1,k1=0.45,k2=0.5,k3=0.4,k4=0.3,type=0,smooth=1,verb=0,delay=0,rhythm=0,prog=0,voicing=0,strum=0,**LFO_DEF)}
+SYNTH_DEFAULTS={"bass":dict(engine=5,mode=0,sync=1,walk=0,sidechain=0,scshape=1,half=0,lock=0,density=1,seed=0,level=0.85,k1=0.42,k2=0.25,k3=0.45,k4=0.45,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
+                "lead":dict(engine=4,mode=0,sync=1,sidechain=0,scshape=1,half=0,lock=0,density=1,seed=0,outside=0.35,level=0.7,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
+                "chord":dict(engine=0,mode=0,sidechain=0,scshape=1,half=0,level=0.65,k1=0.45,k2=0.5,k3=0.4,k4=0.3,type=0,smooth=1,verb=0,delay=0,rhythm=0,prog=0,voicing=0,strum=0,**LFO_DEF)}
 PATTERN_KEYS=[("ockm-end",0,None),("ockm-impact",0,None),("ockm-pump",0,None),("ockm-bass-on",1,None),("ockm-lead-on",1,None),("ockm-chord-on",1,None),("ockm-rise",0,None),("ockm-drum-len",16,None),("ockm-bass-len",64,None),("ockm-lead-len",64,None),("ockm-chord-len",64,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None),("ockm-leader",0,None),("ockm-drum-groove",-1,None),("ockm-fill-every",0,None),("ockm-fill-style",0,None),("ockm-drums-on",1,None),("ockm-turn-every",0,None),("ockm-style",-1,None)]
 for t,d in SYNTH_DEFAULTS.items():
     PATTERN_KEYS+=[(f"ockm-{t}-{k}",v,None) for k,v in d.items()]
@@ -593,15 +596,18 @@ dtb=p.add("#X obj 1850 375 t b b;")
 # ockm-<track>-mute-q 0/1 asks for a mute: straight away when stopped or 'now', otherwise held until the next beat or bar,
 # then sent as ockm-<track>-mute before that step's hits. Stopping lets anything waiting go at once.
 rmq=p.add("#X obj 2100 300 r ockm-mute-quant;"); vmq=p.add("#X obj 2100 325 v ockm_mq;"); p.con(rmq,0,vmq,0)
-rbt=p.add("#X obj 2250 300 r ockm-beat;"); xbt=p.add("#X obj 2250 325 expr ockm_mq==1;"); sbt1=p.add("#X obj 2250 350 sel 1;")
-rbr=p.add("#X obj 2350 300 r ockm-bar;"); xbr=p.add("#X obj 2350 325 expr ockm_mq>=1;"); sbr1=p.add("#X obj 2350 350 sel 1;")
+# v0.93: ockm-mute-bar 1 makes every mute wait for the next bar whatever the setting (a performance recipe's mutes land
+# on the 1, with its effects); 0 goes back to the setting
+rmb=p.add("#X obj 1950 300 r ockm-mute-bar;"); vmb=p.add("#X obj 1950 325 v ockm_mqb;"); p.con(rmb,0,vmb,0)
+rbt=p.add("#X obj 2250 300 r ockm-beat;"); xbt=p.add("#X obj 2250 325 expr ockm_mq==1 && ockm_mqb==0;"); sbt1=p.add("#X obj 2250 350 sel 1;")
+rbr=p.add("#X obj 2350 300 r ockm-bar;"); xbr=p.add("#X obj 2350 325 expr ockm_mq>=1 || ockm_mqb>0;"); sbr1=p.add("#X obj 2350 350 sel 1;")
 rps=p.add("#X obj 2450 300 r ockm-playing;"); sps=p.add("#X obj 2450 325 sel 0;")
 stk=p.add("#X obj 2250 380 s ockm-mute-tick;")
 for c in [(rbt,0,xbt,0),(xbt,0,sbt1,0),(sbt1,0,stk,0),(rbr,0,xbr,0),(xbr,0,sbr1,0),(sbr1,0,stk,0),(rps,0,sps,0),(sps,0,stk,0)]: p.con(*c)
 for _i,_t in enumerate([n for n,_ in SLOTS]+["bass","lead","chord"]):
     x=2100+_i*120
     rq=p.add(f"#X obj {x} 420 r ockm-{_t}-mute-q;"); tq=p.add(f"#X obj {x} 445 t f f;"); fq=p.add(f"#X obj {x+60} 520 f;")
-    now=p.add(f"#X obj {x} 470 expr if(ockm_playv>0 && ockm_mq>0 \\, -1 \\, {D}f1);"); mo=p.add(f"#X obj {x} 495 moses 0;")
+    now=p.add(f"#X obj {x} 470 expr if(ockm_playv>0 && (ockm_mq>0 || ockm_mqb>0) \\, -1 \\, {D}f1);"); mo=p.add(f"#X obj {x} 495 moses 0;")
     one=p.add(f"#X msg {x} 520 1;"); vp=p.add(f"#X obj {x} 545 v ockm_{_t}_mqp;")
     smt=p.add(f"#X obj {x} 600 s ockm-{_t}-mute;"); z=p.add(f"#X msg {x+40} 575 0;"); vp2=p.add(f"#X obj {x+40} 600 v ockm_{_t}_mqp;")
     rt=p.add(f"#X obj {x} 625 r ockm-mute-tick;"); xp=p.add(f"#X obj {x} 650 expr ockm_{_t}_mqp;"); sp1=p.add(f"#X obj {x} 675 sel 1;"); tbb_=p.add(f"#X obj {x} 700 t b b;")
@@ -687,7 +693,7 @@ slb=sub.add("#X obj 20 40 loadbang;")
 for i,(nm,snd) in enumerate(SLOTS):
     y=80+i*30
     sub.add(f"#X text 20 {y} {nm};")
-    for j,(param,dflt,lo,hi) in enumerate([("sound",snd,0,7),("tune",0,-12,12),("decay",100,10,400),("level",1,0,1),("verb",VERB[snd],0,1),("delay",DLY[snd],0,1)]):
+    for j,(param,dflt,lo,hi) in enumerate([("sound",snd,0,7),("tune",0,-12,12),("decay",100,10,400),("level",1,0,1.5),("verb",VERB[snd],0,1),("delay",DLY[snd],0,1)]):
         m=sub.add(f"#X obj {70+j*140} {y-18} r {show(f'ockm-{nm}-{param}')};")
         fa=sub.add(f"#X floatatom {115+j*140} {y} 5 {lo} {hi} 0 - - ockm-{nm}-{param};")
         sub.con(m,0,fa,0)

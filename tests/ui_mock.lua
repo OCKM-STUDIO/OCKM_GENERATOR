@@ -124,6 +124,8 @@ for line in io.lines(script) do
     local atoms = {}
     for k = 3, #t do atoms[#atoms + 1] = t[k] end
     obj:test(t[2], atoms)
+  elseif t[1] == "mark" then
+    flush(); emit("mark " .. t[2])   -- a marker in the output, so a test can tell what came before and after
   elseif t[1] == "paint" then
     flush()
     emit("begin " .. t[2])

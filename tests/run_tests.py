@@ -766,7 +766,7 @@ def touchscreen_drives_the_engine(work):
     assert "1" in printed(out, "ockm-d1-mute"), "perform: the kick tile should mute d1"
     assert "1" in printed(out, "ockm-d2-mute"), "mixer: M on strip 2 should mute d2"
     bl = [float(x) for x in printed(out, "ockm-bass-level")]
-    assert any(0.4 < x < 0.6 for x in bl), f"mixer: bass fader halfway should be about 0.5: {bl}"
+    assert any(0.65 < x < 0.85 for x in bl), f"mixer: bass fader halfway should be about 0.75 (faders go to 1.5): {bl}"
     assert "6" in printed(out, "ockm-chord-type"), f"chord tab: colour 9ths should pick the ninth chord type (6): {printed(out, 'ockm-chord-type')}"
     assert not [l for l in out.splitlines() if "error" in l.lower()], "errors: " + " | ".join(l for l in out.splitlines() if "error" in l.lower())
 
@@ -952,23 +952,24 @@ def live_mutes_land_on_the_bar(work):
 
 @test
 def live_macros_move_several_things_and_put_them_back(work):
-    """Hold wash: delay and reverb go up together; let go and they go back. Hold strip: everything but kick and bass mutes, then returns."""
+    """Hold wash: delay and reverb go up together; let go and they go back. Hold breakdown (slot C, stopped, so it plays while
+    held): the drums mute, then come back; the bass keeps playing."""
     if not PDLUA:
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness(); h.show("ockm-delay-mix", "ockm-verb-mix", "ockm-d2-mute", "ockm-d1-mute", "ockm-bass-mute", "ockm-filter-glide")
     h.at(100, "ockm-ui-test tap 338 36")       # live tab (mutes land now)
     h.at(200, "ockm-ui-test press 700 500")    # wash, held
     h.at(300, "ockm-ui-test release 700 500")
-    h.at(400, "ockm-ui-test press 850 500")    # strip, held
+    h.at(400, "ockm-ui-test press 850 500")    # breakdown, held
     h.at(500, "ockm-ui-test release 850 500")
     f = os.path.join(work, "t_macro.pd"); h.finish(600, f)
     out = run(work, f)
     dm = [float(x) for x in printed(out, "ockm-delay-mix")]; vm = [float(x) for x in printed(out, "ockm-verb-mix")]
-    assert len(dm) >= 2 and dm[-2] > 0.8 and dm[-1] == dm[0] if len(dm) > 2 else (dm[0] > 0.8 and dm[-1] < 0.8), f"wash: delay up, then back: {dm}"
+    assert len(dm) >= 2 and dm[0] > 0.8 and dm[1] < 0.8, f"wash: delay up, then back: {dm}"
     assert vm and max(vm) > 0.85 and vm[-1] < 0.85, f"wash: reverb up, then back: {vm}"
     assert printed(out, "ockm-filter-glide"), "wash: the filter moves too"
-    assert printed(out, "ockm-d2-mute") == ["1", "0"], f"strip: the snare mutes, then comes back: {printed(out, 'ockm-d2-mute')}"
-    assert not printed(out, "ockm-d1-mute") and not printed(out, "ockm-bass-mute"), "strip: kick and bass keep playing"
+    assert printed(out, "ockm-d2-mute") == ["1", "0"], f"breakdown: the snare mutes, then comes back: {printed(out, 'ockm-d2-mute')}"
+    assert printed(out, "ockm-d1-mute") == ["1", "0"] and not printed(out, "ockm-bass-mute"), "breakdown: the kick goes too, the bass keeps playing"
 
 @test
 def settings_macro_library_and_slots(work):
@@ -1146,7 +1147,7 @@ def synths_sit_at_similar_levels(work):
     for part, setup, eng in [("bass", "ockm-bass-rhythm 12 ; ockm-bass-notes 3", None),   # the acid riff: a busy, typical bass line ("chord", "ockm-chord-prog 3 ; ockm-chord-rhythm 4", 0),
                              ("chord", "ockm-chord-prog 3 ; ockm-chord-rhythm 4", 1), ("chord", "ockm-chord-prog 3 ; ockm-chord-rhythm 4", 2)]:
         h = Harness(); name = f"lv-{part}{eng}"; h.record(os.path.join(work, name + ".wav"))
-        mutes = " ; ".join(f"ockm-{t}-mute {0 if t == part else 1}" for t in tracks)
+        mutes = " ; ".join(f"ockm-{t}-mute {0 if t == part else 1}" for t in tracks) + " ; ockm-bass-level 1 ; ockm-chord-level 1 ; ockm-lead-level 1"   # the engines, at unity (the starting mix sits lower)
         extra = f" ; ockm-chord-engine {eng}" if eng is not None else ""
         h.at(100, f"ockm-verb-mix 0 ; ockm-delay-mix 0 ; {mutes}{extra} ; {setup}"); h.at(200, "ockm-play 1"); h.at(3200, "ockm-play 0")
         _, (snd, sr) = play(work, h, name, ms=3200)
@@ -1639,6 +1640,36 @@ def perform_pump_is_held(work):
     L = ui_preview.run(["test press 660 106", "test release 660 106"])
     pump = [float(l.split()[3]) for l in L if l.startswith("sent ockm-pump ")]
     assert pump == [1, 0], f"held then let go: {pump}"
+
+@test
+def breakdown_recipe_runs_for_bars_or_while_held(work):
+    """v0.93 performance recipe (breakdown, slot C): drums out with the filter down and reverb and delay up. A tap runs it
+    for 4 bars: its mutes wait for the bar, they're asked back at the start of bar 4 so they land on the 1 of bar 5, and the
+    effects come back on that same 1. A hold lasts while held: let go and it all comes back on the next bar."""
+    sys.path.insert(0, os.path.join(ROOT, "tests"))
+    import ui_preview
+    if not ui_preview.LUA:
+        raise Skip("no lua to run the screen")
+    def sent(lines, hook): return [l for l in lines if l.startswith("sent " + hook + " ")]
+    BAR = "send ockm-bar bang"
+    steps = [f"send ockm-step float {i}" for i in (1, 2)]
+    L = ui_preview.run(["send ockm-playing float 1", "test press 865 500"] + steps + ["test release 865 500", "mark tapped", BAR, BAR, BAR, "mark bar3",
+                        BAR, "mark bar4", BAR, "mark bar5"])
+    def upto(mark): return L[:L.index("mark " + mark)] if ("mark " + mark) in L else L
+    assert sent(L, "ockm-mute-bar")[:1] == ["sent ockm-mute-bar float 1"], f"its mutes should wait for the bar: {sent(L, 'ockm-mute-bar')}"
+    kick_out = [l for l in upto("tapped") if l.startswith("sent ockm-d1-mute-q ")]
+    assert kick_out and kick_out[-1].endswith(" 1"), f"the kick should go: {kick_out}"
+    assert not [l for l in upto("bar3") if l.startswith("sent ockm-d1-mute-q ") and l.endswith(" 0")], "a tap: drums stay out for the bars"
+    back = [l for l in upto("bar4") if l.startswith("sent ockm-d1-mute-q ") and l.endswith(" 0")]
+    assert back, "at the start of bar 4 the drums are asked back (to land on the 1 of bar 5)"
+    b4 = L.index("mark bar4"); b5 = L.index("mark bar5")
+    assert "sent ockm-mute-bar float 0" in L[b4:b5], f"the effects come back with the drums, on the 1: {L[b4:b5]}"
+    # hold: let go after a beat and a bit, and it drops on the next bar
+    steps = [f"send ockm-step float {i}" for i in range(1, 7)]
+    H = ui_preview.run(["send ockm-playing float 1", "test press 865 500"] + steps + ["test release 865 500", "mark let-go", BAR, "mark bar1"])
+    lg = H.index("mark let-go")
+    assert [l for l in H[:lg] if l.startswith("sent ockm-d1-mute-q ") and l.endswith(" 0")], "a hold: let go and the drums are asked back"
+    assert "sent ockm-mute-bar float 0" in H[lg:H.index("mark bar1")], "and the rest lands with them on the next bar"
 
 @test
 def refit_my_line_when_the_harmony_moves(work):
