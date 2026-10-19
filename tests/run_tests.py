@@ -1502,8 +1502,10 @@ def suggest_chords_fit_the_melody(work):
 
 @test
 def song_styles_set_the_lot(work):
-    """Song screen styles: techno sets 132 bpm, straight swing, the techno groove, a harder kick, takes the lead out and puts the
-    bass round the kick on the pedal; drum and bass goes to 174 with the bass and chords at half-time. A kick on a sample keeps it."""
+    """Builder styles, house through to techno. Peak time sets 132 bpm, straight swing, the techno groove, F phrygian, a harder
+    lower kick, the bass round the kick on the home note, and a lead. Deep house: 122, F dorian, Rhodes chords, no lead.
+    Shuffle re-rolls the lit style from its own choices. A kick on a kit sample goes back to the synth; one on your own
+    sample keeps it."""
     sys.path.insert(0, os.path.join(ROOT, "tests"))
     import ui_preview
     if not ui_preview.LUA:
@@ -1513,27 +1515,37 @@ def song_styles_set_the_lot(work):
         for l in lines:
             if l.startswith("sent "):
                 v = l.split()
-                out[v[1]] = float(v[3]) if len(v) > 3 else None
+                out[v[1]] = float(v[3]) if len(v) > 3 and v[3] not in ("bang",) else None
         return out
-    t = sent(ui_preview.run(["test tap 477 36", "test tap 558 142"]))
+    PEAK, DEEP, SHUFFLE = "test tap 636 174", "test tap 83 142", "test tap 896 158"
+    t = sent(ui_preview.run(["test tap 477 36", PEAK]))
     assert t["ockm-bpm"] == 132 and t["ockm-swing"] == 50 and t["ockm-drum-groove"] == 5, t
+    assert t["ockm-root"] == 5 and t["ockm-scale"] == 3, "F phrygian"
     assert t["ockm-d1-drive"] == 0.5 and t["ockm-d1-tune"] == -2, "the kick gets harder and lower"
-    assert t["ockm-lead-on"] == 0 and t["ockm-bass-on"] == 1 and t["ockm-bass-rhythm"] == 10 and t["ockm-bass-sync"] == 0, t
-    assert t["ockm-style"] == 3, t
-    d = sent(ui_preview.run(["test tap 477 36", "test tap 558 174"]))
-    assert d["ockm-bpm"] == 174 and d["ockm-bass-half"] == 1 and d["ockm-chord-half"] == 1 and d["ockm-bass-engine"] == 3, d
-    smp = sent(ui_preview.run(["send ockm-d1-sample float 2", "test tap 477 36", "test tap 558 142"]))
-    assert "ockm-d1-drive" not in smp, "a kick playing a sample keeps its sound"
-    # kits: drum + bass plays kit-breaks where the folder has one (kick, snare), the synth kit elsewhere (hat).
-    # Then techno takes the kit slots back to the synth sound
-    kit = ["send ockm-sample-counts list 31 6 0 0 0 0 0", "send ockm-sample-name list 0 31 kit-breaks", "send ockm-sample-name list 1 5 kit-breaks",
-           "send ockm-sample-name list 1 6 kit-boom", "test tap 477 36", "test tap 558 174"]
+    assert t["ockm-lead-on"] == 1 and t["ockm-bass-rhythm"] == 10 and t["ockm-bass-sync"] == 0 and t["ockm-chord-on"] == 1, t
+    assert t["ockm-style"] == 10, t
+    d = sent(ui_preview.run(["test tap 477 36", DEEP]))
+    assert d["ockm-bpm"] == 122 and d["ockm-scale"] == 2 and d["ockm-chord-engine"] == 4 and d["ockm-lead-on"] == 0, d
+    lines = ui_preview.run(["test tap 477 36", DEEP] + [SHUFFLE] * 4)
+    chunks, cur = [], []
+    for l in lines:
+        if l.startswith("sent "):
+            cur.append(l)
+            if l.startswith("sent ockm-style "): chunks.append(sent(cur)); cur = []
+    seen = set()
+    for sh in chunks[1:]:   # the first is the plain deep house tap
+        assert sh["ockm-style"] == 0 and sh["ockm-bpm"] == 122, "shuffle stays in deep house"
+        assert sh["ockm-drum-groove"] in (2, 16, 17) and sh["ockm-root"] in (5, 2, 7, 0) and sh["ockm-chord-prog"] in (3, 1, 9, 6), sh
+        assert sh["ockm-bass-seed"] >= 1, "a shuffled riff is a variation"
+        seen.add((sh["ockm-root"], sh["ockm-chord-prog"], sh["ockm-drum-groove"], sh["ockm-bass-seed"]))
+    assert len(chunks) == 5, f"four shuffles: {len(chunks)}"
+    assert len(seen) > 1, "shuffle should come out differently"
+    kit = ["send ockm-sample-counts list 31 6 0 0 0 0 0", "send ockm-sample-name list 0 31 kit-breaks", "send ockm-d1-sample float 31",
+           "test tap 477 36", DEEP]
     k = sent(ui_preview.run(kit))
-    assert k["ockm-d1-sample"] == 31 and k["ockm-d2-sample"] == 5, f"the breaks kit's kick and snare: {k.get('ockm-d1-sample')} {k.get('ockm-d2-sample')}"
-    assert "ockm-d4-sample" not in k and k["ockm-d4-tune"] == 2, "no kit hat: the synth hat, voiced for the style"
-    lines = ui_preview.run(kit + ["test tap 558 142"])
-    after = [l for l in lines[[i for i, l in enumerate(lines) if l.startswith("sent ockm-style")][0] + 1:] if l.startswith("sent ockm-d1-sample")]
-    assert after and after[-1].split()[3] in ("0", "0.0"), f"techno: off the kit, back to the synth kick: {after}"
+    assert k.get("ockm-d1-sample") == 0, "a kick on a kit goes back to the synth kick"
+    own = sent(ui_preview.run(["send ockm-d1-sample float 2", "test tap 477 36", PEAK]))
+    assert "ockm-d1-drive" not in own and own.get("ockm-d1-sample") != 0, "a kick on your own sample keeps it"
 
 @test
 def refit_my_line_when_the_harmony_moves(work):

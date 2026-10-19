@@ -119,7 +119,7 @@ SHOTS = [
     ("export", ["test tap 919 36", "test tap 830 95", "test tap 854 178"]),                                    # project screen, export...
     ("bass-manual", ["test tap 601 36", "test tap 900 283", "test tap 89 158"]),      # switch to manual, then edit step 2
     ("bass-sidechain", ["test tap 836 544", "send ockm-bass-sidechain float 0.7", "test tap 601 36"]),   # the sidechain shapes, pump picked
-    ("song-style", ["test tap 477 36", "test tap 558 174"]),   # drum and bass (last: it changes the tempo and groove)
+    ("song-style", ["test tap 477 36", "test tap 636 174"]),   # peak time (last: it changes the tempo and groove)
 ]
 
 

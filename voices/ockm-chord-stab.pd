@@ -335,6 +335,7 @@
 #X obj 120 300 +~;
 #X obj 120 330 *~ 0.42;
 #X obj 120 370 outlet~;
+#X obj 120 315 hip~ 20;
 #X connect 6 0 7 0;
 #X connect 6 0 8 0;
 #X connect 6 0 9 0;
@@ -368,5 +369,6 @@
 #X connect 19 0 24 1;
 #X connect 24 0 25 0;
 #X connect 21 0 25 1;
-#X connect 25 0 26 0;
+#X connect 25 0 28 0;
+#X connect 28 0 26 0;
 #X connect 26 0 27 0;

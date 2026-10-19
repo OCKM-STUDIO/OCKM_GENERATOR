@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.84 (19 October 2026)
+
+- **Styles, house through to techno:** deep house, Chicago, classic house, nu disco, tech house, minimal, progressive, dub techno, Detroit, acid, peak time and hard techno. Garage, speed garage, drum and bass, boom bap and lofi are gone. Each style now sets a key and scale too, uses its own engines and progressions, and seven of them bring the lead in
+- **Shuffle** re-rolls the lit style within its own choices (key, groove, progression, engines, rhythms, riff variation)
+- **House piano** rebuilt, M1-style: two strings beating gently, a hammer click, bright as it rings (it had decayed to an electric-piano tone). **Rhodes** rebuilt: a warm body with the tine on the attack, bark on hard hits. Chord engines get a low cut on their output (FM at a 1:1 ratio puts a sideband at 0 Hz)
+- **Pruned:** the lead's six rhythms that copied the bass's, and the three older melody shapes, are hidden from the steppers (saved projects still play them)
+- **Renamed:** fills drop and build are now cut out and snare build (drop is the Perform pad, build a macro). Perform A says mutate, original and density, like the tabs
+
 ## v0.83.1 (19 October 2026)
 
 - **The Pi boots straight into the app,** with no desktop or taskbar first. It logs in to its own session that only runs our start-up (screen rotation, then the app). Quit to desktop still brings the desktop up

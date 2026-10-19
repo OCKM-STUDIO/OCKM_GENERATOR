@@ -1464,8 +1464,8 @@ PRE["groove"]=[(nm,_groove_line(sw,parts)) for nm,sw,parts in GROOVES]
 FILLS=[
  ("snare-roll",dict(snare="........x-x-xxXX",clap="........--------")),
  ("tom-run",dict(tom="........X-x-xxxX",kick="........x-------",snare="........--------")),
- ("drop",dict(kick="........--------",hat="............----",ohat="............----",clap="........--------")),
- ("build",dict(snare="x-x-x-x-xxxxXXXX",clap="........x-x-xxxx",hat="xxxxxxxxxxxxxxxx")),
+ ("cut-out",dict(kick="........--------",hat="............----",ohat="............----",clap="........--------")),
+ ("snare-build",dict(snare="x-x-x-x-xxxxXXXX",clap="........x-x-xxxx",hat="xxxxxxxxxxxxxxxx")),
  # a whole bar of breakbeat in place of the groove: kick and snare in the classic broken pattern (with ghost snares),
  # straight 8th hats, everything else quiet for the bar
  ("breakbeat",dict(kick="X.x.......Xx....",snare="....X..x.x..X..x",hat="x.x.x.x.x.x.x.x.",clap="----------------",ohat="----------------",
@@ -1945,36 +1945,65 @@ def chord_voice(sp,kind):
                   (tb,0,tbb,0),(tbb,1,fv,0),(fv,0,pa,0),(pa,0,ma,0),(ma,0,av,0),(tbb,0,pp,0),(pp,0,pe,0),
                   (k[0],0,x1,0),(x1,0,g2,1),(x1,1,g3,1),(k[1],0,x2,0),(x2,0,pg,1),(k[2],0,x3,0),(x3,0,g4,1),(k[3],0,x4,0),(x4,0,pa,1)]: sp.con(*c)
     elif kind=="piano":
-        # M1-style house piano: FM with an index that falls fast (bright hit, mellow tail), plus an octave layer.
-        # Two-stage amp: a quick drop after the hit, then a longer fade
-        tf=sp.add("#X obj 80 140 t f f f;"); mo=sp.add("#X obj 80 170 osc~;"); ixv=sp.add("#X obj 300 200 vline~;")
-        m1=sp.add("#X obj 80 200 *~;"); m2=sp.add("#X obj 80 225 *~ 0;"); ad=sp.add("#X obj 80 250 +~ 0;"); car=sp.add("#X obj 80 275 osc~;")
-        h2=sp.add("#X obj 200 170 * 2;"); ad2=sp.add("#X obj 200 250 +~ 0;"); car2=sp.add("#X obj 200 275 osc~;"); g2=sp.add("#X obj 200 300 *~ 0.3;")
-        sm=sp.add("#X obj 80 305 +~;")
-        tbb=sp.add("#X obj 20 140 t b b;"); tv=sp.add("#X obj 400 80 t f f;"); v4=sp.add("#X obj 460 110 * 0.4;")
-        pa=sp.add("#X obj 400 140 pack f 900 0.4;"); ma=sp.add(f"#X msg 400 170 {D}1 2 \\, {D}3 120 2 \\, 0 {D}2 122;")
-        fk1=sp.add("#X obj 300 110 f 3;"); pk=sp.add("#X obj 300 140 pack f 150;"); mi=sp.add(f"#X msg 300 170 {D}1 \\, 0.15 {D}2;")
-        x1=sp.add(f"#X obj 600 140 expr 0.5+5*{D}f1;"); x2=sp.add("#X obj 690 140 * 0.6;"); x3=sp.add(f"#X obj 780 140 expr 40+{D}f1*500;"); x4=sp.add(f"#X obj 870 140 expr 200+{D}f1*2500;")
-        for c in [(mt,0,tf,0),(tf,2,mo,0),(tf,1,m2,1),(tf,1,ad,1),(tf,0,h2,0),(h2,0,ad2,1),
-                  (mo,0,m1,0),(ixv,0,m1,1),(m1,0,m2,0),(m2,0,ad,0),(ad,0,car,0),(m2,0,ad2,0),(ad2,0,car2,0),(car2,0,g2,0),
-                  (car,0,sm,0),(g2,0,sm,1),(sm,0,am,0),
-                  (tb,0,tbb,0),(tbb,1,fv,0),(fv,0,tv,0),(tv,1,v4,0),(v4,0,pa,2),(tv,0,pa,0),(pa,0,ma,0),(ma,0,av,0),
-                  (tbb,0,fk1,0),(fk1,0,pk,0),(pk,0,mi,0),(mi,0,ixv,0),
-                  (k[0],0,x1,0),(x1,0,fk1,1),(k[1],0,x2,0),(x2,0,g2,1),(k[2],0,x3,0),(x3,0,pk,1),(k[3],0,x4,0),(x4,0,pa,1)]: sp.con(*c)
+        # v0.84 house piano (M1-style): two strings a few cents apart so it beats like a piano, FM that stays bright as it
+        # decays (an index that falls to a rich level, not to a pure sine: that was the electric piano sound), an octave
+        # layer, and a hammer click. Amp: a quick drop after the hit, then a longer tail. k1 brightness, k2 octave, k3 snap, k4 length
+        tf=sp.add("#X obj 80 140 t f f f f;"); mo=sp.add("#X obj 80 170 osc~;"); ixv=sp.add("#X obj 300 200 vline~;")
+        m1=sp.add("#X obj 80 200 *~;"); m2=sp.add("#X obj 80 225 *~ 0;")
+        ad=sp.add("#X obj 80 250 +~ 0;"); car=sp.add("#X obj 80 275 osc~;")
+        dt=sp.add("#X obj 140 170 * 1.0035;"); adb=sp.add("#X obj 140 250 +~ 0;"); carb=sp.add("#X obj 140 275 osc~;"); cbg=sp.add("#X obj 140 290 *~ 0.5;")   # the second string quieter: a gentle beat, not a deep one
+        h2=sp.add("#X obj 200 170 * 2;"); m22=sp.add("#X obj 200 225 *~ 2;"); ad2=sp.add("#X obj 200 250 +~ 0;"); car2=sp.add("#X obj 200 275 osc~;"); g2=sp.add("#X obj 200 300 *~ 0.3;")
+        nz=sp.add("#X obj 260 250 noise~;"); hb=sp.add("#X obj 260 275 bp~ 2800 1.5;"); hv=sp.add("#X obj 340 250 vline~;"); hg=sp.add("#X obj 260 300 *~;")
+        sm=sp.add("#X obj 80 305 +~;"); sm2=sp.add("#X obj 80 320 +~;"); sm3=sp.add("#X obj 80 335 +~;"); hl=sp.add("#X obj 80 350 *~ 0.5;")
+        tbb=sp.add("#X obj 20 140 t b b b;"); tv=sp.add("#X obj 400 80 t f f f;")
+        # amp: velocity in 2 ms, down to 45% by the snap time, then out over the length
+        pa=sp.add("#X obj 400 140 pack f 1200 0.45 150;"); ma=sp.add(f"#X msg 400 170 {D}1 2 \\, {D}3 {D}4 2 \\, 0 {D}2 {D}4;")   # the tail starts as the drop ends
+        v45=sp.add("#X obj 480 110 * 0.45;")
+        # index: a hard hit is brighter; falls over the snap time to a level that keeps the tone rich
+        ixe=sp.add(f"#X obj 300 110 expr (1.5+5*{D}f2)*(0.55+0.45*{D}f1) \\; 0.9+1.4*{D}f2 \\; {D}f3;")
+        pk=sp.add("#X obj 300 140 pack f f f;"); mi=sp.add(f"#X msg 300 170 {D}1 \\, {D}2 {D}3;")
+        hm=sp.add(f"#X msg 340 220 {D}1 1 \\, 0 14 1;"); hvx=sp.add("#X obj 340 200 * 0.35;")
+        x2=sp.add("#X obj 690 140 * 0.6;"); x3=sp.add(f"#X obj 780 140 expr 260-200*{D}f1;"); x4=sp.add(f"#X obj 870 140 expr 300+{D}f1*2700;")
+        fk1=sp.add("#X obj 600 170 f 0.5;"); fsn=sp.add("#X obj 780 170 f 150;")
+        for c in [(mt,0,tf,0),(tf,3,mo,0),(tf,2,m2,1),(tf,2,ad,1),(tf,1,dt,0),(dt,0,adb,1),(tf,0,h2,0),(h2,0,ad2,1),
+                  (mo,0,m1,0),(ixv,0,m1,1),(m1,0,m2,0),(m2,0,ad,0),(ad,0,car,0),(m2,0,adb,0),(adb,0,carb,0),
+                  (m2,0,m22,0),(m22,0,ad2,0),(ad2,0,car2,0),(car2,0,g2,0),
+                  (nz,0,hb,0),(hb,0,hg,0),(hv,0,hg,1),
+                  (car,0,sm,0),(carb,0,cbg,0),(cbg,0,sm,1),(sm,0,hl,0),(hl,0,sm2,0),(g2,0,sm2,1),(sm2,0,sm3,0),(hg,0,sm3,1),(sm3,0,am,0),
+                  (tb,0,tbb,0),(tbb,2,fv,0),(fv,0,tv,0),(tv,2,v45,0),(v45,0,pa,2),(tv,1,hvx,0),(hvx,0,hm,0),(hm,0,hv,0),
+                  (tv,0,ixe,0),(ixe,2,pk,2),(ixe,1,pk,1),(ixe,0,pk,0),(pk,0,mi,0),(mi,0,ixv,0),
+                  (tbb,1,fsn,0),(fsn,0,pa,3),(fsn,0,ixe,2),(tbb,0,pa,0),(pa,0,ma,0),(ma,0,av,0),
+                  (k[0],0,fk1,0),(fk1,0,ixe,1),(k[1],0,x2,0),(x2,0,g2,1),(k[2],0,x3,0),(x3,0,fsn,1),(k[3],0,x4,0),(x4,0,pa,1)]: sp.con(*c)
+        # the amp pack takes the velocity on its left inlet: re-route so the hot inlet fires last with it
+        sp.C=[c for c in sp.C if c!=(tbb,0,pa,0)]; sp.con(tv,0,pa,0)
     elif kind=="rhodes":
-        # Rhodes-style electric piano: gentle FM that barks when hit hard, a soft decay to a held level, optional tremolo
+        # v0.84 Rhodes: a warm body (gentle FM, ratio 1) plus the tine: a high partial (14x, as on the DX7 electric pianos)
+        # that rings for a moment on the attack. Bark: the harder the hit, the more the body is driven (k2 sets how much),
+        # with a touch of even harmonics. Tremolo (k3), a long soft decay (k4). k1 tone: how bright the body and tine are
         tf=sp.add("#X obj 80 140 t f f f;"); mo=sp.add("#X obj 80 170 osc~;"); ixv=sp.add("#X obj 300 230 vline~;")
         m1=sp.add("#X obj 80 200 *~;"); m2=sp.add("#X obj 80 225 *~ 0;"); ad=sp.add("#X obj 80 250 +~ 0;"); car=sp.add("#X obj 80 275 osc~;")
-        tro=sp.add("#X obj 200 200 osc~ 4.5;"); trd=sp.add("#X obj 200 225 *~ 0;"); tr1=sp.add("#X obj 200 250 +~ 1;"); trm=sp.add("#X obj 80 300 *~;")
-        tbb=sp.add("#X obj 20 140 t b b;"); tv=sp.add("#X obj 400 80 t f f f;"); v5=sp.add("#X obj 480 110 * 0.55;")
-        pa=sp.add("#X obj 400 140 pack f 900 0.5;"); ma=sp.add(f"#X msg 400 170 {D}1 3 \\, {D}3 {D}2 3;")
-        ix=sp.add(f"#X obj 300 140 expr 0.2+1.2*{D}f2+2.5*{D}f3*{D}f1 \; 0.2+1.2*{D}f2;"); pk=sp.add("#X obj 300 170 pack f f;"); mi=sp.add(f"#X msg 300 200 {D}1 \\, {D}2 250;")
-        x3=sp.add("#X obj 780 140 * 0.35;"); x4=sp.add(f"#X obj 870 140 expr 300+{D}f1*3000;")
-        for c in [(mt,0,tf,0),(tf,2,mo,0),(tf,1,m2,1),(tf,0,ad,1),
-                  (mo,0,m1,0),(ixv,0,m1,1),(m1,0,m2,0),(m2,0,ad,0),(ad,0,car,0),(tro,0,trd,0),(trd,0,tr1,0),(car,0,trm,0),(tr1,0,trm,1),(trm,0,am,0),
-                  (tb,0,tbb,0),(tbb,1,fv,0),(fv,0,tv,0),(tv,2,v5,0),(v5,0,pa,2),(tv,1,ix,0),(ix,1,pk,1),(ix,0,pk,0),(pk,0,mi,0),(mi,0,ixv,0),
+        t14=sp.add("#X obj 160 170 * 14;"); to=sp.add("#X obj 160 200 osc~;"); tvl=sp.add("#X obj 240 200 vline~;"); tg=sp.add("#X obj 160 225 *~;")
+        bk=sp.add(f"#X obj 80 300 expr~ (tanh({D}v1*max({D}f2\\,1) + 0.3*(max({D}f2\\,1)-1)*{D}v1*{D}v1))/tanh(max({D}f2\\,1));"); dc=sp.add("#X obj 80 325 hip~ 15;")   # max: never divide by tanh(0) before the first note
+        sm=sp.add("#X obj 80 350 +~;")
+        tro=sp.add("#X obj 200 300 osc~ 4.5;"); trd=sp.add("#X obj 200 325 *~ 0;"); tr1=sp.add("#X obj 200 350 +~ 1;"); trm=sp.add("#X obj 80 375 *~;")
+        tbb=sp.add("#X obj 20 140 t b b;"); tv=sp.add("#X obj 400 80 t f f f f;")
+        pa=sp.add("#X obj 400 140 pack f 2500 0.6;"); ma=sp.add(f"#X msg 400 170 {D}1 3 \\, {D}3 400 3 \\, 0 {D}2 403;")
+        v6=sp.add("#X obj 480 110 * 0.6;")
+        ixe=sp.add(f"#X obj 300 140 expr 0.3+1.2*{D}f2 + 2.5*{D}f3*{D}f1 \\; 0.12+0.45*{D}f2;"); pk=sp.add("#X obj 300 170 pack f f;"); mi=sp.add(f"#X msg 300 200 {D}1 \\, {D}2 300;")
+        tne=sp.add(f"#X obj 240 140 expr {D}f1*(0.06+0.22*{D}f2);"); tm=sp.add(f"#X msg 240 170 {D}1 1 \\, 0 70 1;")
+        bkx=sp.add(f"#X obj 520 110 expr 1+3*{D}f2*{D}f1;")
+        fk1=sp.add("#X obj 600 200 f 0.5;"); fk2=sp.add("#X obj 690 200 f 0.4;")
+        x3=sp.add("#X obj 780 140 * 0.35;"); x4=sp.add(f"#X obj 870 140 expr 800+{D}f1*4500;")
+        for c in [(mt,0,tf,0),(tf,2,mo,0),(tf,1,m2,1),(tf,1,ad,1),(tf,0,t14,0),(t14,0,to,0),
+                  (mo,0,m1,0),(ixv,0,m1,1),(m1,0,m2,0),(m2,0,ad,0),(ad,0,car,0),(car,0,bk,0),(bk,0,dc,0),(dc,0,sm,0),
+                  (to,0,tg,0),(tvl,0,tg,1),(tg,0,sm,1),
+                  (tro,0,trd,0),(trd,0,tr1,0),(sm,0,trm,0),(tr1,0,trm,1),(trm,0,am,0),
+                  (tb,0,tbb,0),(tbb,1,fv,0),(fv,0,tv,0),
+                  (tv,3,bkx,0),(bkx,0,bk,1),(tv,2,tne,0),(tne,0,tm,0),(tm,0,tvl,0),
+                  (tv,1,v6,0),(v6,0,pa,2),(tv,1,ixe,0),(ixe,1,pk,1),(ixe,0,pk,0),(pk,0,mi,0),(mi,0,ixv,0),
                   (tv,0,pa,0),(pa,0,ma,0),(ma,0,av,0),
-                  (k[0],0,ix,1),(k[1],0,ix,2),(k[2],0,x3,0),(x3,0,trd,1),(k[3],0,x4,0),(x4,0,pa,1)]: sp.con(*c)
+                  (k[0],0,fk1,0),(fk1,0,ixe,1),(fk1,0,tne,1),(k[1],0,fk2,0),(fk2,0,ixe,2),(fk2,0,bkx,1),
+                  (k[2],0,x3,0),(x3,0,trd,1),(k[3],0,x4,0),(x4,0,pa,1)]: sp.con(*c)
     elif kind=="strings":
         # string machine: three detuned saws through a soft filter, slow swell, long release. The ensemble is added after the voices
         tf=sp.add("#X obj 80 140 t f f f;"); du=sp.add("#X obj 160 170 * 1.004;"); dd=sp.add("#X obj 240 170 * 0.996;")
@@ -2002,12 +2031,12 @@ def chord_voice(sp,kind):
                   (k[0],0,x1,0),(x1,0,l1,1),(x1,0,l2,1),(k[1],0,x2,0),(x2,0,du,1),(x2,1,dd,1),
                   (k[2],0,x3,0),(x3,0,fa3,0),(fa3,1,ad,1),(fa3,0,pa,1),(k[3],0,x4,0),(x4,0,ad,0),(ad,0,pa,2)]: sp.con(*c)
 
-CHORD_GAIN={"stab":0.42,"organ":0.135,"pad":0.25,"piano":0.28,"rhodes":0.11,"strings":0.36}   # measured: stab was a third as loud as the bass, organ a little loud
+CHORD_GAIN={"stab":0.42,"organ":0.135,"pad":0.25,"piano":0.4,"rhodes":0.13,"strings":0.36}   # measured: stab was a third as loud as the bass, organ a little loud
 CHORD_ENGINES=[("stab","Stab: two detuned saws through a filter that snaps shut. Dub techno with the delay"),
                ("organ","Organ: sine drawbars plus a percussive click. House organ stabs"),
                ("pad","Pad: three detuned saws with a slow attack. Long chords"),
-               ("piano","House piano: an M1-style bright hit that mellows. 90s house and garage"),
-               ("rhodes","Rhodes: a warm electric piano that barks when hit hard \\, with tremolo. Deep house and trip hop"),
+               ("piano","House piano: M1-style. Two strings beating gently \\, a hammer click \\, bright as it rings. Classic house"),
+               ("rhodes","Rhodes: a warm body with the tine ringing on the attack \\, barks when hit hard \\, tremolo. Deep house"),
                ("strings","Strings: a string machine with a slow swell and an ensemble chorus. Dub techno and builds")]
 for idx,(kind,title) in enumerate(CHORD_ENGINES):
     q=P(); q.add(f"#X text 20 10 Chord engine {idx}. {title}. k1-k4 0 to 1.;")
@@ -2030,7 +2059,8 @@ for idx,(kind,title) in enumerate(CHORD_ENGINES):
             pp=q.add(f"#X obj {120+v*90} 170 pipe 0;"); q.con(up,v,pp,0); q.con(pp,0,o,0)
             q.con(strum[v],0,pp,1)
     s1=q.add("#X obj 120 260 +~;"); s2=q.add("#X obj 120 280 +~;"); s3=q.add("#X obj 120 300 +~;"); g=q.add(f"#X obj 120 330 *~ {CHORD_GAIN[kind]};"); out=q.add("#X obj 120 370 outlet~;")
-    for c in [(vs[0],0,s1,0),(vs[1],0,s1,1),(s1,0,s2,0),(vs[2],0,s2,1),(s2,0,s3,0),(vs[3],0,s3,1),(s3,0,g,0),(g,0,out,0)]: q.con(*c)
+    hp=q.add("#X obj 120 315 hip~ 20;")   # FM at a 1:1 ratio puts a sideband at 0 Hz (an offset): keep it out of the mix
+    for c in [(vs[0],0,s1,0),(vs[1],0,s1,1),(s1,0,s2,0),(vs[2],0,s2,1),(s2,0,s3,0),(vs[3],0,s3,1),(s3,0,hp,0),(hp,0,g,0),(g,0,out,0)]: q.con(*c)
     if kind=="strings":
         # ensemble: three delay taps swept by slow sines a third of a cycle apart (k2 sets the depth)
         q.C=[c for c in q.C if c!=(g,0,out,0)]
