@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.81.1 (19 October 2026)
+
+- **Pi: sound through the DAC Pro.** The start script turned the DAC's card number into Pd's device number the wrong way, so the sound went to the second HDMI port. It now finds the DAC by name in Pd's own device list
+
 ## v0.81 (19 October 2026)
 
 - **The lead's freedom buttons are now one slider, inside to outside.** It builds up as it goes: chord notes, then passing notes between the beats, then colour (7ths and 9ths on some beats), then outside (octave leaps and chromatic notes). It works on one chord, mutate picks where the extra notes land, and the steps show what it plays. Replaces ockm-lead-freedom with ockm-lead-outside
