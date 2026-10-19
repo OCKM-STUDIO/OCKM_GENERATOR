@@ -1,6 +1,7 @@
 # The Pi's login start-up (copy to ~/.config/labwc/autostart). It replaces the system one, so the desktop and taskbar
-# don't load: the screen goes straight to the app. Screen rotation (kanshi) still starts first. If the app quits
-# (menu: quit to desktop), the desktop and taskbar start then. To get the normal desktop back, delete
+# don't load: the screen goes straight to the app. Screen rotation (kanshi) still starts first. If the app quits from
+# its menu (quit to desktop), the desktop and taskbar start then. tools/pi/ockm-restart.sh restarts the app without
+# that: it leaves a flag, and the loop below starts the app again instead. To get the normal desktop back, delete
 # ~/.config/labwc/autostart
 /usr/bin/kanshi &
-sh -c '/home/simon/OCKM_GENERATOR/tools/pi/ockm-start.sh; /usr/bin/lwrespawn /usr/bin/pcmanfm-pi & /usr/bin/lwrespawn /usr/bin/wf-panel-pi &' &
+sh -c 'while true; do rm -f /tmp/ockm-restart; /home/simon/OCKM_GENERATOR/tools/pi/ockm-start.sh; [ -f /tmp/ockm-restart ] || break; done; /usr/bin/lwrespawn /usr/bin/pcmanfm-pi & /usr/bin/lwrespawn /usr/bin/wf-panel-pi &' &
