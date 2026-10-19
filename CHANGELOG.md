@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.88 (19 October 2026)
+
+- **One sidechain model:** each part's tab sets how it pumps (amount, and duck, pump or gate: now on the lead and chord tabs as well as the bass). Perform's **pump** is a move you hold, like drop and throw: deep while held, gone when you let go (it was a three-way switch on top of the tab settings)
+
 ## v0.87 (19 October 2026)
 
 - **One Perform screen.** What was Perform B (track tiles with quantised mutes, the mute presets, the effects and macros) is now **perform**, the home screen, in a wide tab where the two used to sit, so the other tabs haven't moved

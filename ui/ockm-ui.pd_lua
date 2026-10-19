@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.87"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.88"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -961,8 +961,9 @@ function ui:layout_live(add)
   local rise = (self.v["ockm-rise"] or 0) > 0
   local pump = self.v["ockm-pump"] or 0
   add{ kind="choice", x=mx, y=80, w=mw, h=52, label="rise", sel=rise, accent=true, tap=function() self:send("ockm-rise", rise and 0 or 1) end }
-  add{ kind="choice", x=mx + (mw + 6), y=80, w=mw, h=52, label=(pump <= 0) and "pump" or ((pump < 0.75) and "pump ·" or "pump ··"), sel=(pump > 0), accent=true,
-       tap=function() self:send("ockm-pump", (pump <= 0) and 0.5 or ((pump < 0.75) and 1 or 0)) end }
+  -- v0.88: pump is a move you hold, like drop and throw: everything dips on each kick, deep, until you let go. How each
+  -- part pumps the rest of the time is its own sidechain, on its tab
+  add{ kind="pad", x=mx + (mw + 6), y=80, w=mw, h=52, hook="ockm-pump", label="pump", sub="hold" }
   add{ kind="pad", x=mx + 2 * (mw + 6), y=80, w=mw, h=52, hook="ockm-drop", label="drop", sub="hold" }
   add{ kind="pad", x=mx + 3 * (mw + 6), y=80, w=mw, h=52, hook="ockm-delay-throw", label="throw", sub="hold" }
   local hold = self.filter_hold
@@ -2056,6 +2057,20 @@ local function outside_zone(v)
   return "outside: leaps and chromatic notes"
 end
 local SC_SHAPES = { "duck", "pump", "gate" }   -- ockm-<part>-scshape 0, 1, 2
+-- a part's sidechain (v0.79 on the bass, v0.88 on all three): how far it dips on each kick, and how (duck, pump or gate),
+-- with a picture of one beat
+function ui:sidechain_row(add, p, ix, y, iw)
+  local shk = "ockm-"..p.."-scshape"
+  local shp = math.floor((self.v[shk] or 1) + 0.5)
+  local bw, cw = math.floor(iw * 0.38), math.floor(iw * 0.13)
+  add{ kind="hbar", x=ix, y=y, w=bw, h=30, hook="ockm-"..p.."-sidechain", lo=0, hi=1, label="sidechain", bold=true }
+  for i, nm in ipairs(SC_SHAPES) do
+    add{ kind="choice", x=ix + bw + 6 + (i - 1) * (cw + 4), y=y, w=cw, h=30, label=nm, small=true, sel=(shp == i - 1),
+         tap=function() self:send(shk, i - 1) end }
+  end
+  local px = ix + bw + 6 + 3 * (cw + 4) + 2
+  add{ kind="scpic", x=px, y=y, w=ix + iw - px, h=30, shape=shp, amt=self.v["ockm-"..p.."-sidechain"] or 0 }
+end
 -- how far a sidechain shape has dipped, t beats after the kick (0 to 1): the same curves as the engine
 local function sc_dip(shape, t)
   if shape == 0 then return math.max(0, 1 - t / 0.2) end
@@ -2102,7 +2117,7 @@ function ui:gen_controls(add, p, ix, cy, iw, k)
     end
     add{ kind="choice", x=ix, y=450, w=iw, h=34, label="smooth voicing", accent=true, small=true, sel=(self.v["ockm-chord-smooth"] or 1) > 0,
          tap=function() self:send("ockm-chord-smooth", ((self.v["ockm-chord-smooth"] or 1) > 0) and 0 or 1) end }
-    add{ kind="hbar", x=ix, y=494, w=iw, h=30, hook="ockm-chord-sidechain", lo=0, hi=1, label="sidechain from the kick", bold=true }
+    self:sidechain_row(add, "chord", ix, 494, iw)
     if self:part_empty("chord") then
       add{ kind="btn", x=ix, y=532, w=iw, h=34, accent=true, label=START.chord, tap=function() self:start_part("chord") end }
     end
@@ -2133,21 +2148,7 @@ function ui:gen_controls(add, p, ix, cy, iw, k)
          valtext=function(v) return outside_zone(v) end }
   end
   -- sidechain: how far it dips each time the kick hits (the Perform pump does all the synths at once)
-  if p == "bass" then
-    -- v0.79 (bass first, to try it): how far it dips, and how: duck, pump or gate, with a picture of one beat
-    local shk = "ockm-"..p.."-scshape"
-    local shp = math.floor((self.v[shk] or 1) + 0.5)
-    local bw, cw = math.floor(iw * 0.38), math.floor(iw * 0.13)
-    add{ kind="hbar", x=ix, y=446, w=bw, h=30, hook="ockm-"..p.."-sidechain", lo=0, hi=1, label="sidechain", bold=true }
-    for i, nm in ipairs(SC_SHAPES) do
-      add{ kind="choice", x=ix + bw + 6 + (i - 1) * (cw + 4), y=446, w=cw, h=30, label=nm, small=true, sel=(shp == i - 1),
-           tap=function() self:send(shk, i - 1) end }
-    end
-    local px = ix + bw + 6 + 3 * (cw + 4) + 2
-    add{ kind="scpic", x=px, y=446, w=ix + iw - px, h=30, shape=shp, amt=self.v["ockm-"..p.."-sidechain"] or 0 }
-  else
-    add{ kind="hbar", x=ix, y=446, w=iw, h=30, hook="ockm-"..p.."-sidechain", lo=0, hi=1, label="sidechain from the kick", bold=true }
-  end
+  self:sidechain_row(add, p, ix, 446, iw)
   add{ kind="hbar", x=ix, y=482, w=iw, h=30, hook="ockm-"..p.."-density", lo=0, hi=2, label="density", bold=true }
   local skey = "ockm-"..p.."-seed"
   local seed = math.floor(self.v[skey] or 0)

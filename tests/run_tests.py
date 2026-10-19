@@ -1607,6 +1607,17 @@ def drums_tab_swipes_to_all_drums(work):
     assert any(e[:2] == ["d1", "0"] for e in edits[1:]), f"back on one drum: the kick's step 1: {edits}"
 
 @test
+def perform_pump_is_held(work):
+    """Perform's pump is a move you hold, like drop and throw: 1 while held, back to 0 on release."""
+    sys.path.insert(0, os.path.join(ROOT, "tests"))
+    import ui_preview
+    if not ui_preview.LUA:
+        raise Skip("no lua to run the screen")
+    L = ui_preview.run(["test press 660 106", "test release 660 106"])
+    pump = [float(l.split()[3]) for l in L if l.startswith("sent ockm-pump ")]
+    assert pump == [1, 0], f"held then let go: {pump}"
+
+@test
 def refit_my_line_when_the_harmony_moves(work):
     """A lead that's yours, all on A over A minor. The harmony changes to E minor under it: the lead tab says the notes no
     longer fit, and refit moves each one to the nearest chord note (G), keeping the rhythm."""
