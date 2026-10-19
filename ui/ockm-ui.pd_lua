@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.88"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.89"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -161,6 +161,7 @@ function ui:defaults()
   end
   v["ockm-bass-on"] = 1; v["ockm-lead-on"] = 1; v["ockm-chord-on"] = 1; v["ockm-drums-on"] = 1; v["ockm-turn-every"] = 0; v["ockm-bass-walk"] = 0; v["ockm-lead-outside"] = 0.35; v["ockm-rise"] = 0; v["ockm-end"] = 0; v["ockm-impact"] = 0; v["ockm-pump"] = 0
   v["ockm-bass-scshape"] = 1; v["ockm-lead-scshape"] = 1; v["ockm-chord-scshape"] = 1
+  v["ockm-drum-punch"] = 0.5
   v["ockm-style"] = -1; v["ockm-bass-half"] = 0; v["ockm-lead-half"] = 0; v["ockm-chord-half"] = 0
   v["ockm-bass-mode"] = 0; v["ockm-lead-mode"] = 0; v["ockm-chord-mode"] = 0   -- 0 auto, 1 manual
   v["ockm-bass-sync"] = 1; v["ockm-lead-sync"] = 1; v["ockm-leader"] = 0; v["ockm-drum-groove"] = -1
@@ -205,7 +206,7 @@ function ui:hooks()
   for _, k in ipairs({ "ockm-drum-loop", "ockm-swing", "ockm-accent", "ockm-sync", "ockm-fill-every", "ockm-fill-style" }) do h[#h+1] = k end
   for _, k in ipairs({ "ockm-drums-on", "ockm-turn-every", "ockm-bass-walk", "ockm-lead-outside", "ockm-bass-sidechain", "ockm-lead-sidechain", "ockm-chord-sidechain",
                          "ockm-style", "ockm-bass-half", "ockm-lead-half", "ockm-chord-half",
-                         "ockm-bass-scshape", "ockm-lead-scshape", "ockm-chord-scshape" }) do h[#h+1] = k end
+                         "ockm-bass-scshape", "ockm-lead-scshape", "ockm-chord-scshape", "ockm-drum-punch" }) do h[#h+1] = k end
   for _, k in ipairs({ "ockm-volume", "ockm-verb-mix", "ockm-delay-mix", "ockm-drive", "ockm-delay-fb", "ockm-delay-steps", "ockm-verb-size", "ockm-verb-tone" }) do h[#h+1] = k end
   return h
 end
@@ -1481,7 +1482,10 @@ function ui:layout_drums(add)
   local ph = self:phrase()
   add{ kind="text", x=gx, y=498, w=half, h=12, size=10,
        label="fill at the end of each phrase (" .. ((ph > 0) and ("every " .. ph .. " bars") or "phrase off") .. ": set on the builder)" }
-  add{ kind="choice", x=gx, y=514, w=half, h=30, small=true, sel=(every == 0), label="no fill", tap=function() self:phrase_move("ockm-fill-every", false) end }
+  local nfw = (half - 6) / 2
+  add{ kind="choice", x=gx, y=514, w=nfw, h=30, small=true, sel=(every == 0), label="no fill", tap=function() self:phrase_move("ockm-fill-every", false) end }
+  -- v0.89: the drum bus. Punch: parallel compression and saturation on all eight drums together
+  add{ kind="hbar", x=gx + nfw + 6, y=514, w=nfw, h=30, hook="ockm-drum-punch", lo=0, hi=1, label="punch (all drums)", bold=true }
   local style = math.floor(self.v["ockm-fill-style"] or 0)
   local sw = (half - (#FILLS - 1) * 6) / #FILLS
   for i, name in ipairs(FILLS) do
@@ -1770,61 +1774,61 @@ end
 -- Numbers: roots 0 C .. 9 A; scales 0 minor 1 major 2 dorian 3 phrygian; grooves, progressions, rhythms and riffs as listed
 -- in the presets block. Knobs (k) only go with the first engine in the list.
 local STYLES = {
-  { "deep house", bpm=122, swing=58, groove={ 2, 16, 17 }, root={ 5, 2, 7, 0 }, scale={ 2, 0 }, prog={ 3, 1, 9, 6 }, type={ 6, 1 },
+  { "deep house", kit="909-long", punch=0.4, bpm=122, swing=58, groove={ 2, 16, 17 }, root={ 5, 2, 7, 0 }, scale={ 2, 0 }, prog={ 3, 1, 9, 6 }, type={ 6, 1 },
     drums={ kick={ -1, 110, 0.1, 0 }, clap={ 0, 100, 0, 0.1 } },
     bass={ engine={ 5, 1 }, rhythm={ 9, 3, 8 }, notes={ 2, 0 }, move=1, k={ 0.35, 0.2, 0.4, 0.45 } },
     chord={ engine={ 4, 3 }, rhythm={ 6, 3, 8 }, verb=0.25, delay=0.12 },
     lead=false },
-  { "chicago", bpm=125, swing=62, groove={ 13, 14, 22 }, root={ 7, 0, 9 }, scale={ 0, 2 }, prog={ 1, 0, 3 }, type={ 1, 0 },
+  { "chicago", kit="909", punch=0.6, bpm=125, swing=62, groove={ 13, 14, 22 }, root={ 7, 0, 9 }, scale={ 0, 2 }, prog={ 1, 0, 3 }, type={ 1, 0 },
     drums={ kick={ 0, 90, 0.2, 0.3 }, clap={ 0, 100, 0, 0.2 } },
     bass={ engine={ 5, 0 }, rhythm={ 1, 0, 7 }, notes={ 1, 2, 3 }, move=1 },
     chord={ engine={ 1, 3 }, rhythm={ 4, 2, 7 }, verb=0.1 },
     lead=false },
-  { "classic house", bpm=124, swing=56, groove={ 1, 0, 21 }, root={ 0, 7, 2 }, scale={ 1, 4, 0 }, prog={ 5, 3, 9 }, type={ 1, 0 },
+  { "classic house", kit="909", punch=0.5, bpm=124, swing=56, groove={ 1, 0, 21 }, root={ 0, 7, 2 }, scale={ 1, 4, 0 }, prog={ 5, 3, 9 }, type={ 1, 0 },
     drums={ kick={ 0, 100, 0.1, 0.2 }, clap={ 0, 100, 0, 0 } },
     bass={ engine={ 5, 4 }, rhythm={ 0, 1, 9 }, notes={ 2, 1 }, move=1, sidechain=0.2 },
     chord={ engine={ 3, 1 }, rhythm={ 6, 2, 5 }, verb=0.15, delay=0.1 },
     lead={ engine={ 1, 2 }, rhythm={ 10, 11, 8 }, notes={ 15, 16 }, outside=0.4, verb=0.15, delay=0.2 } },
-  { "nu disco", bpm=118, swing=54, groove={ 23, 15, 21 }, root={ 2, 9, 4 }, scale={ 2, 4, 0 }, prog={ 1, 3, 5 }, type={ 1, 6 },
+  { "nu disco", kit="808", punch=0.4, bpm=118, swing=54, groove={ 23, 15, 21 }, root={ 2, 9, 4 }, scale={ 2, 4, 0 }, prog={ 1, 3, 5 }, type={ 1, 6 },
     drums={ kick={ 0, 90, 0, 0.1 }, clap={ 0, 90, 0, 0.2 } },
     bass={ engine={ 4, 5 }, rhythm={ 4, 1, 9 }, notes={ 1, 2 }, move=1 },
     chord={ engine={ 5, 3 }, rhythm={ 2, 6, 0 }, verb=0.2 },
     lead={ engine={ 1, 4 }, rhythm={ 11, 10 }, notes={ 16, 15, 17 }, outside=0.45, delay=0.25 } },
-  { "tech house", bpm=126, swing=54, groove={ 3, 24, 21 }, root={ 9, 7, 2, 4 }, scale={ 0, 2 }, prog={ 0, 1 }, type={ 1, 0 },
+  { "tech house", kit="909", punch=0.7, bpm=126, swing=54, groove={ 3, 24, 21 }, root={ 9, 7, 2, 4 }, scale={ 0, 2 }, prog={ 0, 1 }, type={ 1, 0 },
     drums={ kick={ 0, 90, 0.3, 0.4 }, clap={ 0, 80, 0, -0.5 } },
     bass={ engine={ 5, 4, 2 }, rhythm={ 14, 2, 10 }, notes={ 0, 3, 5 }, move=1, sidechain=0.3, k={ 0.35, 0.3, 0.5, 0.35 } },
     chord={ engine={ 0, 1 }, rhythm={ 3, 2, 6 }, delay=0.25 },
     lead=false },
-  { "minimal", bpm=125, swing=55, groove={ 4, 28 }, root={ 4, 2, 9 }, scale={ 0, 3, 2 }, prog=0, type={ 0, 1 },
+  { "minimal", kit="808", punch=0.5, bpm=125, swing=55, groove={ 4, 28 }, root={ 4, 2, 9 }, scale={ 0, 3, 2 }, prog=0, type={ 0, 1 },
     drums={ kick={ 1, 70, 0.1, 0.3 }, clap={ 2, 60, 0, -0.6 } },
     bass={ engine={ 1, 5 }, rhythm={ 15, 6, 10 }, notes={ 0, 6 }, move=0 },
     chord={ engine=0, rhythm={ 3, 0 }, delay=0.4 },
     lead={ engine={ 4, 2 }, rhythm={ 9, 12 }, notes={ 6, 10, 11 }, outside=0.3, verb=0.1, delay=0.35 } },
-  { "progressive", bpm=122, swing=50, groove={ 0, 2 }, root={ 2, 9, 4, 7 }, scale={ 0, 5 }, prog={ 3, 6, 7 }, type={ 6, 0 },
+  { "progressive", kit="909-long", punch=0.5, bpm=122, swing=50, groove={ 0, 2 }, root={ 2, 9, 4, 7 }, scale={ 0, 5 }, prog={ 3, 6, 7 }, type={ 6, 0 },
     drums={ kick={ -1, 120, 0.2, 0.2 }, clap={ 0, 110, 0, 0.2 } },
     bass={ engine={ 5, 3 }, rhythm={ 2, 1 }, notes={ 0, 2 }, move=1, sidechain=0.3 },
     chord={ engine={ 2, 5 }, rhythm={ 0, 1 }, verb=0.35, sidechain=0.4 },
     lead={ engine={ 1, 2, 4 }, rhythm={ 13, 10 }, notes={ 18, 8, 9 }, outside=0.3, verb=0.2, delay=0.3 } },
-  { "dub techno", bpm=120, swing=52, groove={ 6, 28 }, root={ 5, 7, 9 }, scale={ 0, 2 }, prog={ 2, 0 }, type={ 1, 6 },
+  { "dub techno", kit="909-long", punch=0.4, bpm=120, swing=52, groove={ 6, 28 }, root={ 5, 7, 9 }, scale={ 0, 2 }, prog={ 2, 0 }, type={ 1, 6 },
     drums={ kick={ -1, 130, 0.2, 0 }, clap={ 0, 100, 0, 0.3 } },
     bass={ engine=1, rhythm={ 5, 15 }, notes=0, move=1 },
     chord={ engine={ 0, 5 }, rhythm=3, verb=0.35, delay=0.55 },
     lead=false },
-  { "detroit", bpm=128, swing=53, groove={ 25, 11, 26 }, root={ 0, 9, 5 }, scale={ 0, 2 }, prog={ 1, 3, 6 }, type={ 1, 6 },
+  { "detroit", kit="909", punch=0.6, bpm=128, swing=53, groove={ 25, 11, 26 }, root={ 0, 9, 5 }, scale={ 0, 2 }, prog={ 1, 3, 6 }, type={ 1, 6 },
     drums={ kick={ 0, 100, 0.3, 0.3 }, clap={ 0, 90, 0.1, 0.1 } },
     bass={ engine={ 2, 5 }, rhythm={ 1, 14 }, notes={ 2, 0 }, move=1 },
     chord={ engine={ 5, 2 }, rhythm={ 0, 1 }, verb=0.25 },
     lead={ engine={ 2, 1 }, rhythm={ 10, 8 }, notes={ 15, 17 }, outside=0.4, delay=0.2 } },
-  { "acid", bpm=130, swing=52, groove={ 29, 5, 14 }, root={ 9, 4, 7 }, scale={ 3, 0 }, prog=0, type=0,
+  { "acid", kit="909", punch=0.7, bpm=130, swing=52, groove={ 29, 5, 14 }, root={ 9, 4, 7 }, scale={ 3, 0 }, prog=0, type=0,
     drums={ kick={ 0, 110, 0.4, 0.4 }, clap={ 0, 90, 0.1, -0.3 } },
     bass={ engine=0, rhythm={ 13, 12 }, notes={ 3, 4 }, move=0, delay=0.15 },
     chord=false, lead=false },
-  { "peak time", bpm=132, swing=50, groove={ 5, 26, 24 }, root={ 5, 4, 2 }, scale={ 3, 0 }, prog={ 0, 2 }, type=0,
+  { "peak time", kit="909", punch=0.8, bpm=132, swing=50, groove={ 5, 26, 24 }, root={ 5, 4, 2 }, scale={ 3, 0 }, prog={ 0, 2 }, type=0,
     drums={ kick={ -2, 150, 0.5, 0.5 }, clap={ 0, 70, 0.2, -0.6 } },
     bass={ engine={ 5, 1 }, rhythm={ 10, 2 }, notes=0, move=0, sidechain=0.5, k={ 0.25, 0.2, 0.35, 0.3 } },
     chord={ engine=0, rhythm={ 3, 2 }, delay=0.35 },
     lead={ engine={ 3, 0 }, rhythm={ 0, 1 }, notes={ 1, 7 }, outside=0.1, delay=0.2 } },
-  { "hard techno", bpm=140, swing=50, groove={ 27, 26, 37 }, root={ 2, 6, 1 }, scale=3, prog=0, type=0,
+  { "hard techno", kit="909", punch=1.0, bpm=140, swing=50, groove={ 27, 26, 37 }, root={ 2, 6, 1 }, scale=3, prog=0, type=0,
     drums={ kick={ -3, 170, 0.8, 0.8 }, clap={ 0, 90, 0.4, -0.3 } },
     bass={ engine={ 1, 3 }, rhythm={ 10, 2 }, notes=0, move=0, sidechain=0.6, k={ 0.4, 0.8, 0.3, 0.4 } },
     chord=false,
@@ -1990,14 +1994,15 @@ function ui:apply_style(i, shuf)
   self:send("ockm-drum-groove", spick(st.groove, shuf))   -- the groove sets its own swing: the style's comes after
   self:send("ockm-swing", st.swing)
   self:send("ockm-turn-every", 0)
+  self:send("ockm-drum-punch", st.punch or 0.5)
   local root, scale = spick(st.root, shuf), spick(st.scale, shuf)
   self:send("ockm-root", root); self:send("ockm-scale", scale)
   for slot = 1, #SLOTS do
     local nm, t = SLOTS[slot], self:voice_type(slot)
     local d = st.drums[t]
     local ks = st.kit and self:kit_sample(slot, st.kit)
-    if ks then   -- the style's kit has this sound: play it as it is
-      self:send("ockm-"..nm.."-sample", ks); self:send("ockm-"..nm.."-tune", 0); self:send("ockm-"..nm.."-decay", 100)
+    if ks then   -- the style's kit has this sound: play it at its full length, tuned as the style tunes that drum
+      self:send("ockm-"..nm.."-sample", ks); self:send("ockm-"..nm.."-tune", d and d[1] or 0); self:send("ockm-"..nm.."-decay", 100)
       self:send("ockm-"..nm.."-tone", 0); self:send("ockm-"..nm.."-verb", 0); self:send("ockm-"..nm.."-delay", 0)
       d = nil
     elseif self:kit_of(slot) then   -- on a kit: back to the synth sound (your own samples stay)

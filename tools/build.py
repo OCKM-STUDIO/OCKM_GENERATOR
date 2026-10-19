@@ -108,7 +108,7 @@ lat=p.add(f"#X obj 600 680 list append {D}0-smp;"); lpr=p.add("#X obj 600 705 li
 sf=p.add("#X obj 600 755 soundfiler;"); ui_=p.add("#X obj 700 780 unpack f;"); p.add(f"#X obj 900 700 table {D}0-smp;")
 for c in [(hp2,0,lat,0),(lat,0,lpr,0),(lpr,0,ltr,0),(ltr,0,sf,0)]: p.con(*c)
 # hit: vel -> (length ms at this speed, amplitude, when to fade, sample count)
-ex=p.add(f"#X obj 30 120 expr {D}f2*(1-0.4*{D}f7)/max({D}f3\\,1)*1000/pow(2\\,{D}f4/12) \\; {D}f1*{D}f6*0.8 \\; {D}f2*(1-0.4*{D}f7)/max({D}f3\\,1)*1000/pow(2\\,{D}f4/12)*min({D}f5\\,100)/100 \\; {D}f2 \\; 1+{D}f2*0.4*{D}f7;")
+ex=p.add(f"#X obj 30 120 expr {D}f2*(1-0.4*{D}f7)/max({D}f3\\,1)*1000/pow(2\\,{D}f4/12) \\; {D}f1*{D}f6*1.4 \\; {D}f2*(1-0.4*{D}f7)/max({D}f3\\,1)*1000/pow(2\\,{D}f4/12)*min({D}f5\\,100)/100 \\; {D}f2 \\; 1+{D}f2*0.4*{D}f7;")
 init=p.add("#X msg 200 75 44100;"); p.con(tlb,1,init,0); p.con(init,0,ex,2)
 il=p.add("#X msg 260 75 1;"); p.con(tlb,1,il,0); p.con(il,0,ex,5)
 idc=p.add("#X msg 300 75 100;"); p.con(tlb,1,idc,0); p.con(idc,0,ex,4)
@@ -165,6 +165,19 @@ am=p.add("#X msg 420 315 0.7 \\, 0 900 5;"); av=p.add("#X obj 420 345 vline~;");
 for c in [(ri,0,ti,0),(ti,2,cm,0),(cm,0,cv,0),(cn,0,ch,0),(ch,0,ch2,0),(ch2,0,cg,0),(cv,0,cg,1),(cg,0,out,0),
           (ti,1,pm,0),(pm,0,pv,0),(pv,0,po,0),(ti,0,am,0),(am,0,av,0),(po,0,pg,0),(av,0,pg,1),(pg,0,out,0),(ri,0,p.add("#X msg 520 285 \; ockm-riser-stop bang;"),0)]: p.con(*c)
 p.save("voices/ockm-transfx.pd","#N canvas 120 120 700 600 12;")
+
+# ---------------- drum bus (v0.89): parallel compression and saturation on the eight drums together ----------------
+# ockm-drum-punch 0 to 1. A squashed copy of the drums (threshold 0.3, ratio 4, a 2 ms attack so each hit's front edge gets
+# through, 100 ms release) is blended under the dry drums, then the lot goes through a soft saturator. 0 leaves them alone.
+# Tuned on the 909 kit: at 1 the drums are about 6 dB fuller with the peaks kept (crest 18 dB down to 13.5)
+p=P(); header_text(p,"Drum bus: parallel compression plus saturation. ockm-drum-punch 0 (off) to 1.")
+inl=p.add("#X obj 30 40 inlet~;"); out=p.add("#X obj 30 400 outlet~;")
+env=p.add("#X obj 200 100 fexpr~ if(abs($x1)>$y1 \\, $y1+0.0104*(abs($x1)-$y1) \\, $y1*0.99979);".replace("$","\\$"))
+cmp_=p.add("#X obj 200 150 expr~ $v1*min(1 \\, pow(0.3/max($v2 \\, 0.0001) \\, 0.75))*2.5;".replace("$","\\$"))   # threshold 0.3, ratio 4, 2.5x makeup
+mixx=p.add("#X obj 30 250 expr~ (1-$f3)*$v1 + $f3*tanh(0.45*($v1 + 0.7*$f3*$v2))/0.45;".replace("$","\\$"))   # 0: untouched. The squashed copy adds body between the hits; the saturation (matched to the bus level, peaks near 2) only rounds the very top, so the transients keep their edge
+rp=p.add("#X obj 400 40 r ockm-drum-punch;"); lp=p.add("#X obj 400 70 line 0 20;")
+for c in [(inl,0,env,0),(inl,0,cmp_,0),(env,0,cmp_,1),(inl,0,mixx,0),(cmp_,0,mixx,1),(rp,0,lp,0),(lp,0,mixx,2),(mixx,0,out,0)]: p.con(*c)
+p.save("voices/ockm-drumbus.pd","#N canvas 120 120 700 450 12;")
 
 # ---------------- transitions: what happens where song sections meet ----------------
 # Per pattern: ockm-end (how its last bar in the song plays: 0 nothing, 1 fill, 2 riser, 3 riser + gap, 4 dub out)
@@ -471,7 +484,7 @@ DLY=[0]*8    # default delay send per sound: likewise
 MONO=["note","on","acc","slide"]; CHORD=["on","deg"]
 def show(h): return "ockm-show-"+h[5:]
 # Settings registry: (hook, default, hook the store listens to if different)
-PROJECT_KEYS=[("ockm-bpm",124,"ockm-tempo"),("ockm-volume",1,None),("ockm-accent",0.3,None),("ockm-filter",0,"ockm-filter-now"),("ockm-drive",0,None),
+PROJECT_KEYS=[("ockm-drum-punch",0.5,None),("ockm-bpm",124,"ockm-tempo"),("ockm-volume",1,None),("ockm-accent",0.3,None),("ockm-filter",0,"ockm-filter-now"),("ockm-drive",0,None),
     ("ockm-delay-mix",0.5,None),("ockm-delay-fb",0.4,None),("ockm-delay-steps",3,None),("ockm-verb-mix",0.3,None),
     ("ockm-verb-size",0.6,None),("ockm-verb-tone",0.5,None),("ockm-sync",0,None),("ockm-clock-out",1,None)]
 for nm,snd in SLOTS:
@@ -625,12 +638,14 @@ for r,(nm,snd) in enumerate(SLOTS):
     if r==0: p.add(f"#X obj 1200 {y} ockm-samplelib;"); p.add(f"#X obj 1200 {y+25} ockm-recorder;"); p.add(f"#X obj 1200 {y+50} ockm-transitions;")
     gt=p.add(f"#X obj 660 {y+2} ockm-gate {nm} nolevel;")
     eqd=p.add(f"#X obj 710 {y+2} ockm-eq {nm};")
-    p.con(dgo,0,row,0); p.con(row,0,v,0); p.con(v,0,gt,0); p.con(gt,0,eqd,0); p.con(eqd,0,mix,0); v=eqd
+    p.con(dgo,0,row,0); p.con(row,0,v,0); p.con(v,0,gt,0); p.con(gt,0,eqd,0); p.con(eqd,0,p.add(f"#X obj 640 {y+22} throw~ ockm-drumbus;"),0); v=eqd   # to the drum bus
     p.con(eqd,0,p.add(f"#X obj 700 {y+22} throw~ ockm-stem-drums;"),0)
     vs=p.add(f"#X obj 760 {y+2} *~ 0;"); vt=p.add(f"#X obj 830 {y+2} throw~ ockm-revbus;"); vr=p.add(f"#X obj 760 {y-18} r ockm-{nm}-verb;")
     p.con(v,0,vs,0); p.con(vs,0,vt,0); p.con(vr,0,vs,1)
     ds=p.add(f"#X obj 990 {y+2} *~ 0;"); dt_=p.add(f"#X obj 1060 {y+2} throw~ ockm-dlybus;"); dr_=p.add(f"#X obj 990 {y-18} r ockm-{nm}-delay;")
     p.con(v,0,ds,0); p.con(ds,0,dt_,0); p.con(dr_,0,ds,1)
+# the drum bus: the eight drums together, then into the mix
+cdb=p.add("#X obj 400 960 catch~ ockm-drumbus;"); dbus=p.add("#X obj 400 980 ockm-drumbus;"); p.con(cdb,0,dbus,0); p.con(dbus,0,mix,0)
 rsm=p.add("#X obj 1600 380 r ockm-stepms;"); vsm=p.add("#X obj 1600 405 v ockm_stepms;"); p.con(rsm,0,vsm,0)
 # build and drop (v0.83). ockm-rise 1 starts a build that ends on a loop start at least 2 bars away: the high-pass climbs
 # (slowly at first), a noise riser comes in over the last bar's first 3 beats, the last beat drops out (ockm-gap), and on

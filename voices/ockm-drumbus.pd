@@ -1,0 +1,17 @@
+#N canvas 120 120 700 450 12;
+#X text 20 10 Drum bus: parallel compression plus saturation. ockm-drum-punch 0 (off) to 1.;
+#X obj 30 40 inlet~;
+#X obj 30 400 outlet~;
+#X obj 200 100 fexpr~ if(abs(\$x1)>\$y1 \, \$y1+0.0104*(abs(\$x1)-\$y1) \, \$y1*0.99979);
+#X obj 200 150 expr~ \$v1*min(1 \, pow(0.3/max(\$v2 \, 0.0001) \, 0.75))*2.5;
+#X obj 30 250 expr~ (1-\$f3)*\$v1 + \$f3*tanh(0.45*(\$v1 + 0.7*\$f3*\$v2))/0.45;
+#X obj 400 40 r ockm-drum-punch;
+#X obj 400 70 line 0 20;
+#X connect 1 0 3 0;
+#X connect 1 0 4 0;
+#X connect 3 0 4 1;
+#X connect 1 0 5 0;
+#X connect 4 0 5 1;
+#X connect 6 0 7 0;
+#X connect 7 0 5 2;
+#X connect 5 0 2 0;

@@ -1585,7 +1585,7 @@ def phrase_sets_the_fill_and_turnaround(work):
     L = ui_preview.run(["send ockm-fill-every float 0", "send ockm-turn-every float 0",
                         "test tap 539 36", "test tap 900 569",       # drums tab: breakbeat fill
                         "test tap 477 36", "test tap 878 406",       # builder: turnaround on
-                        "test tap 539 36", "test tap 716 529"])      # drums tab: no fill
+                        "test tap 539 36", "test tap 600 529"])      # drums tab: no fill
     assert sends(L, "ockm-fill-style")[-1:] == [4], "breakbeat picked"
     assert sends(L, "ockm-fill-every")[-2:] == [8, 0], f"the fill every 8, then off: {sends(L, 'ockm-fill-every')}"
     assert sends(L, "ockm-turn-every")[-1:] == [8], f"the turnaround on the same 8-bar phrase: {sends(L, 'ockm-turn-every')}"

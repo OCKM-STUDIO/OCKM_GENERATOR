@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.89 (19 October 2026)
+
+- **909 and 808 kits:** three kits from your Analog Drums packs (909, 909 long, 808), and every style loads one, tuned as the style tunes its drums
+- **Drum bus with punch:** the eight drums now go through parallel compression and a soft saturator before the mix. Punch (drums tab) sets how much; each style sets its own. Tuned on the 909 kit: at 1, about 6 dB fuller with the peaks kept
+- Samples play about 5 dB louder, level with the synth drums
+
 ## v0.88 (19 October 2026)
 
 - **One sidechain model:** each part's tab sets how it pumps (amount, and duck, pump or gate: now on the lead and chord tabs as well as the bass). Perform's **pump** is a move you hold, like drop and throw: deep while held, gone when you let go (it was a three-way switch on top of the tab settings)

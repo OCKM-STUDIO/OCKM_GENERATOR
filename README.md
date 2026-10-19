@@ -2,7 +2,7 @@
 
 A drum machine and easy-to-program synths in one box. Built in Pure Data, designed to run on a Raspberry Pi with a touchscreen and a few knobs.
 
-Current version: **v0.88**
+Current version: **v0.89**
 
 ## How to open it
 
@@ -298,6 +298,7 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 | `ockm-bass-gen`, `ockm-lead-gen`, `ockm-chord-gen` | Rebuild that track with the current settings |
 | `ockm-bass-lock`, `ockm-lead-lock` | Retired from the screen in v0.75 (0 own rhythm, 1 on the kick, 2 the gaps between kicks) |
 | `ockm-<synth>-sidechain` | How far bass, lead or chord dips on each kick, 0 to 1 |
+| `ockm-drum-punch` | The drum bus, 0 (off) to 1: parallel compression and saturation on all eight drums (project setting, default 0.5) |
 | `ockm-<synth>-scshape` | Sidechain shape: 0 duck, 1 pump (default), 2 gate |
 | `ockm-<synth>-half` | Half-time: 1 plays the part's pattern at half speed (one step every two, over two loops) |
 | `ockm-bass-density`, `ockm-lead-density` | 0 to 2: fewer to more notes, 1 is the preset as written |
@@ -393,7 +394,15 @@ Every part has its own length: the drums (all 8 rows together), bass, lead and c
 
 ### Kits
 
-A kit is one file in each sound folder named `kit-<name>`: `samples/kick/kit-breaks.wav`, `samples/snare/kit-breaks.wav` and so on. A style can load one by name (none of the house-to-techno styles do yet: the kits came with the hip hop and drum and bass styles, now gone), and the drums tab shows "breaks kit" instead of a number. Names starting with a letter sort after numbered files, so adding a kit never renumbers your samples. A kit can leave sounds out: those slots stay on the synth. The three kits are built from the CM Lofi packs (kick, snare, clap, closed and open hat).
+A kit is one file in each sound folder named `kit-<name>`: `samples/kick/kit-909.wav`, `samples/snare/kit-909.wav` and so on. Names starting with a letter sort after numbered files, so adding a kit never renumbers your samples. A kit can leave sounds out: those slots stay on the synth. The drums tab shows "909 kit" instead of a number.
+
+Since v0.89 every style loads one (where the files are there; without them it voices the synth kit instead), tuned the way the style tunes that drum:
+- **909** (Analog Drums 909: the fast-attack kick, the bright long snare, clap, closed and open hats, rim, mid tom): Chicago, classic house, tech house, Detroit, acid, peak time, hard techno
+- **909 long** (the long kick, the low snare, the low tom): deep house, progressive, dub techno
+- **808** (Analog Drums 808: kick, snare, clap, hats, claves, mid tom): nu disco, minimal
+- breaks, boom and dusty (from the CM Lofi packs) are still there for your own use
+
+**Punch** (drums tab, beside no fill): the drum bus, on all eight drums together. A squashed copy of the drums (parallel compression: a 2 ms attack lets each hit's front edge through) is blended under them for body, then a soft saturator rounds only the very top, so the transients keep their edge. 0 leaves the drums alone; at 1 they're about 6 dB fuller with the peaks kept. Each style sets its own (0.4 deep house and dub techno, up to 1 for hard techno). Saved with the project. Samples also play about 5 dB louder than before (they're normalised to full scale but were being turned down), to sit with the synth drums
 
 ### Grooves
 
