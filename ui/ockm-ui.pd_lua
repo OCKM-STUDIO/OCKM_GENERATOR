@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.97"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.98"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -45,22 +45,41 @@ local NOTES   = { "C","C#","D","D#","E","F","F#","G","G#","A","A#","B" }
 local SCALES  = { {0,2,3,5,7,8,10}, {0,2,4,5,7,9,11}, {0,2,3,5,7,9,10}, {0,1,3,5,7,8,10}, {0,2,4,5,7,9,10}, {0,2,3,5,7,8,11} }
 local SCALE_NAMES = { "minor","major","dorian","phrygian","mixo","harm min" }
 local MONO_ENG  = { "acid","sub 808","fm","reese","pluck","analogue","donk" }
--- the order the bass engines are shown in: analogue (the default) first, then by family
-local MONO_ORDER = { 5, 1, 0, 3, 2, 4, 6 }
--- the lead has its own engines. Numbers match ockm-lead-engine; LEAD_ORDER is the order they're shown in
-local LEAD_ENG  = { "acid","juno","dx","sync","mini" }
-local LEAD_ORDER = { 4, 1, 2, 0, 3 }
+-- the order the engines are shown in (v0.98: six bass, four lead, four chord). Numbers match ockm-<part>-engine, which
+-- keep their old values so saved projects load; retired ones (bass pluck, lead acid and juno, chord pad and strings) are
+-- left off and moved on to their replacements (RETIRED, below)
+local MONO_ORDER = { 5, 0, 1, 3, 2, 6 }
+local LEAD_ENG  = { "acid","juno","dx","sync","mini","supersaw" }
+local LEAD_ORDER = { 4, 2, 3, 5 }
 local CHORD_ENG = { "stab","organ","pad","piano","rhodes","strings" }
+local CHORD_ORDER = { 0, 1, 3, 4 }
+-- names shown on screen, where they differ from the engine's own
+local ENG_LABEL = { reese = "wide", mini = "analogue", stab = "poly" }
+local function eng_label(nm) return ENG_LABEL[nm] or nm end
+-- each engine's sweet spot (k1-k4), loaded when it's picked, so it sounds right straight away
+local ENGINE_K = {
+  bass  = { [0] = { 0.35, 0.6, 0.55, 0.4 }, [1] = { 0.45, 0.3, 0.35, 0.55 }, [2] = { 0.4, 0.35, 0.45, 0.4 },
+            [3] = { 0.45, 0.5, 0.35, 0.5 }, [5] = { 0.42, 0.25, 0.45, 0.45 }, [6] = { 0.5, 0.5, 0.35, 0.45 } },
+  lead  = { [2] = { 0.45, 0.1, 0.25, 0.5 }, [3] = { 0.4, 0.55, 0.5, 0.45 }, [4] = { 0.55, 0.3, 0.4, 0.45 }, [5] = { 0.55, 0.55, 0.3, 0.5 } },
+  chord = { [0] = { 0.45, 0.5, 0.0, 0.32 }, [1] = { 0.5, 0.4, 0.3, 0.4 }, [3] = { 0.5, 0.3, 0.4, 0.4 }, [4] = { 0.5, 0.4, 0.3, 0.5 } },
+}
+-- retired engines: what a saved project's engine becomes, and the knobs that make it sound like the old one
+local RETIRED = {
+  bass  = { [4] = { 5, { k4 = 0.7 } } },
+  lead  = { [0] = { 4, { k2 = 0.8 } }, [1] = { 4, { chorus = 1 } } },
+  chord = { [2] = { 0, { k3 = 0.8, k4 = 0.6 } }, [5] = { 0, { k3 = 0.7, k4 = 0.6, chorus = 3 } } },
+}
 local function engines_of(part) if part == "chord" then return CHORD_ENG elseif part == "lead" then return LEAD_ENG end return MONO_ENG end
 local KNOBS = {
   acid  = {"cutoff","resonance","env amount","decay"},
-  ["sub 808"] = {"tone","drive","pitch drop","decay"},
+  ["sub 808"] = {"tone","weight","pitch drop","decay"},
   fm    = {"brightness","ratio","env","decay"},
   reese = {"cutoff","detune","env amount","decay"},
   pluck = {"brightness","saw-square","snap","decay"},
   analogue = {"cutoff","saw-square","envelope","decay"},
   donk  = {"brightness","bounce","hollow","decay"},
-  stab  = {"brightness","detune","snap","length"},
+  stab  = {"brightness","detune","attack","length"},
+  supersaw = {"spread","cutoff","drift","decay"},
   organ = {"drawbars","click","sub","length"},
   pad   = {"brightness","detune","attack","length"},
   mini  = {"cutoff","emphasis","contour","decay"},
@@ -228,6 +247,7 @@ function ui:defaults()
   end
   v["ockm-bass-on"] = 1; v["ockm-lead-on"] = 1; v["ockm-chord-on"] = 1; v["ockm-drums-on"] = 1; v["ockm-turn-every"] = 0; v["ockm-bass-walk"] = 0; v["ockm-lead-outside"] = 0.35; v["ockm-rise"] = 0; v["ockm-end"] = 0; v["ockm-impact"] = 0; v["ockm-pump"] = 0
   v["ockm-bass-scshape"] = 1; v["ockm-lead-scshape"] = 1; v["ockm-chord-scshape"] = 1
+  v["ockm-bass-engine"] = 5; v["ockm-lead-engine"] = 4; v["ockm-chord-engine"] = 0   -- analogue, analogue, poly (as the engine starts)
   v["ockm-drum-punch"] = 0.5
   v["ockm-style"] = -1; v["ockm-bass-half"] = 0; v["ockm-lead-half"] = 0; v["ockm-chord-half"] = 0
   v["ockm-bass-mode"] = 0; v["ockm-lead-mode"] = 0; v["ockm-chord-mode"] = 0   -- 0 auto, 1 manual
@@ -291,7 +311,11 @@ function ui:postinitialize()
   for _, hook in ipairs(self:hooks()) do
     local function set(o, sel, atoms)
       local x = (sel == "float" or sel == "set" or sel == "list") and tonumber(atoms[1]) or nil
-      if x then o.v[hook] = x; o:dirty() end
+      if x then
+        o.v[hook] = x; o:dirty()
+        local part = hook:match("^ockm%-(%a+)%-engine$")
+        if part and RETIRED[part] and RETIRED[part][math.floor(x)] then o:retire_engine(part, math.floor(x)) end
+      end
     end
     listen(hook, set)
     listen("ockm-show-" .. hook:sub(6), set)
@@ -1814,6 +1838,21 @@ function ui:layout_synth(add)
   self:layout_synth_sound(add, part, mono)
 end
 
+-- pick an engine and load its sweet spot (k: the knobs to use instead, a style's own)
+function ui:pick_engine(part, e, k)
+  self:send("ockm-"..part.."-engine", e)
+  local d = k or (ENGINE_K[part] or {})[e]
+  if d then for j = 1, 4 do self:send("ockm-"..part.."-k"..j, d[j]) end end
+end
+-- a saved project on a retired engine: move it to the replacement, set to sound like the old one
+function ui:retire_engine(part, old)
+  local r = RETIRED[part][old]
+  local d = (ENGINE_K[part] or {})[r[1]] or { 0.5, 0.5, 0.5, 0.5 }
+  local k = { d[1], d[2], d[3], d[4] }
+  for j = 1, 4 do if r[2]["k"..j] then k[j] = r[2]["k"..j] end end
+  self:pick_engine(part, r[1], k)
+  if r[2].chorus then self:send("ockm-"..part.."-chorus", r[2].chorus) end
+end
 function ui:layout_synth_sound(add, part, mono)
   local half = (W - 48) / 2
   -- left: where the notes come from (the same settings as this part's column on compose)
@@ -1824,10 +1863,11 @@ function ui:layout_synth_sound(add, part, mono)
   add{ kind="text", x=rx, y=314, w=200, h=12, label="sound", size=10 }
   local eng = engines_of(part)
   local ew = rw / #eng
-  for i = 1, #eng do
-    local e = (part == "lead") and LEAD_ORDER[i] or (part == "bass") and MONO_ORDER[i] or (i - 1)
-    add{ kind="choice", x=rx + (i - 1) * ew, y=330, w=ew - 4, h=40, label=eng[e + 1], small=true, sel=(self.v["ockm-"..part.."-engine"] == e),
-         tap=function() self:send("ockm-"..part.."-engine", e) end }
+  local order = (part == "lead") and LEAD_ORDER or (part == "bass") and MONO_ORDER or CHORD_ORDER
+  ew = rw / #order
+  for i, e in ipairs(order) do
+    add{ kind="choice", x=rx + (i - 1) * ew, y=330, w=ew - 4, h=40, label=eng_label(eng[e + 1]), small=true, sel=(self.v["ockm-"..part.."-engine"] == e),
+         tap=function() self:pick_engine(part, e) end }
   end
   local kn = KNOBS[eng[(self.v["ockm-"..part.."-engine"] or 0) + 1]] or KNOBS.acid
   local kw = (rw - 6) / 2
@@ -2029,9 +2069,9 @@ local STYLES = {
     lead=false },
   { "classic house", kit="909", punch=0.5, bpm=124, swing=56, groove={ 1, 0, 21, 16 }, root={ 0, 7, 2, 5 }, scale={ 1, 4, 0 }, prog={ 5, 3, 9, 10 }, type={ 6, 1 },
     drums={ kick={ 0, 100, 0.1, 0.2 }, clap={ 0, 100, 0, 0 } },
-    bass={ engine={ 5, 4 }, rhythm={ 0, 1, 9, 4 }, notes={ 2, 1, 0 }, move=1, sidechain=0.2 },
+    bass={ engine={ 5, 2 }, rhythm={ 0, 1, 9, 4 }, notes={ 2, 1, 0 }, move=1, sidechain=0.2 },
     chord={ engine={ 3, 1 }, rhythm={ 6, 2, 5, 10 }, verb=0.15, delay=0.1, strum=0.1 },
-    lead={ engine={ 1, 2 }, rhythm={ 10, 11, 8 }, notes={ 15, 16, 8 }, outside=0.4, verb=0.15, delay=0.2 } },
+    lead={ engine={ 4, 2 }, rhythm={ 10, 11, 8 }, notes={ 15, 16, 8 }, outside=0.4, verb=0.15, delay=0.2, chorus=2 } },
   -- v0.90: Italian piano house (Black Box, Cappella, late 80s Italy): an M1-style piano playing open triads in a major key
   -- on the big four-chord turn, a riff that pushes ahead of the beat, the M1 organ bass bouncing on the offbeats
   { "italo piano", kit="909", punch=0.5, bpm=124, swing=55, groove={ 1, 21, 0, 16 }, root={ 0, 7, 5, 2 }, scale={ 1, 4 }, prog={ 10, 11, 3 }, type={ 0, 1 },
@@ -2041,12 +2081,12 @@ local STYLES = {
     lead=false },
   { "nu disco", kit="808", punch=0.4, bpm=118, swing=54, groove={ 23, 15, 21 }, root={ 2, 9, 4 }, scale={ 2, 4, 0 }, prog={ 1, 3, 5, 9 }, type={ 12, 6 },
     drums={ kick={ 0, 90, 0, 0.1 }, clap={ 0, 90, 0, 0.2 } },
-    bass={ engine={ 4, 5 }, rhythm={ 4, 1, 9 }, notes={ 1, 2 }, move=1 },
-    chord={ engine={ 5, 3 }, rhythm={ 2, 6, 0, 9 }, verb=0.2, chorus=2 },
-    lead={ engine={ 1, 4 }, rhythm={ 11, 10 }, notes={ 16, 15, 17 }, outside=0.45, delay=0.25 } },
+    bass={ engine={ 5, 2 }, rhythm={ 4, 1, 9 }, notes={ 1, 2 }, move=1, k={ 0.5, 0.3, 0.5, 0.7 } },
+    chord={ engine={ 0, 3 }, rhythm={ 2, 6, 0, 9 }, verb=0.2, chorus=3, k={ 0.5, 0.5, 0.7, 0.6 } },
+    lead={ engine={ 4, 2 }, chorus=2, rhythm={ 11, 10 }, notes={ 16, 15, 17 }, outside=0.45, delay=0.25 } },
   { "tech house", kit="909", punch=0.7, bpm=126, swing=54, groove={ 3, 24, 21 }, root={ 9, 7, 2, 4 }, scale={ 0, 2 }, prog={ 0, 1, 2 }, type={ 10, 11 },
     drums={ kick={ 0, 90, 0.3, 0.4 }, clap={ 0, 80, 0, -0.5 } },
-    bass={ engine={ 5, 4, 2 }, rhythm={ 14, 2, 9 }, notes={ 0, 3, 5 }, move=1, sidechain=0.3, k={ 0.35, 0.3, 0.5, 0.35 } },
+    bass={ engine={ 5, 2, 6 }, rhythm={ 14, 2, 9 }, notes={ 0, 3, 5 }, move=1, sidechain=0.3, k={ 0.35, 0.3, 0.5, 0.35 } },
     chord={ engine={ 0, 1 }, rhythm={ 3, 2, 6 }, delay=0.25 },
     lead=false },
   { "minimal", kit="808", punch=0.5, bpm=125, swing=55, groove={ 4, 28, 26 }, root={ 4, 2, 9 }, scale={ 0, 3, 2 }, prog=0, type={ 11, 10 },
@@ -2057,18 +2097,18 @@ local STYLES = {
   { "progressive", kit="909-long", punch=0.5, bpm=122, swing=50, groove={ 0, 2, 24 }, root={ 2, 9, 4, 7 }, scale={ 0, 5 }, prog={ 3, 6, 7, 5 }, type={ 6, 7 },
     drums={ kick={ -1, 120, 0.2, 0.2 }, clap={ 0, 110, 0, 0.2 } },
     bass={ engine={ 5, 3 }, rhythm={ 2, 1, 4 }, notes={ 0, 2 }, move=1, sidechain=0.3 },
-    chord={ engine={ 2, 5 }, rhythm={ 0, 1, 9 }, verb=0.35, sidechain=0.4, chorus=1 },
-    lead={ engine={ 1, 2, 4 }, rhythm={ 13, 10 }, notes={ 18, 8, 9 }, outside=0.3, verb=0.2, delay=0.3 } },
+    chord={ engine=0, rhythm={ 0, 1, 9 }, verb=0.35, sidechain=0.4, chorus=1, k={ 0.45, 0.5, 0.8, 0.7 } },
+    lead={ engine={ 5, 4, 2 }, rhythm={ 13, 10 }, notes={ 18, 8, 9 }, outside=0.3, verb=0.2, delay=0.3 } },
   { "dub techno", kit="909-long", punch=0.4, bpm=120, swing=52, groove={ 6, 28, 4 }, root={ 5, 7, 9 }, scale={ 0, 2 }, prog={ 2, 0, 1 }, type={ 10, 8, 11 },
     drums={ kick={ -1, 130, 0.2, 0 }, clap={ 0, 100, 0, 0.3 } },
     bass={ engine=1, rhythm={ 5, 15, 6 }, notes={ 0, 6 }, move=1 },
-    chord={ engine={ 0, 5 }, rhythm={ 3, 0, 2 }, verb=0.35, delay=0.55 },
+    chord={ engine=0, rhythm={ 3, 0, 2 }, verb=0.35, delay=0.55 },
     lead=false },
   { "detroit", kit="909", punch=0.6, bpm=128, swing=53, groove={ 25, 11, 26 }, root={ 0, 9, 5 }, scale={ 0, 2 }, prog={ 1, 0, 2 }, type={ 9, 8 },
     drums={ kick={ 0, 100, 0.3, 0.3 }, clap={ 0, 90, 0.1, 0.1 } },
     bass={ engine={ 2, 5 }, rhythm={ 1, 14, 2 }, notes={ 2, 0 }, move=1 },
-    chord={ engine={ 5, 2 }, rhythm={ 0, 1, 3 }, verb=0.3, chorus=3 },
-    lead={ engine={ 2, 1 }, rhythm={ 10, 8 }, notes={ 15, 17 }, outside=0.4, delay=0.2 } },
+    chord={ engine=0, rhythm={ 0, 1, 3 }, verb=0.3, chorus=3, k={ 0.5, 0.5, 0.7, 0.6 } },
+    lead={ engine={ 2, 4 }, rhythm={ 10, 8 }, notes={ 15, 17 }, outside=0.4, delay=0.2 } },
   { "acid", kit="909", punch=0.7, bpm=130, swing=52, groove={ 29, 5, 14 }, root={ 9, 4, 7 }, scale={ 3, 0 }, prog=0, type=0,
     drums={ kick={ 0, 110, 0.4, 0.4 }, clap={ 0, 90, 0.1, -0.3 } },
     bass={ engine=0, rhythm={ 13, 12, 2 }, notes={ 3, 4 }, move=0, delay=0.15 },
@@ -2077,12 +2117,12 @@ local STYLES = {
     drums={ kick={ -2, 150, 0.5, 0.5 }, clap={ 0, 70, 0.2, -0.6 } },
     bass={ engine={ 5, 1 }, rhythm={ 10, 2, 1 }, notes={ 0, 1 }, move=0, sidechain=0.5, k={ 0.25, 0.2, 0.35, 0.3 } },
     chord={ engine=0, rhythm={ 3, 2, 9 }, delay=0.35 },
-    lead={ engine={ 3, 0 }, rhythm={ 0, 1 }, notes={ 1, 7 }, outside=0.1, delay=0.2 } },
+    lead={ engine={ 3, 5 }, rhythm={ 0, 1 }, notes={ 1, 7 }, outside=0.1, delay=0.2 } },
   { "hard techno", kit="909", punch=1.0, bpm=140, swing=50, groove={ 27, 26, 37 }, root={ 2, 6, 1 }, scale={ 3, 0 }, prog=0, type=0,
     drums={ kick={ -3, 170, 0.8, 0.8 }, clap={ 0, 90, 0.4, -0.3 } },
     bass={ engine={ 1, 3 }, rhythm={ 10, 2, 1 }, notes={ 0, 1 }, move=0, sidechain=0.6, k={ 0.4, 0.8, 0.3, 0.4 } },
     chord=false,
-    lead={ engine={ 4, 0 }, rhythm={ 12, 1 }, notes={ 11, 3 }, outside=0.8, delay=0.3 } },
+    lead={ engine={ 4, 5 }, rhythm={ 12, 1 }, notes={ 11, 3 }, outside=0.8, delay=0.3 } },
 }
 -- the phrase (v0.85): one length, set on the builder, for everything that happens at the end of a phrase. The engine still
 -- counts with ockm-fill-every (the drum fill) and ockm-turn-every (the turnaround); the phrase sets both, and each part's
@@ -2127,7 +2167,7 @@ function ui:layout_compose(add)
   add{ kind="text", x=16, y=196, w=W - 32, h=12, size=10,
        label="in this pattern: tap a part to switch it on or off (off is silent, and nothing on Perform brings it back)" }
   local tw = (W - 32 - 3 * 8) / 4
-  local eng = function(part) local e = engines_of(part); return e[(math.floor(self.v["ockm-"..part.."-engine"] or 0)) + 1] or "" end
+  local eng = function(part) local e = engines_of(part); return eng_label(e[(math.floor(self.v["ockm-"..part.."-engine"] or 0)) + 1] or "") end
   for i, p in ipairs({ "drums", "bass", "chords", "lead" }) do
     local on = self:part_in(p)
     local l1, l2
@@ -2283,9 +2323,8 @@ function ui:apply_style(i, classic)
     self:send("ockm-"..part.."-on", ps and 1 or 0)
     if ps then
       local eng = spick(ps.engine, shuf)
-      self:send("ockm-"..part.."-engine", eng)
       local first = (type(ps.engine) == "table") and ps.engine[1] or ps.engine
-      if ps.k and eng == first then for j = 1, 4 do self:send("ockm-"..part.."-k"..j, ps.k[j]) end end
+      self:pick_engine(part, eng, (ps.k and eng == first) and ps.k or nil)
       self:send("ockm-"..part.."-rhythm", spick(ps.rhythm, shuf))
       if ps.notes then self:send("ockm-"..part.."-notes", spick(ps.notes, shuf)) end
       if ps.move then self:set_bass_move(ps.move) end
@@ -2304,7 +2343,7 @@ function ui:apply_style(i, classic)
         self:send("ockm-"..part.."-mode", 0)   -- made for you again, so it follows the new style
       end
       local e = engines_of(part)
-      said[#said + 1] = e[eng + 1]
+      said[#said + 1] = eng_label(e[eng + 1])
     end
   end
   self:send("ockm-style", i - 1)

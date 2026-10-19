@@ -533,10 +533,10 @@ def chord_progressions_fill_and_lengthen(work):
 
 @test
 def chord_engines_sound(work):
-    for eng, name in enumerate(["stab", "organ", "pad"]):
+    for eng, name, k3 in [(0, "poly", 0.0), (1, "organ", 0.2), (0, "poly-pad", 0.6)]:   # v0.98: poly's k3 is attack
         h = Harness(dut="ockm-chord zz")
         h.record(os.path.join(work, f"c_{name}.wav"), source="dut")
-        h.at(20, f"ockm-zz-engine {eng} ; ockm-zz-k1-m 0.5 ; ockm-zz-k2-m 0.5 ; ockm-zz-k3-m 0.2 ; ockm-zz-k4-m 0.5")
+        h.at(20, f"ockm-zz-engine {eng} ; ockm-zz-k1-m 0.5 ; ockm-zz-k2-m 0.5 ; ockm-zz-k3-m {k3} ; ockm-zz-k4-m 0.5")
         h.at(60, "test-in 45 48 52 0 1")
         _, (s, sr) = play(work, h, f"t_chord_{name}", with_main=False, ms=900)
         x = s[int(0.08 * sr):int(0.4 * sr)]
@@ -544,7 +544,7 @@ def chord_engines_sound(work):
 
 @test
 def bass_engines_play_in_tune(work):
-    for eng, name in enumerate(["acid", "sub", "fm", "reese", "pluck", "analogue", "donk"]):
+    for eng, name in [(0, "acid"), (1, "sub"), (2, "fm"), (3, "wide"), (5, "analogue"), (6, "donk")]:   # 4 (pluck) retired in v0.98
         h = Harness(dut="ockm-mono zz")
         h.record(os.path.join(work, f"b_{name}.wav"), source="dut")
         h.at(20, f"ockm-zz-engine {eng} ; ockm-zz-k1-m 0.5 ; ockm-zz-k2-m 0.3 ; ockm-zz-k3-m 0 ; ockm-zz-k4-m 0.9 ; ockm-zz-drive 0")
@@ -559,10 +559,10 @@ def bass_engines_play_in_tune(work):
 def lead_engines_play_in_tune_and_level(work):
     """Every lead engine sounds, plays A2 at about 110 Hz, and sits at a similar level to the others."""
     levels = {}
-    for eng, name in enumerate(["acid", "juno", "dx", "sync", "mini"]):
+    for eng, name in [(2, "dx"), (3, "sync"), (4, "analogue"), (5, "supersaw")]:   # 0 acid and 1 juno retired in v0.98
         h = Harness(dut="ockm-lead zz")
         h.record(os.path.join(work, f"l_{name}.wav"), source="dut")
-        k1, k3 = (0, 0) if name == "sync" else (0.5, 0.3)   # sync: zero sync, so the pitch counter sees the fundamental
+        k1, k3 = (0, 0) if name == "sync" else (0.15, 0.3) if name == "supersaw" else (0.5, 0.3)   # sync: zero sync, so the pitch counter sees the fundamental
         h.at(20, f"ockm-zz-engine {eng} ; ockm-zz-k1-m {k1} ; ockm-zz-k2-m 0.1 ; ockm-zz-k3-m {k3} ; ockm-zz-k4-m 0.9 ; ockm-zz-drive 0")
         h.at(50, "test-in 45 0 0 1")
         _, (x, sr) = play(work, h, f"t_lead_{name}", with_main=False, ms=650)
@@ -579,10 +579,10 @@ def lead_engines_play_in_tune_and_level(work):
 def chord_engines_sound_and_sit_together(work):
     """Every chord engine sounds, the sine-based ones in tune (A3 = 220 Hz), and all at a similar level to each other."""
     levels = {}
-    for eng, name in enumerate(["stab", "organ", "pad", "piano", "rhodes", "strings"]):
+    for eng, name, k3 in [(0, "poly", 0.0), (1, "organ", 0.3), (3, "piano", 0.3), (4, "rhodes", 0.3), (0, "poly-pad", 0.7)]:
         h = Harness(dut="ockm-chord zz")
         h.record(os.path.join(work, f"c_{name}.wav"), source="dut")
-        h.at(20, f"ockm-zz-engine {eng} ; ockm-zz-k1-m 0.5 ; ockm-zz-k2-m 0.3 ; ockm-zz-k3-m 0.3 ; ockm-zz-k4-m 0.6")
+        h.at(20, f"ockm-zz-engine {eng} ; ockm-zz-k1-m 0.5 ; ockm-zz-k2-m 0.3 ; ockm-zz-k3-m {k3} ; ockm-zz-k4-m 0.6")
         h.at(50, "test-in 57 0 0 0 1")        # just the root, to check the pitch
         h.at(700, "test-in off")
         h.at(1000, "test-in 57 60 64 0 1")    # the chord, for the level
@@ -1722,6 +1722,38 @@ def midi_pads_and_knobs(work):
     assert any(l.startswith("sent ockm-d1-mute-q ") and l.endswith(" 1") for l in pg), "program 4 (top left) toggles the kick"
     assert any(l.startswith("sent ockm-filter-glide ") for l in pg[:pg.index("mark tapped")]), "program 13 taps lift"
     assert [l.split()[3] for l in pg if l.startswith("sent ockm-pump ")] == ["1", "0"], "program 15 toggles pump on, then off"
+
+@test
+def retired_engines_move_on_and_engines_load_their_sweet_spot(work):
+    """v0.98: a project saved on a retired engine moves to its replacement, set to sound like the old one: bass pluck (4)
+    to analogue with a long decay; lead juno (1) to analogue with the chorus; chord strings (5) to poly with a slow attack
+    and chorus I+II. Picking an engine on its tab loads that engine's own knob settings."""
+    sys.path.insert(0, os.path.join(ROOT, "tests"))
+    import ui_preview
+    if not ui_preview.LUA:
+        raise Skip("no lua to run the screen")
+    L = ui_preview.run(["send ockm-bass-engine float 4", "mark bass", "send ockm-lead-engine float 1", "mark lead",
+                        "send ockm-chord-engine float 5", "mark chord", "test tap 601 36", "mark tab"])
+    def after(mark, until=None):
+        i = L.index("mark " + mark); j = L.index("mark " + until) if until else len(L)
+        return {l.split()[1]: float(l.split()[3]) for l in L[i:j] if l.startswith("sent ") and len(l.split()) > 3}
+    def before(mark, start=None):
+        i = L.index("mark " + start) if start else 0; j = L.index("mark " + mark)
+        return {l.split()[1]: float(l.split()[3]) for l in L[i:j] if l.startswith("sent ") and len(l.split()) > 3}
+    b = before("bass")
+    assert b.get("ockm-bass-engine") == 5 and b.get("ockm-bass-k4") == 0.7, f"pluck becomes analogue with a long decay: {b}"
+    l = before("lead", "bass")
+    assert l.get("ockm-lead-engine") == 4 and l.get("ockm-lead-chorus") == 1, f"juno becomes analogue with the chorus: {l}"
+    c = before("chord", "lead")
+    assert c.get("ockm-chord-engine") == 0 and c.get("ockm-chord-k3") == 0.7 and c.get("ockm-chord-chorus") == 3, f"strings become poly: {c}"
+    # the bass tab's engine row: analogue, acid, sub 808, wide, fm, donk. Tap acid (the second)
+    lines = ui_preview.run(["test tap 601 36", "paint tab"])
+    import re as _re
+    shot = [l for l in lines if l.startswith("text ")]
+    names = [" ".join(l.split()[4:]) for l in shot]
+    for nm in ("analogue", "acid", "sub 808", "wide", "fm", "donk"):
+        assert nm in names, f"the bass tab should offer {nm}: {[n for n in names if n in ('pluck', 'reese')]}"
+    assert "pluck" not in names and "reese" not in names, "pluck is retired; reese shows as wide"
 
 @test
 def refit_my_line_when_the_harmony_moves(work):

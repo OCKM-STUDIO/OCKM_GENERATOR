@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.98 (19 October 2026)
+
+Step 2 of the harmony and generator proposal: fewer engines, each sounding right the moment it's picked.
+
+- **Every engine has its own sweet spot.** Picking an engine loads its four knobs at settings that suit it (before, the knobs stayed where the last engine left them, so k2 at 0.25 meant something different on every engine). A style that sets its own knobs keeps them
+- **Bass, seven to six:** analogue, acid, sub 808, wide, FM, donk. Pluck is gone: analogue past decay 0.6 now rings on after its step and fades, which is what pluck did. Reese is now called **wide**. Sub 808's k2 is **weight** (the second harmonic, body on small speakers) instead of a second drive
+- **Lead, five to four:** analogue (was mini), dx, sync and the new **supersaw**: seven detuned saws, from one saw (spread 0) to a trance and peak-time stack, with drift, and a hoover when the decay is long. Juno and lead acid are gone (analogue with the chorus, and analogue with the emphasis up)
+- **Chords, six to four:** **poly** (was stab), organ, piano, rhodes. Poly's k3 is now **attack**: the bottom third is the dub techno stab, up from there a pad, and with the chorus a string machine, so pad and strings are gone. Its length goes up to about 3 seconds
+- **Saved projects still load:** engine numbers are kept, and a project on a retired engine moves to its replacement set to sound like the old one (pluck to analogue with a long decay; lead acid to analogue with emphasis 0.8; juno to analogue with the chorus; pad and strings to poly with a slow attack, strings with chorus I+II)
+- Styles that used retired engines now use their replacements (progressive leads on supersaw, peak time and hard techno can roll supersaw, Detroit and nu disco chords on poly with chorus)
+
 ## v0.97 (19 October 2026)
 
 First step of the harmony and generator proposal.

@@ -1,5 +1,5 @@
 #N canvas 160 160 900 620 12;
-#X text 20 10 Mini lead: three oscillators driven into a ladder filter. Big and warm;
+#X text 20 10 Analogue lead (was mini): three oscillators driven into a ladder filter. Big and warm;
 #X obj 30 50 inlet;
 #X obj 30 80 spigot 1;
 #X obj 30 120 ockm-lead-core;

@@ -439,33 +439,31 @@ The sliders change with the source. **Synth:** as above. **Sample:** level, pitc
 
 ## Bass engines
 
-The bass has seven engines. Only the chosen engine runs, so the others cost no processing power. Every engine uses the same four knobs, 0 to 1. k4 is always decay.
+The bass has six engines (v0.98). Only the chosen engine runs, so the others cost no processing power. Every engine uses four knobs, 0 to 1; k4 is always decay. Picking an engine loads its own sweet spot for the four knobs, so it sounds right straight away (a style that sets its own knobs uses those).
 
-The screen shows them by family: analogue first (the default), then sub 808, acid, reese, FM, pluck and donk.
+The screen shows them by family: analogue first (the default), then acid, sub 808, wide, FM and donk. Engine numbers stay as they were so saved projects load: pluck (4) is retired, and a project saved on it moves to analogue with a long decay.
 
 | Engine | k1 | k2 | k3 | Character |
 |---|---|---|---|---|
 | 0 acid | cutoff | resonance | envelope amount | The 303 squelch |
-| 1 sub 808 | tone | drive | pitch drop (quick, up to 30 semitones) | Deep and clean. Turn the decay up and it rings on past the step like an 808 boom |
+| 1 sub 808 | tone | weight (the second harmonic: body on small speakers) | pitch drop (quick, up to 30 semitones) | Deep and clean. Turn the decay up and it rings on past the step like an 808 boom. Its k2 was a second drive, beside the drive slider |
 | 2 FM | brightness | ratio | envelope on brightness | Punchy, metallic, plucky |
-| 3 reese | cutoff | detune (width) | envelope amount | Dark and wide: three detuned saws beating over a steady sine sub. Keep the envelope low for drum and bass |
-| 4 pluck | brightness | saw to square | filter snap | Rings out and fades over the decay time, with a sub an octave down. Ignores the short 303-style note length |
-| 5 analogue | cutoff | saw to square | filter envelope | The workhorse house and techno bass (Minimoog, SH-101, Pro-One): saw to square with a square sub an octave down, through a resonant 24 dB low-pass. The default |
+| 3 wide (was reese) | cutoff | detune (width) | envelope amount | The detuned-saw techno bass: three saws beating over a steady sine sub |
+| 5 analogue | cutoff | saw to square | filter envelope | The workhorse house and techno bass (Minimoog, SH-101, Pro-One): saw to square with a square sub an octave down, through a resonant 24 dB low-pass. Past decay 0.6 a note rings on after its step and fades, so a long decay is a pluck. The default |
 | 6 donk | brightness (organ harmonics) | bounce (pitch drop onto the note) | hollow (woodier) | Bassline house, garage and the M1 organ bass: a hollow tone that bounces onto each note and rings out |
 
 The drive comes after the engine, so it works on all of them. At 0 it's completely clean; it only colours the sound as you turn it up. The bass starts on analogue.
 
 ## Lead engines
 
-The lead has its own engines, made for melodies (it plays two octaves above the bass). Every lead engine glides on slide steps and adds a gentle vibrato that fades in on held notes, like easing in a mod wheel. k4 is decay, as on the bass. The screen shows them in the order mini, juno, dx, acid, sync.
+The lead has its own engines, made for melodies (it plays two octaves above the bass). Every lead engine glides on slide steps and adds a gentle vibrato that fades in on held notes, like easing in a mod wheel. k4 is decay, as on the bass. Four engines (v0.98), shown as analogue, dx, sync, supersaw; picking one loads its sweet spot. Acid (0) and juno (1) are retired: a project saved on acid moves to analogue with the emphasis up, one on juno to analogue with the chorus on.
 
 | Engine | k1 | k2 | k3 | Character |
 |---|---|---|---|---|
-| 0 acid | cutoff | resonance | envelope amount | The 303, voiced to cut through: more resonance and a little grit |
-| 1 juno | cutoff | pulse width movement | chorus: off, I, II | Saw, a slowly moving pulse and a sub through a soft filter, then the chorus. Dreamy |
 | 2 dx | brightness | character: tine, reed, bell, glass | detune | Two-operator FM. Notes ring and fade like an electric piano; accents hit brighter |
 | 3 sync | sync amount | tone | sweep | A hard-synced saw that sweeps with the envelope. Tech house and electro |
-| 4 mini | cutoff | emphasis | contour | Three oscillators driven into a ladder filter. Big and warm. The default |
+| 4 analogue (was mini) | cutoff | emphasis | contour | Three oscillators driven into a ladder filter. Big and warm. The default |
+| 5 supersaw | spread (one saw to seven) | cutoff | drift (each saw wanders a little) | Seven detuned saws: the trance and peak-time stack, and a hoover with a long decay and the envelope sweeping the filter |
 
 Five more are planned: whistle, supersaw, hoover, melodica and vox. Until then, a lead engine number past the last one plays mini.
 
@@ -480,16 +478,17 @@ Plays up to four notes at once, worked out as it plays from the step's chord roo
 
 **Smooth** (on by default) keeps every chord at about the same height (around D4, and never below D3, out of the bass's way): chords from the key pick the inversion that sits there, fixed shapes move by octaves. Off plays every chord from its root upwards, exactly parallel.
 
-Every hit varies a little in strength, and accents hit harder. On the stab engine, how hard a hit is also opens the filter, so accents bite. Styles set the chord track's low cut (mixer EQ) to 150 Hz, leaving the low end to the kick and bass.
+Every hit varies a little in strength, and accents hit harder. On the poly engine, how hard a hit is also opens the filter, so accents bite. Styles set the chord track's low cut (mixer EQ) to 150 Hz, leaving the low end to the kick and bass.
 
 | Engine | k1 | k2 | k3 | k4 | Character |
 |---|---|---|---|---|---|
-| 0 stab | brightness | detune | filter snap | length | Dub techno stabs. Great with the delay |
+| 0 poly (was stab) | brightness | detune | attack (the bottom third is a stab; up from there a pad) | length (up to about 3 s) | Two detuned saws through a filter. The dub techno stab at attack 0, a pad further up, and a string machine with the chorus on. Replaces pad and strings (v0.98) |
 | 1 organ | upper drawbars | percussion click | sub drawbar | length | House organ |
-| 2 pad | brightness | detune (width) | attack | length | Slow, wide chords |
 | 3 piano | brightness | octave (the even partials) | snap (how fast the first bright hit drops away) | length | House piano (v0.92): a struck string. Ten slightly stretched partials, the first four doubled by a second string that beats against them, the upper ones dying first, a hammer knock. Brighter the harder you hit. Classic house and Italo piano |
 | 4 rhodes | tone (body and tine brightness) | bark (how much a hard hit drives it) | tremolo | length | Electric piano (v0.84): a warm body with the tine ringing on the attack (the 14:1 partial of the DX7 pianos), barks when hit hard. Deep house |
-| 5 strings | tone | ensemble depth | attack | release | String machine with an ensemble chorus. Dub techno and builds |
+
+
+Four engines (v0.98): poly, organ, piano, rhodes, each loading its own sweet spot when picked. Pad (2) and strings (5) are retired: a project saved on pad moves to poly with a slow attack, one on strings to poly with a slow attack and the chorus on I+II.
 
 ## Effects
 
