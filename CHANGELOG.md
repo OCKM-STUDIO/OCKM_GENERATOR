@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.91 (19 October 2026)
+
+- **Italo piano style:** Italian piano house. The M1-style piano on open triads in a major key, a new two-bar **piano riff** that pushes ahead of the beat, the M1 organ bass (donk) bouncing on the offbeats, the 909 kit
+- Two new progressions for major keys: **piano house** (I V vi IV) and **anthem** (vi IV I V)
+
 ## v0.90 (19 October 2026)
 
 - **Chords that don't sound like a home keyboard.** New fixed shapes (m9, m11, dub m7, 4ths, maj9) that move as one block with the progression, the chord memory sound of deep house, Detroit and dub techno. They sit on a second row on the chord tab, under the chords built from the key

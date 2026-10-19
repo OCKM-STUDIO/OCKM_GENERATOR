@@ -1565,13 +1565,13 @@ def song_styles_set_the_lot(work):
                 v = l.split()
                 out[v[1]] = float(v[3]) if len(v) > 3 and v[3] not in ("bang",) else None
         return out
-    PEAK, DEEP, SHUFFLE = "test tap 636 174", "test tap 83 142", "test tap 896 158"
+    PEAK, DEEP, SHUFFLE = "test tap 547 174", "test tap 83 142", "test tap 896 158"
     t = sent(ui_preview.run(["test tap 477 36", PEAK]))
     assert t["ockm-bpm"] == 132 and t["ockm-swing"] == 50 and t["ockm-drum-groove"] == 5, t
     assert t["ockm-root"] == 5 and t["ockm-scale"] == 3, "F phrygian"
     assert t["ockm-d1-drive"] == 0.5 and t["ockm-d1-tune"] == -2, "the kick gets harder and lower"
     assert t["ockm-lead-on"] == 1 and t["ockm-bass-rhythm"] == 10 and t["ockm-bass-sync"] == 0 and t["ockm-chord-on"] == 1, t
-    assert t["ockm-style"] == 10, t
+    assert t["ockm-style"] == 11, t
     d = sent(ui_preview.run(["test tap 477 36", DEEP]))
     assert d["ockm-bpm"] == 122 and d["ockm-scale"] == 2 and d["ockm-chord-engine"] == 4 and d["ockm-lead-on"] == 0, d
     lines = ui_preview.run(["test tap 477 36", DEEP] + [SHUFFLE] * 4)

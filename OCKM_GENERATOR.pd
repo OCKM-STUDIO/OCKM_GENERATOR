@@ -866,10 +866,10 @@
 #X floatatom 690 260 5 0 1 0 - - ockm-chord-smooth;
 #X obj 735 242 r ockm-show-chord-smooth;
 #X text 785 242 rhythm;
-#X floatatom 785 260 5 0 9 0 - - ockm-chord-rhythm;
+#X floatatom 785 260 5 0 10 0 - - ockm-chord-rhythm;
 #X obj 830 242 r ockm-show-chord-rhythm;
 #X text 880 242 prog;
-#X floatatom 880 260 5 0 9 0 - - ockm-chord-prog;
+#X floatatom 880 260 5 0 11 0 - - ockm-chord-prog;
 #X obj 925 242 r ockm-show-chord-prog;
 #X text 20 300 key root: 0 C ... 9 A ... 11 B. Scale: 0 minor 1 major 2 dorian 3 phrygian 4 mixolydian 5 harmonic minor;
 #X text 20 320 bass engines: 0 acid 1 sub/808 2 FM 3 reese 4 pluck 5 analogue (default) 6 donk. Chord engines: 0 stab 1 organ 2 pad 3 piano 4 rhodes 5 strings. Chord type: 0 triad 1 seventh 2 sus2 3 power 4 sus4 5 sixth 6 ninth 7 eleventh;

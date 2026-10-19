@@ -768,7 +768,7 @@ row(140,"bass",[("engine",5,0,6,"ockm-bass-engine",True),("k1",0.42,0,1,"ockm-ba
 row(200,"lead",[("engine",4,0,6,"ockm-lead-engine",True),("k1",0.55,0,1,"ockm-lead-k1",True),("k2",0.3,0,1,"ockm-lead-k2",True),("k3",0.4,0,1,"ockm-lead-k3",True),
                 ("k4",0.45,0,1,"ockm-lead-k4",True),("drive",0,0,1,"ockm-lead-drive",True),("rhythm",6,0,7,"ockm-lead-rhythm",False),("notes",8,0,11,"ockm-lead-notes",False)])
 row(260,"chord",[("engine",0,0,5,"ockm-chord-engine",True),("k1",0.45,0,1,"ockm-chord-k1",True),("k2",0.5,0,1,"ockm-chord-k2",True),("k3",0.4,0,1,"ockm-chord-k3",True),
-                 ("k4",0.3,0,1,"ockm-chord-k4",True),("type",0,0,12,"ockm-chord-type",True),("smooth",1,0,1,"ockm-chord-smooth",True),("rhythm",0,0,9,"ockm-chord-rhythm",False),("prog",0,0,9,"ockm-chord-prog",False)])
+                 ("k4",0.3,0,1,"ockm-chord-k4",True),("type",0,0,12,"ockm-chord-type",True),("smooth",1,0,1,"ockm-chord-smooth",True),("rhythm",0,0,10,"ockm-chord-rhythm",False),("prog",0,0,11,"ockm-chord-prog",False)])
 sub.add("#X text 20 300 key root: 0 C ... 9 A ... 11 B. Scale: 0 minor 1 major 2 dorian 3 phrygian 4 mixolydian 5 harmonic minor;")
 sub.add("#X text 20 320 bass engines: 0 acid 1 sub/808 2 FM 3 reese 4 pluck 5 analogue (default) 6 donk. Chord engines: 0 stab 1 organ 2 pad 3 piano 4 rhodes 5 strings. Chord type: 0 triad 1 seventh 2 sus2 3 power 4 sus4 5 sixth 6 ninth 7 eleventh;")
 sub.add("#X text 20 340 bass/lead rhythm: 0 offbeat 1 rolling 2 gallop 3 acid 4 dub 5 bounce 6 acid16 7 trip-hop. Notes: 0 root 1 octaves 2 root-fifth 3 acid-riff 4 walk-up 5 stab 6 dub 7 pedal 8 arp-up 9 arp-updown 10 call 11 descend;")
@@ -1409,7 +1409,8 @@ PRE={"leadrhythm":[("offbeat","0 0 2 0 0 0 1 0 0 0 2 0 0 0 1 0"),("rolling","0 2
                     ("offbeat","0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0"),("dub-stabs","0 0 0 2 0 0 0 0 0 0 1 0 0 0 0 0"),
                     ("house-organ","1 0 0 1 0 0 1 0 0 0 1 0 0 1 0 0"),("tresillo","2 0 0 1 0 0 1 0 2 0 0 1 0 0 1 0"),
                     ("syncopated","0 0 1 0 0 1 0 0 0 1 0 0 1 0 0 0"),("garage-skip","1 0 0 1 0 0 0 0 0 1 0 0 1 0 0 0 1 0 0 1 0 0 0 0 0 1 0 0 0 0 1 0"),
-                    ("call-answer","2 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 1 0 0 1 0 0 0"),("eighths","1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0")],
+                    ("call-answer","2 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 1 0 0 1 0 0 0"),("eighths","1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0"),
+                    ("piano-riff","2 0 0 1 0 0 2 0 0 1 0 0 1 0 1 0 2 0 0 1 0 0 2 0 0 1 0 0 2 0 0 0")],   # v0.90: the Italo piano riff, two bars
      # chord types. Plain numbers: scale steps above the chord's root, so the chord follows the key (0 root, 2 third...).
      # "s" then numbers: a fixed shape in semitones above the chord's root, moved as one block with the progression (the
      # chord memory sound of deep house, Detroit and dub techno). v0.90: the 9th and 11th leave the root to the bass
@@ -1423,7 +1424,9 @@ PROGS=[("one-chord","i",[(0,1)]),("vamp","i iv",[(0,1),(3,1)]),("dub-techno","i 
        ("deep-house","i iv VI v",[(0,1),(3,1),(5,1),(4,1)]),("garage","i VI iv v",[(0,.5),(5,.5),(3,.5),(4,.5)]),
        ("pop","i VI III VII",[(0,1),(5,1),(2,1),(6,1)]),("uplift","VI VII i",[(5,1),(6,1),(0,2)]),
        ("andalusian","i VII VI V",[(0,1),(6,1),(5,1),(4,1)]),("trip-hop","i VII VI v",[(0,2),(6,2),(5,2),(4,2)]),
-       ("soul","ii V I",[(1,1),(4,1),(0,2)])]
+       ("soul","ii V I",[(1,1),(4,1),(0,2)]),
+       # v0.90, for Italian piano house (in a major key): the big four-chord turn, and the same starting on vi
+       ("piano-house","I V vi IV",[(0,1),(4,1),(5,1),(3,1)]),("anthem","vi IV I V",[(5,1),(3,1),(0,1),(4,1)])]
 # drum grooves: one 16-step line per drum sound (x hit, X accent; v0.86: g a ghost note, about a third, o soft, about two thirds). Swing 0 = leave it as it is.
 # sounds: kick snare clap perc1 hat open-hat tom perc2. A groove lands on whichever slot plays that sound.
 GROOVES=[
