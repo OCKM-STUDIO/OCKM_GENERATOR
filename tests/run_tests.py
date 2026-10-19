@@ -1275,7 +1275,7 @@ def blank_project_synths_start_and_sound(work):
 
 @test
 def part_off_and_build_rise(work):
-    """A part switched off in a pattern goes silent; the build rise climbs over the pattern, and drops back to 0 when switched off."""
+    """A part switched off in a pattern goes silent; the build rise climbs step by step, and drops back to 0 when switched off by hand."""
     h = Harness(); h.record(os.path.join(work, "partoff.wav")); h.show("ockm-rise-now")
     others = " ; ".join(f"ockm-{t}-mute 1" for t in ["d1","d2","d3","d4","d5","d6","d7","d8","lead","chord"])
     h.at(100, f"ockm-bass-gen bang ; {others} ; ockm-length 16 ; ockm-bpm 120 ; ockm-rise 1 ; ockm-play 1")
@@ -1284,7 +1284,7 @@ def part_off_and_build_rise(work):
     out, (x, sr) = play(work, h, "t_partoff", ms=2600)
     on, off = peak(x[int(0.3 * sr):int(1.2 * sr)]), peak(x[int(1.5 * sr):int(2.5 * sr)])
     assert on > 0.05 and off < 0.005, f"the bass should play, then stop when switched off ({on:.3f} then {off:.4f})"
-    rise = [float(v) for v in printed(out, "ockm-rise-now")]
+    rise = [float(v.split()[0]) for v in printed(out, "ockm-rise-now")]   # "value" or "value ms"
     first = rise[:8]
     assert len(first) >= 8 and all(b > a for a, b in zip(first, first[1:])) and first[-1] > first[0], f"the rise should climb step by step: {first}"
     assert rise[-1] == 0, f"the rise should drop to 0 when switched off: {rise[-3:]}"
@@ -1311,6 +1311,39 @@ def sidechain_pump_ducks_the_synths(work):
     assert d1 < 0.55, f"pump on: the pads should dip after the kick ({d1:.2f})"
     d2 = res[2][0] / res[2][1]
     assert d2 < 0.55, f"the chords' own sidechain should dip them after the kick ({d2:.2f})"
+
+@test
+def rise_builds_then_drops(work):
+    """Rise on a 1-bar loop (16 steps), pressed early in the bar: the build runs to a loop start at least 2 bars away, so 2 bars
+    and a bit. With 16 steps to go the riser starts (3 beats long), the gap takes the last beat, then on the 1: rise turns
+    itself off, the gap ends, the riser cuts, the filter snaps back (in 5 ms, not a 100 ms glide) and the impact plays."""
+    h = Harness(); h.show("ockm-rise", "ockm-gap", "ockm-riser-go", "ockm-impact-go", "ockm-rise-now", "ockm-step")
+    h.at(100, "ockm-bpm 120 ; ockm-length 16 ; ockm-drum-len 16 ; ockm-bass-len 16 ; ockm-lead-len 16 ; ockm-chord-len 16")
+    h.at(200, "ockm-play 1"); h.at(200 + 2 * 125 + 60, "ockm-rise 1")       # pressed during step 2
+    f = os.path.join(work, "t_rise.pd"); h.finish(200 + 52 * 125, f)
+    out = run(work, f)
+    ev = [l.split(":", 1) for l in out.splitlines() if l.split(":", 1)[0] in ("ockm-rise", "ockm-gap", "ockm-riser-go", "ockm-impact-go", "ockm-rise-now", "ockm-step")]
+    steps = 0; seen = []
+    for k, v in ev:
+        v = v.strip()
+        if k == "ockm-step": steps += 1; continue
+        if k == "ockm-rise-now": continue
+        seen.append((k, v, steps))
+    order = [k + " " + v.split()[0] for k, v, _ in seen]
+    assert order[:1] == ["ockm-rise 1"], order
+    want = ["ockm-riser-go", "ockm-gap 1", "ockm-rise 0", "ockm-gap 0", "ockm-impact-go"]
+    got = [o for o in order if o.split()[0] in ("ockm-riser-go", "ockm-impact-go") or o in ("ockm-gap 1", "ockm-rise 0", "ockm-gap 0")]
+    got = [o if not o.startswith("ockm-riser-go") else "ockm-riser-go" for o in got]
+    got = [o if not o.startswith("ockm-impact-go") else "ockm-impact-go" for o in got]
+    dedup = [x for i, x in enumerate(got) if i == 0 or x != got[i - 1]]
+    assert [x for x in dedup if x in want][:5] == want, f"the build then the drop, in order: {dedup}"
+    at = {k + " " + v.split()[0]: n for k, v, n in seen}
+    drop = at["ockm-rise 0"]
+    assert drop % 16 == 1 and drop >= 3 + 32, f"the drop lands on a loop start at least 2 bars on (step count {drop})"
+    rn = [l.split(":", 1)[1].split() for l in out.splitlines() if l.startswith("ockm-rise-now:")]
+    assert ["0", "5"] in rn, f"the filter snaps back in 5 ms on the drop: {rn[-3:]}"
+    peak = max(float(x[0]) for x in rn)
+    assert 0.6 < peak <= 0.86, f"the high-pass climbs most of the way: {peak}"
 
 @test
 def lead_inside_to_outside(work):

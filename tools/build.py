@@ -632,12 +632,38 @@ for r,(nm,snd) in enumerate(SLOTS):
     ds=p.add(f"#X obj 990 {y+2} *~ 0;"); dt_=p.add(f"#X obj 1060 {y+2} throw~ ockm-dlybus;"); dr_=p.add(f"#X obj 990 {y-18} r ockm-{nm}-delay;")
     p.con(v,0,ds,0); p.con(ds,0,dt_,0); p.con(dr_,0,ds,1)
 rsm=p.add("#X obj 1600 380 r ockm-stepms;"); vsm=p.add("#X obj 1600 405 v ockm_stepms;"); p.con(rsm,0,vsm,0)
-# build rise: with ockm-rise above 0, the high-pass climbs over the pattern (slowly at first) and drops back when the pattern changes
-rri=p.add("#X obj 1750 380 r ockm-rise;"); vri=p.add("#X obj 1750 405 v ockm_rise;"); tri=p.add("#X obj 1750 430 t b f;"); p.con(rri,0,tri,0); p.con(tri,1,vri,0)
-rstp=p.add("#X obj 1900 380 r ockm-step;")
-rex=p.add(f"#X obj 1900 455 expr if(ockm_rise>0 \\, ockm_rise*0.75*pow(({D}f1+1)/max(ockm_plen\\,1)\\,2) \\, 0);"); srn=p.add("#X obj 1900 480 s ockm-rise-now;")
-z0r=p.add("#X msg 1750 455 0;")
-for c in [(rstp,0,rex,0),(rex,0,srn,0),(tri,0,z0r,0),(z0r,0,srn,0)]: p.con(*c)
+# build and drop (v0.83). ockm-rise 1 starts a build that ends on a loop start at least 2 bars away: the high-pass climbs
+# (slowly at first), a noise riser comes in over the last bar's first 3 beats, the last beat drops out (ockm-gap), and on
+# the 1 everything slams back: the filter snaps open, the riser cuts, a crash and sub boom (the impact). Then rise turns
+# itself off. Turned off by hand mid-build, the filter glides back and nothing drops.
+rri=p.add("#X obj 1750 380 r ockm-rise;"); tri=p.add("#X obj 1750 405 t f f;"); vri=p.add("#X obj 1850 430 v ockm_rise;"); p.con(rri,0,tri,0); p.con(tri,1,vri,0)
+rs0=p.add("#X obj 1750 430 sel 0;"); p.con(tri,0,rs0,0)
+roff=p.add("#X msg 1750 455 \\; ockm-rise-now 0 100 \\; ockm-gap 0 \\; ockm-riser-stop bang;"); p.con(rs0,0,roff,0)
+rtb=p.add("#X obj 1800 455 t b b;"); p.con(rs0,1,rtb,0)
+rtot=p.add(f"#X obj 1800 480 expr ockm_plen - ockm_rstep + max(ockm_plen\\,1)*ceil(max(0\\, 32-(ockm_plen-ockm_rstep))/max(ockm_plen\\,1));")
+vtot=p.add("#X obj 1800 505 v ockm_rtotal;"); rz=p.add("#X msg 1900 480 0;"); vel=p.add("#X obj 1900 505 v ockm_relap;")
+for c in [(rtb,0,rtot,0),(rtot,0,vtot,0),(rtb,1,rz,0),(rz,0,vel,0)]: p.con(*c)
+rstp=p.add("#X obj 2000 380 r ockm-step;"); rsf=p.add("#X obj 2000 405 t f f;"); vrs=p.add("#X obj 2100 430 v ockm_rstep;")
+p.con(rstp,0,rsf,0); p.con(rsf,1,vrs,0)
+# each step of a build: count it, then left = steps to the drop
+ron=p.add("#X obj 2000 430 expr if(ockm_rise>0 \\, ockm_relap+1 \\, -1);"); rmo=p.add("#X obj 2000 455 moses 0;"); p.con(rsf,0,ron,0); p.con(ron,0,rmo,0)
+rtf=p.add("#X obj 2000 480 t f f;"); vel2=p.add("#X obj 2100 505 v ockm_relap;"); p.con(rmo,1,rtf,0); p.con(rtf,1,vel2,0)
+rlx=p.add(f"#X obj 2000 505 expr ockm_rtotal-{D}f1 \\; 0.85*pow(min({D}f1/max(ockm_rtotal\\,1)\\,1)\\,2);"); p.con(rtf,0,rlx,0)
+srn=p.add("#X obj 2150 530 s ockm-rise-now;"); p.con(rlx,1,srn,0)
+rsl=p.add("#X obj 2000 530 sel 16 0;"); p.con(rlx,0,rsl,0)
+# 16 steps to go: the riser over 3 beats, then the gap for the last beat
+rr12=p.add("#X obj 2000 555 expr ockm_stepms*12;"); rtg=p.add("#X obj 2000 580 t f f;"); srg=p.add("#X obj 2080 605 s ockm-riser-go;")
+rdg=p.add("#X obj 2000 605 delay;"); rgo=p.add("#X msg 2000 630 \\; ockm-gap 1;")
+for c in [(rsl,0,rr12,0),(rr12,0,rtg,0),(rtg,1,srg,0),(rtg,0,rdg,0),(rdg,0,rgo,0)]: p.con(*c)
+# the drop: rise off first (its glide back is then overridden by the snap), the gap ends, the riser cuts, the filter snaps
+# open, and the impact lands a quarter step later (the engine plays a quarter step behind)
+rdrop=p.add("#X msg 2150 555 \\; ockm-rise 0 \\; ockm-gap 0 \\; ockm-riser-stop bang \\; ockm-rise-now 0 5;"); p.con(rsl,1,rdrop,0)
+rqx=p.add("#X obj 2300 555 expr ockm_stepms*0.25;"); rdq=p.add("#X obj 2300 580 delay;"); rimp=p.add("#X msg 2300 605 \\; ockm-impact-go bang;")
+rtb2=p.add("#X obj 2300 530 t b b;"); p.con(rsl,1,rtb2,0)
+for c in [(rtb2,1,rqx,0),(rqx,0,rdq,1),(rtb2,0,rdq,0),(rdq,0,rimp,0)]: p.con(*c)
+# stopping: no build hanging over
+rpst=p.add("#X obj 2400 380 r ockm-playing;"); rps0=p.add("#X obj 2400 405 sel 0;"); rpsm=p.add("#X msg 2400 430 stop;")
+for c in [(rpst,0,rps0,0),(rps0,0,rpsm,0),(rpsm,0,rdg,0),(rpsm,0,rdq,0)]: p.con(*c)
 rpl=p.add("#X obj 1450 380 r ockm-len;"); vpl=p.add("#X obj 1450 405 v ockm_plen;"); p.con(rpl,0,vpl,0)
 # drum settings subpatch
 sub=P()
@@ -1156,9 +1182,10 @@ rf0=q.add("#X obj 300 20 r ockm-filter;"); pkf=q.add("#X obj 300 40 pack f 25;")
 rf=q.add("#X obj 300 60 line 0 5;"); tfn=q.add("#X obj 300 70 t f f;"); sfn=q.add("#X obj 420 70 s ockm-filter-now;")
 q.con(rf0,0,pkf,0); q.con(pkf,0,rf,0); q.con(rgl,0,rf,0); q.con(rf,0,tfn,0); q.con(tfn,1,sfn,0)
 # build rise: ockm-rise-now (0 to 1) lifts the high-pass, never lower than the filter setting already has it
-rrn=q.add("#X obj 520 20 r ockm-rise-now;"); prn=q.add("#X obj 520 40 pack f 100;"); lrn=q.add("#X obj 520 60 line 0 10;"); trn=q.add("#X obj 520 80 t b f;")
+rrn=q.add("#X obj 520 20 r ockm-rise-now;"); prn=q.add("#X obj 520 40 list append 100;"); lrn=q.add("#X obj 520 60 line 0 10;"); trn=q.add("#X obj 520 80 t b f;")   # "value" glides over 100 ms; "value ms" sets the time
+prs=q.add("#X obj 600 40 list split 2;")
 rmx_=q.add(f"#X obj 300 75 expr if({D}f2>0.001 \\, max({D}f1 \\, {D}f2) \\, {D}f1);")
-for c in [(rrn,0,prn,0),(prn,0,lrn,0),(lrn,0,trn,0),(trn,1,rmx_,1),(trn,0,rmx_,0)]: q.con(*c)
+for c in [(rrn,0,prn,0),(prn,0,prs,0),(prs,0,lrn,0),(lrn,0,trn,0),(trn,1,rmx_,1),(trn,0,rmx_,0)]: q.con(*c)
 fx=q.add(f"#X obj 300 80 expr if({D}f1>0 \\, 20*pow(2\\,{D}f1*9.6) \\, 10) \; if({D}f1<0 \\, 20000*pow(2\\,{D}f1*9.6) \\, 20000);")
 rdv=q.add("#X obj 300 200 r ockm-drive;"); dvx=q.add(f"#X obj 300 230 expr 1+{D}f1*9;")
 th=q.add(f"#X obj 30 230 expr~ if({D}f2>1.001 \\, tanh({D}v1*{D}f2)/sqrt({D}f2) \\, {D}v1);")   # drive 0 is clean

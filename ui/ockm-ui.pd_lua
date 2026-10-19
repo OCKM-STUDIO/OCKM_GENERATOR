@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.82"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.83"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -813,7 +813,7 @@ function ui:layout_perform(add)
   local pump = self.v["ockm-pump"] or 0
   add{ kind="choice", x=mx, y=PART_Y, w=mw, h=PART_H, label="rise", sel=rise, accent=true, tap=function()
     self:send("ockm-rise", rise and 0 or 1)
-    self:say(rise and "rise off" or "rise on: the filter climbs across the loop, then drops as it starts again")
+    self:say(rise and "rise off: no drop" or "rise: building to the next loop start (2 bars or more), then the drop")
   end }
   local plab = (pump <= 0) and "pump" or ((pump < 0.75) and "pump ·" or "pump ··")
   add{ kind="choice", x=mx + (mw + 6), y=PART_Y, w=mw, h=PART_H, label=plab, sel=(pump > 0), accent=true, tap=function()
