@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.79 (19 October 2026)
+
+- **Sidechain shapes, on the bass to try:** duck (a quick dip under the kick, back within a step), pump (dips hard, holds, swells back over the beat) and gate (cut for an eighth, then straight back), with a picture of one beat. At full the sidechain now dips all the way to silent. The engine has the shapes for the chords and lead too (ockm-<part>-scshape), defaulting to pump, so they pump harder than before; their tabs get the choice once the bass feels right. Drum + bass ducks its bass
+
 ## v0.78 (19 October 2026)
 
 - **The builder's part tiles have an on/off switch** (the same as on each part's tab) instead of in/out, and say "off in this pattern" when off, here and on Perform

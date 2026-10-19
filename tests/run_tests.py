@@ -736,7 +736,7 @@ def touchscreen_screens_draw(work):
         raise Skip("Pillow not installed")
     p = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_preview.py"), os.path.join(work, "preview")], capture_output=True, text=True)
     assert p.returncode == 0, p.stderr[-800:]
-    assert len(os.listdir(os.path.join(work, "preview"))) == 30, "expected thirty screen pictures"
+    assert len(os.listdir(os.path.join(work, "preview"))) == 31, "expected thirty-one screen pictures"
 
 @test
 def mute_solo_and_levels(work):
@@ -1311,6 +1311,31 @@ def sidechain_pump_ducks_the_synths(work):
     assert d1 < 0.55, f"pump on: the pads should dip after the kick ({d1:.2f})"
     d2 = res[2][0] / res[2][1]
     assert d2 < 0.55, f"the chords' own sidechain should dip them after the kick ({d2:.2f})"
+
+@test
+def sidechain_shapes_duck_pump_gate(work):
+    """Held organ chords, a kick on every beat (muted), the chords' sidechain all the way up, in each shape. 120 bpm, so a step is
+    125 ms. Duck: gone under the kick, back within a step. Pump: still deep at 100 ms, half back by 300 ms. Gate: silent for an eighth
+    (250 ms), then straight back."""
+    res = {}
+    for shape in (-1, 0, 1, 2):     # -1: no sidechain, the reference
+        h = Harness(); h.record(os.path.join(work, f"sc{shape}.wav"))
+        mutes = " ; ".join(f"ockm-{t}-mute 1" for t in ["d1","d2","d3","d4","d5","d6","d7","d8","bass","lead"])
+        h.at(100, f"ockm-bpm 120 ; ockm-length 16 ; ockm-verb-mix 0 ; ockm-delay-mix 0 ; ockm-swing 50 ; ockm-chord-engine 1 ; ockm-chord-mode 1 ; {mutes}")
+        h.at(150, "ockm-pat-chord-on const 0 ; ockm-pat-chord-deg const 0 ; ockm-chord-edit 0 1 0 ; ockm-chord-k3 0 ; ockm-chord-k4 1")
+        h.at(170, "ockm-pat-d1 const 0 ; ockm-d1-sound 0 ; ockm-edit d1 0 2 ; ockm-edit d1 4 2 ; ockm-edit d1 8 2 ; ockm-edit d1 12 2 ; ockm-pump 0 ; "
+                  f"ockm-chord-sidechain {0 if shape < 0 else 1} ; ockm-chord-scshape {max(shape, 0)}")
+        h.at(300, "ockm-play 1"); h.at(2400, "ockm-play 0")
+        _, (x, sr) = play(work, h, f"t_sc{shape}", ms=2400)
+        rms = lambda a, b: math.sqrt(sum(v * v for v in x[int(a * sr):int(b * sr)]) / max(1, int((b - a) * sr)))
+        k = 0.3 + 0.5 + 0.03125         # beat 2's kick (a quarter step late, like every hit)
+        res[shape] = [rms(k + a, k + b) for a, b in [(0.005, 0.03), (0.11, 0.14), (0.29, 0.32)]]
+    g = {s: [v / max(r, 1e-9) for v, r in zip(res[s], res[-1])] for s in (0, 1, 2)}
+    shown = {s: [round(v, 2) for v in g[s]] for s in g}
+    assert all(g[s][0] < 0.25 for s in g), f"every shape dips right after the kick: {shown}"
+    assert g[0][1] > 0.7, f"duck: back within a step: {shown}"
+    assert g[1][1] < 0.3 and 0.2 < g[1][2] < 0.8, f"pump: still deep at 100 ms, swelling back by 300 ms: {shown}"
+    assert g[2][1] < 0.1 and g[2][2] > 0.8, f"gate: cut for the eighth, then straight back: {shown}"
 
 @test
 def projects_new_open_saveas_list_delete(work):

@@ -89,6 +89,7 @@ Tap a track's name on Perform A or the mixer to jump straight to it.
 - **Bass:** **riff** (which notes it plays inside each chord: root, octaves, root and fifth, acid riff and so on), **rhythm**, and **movement**: **pedal** (the riff stays on the key's home note while the chords move above it), **follows** (moves with each chord) or **walks** (follows, and the last notes of a bar step a semitone below the next chord's root, walking into the change)
 - **Lead:** **tune** (the shape of the line: root, arps, motifs and so on), **rhythm**, and **freedom**: **chord notes** (every note lands on the chord), **passing notes** (the notes on the beat do, the ones between can pass) or **free** (it just stays in key)
 - **Half-time** (top right, next to on/off): the part plays its own pattern at half speed, one of its steps every two, so a 16-step riff takes two loops (first half, then second half). Under drums at full speed it's the drum and bass feel, or a breakdown that suddenly opens out. Saved with each pattern
+- **Sidechain shape** (bass, for now): **duck** (a quick dip under the kick, back within a step: makes room, barely heard), **pump** (dips hard, holds a moment, swells back over the beat: the house breathing) or **gate** (cut for an eighth note, then straight back in). The little picture shows one beat at the amount you've set
 - Bass, lead and chords each have a **sidechain** slider: how far that part dips each time the kick hits (it swells back over an eighth note). The **pump** on Perform does all three at once
 - Bass and lead also have: **density** (left for fewer notes, right for more; the middle is the preset as written); **mutate** (a new variation of the same idea), **back** (the variation before, as many times as you like), **original**, and **make it for me**
 - **Chords:** **rhythm**, **colour** (triads, 7ths, 9ths or 11ths) and smooth voicing
@@ -312,6 +313,7 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 | `ockm-bass-gen`, `ockm-lead-gen`, `ockm-chord-gen` | Rebuild that track with the current settings |
 | `ockm-bass-lock`, `ockm-lead-lock` | Retired from the screen in v0.75 (0 own rhythm, 1 on the kick, 2 the gaps between kicks) |
 | `ockm-<synth>-sidechain` | How far bass, lead or chord dips on each kick, 0 to 1 |
+| `ockm-<synth>-scshape` | Sidechain shape: 0 duck, 1 pump (default), 2 gate |
 | `ockm-<synth>-half` | Half-time: 1 plays the part's pattern at half speed (one step every two, over two loops) |
 | `ockm-bass-density`, `ockm-lead-density` | 0 to 2: fewer to more notes, 1 is the preset as written |
 | `ockm-bass-seed`, `ockm-lead-seed` | Variation number: 0 is the original, anything else a mutation |

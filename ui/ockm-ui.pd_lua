@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.78"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.79"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -160,6 +160,7 @@ function ui:defaults()
     v["ockm-"..t.."-lowcut"] = 20; v["ockm-"..t.."-eqlow"] = 0; v["ockm-"..t.."-eqmid"] = 0; v["ockm-"..t.."-eqmidf"] = 400; v["ockm-"..t.."-eqhigh"] = 0
   end
   v["ockm-bass-on"] = 1; v["ockm-lead-on"] = 1; v["ockm-chord-on"] = 1; v["ockm-drums-on"] = 1; v["ockm-turn-every"] = 0; v["ockm-bass-walk"] = 0; v["ockm-lead-freedom"] = 1; v["ockm-rise"] = 0; v["ockm-end"] = 0; v["ockm-impact"] = 0; v["ockm-pump"] = 0
+  v["ockm-bass-scshape"] = 1; v["ockm-lead-scshape"] = 1; v["ockm-chord-scshape"] = 1
   v["ockm-style"] = -1; v["ockm-bass-half"] = 0; v["ockm-lead-half"] = 0; v["ockm-chord-half"] = 0
   v["ockm-bass-mode"] = 0; v["ockm-lead-mode"] = 0; v["ockm-chord-mode"] = 0   -- 0 auto, 1 manual
   v["ockm-bass-sync"] = 1; v["ockm-lead-sync"] = 1; v["ockm-leader"] = 0; v["ockm-drum-groove"] = -1
@@ -203,7 +204,8 @@ function ui:hooks()
   for _, k in ipairs({ "ockm-drum-len", "ockm-bass-len", "ockm-lead-len", "ockm-chord-len" }) do h[#h+1] = k end
   for _, k in ipairs({ "ockm-drum-loop", "ockm-swing", "ockm-accent", "ockm-sync", "ockm-fill-every", "ockm-fill-style" }) do h[#h+1] = k end
   for _, k in ipairs({ "ockm-drums-on", "ockm-turn-every", "ockm-bass-walk", "ockm-lead-freedom", "ockm-bass-sidechain", "ockm-lead-sidechain", "ockm-chord-sidechain",
-                         "ockm-style", "ockm-bass-half", "ockm-lead-half", "ockm-chord-half" }) do h[#h+1] = k end
+                         "ockm-style", "ockm-bass-half", "ockm-lead-half", "ockm-chord-half",
+                         "ockm-bass-scshape", "ockm-lead-scshape", "ockm-chord-scshape" }) do h[#h+1] = k end
   for _, k in ipairs({ "ockm-volume", "ockm-verb-mix", "ockm-delay-mix", "ockm-drive", "ockm-delay-fb", "ockm-delay-steps", "ockm-verb-size", "ockm-verb-tone" }) do h[#h+1] = k end
   return h
 end
@@ -1769,7 +1771,7 @@ local STYLES = {
   -- the drum + bass, boom bap and lofi kits are samples (kit-breaks, kit-boom, kit-dusty); without them, the synth kit as below
   { "drum + bass", bpm=174, swing=50, groove=39, prog=3, type=6, kit="breaks",
     drums={ kick={ 3, 70, 0.6, 0.9 }, snare={ 2, 80, 0.5, 0.9 }, hat={ 2, 40, 0, 0.5 } },
-    bass={ engine=3, rhythm=5, notes=0, move=1, half=1 },
+    bass={ engine=3, rhythm=5, notes=0, move=1, half=1, sidechain=0.3, shape=0 },
     chord={ engine=2, rhythm=0, half=1, verb=0.3 },
     lead=false },
   { "boom bap", bpm=90, swing=62, groove=9, prog=9, type=1, kit="boom",
@@ -1935,6 +1937,7 @@ function ui:apply_style(i)
       if ps.freedom then self:send("ockm-lead-freedom", ps.freedom) end
       self:send("ockm-"..part.."-half", ps.half or 0)
       self:send("ockm-"..part.."-sidechain", ps.sidechain or 0)
+      self:send("ockm-"..part.."-scshape", ps.shape or 1)
       self:send("ockm-"..part.."-verb", ps.verb or 0); self:send("ockm-"..part.."-delay", ps.delay or 0)
       if part ~= "chord" then self:send("ockm-"..part.."-mode", 0) end   -- made for you again, so it follows the new style
     end
@@ -1947,6 +1950,14 @@ end
 local COLOURS = { { 0, "triads" }, { 1, "7ths" }, { 6, "9ths" }, { 7, "11ths" } }
 local MOVES = { { "pedal", "stays on the key" }, { "follows", "moves with the chords" }, { "walks", "steps into changes" } }
 local FREEDOM = { "chord notes", "passing notes", "free" }
+local SC_SHAPES = { "duck", "pump", "gate" }   -- ockm-<part>-scshape 0, 1, 2
+-- how far a sidechain shape has dipped, t beats after the kick (0 to 1): the same curves as the engine
+local function sc_dip(shape, t)
+  if shape == 0 then return math.max(0, 1 - t / 0.2) end
+  if shape == 2 then return (t < 0.5) and 1 or 0 end
+  if t < 0.125 then return 1 end
+  return math.sqrt(math.max(0, 1 - (t - 0.125) / 0.875))
+end
 function ui:bass_move()
   if (self.v["ockm-bass-sync"] or 1) <= 0 then return 0 end
   return ((self.v["ockm-bass-walk"] or 0) > 0) and 2 or 1
@@ -2018,7 +2029,21 @@ function ui:gen_controls(add, p, ix, cy, iw, k)
     end
   end
   -- sidechain: how far it dips each time the kick hits (the Perform pump does all the synths at once)
-  add{ kind="hbar", x=ix, y=446, w=iw, h=30, hook="ockm-"..p.."-sidechain", lo=0, hi=1, label="sidechain from the kick", bold=true }
+  if p == "bass" then
+    -- v0.79 (bass first, to try it): how far it dips, and how: duck, pump or gate, with a picture of one beat
+    local shk = "ockm-"..p.."-scshape"
+    local shp = math.floor((self.v[shk] or 1) + 0.5)
+    local bw, cw = math.floor(iw * 0.38), math.floor(iw * 0.13)
+    add{ kind="hbar", x=ix, y=446, w=bw, h=30, hook="ockm-"..p.."-sidechain", lo=0, hi=1, label="sidechain", bold=true }
+    for i, nm in ipairs(SC_SHAPES) do
+      add{ kind="choice", x=ix + bw + 6 + (i - 1) * (cw + 4), y=446, w=cw, h=30, label=nm, small=true, sel=(shp == i - 1),
+           tap=function() self:send(shk, i - 1) end }
+    end
+    local px = ix + bw + 6 + 3 * (cw + 4) + 2
+    add{ kind="scpic", x=px, y=446, w=ix + iw - px, h=30, shape=shp, amt=self.v["ockm-"..p.."-sidechain"] or 0 }
+  else
+    add{ kind="hbar", x=ix, y=446, w=iw, h=30, hook="ockm-"..p.."-sidechain", lo=0, hi=1, label="sidechain from the kick", bold=true }
+  end
   add{ kind="hbar", x=ix, y=482, w=iw, h=30, hook="ockm-"..p.."-density", lo=0, hi=2, label="density", bold=true }
   local skey = "ockm-"..p.."-seed"
   local seed = math.floor(self.v[skey] or 0)
@@ -3100,6 +3125,16 @@ function ui:draw(g, w)
     self:col(g, w.on and "acc" or "dim"); g:fill_rounded_rect(w.on and w.x or (w.x + hw), w.y, hw, w.h, w.h / 2)
     self:ctext(g, "on", { x=w.x, y=w.y, w=hw, h=w.h }, 11, w.on and "bg" or "mute")
     self:ctext(g, "off", { x=w.x + hw, y=w.y, w=hw, h=w.h }, 11, w.on and "mute" or "txt")
+  elseif k == "scpic" then   -- one beat of the sidechain: the part's level after each kick
+    self:col(g, "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
+    local n, ih = 24, w.h - 8
+    local cw = (w.w - 8) / n
+    self:col(g, "acc")
+    for i = 0, n - 1 do
+      local lvl = 1 - (w.amt or 0) * sc_dip(w.shape or 1, (i + 0.5) / n)
+      local bh = math.max(1, lvl * ih)
+      g:fill_rect(w.x + 4 + i * cw, w.y + 4 + ih - bh, math.max(1, cw - 1), bh)
+    end
   elseif k == "parttile" then
     self:col(g, w.on and "card" or "bg"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 8)
     self:col(g, w.on and "dim" or "off"); g:stroke_rounded_rect(w.x, w.y, w.w, w.h, 8, 1)
