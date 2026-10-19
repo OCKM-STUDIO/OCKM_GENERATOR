@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.93"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.94"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -1096,7 +1096,10 @@ local function default_settings()
                                   { t = "delay", v = 0.45, how = 1, back = 1 }, { t = "pump", v = 1, how = 1, back = 1 } } },
       { name = "wash", moves = { { t = "delay", v = 0.85, how = 1, back = 1 }, { t = "feedback", v = 0.78, how = 1, back = 1 },
                                  { t = "reverb", v = 0.9, how = 1, back = 1 }, { t = "filter", v = -0.5, how = 2, back = 1 } } },
-      { name = "strip", moves = { { t = "mutes", v = 1, how = 1, back = 1 } } },
+      -- v0.94: the breakdown's high-pass twin: drums out, the high-pass climbs over a bar so it thins right out, a touch of
+      -- reverb and delay, then it all slams back on the 1
+      { name = "lift", bars = 4, moves = { { t = "mutes", v = 3, how = 1, back = 1 }, { t = "filter", v = 0.6, how = 3, back = 1 },
+                                          { t = "reverb", v = 0.4, how = 2, back = 1 }, { t = "delay", v = 0.3, how = 2, back = 1 } } },   -- gentle
       { name = "sink", moves = { { t = "filter", v = -0.85, how = 3, back = 1 }, { t = "drive", v = 0.7, how = 3, back = 1 } } },
       { name = "dub out", moves = { { t = "throw", v = 1, how = 1, back = 1 }, { t = "feedback", v = 0.85, how = 1, back = 3 },
                                     { t = "delay", v = 0.8, how = 1, back = 3 } } },
@@ -1105,7 +1108,7 @@ local function default_settings()
       { name = "breakdown", bars = 4, moves = { { t = "mutes", v = 3, how = 1, back = 1 }, { t = "filter", v = -0.6, how = 3, back = 1 },
                                                { t = "reverb", v = 0.55, how = 2, back = 1 }, { t = "delay", v = 0.45, how = 2, back = 1 } } },
     },
-    slots = { 1, 2, 6 },
+    slots = { 1, 3, 6 },
     new = { drum = 16, synth = 64, lead = 1 },
     device = { theme = "dark", snap = 1, mutes = 0 },
   }
@@ -1143,11 +1146,20 @@ function ui:load_settings()
     end
   end
   self.me = d
-  local has = false
-  for _, r in ipairs(d.macros) do if r.name == "breakdown" then has = true end end
+  local has, hp = false, false
+  for _, r in ipairs(d.macros) do if r.name == "breakdown" then has = true end; if r.name == "lift" and r.bars then hp = true end end
+  if not hp then
+    for i, r in ipairs(d.macros) do
+      if r.name == "strip" then
+        d.macros[i] = default_settings().macros[3]
+        if d.slots[2] == 2 then d.slots[2] = i end
+        break
+      end
+    end
+  end
   if not has then
     for i, r in ipairs(d.macros) do
-      if r.name == "lift" then d.macros[i] = default_settings().macros[6]; break end
+      if r.name == "lift" and not r.bars then d.macros[i] = default_settings().macros[6]; break end
     end
   end
   local dev = d.device

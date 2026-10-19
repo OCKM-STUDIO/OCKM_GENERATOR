@@ -952,24 +952,26 @@ def live_mutes_land_on_the_bar(work):
 
 @test
 def live_macros_move_several_things_and_put_them_back(work):
-    """Hold wash: delay and reverb go up together; let go and they go back. Hold breakdown (slot C, stopped, so it plays while
-    held): the drums mute, then come back; the bass keeps playing."""
+    """Out of the box, slot B is lift and slot C breakdown (stopped, so each plays while held). Hold lift: the drums mute,
+    the high-pass comes in (the filter goes up) and the reverb rises; let go and it all comes back. Breakdown does the same
+    with the low-pass (the filter goes down). The bass keeps playing throughout."""
     if not PDLUA:
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
-    h = Harness(); h.show("ockm-delay-mix", "ockm-verb-mix", "ockm-d2-mute", "ockm-d1-mute", "ockm-bass-mute", "ockm-filter-glide")
-    h.at(100, "ockm-ui-test tap 338 36")       # live tab (mutes land now)
-    h.at(200, "ockm-ui-test press 700 500")    # wash, held
+    h = Harness(); h.show("ockm-verb-mix", "ockm-d2-mute", "ockm-d1-mute", "ockm-bass-mute", "ockm-filter-glide")
+    h.at(100, "ockm-ui-test tap 338 36")       # perform
+    h.at(200, "ockm-ui-test press 700 500")    # lift, held
     h.at(300, "ockm-ui-test release 700 500")
     h.at(400, "ockm-ui-test press 850 500")    # breakdown, held
     h.at(500, "ockm-ui-test release 850 500")
     f = os.path.join(work, "t_macro.pd"); h.finish(600, f)
     out = run(work, f)
-    dm = [float(x) for x in printed(out, "ockm-delay-mix")]; vm = [float(x) for x in printed(out, "ockm-verb-mix")]
-    assert len(dm) >= 2 and dm[0] > 0.8 and dm[1] < 0.8, f"wash: delay up, then back: {dm}"
-    assert vm and max(vm) > 0.85 and vm[-1] < 0.85, f"wash: reverb up, then back: {vm}"
-    assert printed(out, "ockm-filter-glide"), "wash: the filter moves too"
-    assert printed(out, "ockm-d2-mute") == ["1", "0"], f"breakdown: the snare mutes, then comes back: {printed(out, 'ockm-d2-mute')}"
-    assert printed(out, "ockm-d1-mute") == ["1", "0"] and not printed(out, "ockm-bass-mute"), "breakdown: the kick goes too, the bass keeps playing"
+    vm = [float(x) for x in printed(out, "ockm-verb-mix")]
+    assert vm and max(vm) > vm[-1] and abs(vm[-1] - 0.3) < 0.01, f"reverb eases up, then back to where it was: {vm}"
+    gl = [float(x.split()[0]) for x in printed(out, "ockm-filter-glide")]
+    assert gl and gl[0] > 0.5, f"lift: the high-pass first (filter up): {gl}"
+    assert any(x < -0.5 for x in gl), f"breakdown: the low-pass (filter down): {gl}"
+    assert printed(out, "ockm-d2-mute") == ["1", "0", "1", "0"], f"the snare mutes and comes back, twice: {printed(out, 'ockm-d2-mute')}"
+    assert printed(out, "ockm-d1-mute") == ["1", "0", "1", "0"] and not printed(out, "ockm-bass-mute"), "the kick goes too, the bass keeps playing"
 
 @test
 def settings_macro_library_and_slots(work):

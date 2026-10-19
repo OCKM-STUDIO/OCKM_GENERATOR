@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.94 (19 October 2026)
+
+- **Lift, on slot B:** breakdown's high-pass twin. The drums go, the high-pass climbs over a bar so the track thins right out, with a gentle touch of reverb and delay, then it all slams back on the 1. Tap for 4 bars or hold, like breakdown. It takes strip's place in your six macros (strip was mutes only, which breakdown and lift now do with effects). Wash is still in the library
+
 ## v0.93 (19 October 2026)
 
 - **Performance recipes: mutes and effects together, with one finger.** A recipe can now have a length. **Breakdown** (new, on slot C) takes the drums out, sweeps the filter down over a bar, and brings up the reverb and delay. Tap it and it runs for 4 bars, then the drums and the effects all come back together on the 1. Or hold it as long as you like: let go and it drops on the next bar. Tap it again while it runs to drop early. Its mutes always land on the bar, whatever the live screen's mute setting. Set any recipe's length in settings, macros (no length, 1, 2, 4 or 8 bars)
