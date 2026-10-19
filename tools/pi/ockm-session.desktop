@@ -1,0 +1,5 @@
+[Desktop Entry]
+Name=OCKM_GENERATOR
+Comment=Straight into the groovebox, no desktop
+Exec=/home/simon/OCKM_GENERATOR/tools/pi/ockm-session.sh
+Type=Application

@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.83.1 (19 October 2026)
+
+- **The Pi boots straight into the app,** with no desktop or taskbar first. It logs in to its own session that only runs our start-up (screen rotation, then the app). Quit to desktop still brings the desktop up
+
 ## v0.83 (19 October 2026)
 
 - **Rise builds to a proper drop.** It used to lift the high-pass across the loop and glide back over 100 ms: a fizzle. Now pressing rise starts a build to the next loop start at least 2 bars away: the high-pass climbs, a noise riser comes in over the last bar's first 3 beats, the last beat drops out, and on the 1 everything slams back (the filter snaps open, the riser cuts, a crash and sub boom). Then rise switches itself off. Switched off by hand mid-build, it glides back with no drop
