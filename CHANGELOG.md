@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.80 (19 October 2026)
+
+- **Reese bass fixed:** each note started with a loud, bright "breath". Two causes: the filter envelope swept up to 6 kHz through a resonant filter (now up to 2.5 kHz, with gentler resonance), and the detuned saws started in phase then cancelled, so the level halved over the first half-second. A steady sine sub now holds the low end under the beating saws
+- **Drum + bass** sets the reese's own knobs (cutoff, wider detune, almost no envelope, longer decay) instead of inheriting the analogue's
+
 ## v0.79 (19 October 2026)
 
 - **Sidechain shapes, on the bass to try:** duck (a quick dip under the kick, back within a step), pump (dips hard, holds, swells back over the beat) and gate (cut for an eighth, then straight back), with a picture of one beat. At full the sidechain now dips all the way to silent. The engine has the shapes for the chords and lead too (ockm-<part>-scshape), defaulting to pump, so they pump harder than before; their tabs get the choice once the bass feels right. Drum + bass ducks its bass

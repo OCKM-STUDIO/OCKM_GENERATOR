@@ -450,7 +450,7 @@ The screen shows them by family: analogue first (the default), then sub 808, aci
 | 0 acid | cutoff | resonance | envelope amount | The 303 squelch |
 | 1 sub 808 | tone | drive | pitch drop (quick, up to 30 semitones) | Deep and clean. Turn the decay up and it rings on past the step like an 808 boom |
 | 2 FM | brightness | ratio | envelope on brightness | Punchy, metallic, plucky |
-| 3 reese | cutoff | detune (width) | envelope amount | Dark and wide |
+| 3 reese | cutoff | detune (width) | envelope amount | Dark and wide: three detuned saws beating over a steady sine sub. Keep the envelope low for drum and bass |
 | 4 pluck | brightness | saw to square | filter snap | Rings out and fades over the decay time, with a sub an octave down. Ignores the short 303-style note length |
 | 5 analogue | cutoff | saw to square | filter envelope | The workhorse house and techno bass (Minimoog, SH-101, Pro-One): saw to square with a square sub an octave down, through a resonant 24 dB low-pass. The default |
 | 6 donk | brightness (organ harmonics) | bounce (pitch drop onto the note) | hollow (woodier) | Bassline house, garage and the M1 organ bass: a hollow tone that bounces onto each note and rings out |

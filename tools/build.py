@@ -914,13 +914,17 @@ def reese(q,core,ks,out):
     p1=q.add("#X obj 30 260 phasor~;"); p2=q.add("#X obj 130 260 phasor~;"); p3=q.add("#X obj 230 260 phasor~;")
     s1=q.add("#X obj 30 290 +~;"); s2=q.add("#X obj 30 315 +~;"); sc=q.add("#X obj 30 340 *~ 0.667;"); ce=q.add("#X obj 30 365 -~ 1;")
     em=q.add("#X obj 350 200 *~ 3000;"); ad=q.add("#X obj 350 230 +~ 300;"); cl=q.add("#X obj 350 260 clip~ 30 12000;")
-    bob=q.add("#X obj 30 400 bob~;"); rs=q.add("#X msg 450 300 1.2;"); lb=q.add("#X obj 450 270 loadbang;")
-    am=q.add("#X obj 30 430 *~;"); g=q.add("#X obj 30 460 *~ 3;")   # v0.71: level-matched with the other bass engines
+    # v0.80: gentler resonance (0.6), a smaller envelope range (k3 up to 2500 Hz, it was 6000: the start of each note "breathed"),
+    # and a steady sine sub under the saws, so the low end holds while the detuned saws beat and cancel above it
+    bob=q.add("#X obj 30 400 bob~;"); rs=q.add("#X msg 450 300 0.6;"); lb=q.add("#X obj 450 270 loadbang;")
+    so=q.add("#X obj 130 400 osc~;"); sg=q.add("#X obj 130 425 *~ 0.35;"); mx=q.add("#X obj 30 450 +~;")
+    am=q.add("#X obj 30 475 *~;"); g=q.add("#X obj 30 500 *~ 1.9;")   # level-matched with the other bass engines
     k1=q.add(f"#X obj 200 140 expr 40*pow(2\\,8*{D}f1);"); k2=q.add(f"#X obj 310 140 expr 0.003+0.02*{D}f1 \; 0.003+0.02*{D}f1;")
-    up=q.add("#X obj 310 170 + 1;"); dn=q.add("#X obj 380 170 expr 1-$f1;".replace("$","\\$")); k3=q.add("#X obj 420 140 * 6000;")
+    up=q.add("#X obj 310 170 + 1;"); dn=q.add("#X obj 380 170 expr 1-$f1;".replace("$","\\$")); k3=q.add("#X obj 420 140 * 2500;")
     for c in [(core,0,mt,0),(mt,0,p1,0),(mt,0,ua,0),(mt,0,db,0),(ua,0,p2,0),(db,0,p3,0),(p1,0,s1,0),(p2,0,s1,1),(s1,0,s2,0),(p3,0,s2,1),
               (s2,0,sc,0),(sc,0,ce,0),(ce,0,bob,0),(core,1,em,0),(em,0,ad,0),(ad,0,cl,0),(cl,0,bob,1),(lb,0,rs,0),(rs,0,bob,2),
-              (bob,0,am,0),(core,2,am,1),(am,0,g,0),(g,0,out,0),(ks[0],0,k1,0),(k1,0,ad,1),(ks[1],0,k2,0),(k2,0,up,0),(k2,1,dn,0),
+              (mt,0,so,0),(so,0,sg,0),(bob,0,mx,0),(sg,0,mx,1),
+              (mx,0,am,0),(core,2,am,1),(am,0,g,0),(g,0,out,0),(ks[0],0,k1,0),(k1,0,ad,1),(ks[1],0,k2,0),(k2,0,up,0),(k2,1,dn,0),
               (up,0,ua,1),(dn,0,db,1),(ks[2],0,k3,0),(k3,0,em,1)]: q.con(*c)
     q.add("#X text 200 110 k1 cutoff / k2 detune (width) / k3 envelope amount;")
 

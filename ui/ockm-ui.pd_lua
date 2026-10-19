@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.79"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.80"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -1771,7 +1771,7 @@ local STYLES = {
   -- the drum + bass, boom bap and lofi kits are samples (kit-breaks, kit-boom, kit-dusty); without them, the synth kit as below
   { "drum + bass", bpm=174, swing=50, groove=39, prog=3, type=6, kit="breaks",
     drums={ kick={ 3, 70, 0.6, 0.9 }, snare={ 2, 80, 0.5, 0.9 }, hat={ 2, 40, 0, 0.5 } },
-    bass={ engine=3, rhythm=5, notes=0, move=1, half=1, sidechain=0.3, shape=0 },
+    bass={ engine=3, rhythm=5, notes=0, move=1, half=1, sidechain=0.3, shape=0, k={ 0.5, 0.45, 0.05, 0.6 } },
     chord={ engine=2, rhythm=0, half=1, verb=0.3 },
     lead=false },
   { "boom bap", bpm=90, swing=62, groove=9, prog=9, type=1, kit="boom",
