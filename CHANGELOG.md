@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.86 (19 October 2026)
+
+- **Mutate changes the rhythm too:** each variation of the bass or lead now moves a hit or two (adds a note on a resting 8th, drops a plain note), not just the notes. Accents and held notes stay, and a variation repeats steadily
+- **The bass leads back round:** on loops of 2 bars or more, the last bar gets a pickup note just before the loop starts again (not the lead: its phrases already land where they mean to)
+- **Grooves breathe:** the house and techno grooves have ghost and soft notes (hats with loud offbeats and ghosted 16ths, the odd ghost before a backbeat). Grooves can use g (ghost) and o (soft) as well as x and X
+
 ## v0.85 (19 October 2026)
 
 - **Phrase on the builder:** one length (off, 4, 8 or 16 bars) for everything at the end of a phrase, with a switch for each move: drum fill and turnaround. The drums tab keeps the fill style (plus no fill) and says the phrase length. Before, the fill and the turnaround each had their own count on different tabs

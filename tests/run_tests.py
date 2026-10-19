@@ -341,6 +341,30 @@ def bass_classic_rhythms(work):
     assert sl[:15] == [1] * 15 and sl[15] == 0, f"slides on through the bar, then lets the next bar start fresh: {sl}"
 
 @test
+def mutate_changes_the_rhythm_and_the_last_bar_leads_back(work):
+    """Bass on quarter notes, 2 bars. The original: quarters, plus a pickup on the last 8th of bar 2 leading back to the start
+    (bar 1 has no note there). Variations move a hit or two (most of them change the rhythm), and the same variation comes
+    back the same."""
+    h = Harness()
+    def grab(ms, label):
+        g = h.add(f"#X obj 10 300 r test-{label};"); a = h.add("#X obj 10 330 array get ockm-pat-bass-on 0 32;")
+        l = h.add(f"#X obj 10 360 list prepend {label};"); pr = h.add("#X obj 10 390 list trim;"); pp = h.add("#X obj 10 420 print GEN;")
+        h.con(g, a); h.con(a, l); h.con(l, pr); h.con(pr, pp); h.at(ms, f"test-{label} bang")
+    h.at(100, "ockm-length 32 ; ockm-bass-len 32 ; ockm-bass-sync 0 ; ockm-bass-density 1 ; ockm-bass-seed 0 ; ockm-bass-notes 0 ; ockm-bass-rhythm 6")
+    grab(200, "orig")
+    for k, sd in enumerate((1, 2, 3, 4)):
+        h.at(250 + k * 40, f"ockm-bass-seed {sd}"); grab(270 + k * 40, f"v{sd}")
+    h.at(450, "ockm-bass-seed 0"); h.at(480, "ockm-bass-seed 3"); grab(520, "again")
+    f = os.path.join(work, "t_mutrhy.pd"); h.finish(600, f)
+    got = {v.split()[0]: [int(float(x)) for x in v.split()[1:]] for v in printed(run(work, f), "GEN")}
+    o = got["orig"]
+    ons = [i for i, x in enumerate(o) if x]
+    assert ons == [0, 4, 8, 12, 16, 20, 24, 28, 30], f"quarters, plus the pickup on the last 8th of bar 2: {ons}"
+    moved = [sd for sd in (1, 2, 3, 4) if got[f"v{sd}"] != o]
+    assert len(moved) >= 3, f"most variations move a hit or two: only {moved} did"
+    assert got["v3"] == got["again"], "the same variation comes back the same"
+
+@test
 def bass_generator_fills_long_patterns(work):
     h = Harness()
     h.at(100, "ockm-length 32 ; ockm-bass-notes 4 ; ockm-bass-rhythm 0")
@@ -1471,11 +1495,12 @@ def drum_grooves_fill_every_slot(work):
     h.at(220, "ockm-d1-sound 4 ; ockm-drum-groove 12"); h.at(260, "test-get bang")   # clear
     f = os.path.join(work, "t_groove.pd"); h.finish(300, f)
     out = run(work, f)
-    rows = {n: [[int(float(x)) for x in v.split()] for v in printed(out, n)] for n in outs}
+    rows = {n: [[round(float(x), 2) for x in v.split()] for v in printed(out, n)] for n in outs}
     kick = [2,0,0,0,1,0,0,0,2,0,0,0,1,0,0,0] * 2
     assert rows["D1"][0][:16] == kick[:16], f"slot 1 (kick) should get the tech house kick: {rows['D1'][0]}"
     assert printed(out, "ockm-drum-len")[-1] == "16", f"a groove makes the drums 1 bar: {printed(out, 'ockm-drum-len')}"
-    assert rows["D4"][0][:16] == [1,1,0,1,1,1,0,1,1,1,0,1,1,1,0,1], f"slot 4 (hat) should get the hats: {rows['D4'][0]}"
+    og = [0.65, 0.35, 0, 1]   # v0.86: the hats breathe: soft, ghost, (open hat), hit
+    assert rows["D4"][0][:16] == og * 4, f"slot 4 (hat) should get the hats, with ghost and soft notes: {rows['D4'][0]}"
     assert rows["D5"][0][:16] == [0,0,2,0,0,0,2,0,0,0,2,0,0,0,2,0], f"slot 5 (open hat) should get the open hats: {rows['D5'][0]}"
     assert "54" in [v.split()[0].split(".")[0] for v in printed(out, "SWING")], f"tech house should set swing 54: {printed(out, 'SWING')}"
     assert all(v == 0 for n in ("D1", "D4", "D5") for v in rows[n][1][:16]), "clear should empty every slot"

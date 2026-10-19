@@ -2,7 +2,7 @@
 
 A drum machine and easy-to-program synths in one box. Built in Pure Data, designed to run on a Raspberry Pi with a touchscreen and a few knobs.
 
-Current version: **v0.84**
+Current version: **v0.86**
 
 ## How to open it
 
@@ -91,7 +91,7 @@ Tap a track's name on Perform A or the mixer to jump straight to it.
 - **Half-time** (top right, next to on/off): the part plays its own pattern at half speed, one of its steps every two, so a 16-step riff takes two loops (first half, then second half). Under drums at full speed it's the drum and bass feel, or a breakdown that suddenly opens out. Saved with each pattern
 - **Sidechain shape** (bass, for now): **duck** (a quick dip under the kick, back within a step: makes room, barely heard), **pump** (dips hard, holds a moment, swells back over the beat: the house breathing) or **gate** (cut for an eighth note, then straight back in). The little picture shows one beat at the amount you've set
 - Bass, lead and chords each have a **sidechain** slider: how far that part dips each time the kick hits (it swells back over an eighth note). The **pump** on Perform does all three at once
-- Bass and lead also have: **density** (left for fewer notes, right for more; the middle is the preset as written); **mutate** (a new variation of the same idea), **back** (the variation before, as many times as you like), **original**, and **make it for me**
+- Bass and lead also have: **density** (left for fewer notes, right for more; the middle is the preset as written); **mutate** (a new variation of the same idea: the notes move, and since v0.86 a hit or two of the rhythm too, while accents and held notes stay), **back** (the variation before, as many times as you like), **original**, and **make it for me**
 - **Chords:** **rhythm**, **colour** (triads, 7ths, 9ths or 11ths) and smooth voicing
 - **Sound** (bottom right): engine, its four knobs (named for the engine), drive, reverb and delay sends, level, and **chorus** (tap: off, I, II, I+II, like a Juno's buttons; off is exactly the dry sound. The juno lead engine also has its own chorus knob)
 - **Movement** (under the sound): an LFO on one of the four knobs. Tap the boxes to step through the shape (sine, triangle, square, saw, random), which knob it moves, and how often (from a 16th to 8 bars, in time with the loop); drag depth to set how far it swings. At depth 0 the knob is exactly where you set it. It's saved with the loop
@@ -413,6 +413,8 @@ A kit is one file in each sound folder named `kit-<name>`: `samples/kick/kit-bre
 
 ### Grooves
 
+
+Since v0.86 the house and techno grooves have dynamics: hats with loud offbeats and ghosted 16ths, and the odd ghost before a backbeat. In a groove line `g` is a ghost note (about a third) and `o` a soft one (about two thirds), alongside `x` and `X`.
 Four banks: classics, house + garage, techno + breaks (12 each), and hard + fast (hard house, drum and bass two-step, drum and bass rolling). Minimal and dub techno have a flat, even kick on every beat. A groove rewrites all 8 drums and sets the swing; **undo** takes it back.
 
 Slot sounds, samples, tune, decay, level and sends are part of the drum kit, which is saved with the project and shared by every pattern.

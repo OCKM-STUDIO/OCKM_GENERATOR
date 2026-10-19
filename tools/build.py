@@ -1405,16 +1405,16 @@ PROGS=[("one-chord","i",[(0,1)]),("vamp","i iv",[(0,1),(3,1)]),("dub-techno","i 
        ("pop","i VI III VII",[(0,1),(5,1),(2,1),(6,1)]),("uplift","VI VII i",[(5,1),(6,1),(0,2)]),
        ("andalusian","i VII VI V",[(0,1),(6,1),(5,1),(4,1)]),("trip-hop","i VII VI v",[(0,2),(6,2),(5,2),(4,2)]),
        ("soul","ii V I",[(1,1),(4,1),(0,2)])]
-# drum grooves: one 16-step line per drum sound (x hit, X accent). Swing 0 = leave it as it is.
+# drum grooves: one 16-step line per drum sound (x hit, X accent; v0.86: g a ghost note, about a third, o soft, about two thirds). Swing 0 = leave it as it is.
 # sounds: kick snare clap perc1 hat open-hat tom perc2. A groove lands on whichever slot plays that sound.
 GROOVES=[
  ("four-floor",56,dict(kick="X...X...X...X...",clap="....x.......x...",hat="..x...x...x...x.")),
- ("house",56,dict(kick="X...x...X...x...",clap="....X.......X...",ohat="..x...x...x...x.",hat=".x.x.x.x.x.x.x.x")),
- ("deep-house",58,dict(kick="X...x...X...x...",clap="....x.......x...",ohat="..x...x...x...x.",perc1=".x....x..x....x.",hat="x...x...x...x...")),
- ("tech-house",54,dict(kick="X...x...X...x...",clap="....X.......X...",ohat="..X...X...X...X.",hat="xx.xxx.xxx.xxx.x",perc1="...x..x....x..x.",tom=".......x........")),
- ("minimal",54,dict(kick="X...X...X...X...",perc1="...x..x...x..x..",hat=".x.x.x.x.x.x.x.x",clap="............x...",tom=".........x......")),
- ("techno",50,dict(kick="X...X...X...X...",ohat="..x...x...x...x.",hat="xx.xxx.xxx.xxx.x",clap="....x.......x...",perc2="...x......x.....")),
- ("dub-techno",54,dict(kick="X...X...X...X...",perc1="...x.....x....x.",ohat="..x...x...x...x.",hat="x.x.x.x.x.x.x.x.")),
+ ("house",56,dict(kick="X...x...X...x...",clap="....X......gX...",ohat="..x...x...x...x.",hat=".o.g.o.g.o.g.o.g")),
+ ("deep-house",58,dict(kick="X...x...X...x...",clap="....x.......x..g",ohat="..x...x...x...x.",perc1=".o....x..g....x.",hat="x..gx..gx..gx.g.")),
+ ("tech-house",54,dict(kick="X...x...X...x...",clap="....X.......X...",ohat="..X...X...X...X.",hat="og.xog.xog.xog.x",perc1="...o..x....g..x.",tom=".......x........")),
+ ("minimal",54,dict(kick="X...X...X...X...",perc1="...g..x...o..x..",hat=".o.g.o.g.o.g.o.g",clap="............x...",tom=".........x......")),
+ ("techno",50,dict(kick="X...X...X...X...",ohat="..x...x...x...x.",hat="og.xog.xog.xog.x",clap="....x.......x...",perc2="...g......x.....")),
+ ("dub-techno",54,dict(kick="X...X...X...X...",perc1="...g.....x....g.",ohat="..x...x...x...x.",hat="o.g.o.g.o.g.o.g.")),
  ("garage",64,dict(kick="X.......x.x.....",snare="....X.......X...",hat="x.xxx.x.x.xxx.x.",perc1="......x......x..",ohat="..x.......x.....")),
  ("breakbeat",54,dict(kick="X.x.......xx....",snare="....X..x.x..X..x",hat="x.x.x.x.x.x.x.x.")),
  ("boom-bap",62,dict(kick="X......x..x.....",snare="....X.......X...",hat="x.x.x.x.x.x.x.x.",ohat="..............x.")),
@@ -1422,24 +1422,24 @@ GROOVES=[
  ("electro",50,dict(kick="X.....x...x.....",clap="....X.......X...",hat="xxxxxxxxxxxxxxxx",tom="..........x..x..")),
  ("clear",0,dict()),
  # bank 2: house and garage (after 'clear', so the numbers of bank 1 never move)
- ("chicago",56,dict(kick="X...X...X...X...",clap="....X.......X...",hat="x.x.x.x.x.x.x.x.",ohat="..x...x...x...x.",perc1="..........x.....")),
- ("jackin",58,dict(kick="X...X...X...X...",clap="....X.......X...",hat=".xx..xx..xx..xx.",ohat="..X...X...X...X.",perc2="x..x..x...x..x..")),
- ("disco",54,dict(kick="X...X...X...X...",snare="....X.......X...",ohat="..x...x...x...x.",hat="xxXxxxXxxxXxxxXx",perc1="x.x.x.x.x.x.x.x.")),
+ ("chicago",56,dict(kick="X...X...X...X...",clap="....X.......X...",hat="o.x.o.x.o.x.o.x.",ohat="..x...x...x...x.",perc1="..........x.....")),
+ ("jackin",58,dict(kick="X...X...X...X...",clap="....X.......X...",hat=".xg..xg..xg..xg.",ohat="..X...X...X...X.",perc2="x..g..x...o..g..")),
+ ("disco",54,dict(kick="X...X...X...X...",snare="....X......gX...",ohat="..x...x...x...x.",hat="gxXxgxXxgxXxgxXx",perc1="o.g.o.g.o.g.o.g.")),
  ("soulful",58,dict(kick="X...X...X...X...",clap="....x.......x...",hat="..x...x...x...x.",perc1="x..x..x...x..x..",perc2="......x.......x.")),
  ("afro-house",56,dict(kick="X...X...X...X...",clap="....x.......x...",hat=".x.x.x.x.x.x.x.x",perc1="x..x..x...x.x...",perc2="..x...x.x...x..x")),
  ("lofi-house",62,dict(kick="X.....x.X.......",snare="....X.......X...",hat="x.x.x.x.x.x.x.x.",ohat=".......x........")),
  ("2-step",64,dict(kick="X.....x...X.....",snare="....X.......X...",hat="x.x.x.x.x.x.x.x.",perc2="..x.......x..x..")),
  ("speed-garage",60,dict(kick="X...X...X...X...",clap="....X.......X...",snare="...x..x.x..x..xx",ohat="..X...X...X...X.",hat="xx.xxx.xxx.xxx.x",perc1="..x....x..x...x.")),
- ("funky-house",56,dict(kick="X...X...X...X...",clap="....X.......X...",hat="xxXxxxXxxxXxxxXx",ohat="..x.......x.....",perc1=".x...x.x.x...x..",tom="...........x..x.")),
+ ("funky-house",56,dict(kick="X...X...X...X...",clap="....X.......X...",hat="gxXxgxXxgxXxgxXx",ohat="..x.......x.....",perc1=".x...x.x.x...x..",tom="...........x..x.")),
  ("ghetto-house",54,dict(kick="X...X..xX...X..x",clap="....X.......X...",hat="x.x.x.x.x.x.x.x.",perc2=".x...x...x...x..")),
  ("nu-disco",54,dict(kick="X...X...X...X...",snare="....X.......X...",hat="..x...x...x...x.",ohat="..........X.....",perc1="xxxxxxxxxxxxxxxx",tom="..............x.")),
- ("rolling",56,dict(kick="X...X...X...X...",clap="........x.......",ohat="..x...x...x...x.",hat="xxxxxxxxxxxxxxxx",perc2=".x....x..x....x.",perc1="...x.......x....")),
+ ("rolling",56,dict(kick="X...X...X...X...",clap="........x.......",ohat="..x...x...x...x.",hat="ogxgogxgogxgogxg",perc2=".x....x..x....x.",perc1="...x.......x....")),
  # bank 3: techno, breaks and downtempo
- ("detroit",54,dict(kick="X...X...X...X...",clap="....X.......X...",hat="x.xxx.xxx.xxx.xx",ohat="..x...x...x...x.",tom=".........x....x.")),
- ("berlin",50,dict(kick="X...X...X...X...",ohat="..X...X...X...X.",hat="xxxxxxxxxxxxxxxx",perc2=".x.......x......",clap="....x.......x...")),
- ("industrial",50,dict(kick="X..xX...X..xX...",snare="....X.......X...",hat="x.x.x.x.x.x.x.x.",perc1="...x...x...x...x",tom="......x.......x.")),
- ("hypnotic",52,dict(kick="X...X...X...X...",perc1=".x.x.x.x.x.x.x.x",perc2="...x.....x...x..",ohat="..x...x...x...x.")),
- ("acid-techno",50,dict(kick="X...X...X...X...",clap="....X.......X...",hat="xxxxxxxxxxxxxxxx",ohat="..X...X...X...X.",snare="...............x")),
+ ("detroit",54,dict(kick="X...X...X...X...",clap="....X.......X...",hat="o.xgo.xgo.xgo.xg",ohat="..x...x...x...x.",tom=".........x....x.")),
+ ("berlin",50,dict(kick="X...X...X...X...",ohat="..X...X...X...X.",hat="ogxgogxgogxgogxg",perc2=".x.......x......",clap="....x.......x...")),
+ ("industrial",50,dict(kick="X..xX...X..xX...",snare="....X.......X...",hat="o.x.o.x.o.x.o.x.",perc1="...x...x...x...x",tom="......x.......x.")),
+ ("hypnotic",52,dict(kick="X...X...X...X...",perc1=".o.g.o.g.o.g.x.g",perc2="...x.....x...x..",ohat="..x...x...x...x.")),
+ ("acid-techno",50,dict(kick="X...X...X...X...",clap="....X.......X...",hat="ogxgogxgogxgogxg",ohat="..X...X...X...X.",snare="...............x")),
  ("think-break",56,dict(kick="X.....X...X.....",snare="....X.......X..x",hat="x.x.x.x.x.x.x.x.",ohat="..............x.")),
  ("jungle",50,dict(kick="X.........X.....",snare="....X..x.x..X..x",hat="xxxxxxxxxxxxxxxx")),
  ("big-beat",54,dict(kick="X.....X.X.....X.",snare="....X.......X...",hat="x.x.x.x.x.x.x.x.",ohat="......x.......x.",perc1="..x...x...x...x.")),
@@ -1448,7 +1448,7 @@ GROOVES=[
  ("half-time",56,dict(kick="X.........x.....",snare="........X.......",hat="x.x.x.x.x.x.x.x.",perc1="...x.......x....")),
  ("lofi-hip-hop",64,dict(kick="X......x..X.....",snare="....X.......X...",hat="x.x.x.x.x.x.x.x.",perc2=".......x........")),
  # bank 4 (v0.76): hard and fast
- ("hard-house",50,dict(kick="X...X...X...X...",clap="....X.......X...",ohat="..X...X...X...X.",hat="x.xxx.xxx.xxx.xx",snare="............xxXX")),
+ ("hard-house",50,dict(kick="X...X...X...X...",clap="....X.......X...",ohat="..X...X...X...X.",hat="o.xgo.xgo.xgo.xg",snare="............goxX")),
  ("dnb-two-step",50,dict(kick="X.........X.....",snare="....X.......X...",hat="x.x.x.x.x.x.x.x.",ohat="..............x.")),
  ("dnb-rolling",50,dict(kick="X.....X...X.....",snare="....X..x....X..x",hat="xxXxxxXxxxXxxxXx",perc2="..x.......x.....")),
 ]
@@ -1457,7 +1457,7 @@ _SND=["kick","snare","clap","perc1","hat","ohat","tom","perc2"]
 def _groove_line(sw,parts):
     for k,v in parts.items(): assert k in _SND and len(v)==16, (k,v)
     vals=[]
-    for nm in _SND: vals+=[{".":0,"x":1,"X":2}[c] for c in parts.get(nm,"."*16)]
+    for nm in _SND: vals+=[{".":0,"x":1,"X":2,"g":0.35,"o":0.65}[c] for c in parts.get(nm,"."*16)]   # v0.86: g ghost, o soft
     return " ".join(str(v) for v in [sw]+vals)
 PRE["groove"]=[(nm,_groove_line(sw,parts)) for nm,sw,parts in GROOVES]
 # drum fills: what changes on the last bar of a phrase. Per drum sound, 16 steps: '.' keep your pattern, '-' silent, 'x' hit, 'X' accent.
@@ -1646,11 +1646,18 @@ m16=p.add("#X obj 20 700 mod 16;"); rd=p.add(f"#X obj 20 720 tabread {D}0-r;")
 kick=p.add("#X obj 1000 700 tabread ockm-pat-d1;")
 lockx=p.add(f"#X obj 160 720 expr if({D}f3==1 \\, if({D}f2>0 \\, if({D}f1==2 || {D}f1==4 || {D}f2>=2 \\, 2 \\, 1) \\, 0) \\, if({D}f3==2 \\, if({D}f2>0 \\, 0 \\, {D}f1) \\, {D}f1));")
 H=f"(abs(sin({D}f4*12.9898+{D}f3*78.233+1.7)*43758.5453)-floor(abs(sin({D}f4*12.9898+{D}f3*78.233+1.7)*43758.5453)))"
-dens=p.add(f"#X obj 160 735 expr if({D}f1>0 && {D}f1<5 && {D}f2<1 && {D}f1!=2 && {D}f1!=4 && {H}>{D}f2 \\, 0 \\, if({D}f1==0 && {D}f2>1 && {H}<({D}f2-1)*0.5 \\, 1 \\, {D}f1));")
+dens0=p.add(f"#X obj 160 735 expr if({D}f1>0 && {D}f1<5 && {D}f2<1 && {D}f1!=2 && {D}f1!=4 && {H}>{D}f2 \\, 0 \\, if({D}f1==0 && {D}f2>1 && {H}<({D}f2-1)*0.5 \\, 1 \\, {D}f1));")
+# v0.86: mutate touches the rhythm (a variation, seed above 0, adds a note on about one 8th-note rest in five and drops about
+# one plain note in seven; accents and held notes stay), and the bass's last bar of a loop of 2 bars or more gets a pickup into the
+# start (a note on its last 8th if it was resting). Same seed, same result, so a variation repeats steadily
+H2=f"(abs(sin({D}f2*12.9898+{D}f3*78.233+7.7)*43758.5453)-floor(abs(sin({D}f2*12.9898+{D}f3*78.233+7.7)*43758.5453)))"
+dens=p.add(f"#X obj 160 760 expr if({D}f3>0 && {D}f1==0 && int({D}f2)%2==0 && {H2}<0.2 \\, 1 \\, if({D}f3>0 && {D}f1==1 && {H2}>0.85 \\, 0 \\, if({D}f5==0 && {D}f4>=32 && int({D}f2)>={D}f4-16 && int({D}f2)%16==14 && {D}f1==0 \\, 1 \\, {D}f1)));")
+p.con(dens0,0,dens,0)
 cx=p.add(f"#X obj 20 745 expr {D}f1>0 \\; {D}f1==2 || {D}f1==4 \\; {D}f1>=3 && {D}f1!=6 \\; {D}f1>0 && {D}f1<5 \\; {D}f1>=5;")
 p.con(rll,0,m16,1)   # a four-bar rhythm repeats every 64 steps
-for c in [(ti,0,m16,0),(m16,0,rd,0),(rd,0,lockx,0),(lockx,0,dens,0),(dens,0,cx,0),(cx,2,tws["slide"],0),(cx,1,tws["acc"],0),
-          (ti,1,kick,0),(kick,0,lockx,1),(var["lock"],1,lockx,2),(var["density"],1,dens,1),(one_d,0,dens,1),(var["seed"],1,dens,2),(ti,1,dens,3)]: p.con(*c)
+for c in [(ti,0,m16,0),(m16,0,rd,0),(rd,0,lockx,0),(lockx,0,dens0,0),(dens,0,cx,0),(cx,2,tws["slide"],0),(cx,1,tws["acc"],0),
+          (ti,1,kick,0),(kick,0,lockx,1),(var["lock"],1,lockx,2),(var["density"],1,dens0,1),(one_d,0,dens0,1),(var["seed"],1,dens0,2),(ti,1,dens0,3),
+          (ti,1,dens,1),(var["seed"],1,dens,2),(rlg,0,dens,3)]: p.con(*c)
 to=p.add("#X obj 20 780 t f f;"); s1=p.add("#X obj 20 810 sel 1;"); th=p.add("#X obj 400 790 t f f;")
 ix=p.add(f"#X obj 400 820 expr if(int({D}f2)==512 \\, (int({D}f3)%8)*64 + int({D}f4)%64 \\, int({D}f1+{D}f3) % int({D}f2));"); rn=p.add(f"#X obj 400 845 tabread {D}0-n;"); td=p.add("#X obj 400 870 t f f;")
 sx=p.add(f"#X obj 560 870 expr ((int({D}f1)%7)+7)%7;"); rs=p.add(f"#X obj 560 895 tabread {D}0-s;")
@@ -1671,6 +1678,7 @@ _IN=f"if({_ST} \\, if({D}f4>=0.5 && {_h(1.1)}<({D}f4-0.5) \\, {D}f1-{_R}+6+2*({_
 _LP=f"7*({D}f4>=0.75 && {_h(5.3)}<({D}f4-0.75)*1.2)"
 snap=p.add(f"#X obj 400 860 expr if({D}f3>0 \\, if({D}f4<0.25 \\, {_SN} \\, {_IN} + {_LP}) \\, {D}f1);")
 fsn=p.add(f"#X obj 560 820 f {D}7;"); p.con(lbm,0,fsn,0); p.con(fsn,0,snap,2); p.con(ti,1,snap,1)
+p.con(fsn,0,dens,4)   # the pickup is the bass's: the lead's phrases already land where they mean to
 p.con(var["outside"],1,snap,3); fr1=p.add("#X msg 640 820 0.35;"); p.con(lbm,0,fr1,0); p.con(fr1,0,snap,3)
 p.con(var["seed"],1,snap,4)
 nx=p.add(f"#X obj 400 930 expr {D}f2 + 12*floor({D}f1/7) + {D}f3;")
