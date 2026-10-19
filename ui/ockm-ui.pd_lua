@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.86"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.87"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -134,7 +134,7 @@ function ui:initialize(sel, atoms)
   self.s = tonumber(atoms[1]) or 1
   self.theme = THEMES[atoms[2]] or THEMES.dark
   self.v = {}                 -- every hook value we know about
-  self.screen = "perform"
+  self.screen = "live"
   self.slot = 1               -- open drum slot
   self.part = 1               -- open synth part
   self.perf_part = 1          -- synth on the perform screen's sound strip
@@ -631,7 +631,8 @@ end
 --   4. sound shaping at the bottom
 -- the tabs, in three groups: playing (perform A, perform B, mixer), making (compose and the four parts), arranging.
 -- { screen, label, part, width, gap before }
-local TABS = { { "perform", "perform A", nil, 72 }, { "live", "perform B", nil, 72 }, { "mixer", "mixer", nil, 58 },
+-- v0.87: one perform screen ("live" inside), as wide as the two it replaces so the other tabs stay where they were
+local TABS = { { "live", "perform", nil, 148 }, { "mixer", "mixer", nil, 58 },
                { "compose", "builder", nil, 58, 8 }, { "drums", "drums", nil, 58 }, { "synth", "bass", 1, 58 }, { "synth", "lead", 2, 58 }, { "synth", "chord", 3, 58 },
                { "arrange", "arrange", nil, 58, 8 } }
 local NAV_Y, NAV_H = 70, 36
@@ -750,6 +751,29 @@ local PB_Y, PB_H = 412, 176
 local PART_Y, PART_H = 418, 40
 local half_w = (W - 32 - 16) / 2
 local function part_x(i) local tw = (half_w - 12 - 12) / 3; return 22 + (i - 1) * (tw + 6), tw end
+
+-- the drums tab's all drums view (v0.87, from Perform A): 8 lanes with mute and solo, a tap cycles empty, hit, accent.
+-- Tap a name (or swipe right across the names) to go back to one drum, with its sound and settings
+function ui:layout_drumgrid(add)
+  local back = function(dx) if dx > 0 then self.drums_all = false end end
+  for i = 1, 8 do
+    local y = self:lane_y(i)
+    local name = SHORT[(self.v["ockm-"..SLOTS[i].."-sound"] or 0) + 1]
+    local tr = TRACKS[i]
+    add{ kind="ms", x=108, y=y, w=38, h=LANE_H, label="M", hook="ockm-"..tr.."-mute" }
+    add{ kind="ms", x=150, y=y, w=38, h=LANE_H, label="S", hook="ockm-"..tr.."-solo" }
+    add{ kind="lanename", x=16, y=y, w=88, h=LANE_H, label=name, swipe=back, tap=function() self.slot = i; self.drums_all = false end }
+    add{ kind="lane", x=LANE_X, y=y, w=W - LANE_X - 16, h=LANE_H, track=i }
+    local cw = (W - LANE_X - 16) / 16
+    for c = 0, 15 do
+      local st = (self:shown_block() * 16 + c) % self:plen("drum")
+      add{ kind="pcell", x=LANE_X + c * cw, y=y, w=cw, h=LANE_H, slot=i, step=st, tap=function() self:drum_cycle(i, st) end }
+    end
+  end
+  add{ kind="text", x=16, y=420, w=W - 160, h=12, size=10,
+       label="all drums: tap a step for a hit, again for an accent, again to clear. Tap a name for that drum's sound and settings" }
+  add{ kind="btn", x=W - 16 - 130, y=410, w=130, h=36, small=true, accent=true, label="one drum", tap=function() self.drums_all = false end }
+end
 
 function ui:layout_perform(add)
   -- the drums: 8 lanes, a picture of the block that is playing. Tap a name to open it, a step to change it
@@ -1332,6 +1356,7 @@ function ui:track_sounding(n)
 end
 
 function ui:open(screen)
+  if screen == "perform" then screen = "live" end   -- v0.87: Perform A is gone; its drum grid is the drums tab's all drums view
   self.msg = nil
   self.screen = screen
   self.pick, self.confirm, self.sheet = nil, nil, nil
@@ -1353,15 +1378,19 @@ function ui:step_row(add, y, h, kind)
 end
 
 function ui:layout_drums(add)
+  if self.drums_all then return self:layout_drumgrid(add) end
   local nm = SLOTS[self.slot]
-  local tw = (W - 32 - 7 * 8) / 8
-  -- which drum: the 8 slots, named by their sound
+  local AW = 96   -- the all drums button, right of the slots
+  local tw = (W - 32 - 7 * 6 - 8 - AW) / 8
+  -- which drum: the 8 slots, named by their sound. Swipe left across them for all eight at once
+  local to_all = function(dx) if dx < 0 then self.drums_all = true end end
   for i = 1, 8 do
     local smp = math.floor(self.v["ockm-"..SLOTS[i].."-sample"] or 0)
-    add{ kind="choice", x=16 + (i - 1) * (tw + 8), y=114, w=tw, h=40,
+    add{ kind="choice", x=16 + (i - 1) * (tw + 6), y=114, w=tw, h=40,
          label=SHORT[(self.v["ockm-"..SLOTS[i].."-sound"] or 0) + 1] .. (smp > 0 and string.format(" %02d", smp) or ""),
-         sel=(i == self.slot), tap=function() self.slot = i; self:preview(i, true) end }
+         sel=(i == self.slot), swipe=to_all, tap=function() self.slot = i; self:preview(i, true) end }
   end
+  add{ kind="btn", x=W - 16 - AW, y=114, w=AW, h=40, small=true, accent=true, label="all drums", tap=function() self.drums_all = true end }
   self:step_row(add, D_STEP_Y, D_STEP_H, "dstep")
   -- the lane under the steps: velocity or timing, dragged up and down per step
   local lane = self.lane or "vel"
@@ -2970,7 +2999,8 @@ function ui:release(x, y)
     self:preview(w.preview, true)
   elseif t.mode == "swipe" then
     local dx = x - t.x0
-    self:set_page(self.page + ((dx < 0) and 1 or -1))
+    if type(w.swipe) == "function" then w.swipe(dx)   -- a widget with its own swipe (the drums tab's views)
+    else self:set_page(self.page + ((dx < 0) and 1 or -1)) end
   elseif t.mode == nil and inside(w, x, y) then
     if w.kind == "dstep" then self:drum_tap(w.i)
     elseif (w.kind == "mstep" or w.kind == "cstep") and self:locked() then
@@ -3028,7 +3058,12 @@ function ui:paint_layer_2(g)
   if self.playing == 0 then return end
   local i = self.step % 16      -- every part's length is whole bars, so the step within the bar is the same for all
   local pitch = (W - 32) / 16
-  if self.screen == "perform" then
+  if self.screen == "drums" and self.drums_all then
+    if self:play_block() == self.page then
+      local lw = (W - LANE_X - 16) / 16
+      self:col(g, "acc"); g:fill_rect(LANE_X + i * lw + 2, LANE_Y - 6, lw - 4, 3)
+    end
+  elseif self.screen == "perform" then
     local lw = (W - LANE_X - 16) / 16
     self:col(g, "acc"); g:fill_rect(LANE_X + i * lw + 2, LANE_Y - 6, lw - 4, 3)
     for n, p in ipairs(SYNTHS) do

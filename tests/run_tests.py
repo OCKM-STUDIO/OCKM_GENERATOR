@@ -701,7 +701,7 @@ def touchscreen_drives_the_engine(work):
     h = Harness(); h.show("ockm-edit", "ockm-page", "ockm-len", "ockm-load", "ockm-d1-sound", "ockm-bass-edit", "ockm-want", "ockm-lead-k1", "ockm-filter", "ockm-chord-prog", "ockm-chord-type", "ockm-d1-mute", "ockm-d2-mute", "ockm-bass-level", "ockm-bass-mode")
     tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
     h.at(100, "ockm-resync bang")
-    tap(150, 50, 137)                    # perform: open the kick lane
+    tap(150, 539, 36)                    # drums tab (the kick slot)
     tap(170, 160, 212); tap(180, 160, 212)   # step 3: on, then accent
     tap(190, 262, 36)                    # perform tab
     tap(200, 539, 36)                    # drums tab (back to the kick slot)
@@ -711,19 +711,18 @@ def touchscreen_drives_the_engine(work):
     h.at(240, "ockm-ui-test drag 200 212 600 212")   # swipe right: back to 1-16
     tap(245, 194, 88)                    # forward arrow (steps 17-32)
     tap(248, 38, 88)                     # back arrow (steps 1-16)
-    tap(250, 262, 36)                    # perform tab
-    tap(255, 200, 438); tap(258, 129, 524)   # synth card: lead, then its first knob
     tap(260, 601, 36)                    # bass tab (bass is on auto)
     tap(270, 45, 158)                    # bass step 1: made for you, but any step can be edited (it becomes yours)
     tap(280, 600, 236)                   # note picker: third note of the scale
     tap(290, 262, 36)                    # perform tab
-    tap(310, 629, 500)                   # master fx: filter, middle
+    tap(310, 716, 215)                   # perform: the filter, middle
     tap(320, 477, 36)                    # song tab
     tap(335, 324, 345)                   # harmony: next progression
     tap(338, 725, 36)                    # chord tab
     tap(340, 298, 421)                   # colour: 9ths
-    tap(345, 262, 36); tap(348, 126, 137)  # perform tab, mute the kick lane
-    tap(349, 192 + 47 * 1 + 20, 165)     # perform: snare lane, step 2
+    tap(345, 262, 36); tap(346, 74, 186)   # perform tab, mute the kick tile
+    tap(347, 539, 36); tap(348, 896, 134)  # drums tab, all drums
+    tap(349, 192 + 47 * 1 + 20, 165)     # all drums: snare lane, step 2
     tap(350, 407, 36)                    # mixer tab
     tap(355, 673, 361)                   # bass fader, halfway (below the EQ button)
     tap(360, 130, 505)                   # mute on strip 2
@@ -737,13 +736,11 @@ def touchscreen_drives_the_engine(work):
     assert any(e.startswith("d1 16 ") for e in edits), f"tap after the swipe should edit step 17: {edits}"
     be = printed(out, "ockm-bass-edit")
     assert len(be) >= 2 and be[-1].split()[:2] == ["0", "36"], f"bass step 1 should become C (A minor, third step): {be}"
-    lk = [float(x) for x in printed(out, "ockm-lead-k1")]
-    assert any(0.4 < x < 0.6 for x in lk), f"perform strip: lead knob 1 should be about halfway: {lk}"
-    assert any(abs(float(x)) < 0.1 for x in printed(out, "ockm-filter")), "perform strip: filter in the middle should be about 0"
+    assert any(abs(float(x)) < 0.1 for x in printed(out, "ockm-filter")), "perform: filter in the middle should be about 0"
     assert printed(out, "ockm-chord-prog"), "song: the progression arrow should pick the next progression"
-    assert any(e.startswith("d2 1 ") for e in edits), f"tapping the snare lane on perform should edit d2 step 2: {edits}"
+    assert any(e.startswith("d2 1 ") for e in edits), f"tapping the snare lane in all drums should edit d2 step 2: {edits}"
     assert "1" in printed(out, "ockm-bass-mode"), "editing the bass should make it yours"
-    assert "1" in printed(out, "ockm-d1-mute"), "perform: M on the kick lane should mute d1"
+    assert "1" in printed(out, "ockm-d1-mute"), "perform: the kick tile should mute d1"
     assert "1" in printed(out, "ockm-d2-mute"), "mixer: M on strip 2 should mute d2"
     bl = [float(x) for x in printed(out, "ockm-bass-level")]
     assert any(0.4 < x < 0.6 for x in bl), f"mixer: bass fader halfway should be about 0.5: {bl}"
@@ -892,8 +889,8 @@ def drop_holds_the_hits_and_lands_on_the_bar(work):
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness(); h.show("ockm-gap", "ockm-drop", "ockm-bar")
     h.at(100, "ockm-bpm 120 ; ockm-play 1")
-    h.at(300, "ockm-ui-test press 760 438")       # drop, held
-    h.at(700, "ockm-ui-test release 760 438")     # let go part way through a bar (a bar is 2 s at 120)
+    h.at(300, "ockm-ui-test press 772 106")       # drop, held (perform)
+    h.at(700, "ockm-ui-test release 772 106")     # let go part way through a bar (a bar is 2 s at 120)
     f = os.path.join(work, "t_drop.pd"); h.finish(3000, f)
     out = run(work, f)
     lines = [l for l in out.splitlines() if l.startswith(("ockm-gap:", "ockm-drop:", "ockm-bar:"))]
@@ -1075,10 +1072,10 @@ def touchscreen_filter_springs_and_throw(work):
     if not PDLUA:
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness(); h.show("ockm-filter-glide", "ockm-delay-throw", "ockm-filter-now")
-    h.at(100, "ockm-ui-test drag 600 486 520 486")          # sweep the filter left, let go
-    h.at(500, "ockm-ui-test tap 742 476")                   # hold on
-    h.at(550, "ockm-ui-test drag 600 486 520 486")          # sweep again, let go: it stays
-    h.at(900, "ockm-ui-test tap 870 438")                   # throw
+    h.at(100, "ockm-ui-test drag 716 215 636 215")          # sweep the filter left, let go
+    h.at(500, "ockm-ui-test tap 902 163")                   # hold on
+    h.at(550, "ockm-ui-test drag 716 215 636 215")          # sweep again, let go: it stays
+    h.at(900, "ockm-ui-test tap 886 106")                   # throw
     f = os.path.join(work, "t_spring_ui.pd"); h.finish(1000, f)
     out = run(work, f)
     gl = printed(out, "ockm-filter-glide")
@@ -1592,6 +1589,22 @@ def phrase_sets_the_fill_and_turnaround(work):
     assert sends(L, "ockm-fill-style")[-1:] == [4], "breakbeat picked"
     assert sends(L, "ockm-fill-every")[-2:] == [8, 0], f"the fill every 8, then off: {sends(L, 'ockm-fill-every')}"
     assert sends(L, "ockm-turn-every")[-1:] == [8], f"the turnaround on the same 8-bar phrase: {sends(L, 'ockm-turn-every')}"
+
+@test
+def drums_tab_swipes_to_all_drums(work):
+    """Drums tab: swipe left across the drum slots for all drums (a tap on the snare lane edits d2), swipe right across the
+    names to come back to one drum (a tap on the step row edits the selected drum, d1)."""
+    sys.path.insert(0, os.path.join(ROOT, "tests"))
+    import ui_preview
+    if not ui_preview.LUA:
+        raise Skip("no lua to run the screen")
+    L = ui_preview.run(["test tap 539 36", "test drag 600 134 200 134",      # swipe left across the slots
+                        "test tap 259 165",                                   # all drums: snare lane, step 2
+                        "test drag 40 200 300 200",                           # swipe right across the names
+                        "test tap 45 212"])                                   # one drum: step 1 of the kick
+    edits = [l.split()[2:] for l in L if l.startswith("sent ockm-edit ")]   # "sent ockm-edit d2 1 1": the drum, the step, the value
+    assert edits and edits[0][:2] == ["d2", "1"], f"all drums: the snare lane, step 2: {edits}"
+    assert any(e[:2] == ["d1", "0"] for e in edits[1:]), f"back on one drum: the kick's step 1: {edits}"
 
 @test
 def refit_my_line_when_the_harmony_moves(work):

@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.87 (19 October 2026)
+
+- **One Perform screen.** What was Perform B (track tiles with quantised mutes, the mute presets, the effects and macros) is now **perform**, the home screen, in a wide tab where the two used to sit, so the other tabs haven't moved
+- **All drums, on the drums tab:** Perform A's eight-lane grid with mute and solo. Tap **all drums** or swipe left across the drum slots to get there; tap a name, swipe right across the names, or tap **one drum** to come back
+- Mutate, original and density live on the bass and lead tabs (they were also on Perform A)
+
 ## v0.86 (19 October 2026)
 
 - **Mutate changes the rhythm too:** each variation of the bass or lead now moves a hit or two (adds a note on a resting 8th, drops a plain note), not just the notes. Accents and held notes stay, and a variation repeats steadily

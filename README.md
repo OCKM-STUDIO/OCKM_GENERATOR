@@ -2,7 +2,7 @@
 
 A drum machine and easy-to-program synths in one box. Built in Pure Data, designed to run on a Raspberry Pi with a touchscreen and a few knobs.
 
-Current version: **v0.86**
+Current version: **v0.87**
 
 ## How to open it
 
@@ -11,37 +11,21 @@ Open `OCKM_GENERATOR.pd` in plugdata. Keep the folder together: the main patch f
 The window is the instrument: three touch screens, drawn in Lua (plugdata has Lua built in). Click with the mouse on the Mac, tap with a finger on the Pi. If clicks do nothing, the patch is in edit mode: press Cmd+E.
 
 **How every screen is laid out**, top to bottom:
-1. **Top bar:** play, tempo, then the screens as tabs in three groups: playing (**Perform A, Perform B, mixer**), making (**builder, drums, bass, lead, chord**) and **arrange**. On the right, **save** (a disc, orange when there's something to save) and **☰**, the menu: project, export, settings, revert (and quit to desktop on the Pi). The version number sits next to the tempo
+1. **Top bar:** play, tempo, then the screens as tabs in three groups: playing (**perform**, **mixer**), making (**builder, drums, bass, lead, chord**) and **arrange**. On the right, **save** (a disc, orange when there's something to save) and **☰**, the menu: project, export, settings, revert (and quit to desktop on the Pi). The version number sits next to the tempo
 2. **Navigation strip:** on the left, right above the steps, the **steps** navigator: back and forward arrows either side of the steps you're looking at (for example "17-32"). The dots show every block of 16: white is the one on screen, orange is the one playing. You can also swipe the step row sideways. In the middle, how long the loop is and which part sets it, like "loop 4 bars (bass, lead, chords)". On the drums, bass, lead and chord tabs, the right of the strip has that part's **length** (1, 2, 4, 8 or 16 bars) and **double**. See "Part lengths" below
 3. **What you're editing:** the steps (and, on the drums screen, which of the 8 drum slots)
 4. **Sound shaping** at the bottom
 
-Tap a track's name on Perform A or the mixer to jump straight to it.
+Tap a track's name on the mixer, or in the drums tab's all drums view, to jump straight to it.
 
-**Perform A** (home)
-- **Play** and **tempo** top left. Drag the tempo number up or down
-- One loop per project: everything you play live works on it. **Save** (the disc) keeps the loop and the kit. It turns orange when there's something unsaved
-- **The drums**: 8 lanes for the 16 steps on screen, with the playhead running above them. **Tap a step to edit it** (empty, hit, accent), just like the drums screen. Tap a drum's **name** to open it
-- **M** mutes a track and **S** solos it (several can be soloed at once). Mutes and solos are for playing live, so they aren't saved
-- **Bottom left, the synths:** bass, lead and chord buttons, each with its own **M** and **S** and a light that flashes as the part plays. Tap one to pick it, then:
-  - bass or lead on auto: **mutate** (a fresh variation), **original** (back to the one you started with) and **density** (fewer or more notes): the same words as on the part's own tab
-  - chords: step through the chord **rhythms**
-  - an empty part: a button to start it
-  - and the part's four main knobs (named for the engine it's using)
-- **Bottom right, master FX**, played like an SP-404:
-  - **Moves** along the top: **rise** and **pump** switch on and off. **Drop** (hold it): nothing new plays while you hold it, the effects ring on, and everything comes back on the next bar after you let go. **Throw** (hold it): sends the whole mix into its own echo line; let go and the echoes ring out at your delay time and feedback. The dub throw
-  - **Filter**: drag left for low-pass, right for high-pass. Let go and it snaps back to off. Tap **hold** (in its corner) to make it stay where you leave it; tap hold again and it snaps home
-  - **Drive** beside it; then delay level, **feedback** and **time** (in steps); reverb level and **size**. Reverb tone is in settings
-- These are bars: drag along them. The orange line shows the value
-- **Length** is in the navigation strip. Making the loop longer repeats what's there
-- **Save** and **project**, top right
-
-**Perform B** (no steps, just mutes and effects, big enough for thumbs)
-- **A tile per track**, plus **all synths**. Tap anywhere on a tile to mute it or bring it back; **S** in its corner solos. The light flashes as the track plays
+**Perform** (home: no steps, just mutes and effects, big enough for thumbs. Until v0.87 this was Perform B; Perform A's drum grid is now the drums tab's **all drums** view)
+- **Play** and **tempo** top left. Drag the tempo number up or down. One loop per project: everything you play live works on it. **Save** (the disc) keeps the loop and the kit, and turns orange when there's something unsaved
+- **A tile per track**, plus **all synths**. Tap anywhere on a tile to mute it or bring it back; **S** in its corner solos (several can be soloed at once). The light flashes as the track plays. Mutes and solos are for playing live, so they aren't saved. A part switched off on the builder shows "off in this pattern" and nothing here brings it back
 - **Mutes land:** **now** (straight away, like an MPC's track mute), **next beat** or **next bar**. A change that's waiting gets an orange outline and says when it lands, so you can tap several and have them all switch together. Stopped, they land at once
-- **Scenes** along the bottom: drums only, no drums, kick + bass, all in. They clear any solos and go through the same timing
-- **Master effects:** rise, pump, drop and throw; a big filter with hold; drive and master volume; delay and reverb
+- **Mute presets** along the bottom: drums only, no drums, kick + bass, all in. They clear any solos and go through the same timing
+- **Master effects:** **rise** (a build to the next loop start at least 2 bars away, then the drop: see Rise below), **pump**, **drop** (hold it: nothing new plays, the effects ring on, and everything comes back on the next bar after you let go) and **throw** (hold it: the whole mix into its own echo line; let go and the echoes ring out). A big **filter** (drag left for low-pass, right for high-pass; let go and it snaps back, or tap **hold** to make it stay); drive and master volume; delay level, feedback and time; reverb level and size. Reverb tone is in settings
 - **Macros:** three slots, A, B and C. Hold one to play it; let go and everything goes back (a macro with a move that stays lights up and waits: tap it again to let go). The small **v** on each picks which of your six macros is on that slot. Out of the box: build, wash and strip
+- Mutate, original and density for the bass and lead are on their own tabs
 
 **Drum lab** (its own patch: open `OCKM_DRUM_LAB.pd` in plugdata on the Mac). For designing a whole kit of your own, then rendering it as samples. Eight sounds, in two rows of four:
 - **Clap:** how many bursts, the gap between them and how loose it is, burst length, two noise colours (body and air) with their focus and balance, a separate tail with its own tone, a small room, snap and drive
@@ -59,7 +43,7 @@ Tap a track's name on Perform A or the mixer to jump straight to it.
 - **render** records one hit to `samples/clap` or `samples/snare` as a 24-bit mono WAV, named `lab-clap-` or `lab-snare-` plus the date and time. Pick it on the drums tab like any other sample (it's yours, so it can go on the SP-404 or into Ableton too)
 - Nothing in the instrument depends on the lab: it only writes WAVs
 
-**Drum** (one slot at a time)
+**Drum** (one slot at a time, or **all drums**: tap the button right of the slots, or swipe left across them, for all eight lanes at once with M and S. Tap a step for a hit, again for an accent, again to clear; tap a name, swipe right across the names, or tap **one drum** to come back)
 - The 8 slots along the top, named by the sound they play
 - **Sound**: 8 pads, one per drum sound
 - **Steps**: tap cycles empty, hit (white), accent (orange)
@@ -70,7 +54,7 @@ Tap a track's name on Perform A or the mixer to jump straight to it.
 
 **Builder** (where compose used to be): what's in this pattern, and the harmony everything follows.
 - **Styles** (two rows along the top, house through to techno): deep house, Chicago, classic house, nu disco, tech house, minimal, progressive, dub techno, Detroit, acid, peak time and hard techno. One tap sets the tempo, swing and groove, the key and scale (deep house in F dorian, peak time in F phrygian and so on), the kick and clap character, which parts are in, what each one plays and on which sound, the progression and chord colour, sends and sidechain. The lead is on in seven of them. **Shuffle** (right of the chips) re-rolls the lit style from its own choices: a different key, groove, progression, engines, rhythms, and a variation of the riffs, all still inside the style. Other styles leave a drum slot that plays one of your own samples or saved sounds alone, and take a slot that's on a kit back to the synth sound. The message that pops up has **undo**. The last style you picked stays lit; it's a starting point, so tweak away
-- **Four tiles: drums, bass, chords, lead**, each with an **on/off** switch. Tap one to switch that part **off** in this pattern, tap again to switch it back **on**. Off is different from muted: an off part is silent, its tiles on Perform A and B go dim and say "off in this pattern", and nothing on Perform (mutes, scenes, all in, macros) brings it back. Saved with each pattern, so an intro can leave the bass out. Each part's own tab has the same **on/off** switch, top right
+- **Four tiles: drums, bass, chords, lead**, each with an **on/off** switch. Tap one to switch that part **off** in this pattern, tap again to switch it back **on**. Off is different from muted: an off part is silent, its tiles on Perform go dim and say "off in this pattern", and nothing on Perform (mutes, scenes, all in, macros) brings it back. Saved with each pattern, so an intro can leave the bass out. Each part's own tab has the same **on/off** switch, top right
 - **The harmony:** the progression, the key and the scale. The bass, chords and lead all follow it, and it keeps steering even when the chords are out (so the bass still moves with it). The progression lives here now, not on the chord tab
 - **Or fit the chords to my bass / my lead:** when you've written a line of your own, this picks the progression that fits it best (it scores every progression against your notes; tap again for the next best). Only lit when that part is yours
 - **Phrase: off, 4, 8 or 16 bars,** counted from play, and what happens at the end of each one: **drum fill** (the style is picked on the drums tab) and **turnaround** (the harmony goes to the V chord, made major (E in A minor), which leads back round; the chords play it, a following bass moves with it, and the lead's notes bend to fit). One length for both, so the fill and the turnaround always land together. Saved with each pattern. (Until v0.85 the fill and the turnaround each had their own every-so-many-bars setting, on two tabs.)
@@ -80,7 +64,7 @@ Tap a track's name on Perform A or the mixer to jump straight to it.
 - **Made for you:** generated from its settings, and it follows the harmony: change the progression, key or scale and it rewrites itself to fit
 - **Yours:** as soon as you edit a step it's yours, and nothing rewrites it. If the harmony then changes under it, its tab says how many notes no longer fit, with **refit my line** (each of those notes moves to the nearest chord note, keeping your rhythm, accents and slides) or **leave it**. **Make it for me** hands a part back to its generator
 
-**Starting from empty.** A synth part with no notes says so: on perform its lane reads "empty: tap to start", and its tab shows a **start** button. For the lead you can also just write a tune by hand on the lead tab.
+**Starting from empty.** A synth part with no notes says so: on the drums and synth tabs it reads "empty: tap to start", and its tab shows a **start** button. For the lead you can also just write a tune by hand on the lead tab.
 
 **Bass, lead and chord** (a tab each)
 - **Steps**: tap cycles off, on, accent. **Drag a step up or down** to change its note. Or tap a step, then pick its note from the row underneath (the dimmed one is the key's root). **Slide** applies to the selected step. Editing any step makes the part yours
@@ -100,7 +84,7 @@ Tap a track's name on Perform A or the mixer to jump straight to it.
 **Settings** (☰, or tap the tempo). Four sections:
 - **This project** (saved with it): tempo with -5, -1, +1, +5 and a slider, swing, how strong accents are, reverb tone, and MIDI clock: lead (send clock out) or follow (play to incoming clock). Dragging the tempo up or down in the top bar still changes it directly
 - **New projects:** how a new blank project starts: drums 1, 2 or 4 bars; synths 2, 4 or 8 bars; the lead on notes 1 and rhythm 1 (like everything else), or as motif, call and answer, or arp
-- **This device:** theme (dark or light), how fast the filter lets go (snap, quick, slow), and where Perform B's mutes start (now, next beat, next bar)
+- **This device:** theme (dark or light), how fast the filter lets go (snap, quick, slow), and where Perform's mutes start (now, next beat, next bar)
 - **Macros:** your six macros. Each is up to four moves: what (filter, delay, feedback, reverb, size, drive, pump, volume, rise, throw or a set of mutes), how much, how it gets there (jump, or over a beat, a bar, 2 or 4 bars) and how it lets go (snap back, glide back over a bar, or stay). Tap a box to step through its choices. Pick which slot it's on (A, B or C) and hold **try it** to hear it. Names come from a list (there's no keyboard on the Pi)
 
 New projects, this device and macros are yours, not a project's: they're kept in `my-settings.lua` beside the patch, so they're the same in every project.
