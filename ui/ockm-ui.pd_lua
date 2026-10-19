@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.94"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.95"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -376,6 +376,8 @@ function ui:postinitialize()
   listen("ockm-page",    function(o, sel, a) o.page = math.floor(tonumber(a[1]) or 0); o:dirty() end)
   listen("ockm-step",    function(o, sel, a) o:on_step(math.floor(tonumber(a[1]) or 0)) end)
   listen("ockm-bar",     function(o, sel, a) o:on_bar() end)
+  listen("ockm-midi-note", function(o, sel, a) o:midi_pad(tonumber(a[1]) or 0, tonumber(a[2]) or 0) end)
+  listen("ockm-midi-cc",   function(o, sel, a) o:midi_knob(tonumber(a[2]) or 0, tonumber(a[1]) or 0) end)
   for _, n in ipairs({ "ockm-refresh","ockm-edit","ockm-extend","ockm-bass-edit","ockm-lead-edit","ockm-chord-edit",
                        "ockm-bass-gen","ockm-lead-gen","ockm-chord-gen","ockm-drums-changed" }) do
     listen(n, function(o) o:dirty() end)
@@ -1096,9 +1098,9 @@ local function default_settings()
                                   { t = "delay", v = 0.45, how = 1, back = 1 }, { t = "pump", v = 1, how = 1, back = 1 } } },
       { name = "wash", moves = { { t = "delay", v = 0.85, how = 1, back = 1 }, { t = "feedback", v = 0.78, how = 1, back = 1 },
                                  { t = "reverb", v = 0.9, how = 1, back = 1 }, { t = "filter", v = -0.5, how = 2, back = 1 } } },
-      -- v0.94: the breakdown's high-pass twin: drums out, the high-pass climbs over a bar so it thins right out, a touch of
+      -- v0.94: the breakdown's high-pass twin: drums out, the high-pass climbs slowly over the 4 bars (halfway up), a touch of
       -- reverb and delay, then it all slams back on the 1
-      { name = "lift", bars = 4, moves = { { t = "mutes", v = 3, how = 1, back = 1 }, { t = "filter", v = 0.6, how = 3, back = 1 },
+      { name = "lift", bars = 4, moves = { { t = "mutes", v = 3, how = 1, back = 1 }, { t = "filter", v = 0.3, how = 5, back = 1 },
                                           { t = "reverb", v = 0.4, how = 2, back = 1 }, { t = "delay", v = 0.3, how = 2, back = 1 } } },   -- gentle
       { name = "sink", moves = { { t = "filter", v = -0.85, how = 3, back = 1 }, { t = "drive", v = 0.7, how = 3, back = 1 } } },
       { name = "dub out", moves = { { t = "throw", v = 1, how = 1, back = 1 }, { t = "feedback", v = 0.85, how = 1, back = 3 },
@@ -1148,6 +1150,12 @@ function ui:load_settings()
   self.me = d
   local has, hp = false, false
   for _, r in ipairs(d.macros) do if r.name == "breakdown" then has = true end; if r.name == "lift" and r.bars then hp = true end end
+  -- v0.95: lift's high-pass goes half as far, over the 4 bars (it went to 0.6 in a bar)
+  for _, r in ipairs(d.macros) do
+    if r.name == "lift" and r.bars then
+      for _, m in ipairs(r.moves) do if m.t == "filter" and m.v == 0.6 and m.how == 3 then m.v = 0.3; m.how = 5 end end
+    end
+  end
   if not hp then
     for i, r in ipairs(d.macros) do
       if r.name == "strip" then
@@ -1326,6 +1334,53 @@ function ui:macro_sub(i)
   end
   if mc.latched then return "tap to let go" end
   return nil
+end
+
+-- ------------------------------------------------------------------ MIDI controller (v0.95)
+-- Pads and knobs from a controller such as an MPK mini or an MPC (no keys). Pads by note, on any channel:
+-- bank A (36-43): mute or bring back drums 1-8, landing like the Perform tiles. Bank B (44-51): macro slots A, B, C,
+-- then pump, drop and throw (held while the pad is), rise (a tap), all in. Knobs by CC (70-77, or 1-8):
+-- filter, drive, delay, reverb, then k1-k4 of the synth whose tab you last opened.
+local PAD_MOVES = { "ockm-pump", "ockm-drop", "ockm-delay-throw" }
+local MIDI_KNOBS = { { "ockm-filter", -1, 1 }, { "ockm-drive", 0, 1 }, { "ockm-delay-mix", 0, 1 }, { "ockm-verb-mix", 0, 1 } }
+function ui:midi_pad(n, vel)
+  n = math.floor(n)
+  local i = n - 35
+  if i < 1 or i > 16 then return end
+  local down = vel > 0
+  if i <= 8 then
+    if not down then return end
+    local t = TRACKS[i]
+    if not self:track_in(t) then return end
+    self:qmute(t, (self:mute_target(t) > 0) and 0 or 1)
+  else
+    local b = i - 8
+    if b <= 3 then
+      if down then self:macro_down(b) else self:macro_up(b) end
+    elseif b <= 6 then
+      psend(PAD_MOVES[b - 3], "float", { down and 1 or 0 }); self.pad_on = down and PAD_MOVES[b - 3] or nil
+    elseif b == 7 then
+      if down then self:send("ockm-rise", 1) end
+    elseif down then
+      self:scene(function() return true end)
+    end
+  end
+  self:dirty()
+end
+function ui:midi_knob(cc, val)
+  cc = math.floor(cc)
+  local k = (cc >= 70 and cc <= 77) and (cc - 69) or ((cc >= 1 and cc <= 8) and cc or nil)
+  if not k then return end
+  local x = math.max(0, math.min(127, val)) / 127
+  if k <= 4 then
+    local m = MIDI_KNOBS[k]
+    local v = m[2] + (m[3] - m[2]) * x
+    if k == 1 and math.abs(v) < 0.04 then v = 0 end   -- the filter's middle is off: give it a little room
+    self:send(m[1], v)
+  else
+    self:send("ockm-" .. (SYNTHS[self.part or 1] or "bass") .. "-k" .. (k - 4), x)
+  end
+  self:dirty()
 end
 
 -- ------------------------------------------------------------------ settings screen

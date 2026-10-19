@@ -968,7 +968,7 @@ def live_macros_move_several_things_and_put_them_back(work):
     vm = [float(x) for x in printed(out, "ockm-verb-mix")]
     assert vm and max(vm) > vm[-1] and abs(vm[-1] - 0.3) < 0.01, f"reverb eases up, then back to where it was: {vm}"
     gl = [float(x.split()[0]) for x in printed(out, "ockm-filter-glide")]
-    assert gl and gl[0] > 0.5, f"lift: the high-pass first (filter up): {gl}"
+    assert gl and gl[0] > 0.2, f"lift: the high-pass first (filter up): {gl}"
     assert any(x < -0.5 for x in gl), f"breakdown: the low-pass (filter down): {gl}"
     assert printed(out, "ockm-d2-mute") == ["1", "0", "1", "0"], f"the snare mutes and comes back, twice: {printed(out, 'ockm-d2-mute')}"
     assert printed(out, "ockm-d1-mute") == ["1", "0", "1", "0"] and not printed(out, "ockm-bass-mute"), "the kick goes too, the bass keeps playing"
@@ -1672,6 +1672,29 @@ def breakdown_recipe_runs_for_bars_or_while_held(work):
     lg = H.index("mark let-go")
     assert [l for l in H[:lg] if l.startswith("sent ockm-d1-mute-q ") and l.endswith(" 0")], "a hold: let go and the drums are asked back"
     assert "sent ockm-mute-bar float 0" in H[lg:H.index("mark bar1")], "and the rest lands with them on the next bar"
+
+@test
+def midi_pads_and_knobs(work):
+    """v0.95 a MIDI controller: pad 36 (bank A, pad 1) mutes the kick and again brings it back; pad 45 (bank B, pad 2)
+    holds macro slot B while held; pad 47 (pump) is 1 while held; knob CC 70 sweeps the filter (64 is the middle: off),
+    CC 74 sets k1 of the synth on screen, and CC 1 works too (older MPK minis). Keys outside the pads do nothing."""
+    sys.path.insert(0, os.path.join(ROOT, "tests"))
+    import ui_preview
+    if not ui_preview.LUA:
+        raise Skip("no lua to run the screen")
+    N = lambda n, v: f"send ockm-midi-note list {n} {v} 10"
+    C = lambda cc, v: f"send ockm-midi-cc list {v} {cc} 1"
+    L = ui_preview.run([N(36, 100), N(36, 0), "send ockm-d1-mute float 1", N(36, 100), N(45, 100), "mark held", N(45, 0), "mark up", N(47, 90), N(47, 0),
+                        C(70, 0), C(70, 64), C(70, 127), "test tap 663 36", C(74, 127), C(1, 127), "mark keys", N(60, 100), N(60, 0)])
+    kick = [l.split()[3] for l in L if l.startswith("sent ockm-d1-mute-q ")]
+    assert kick[:2] == ["1", "0"], f"pad 1 toggles the kick: {kick}"
+    held = L.index("mark held")
+    assert any(l.startswith("sent ockm-filter-glide ") for l in L[:held]), "slot B (lift) moves the filter while held"
+    assert [l.split()[3] for l in L if l.startswith("sent ockm-pump ")] == ["1", "0"], "the pump pad is held"
+    fl = [float(l.split()[3]) for l in L if l.startswith("sent ockm-filter ")]
+    assert fl[:3] == [-1, 0, 1], f"knob 1 is the filter, off in the middle: {fl}"
+    assert [float(l.split()[3]) for l in L if l.startswith("sent ockm-lead-k1 ")][-1:] == [1], "knob 5 is k1 of the synth on screen (the lead tab)"
+    assert not [l for l in L[L.index("mark keys"):] if l.startswith("sent ") and not l.startswith("sent ockm-midi-")], "keys do nothing"
 
 @test
 def refit_my_line_when_the_harmony_moves(work):

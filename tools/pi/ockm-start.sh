@@ -13,4 +13,7 @@ if [ -n "$N" ]; then
 else
     SOUND="-nosound"
 fi
-exec pd $SOUND -nomidi -path tools/pi -path /usr/lib/pd/extra/pdlua -lib pdlua -open OCKM_GENERATOR.pd
+# MIDI: Pd's own ALSA input and output (clock out to a follower, clock and pads and knobs in); controllers are
+# connected to it as they're plugged in (v0.95)
+"$(dirname "$0")/ockm-midi-connect.sh" &
+exec pd $SOUND -alsamidi -midiindev 1 -midioutdev 1 -path tools/pi -path /usr/lib/pd/extra/pdlua -lib pdlua -open OCKM_GENERATOR.pd

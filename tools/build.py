@@ -808,6 +808,11 @@ p.L.append(sub.text("#N canvas 340 240 640 180 midi-sync 0;").rstrip("\n"))
 p.add("#X restore 450 960 pd midi-sync;")
 p.add("#X text 450 985 MIDI clock leader or follower;")
 p.add("#X obj 450 1010 ockm-clock;")
+# v0.95 MIDI in from a controller (an MPK mini, an MPC): pads and knobs, handed to the screen, which knows what's open.
+# ockm-midi-note <note> <velocity> <channel> (velocity 0 = let go), ockm-midi-cc <value> <cc> <channel>
+nin=p.add("#X obj 450 1040 notein;"); npk=p.add("#X obj 450 1065 pack f f f;"); nsd=p.add("#X obj 450 1090 s ockm-midi-note;")
+cin=p.add("#X obj 600 1040 ctlin;"); cpk=p.add("#X obj 600 1065 pack f f f;"); csd=p.add("#X obj 600 1090 s ockm-midi-cc;")
+for c in [(nin,2,npk,2),(nin,1,npk,1),(nin,0,npk,0),(npk,0,nsd,0),(cin,2,cpk,2),(cin,1,cpk,1),(cin,0,cpk,0),(cpk,0,csd,0)]: p.con(*c)
 p.add("#X text 250 985 effects and sends;")
 p.add("#X obj 1100 800 declare -path voices -path seq -path lab;")
 # ---- the main window: the touchscreen UI on top; the engine and the old test panel in closed subpatches ----

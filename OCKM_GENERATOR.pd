@@ -980,6 +980,12 @@
 #X restore 450 960 pd midi-sync;
 #X text 450 985 MIDI clock leader or follower;
 #X obj 450 1010 ockm-clock;
+#X obj 450 1040 notein;
+#X obj 450 1065 pack f f f;
+#X obj 450 1090 s ockm-midi-note;
+#X obj 600 1040 ctlin;
+#X obj 600 1065 pack f f f;
+#X obj 600 1090 s ockm-midi-cc;
 #X text 250 985 effects and sends;
 #X text 1100 800 (the declare is in the main window);
 #X connect 7 0 6 0;
@@ -1586,6 +1592,14 @@
 #X connect 153 0 552 0;
 #X connect 609 0 581 0;
 #X connect 153 0 581 0;
+#X connect 633 2 634 2;
+#X connect 633 1 634 1;
+#X connect 633 0 634 0;
+#X connect 634 0 635 0;
+#X connect 636 2 637 2;
+#X connect 636 1 637 1;
+#X connect 636 0 637 0;
+#X connect 637 0 638 0;
 #X restore 20 624 pd engine;
 #N canvas 80 80 1140 840 test-panel 0;
 #X obj 0 0 ockm-panel;

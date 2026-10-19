@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.95 (19 October 2026)
+
+- **MIDI controllers: pads and knobs.** Plug in an MPK mini (or an MPC, or most pad controllers) and it's picked up within a couple of seconds, no setup. Pads, by note on any channel. Bank A (36 to 43): mute or bring back drums 1 to 8, landing like the Perform tiles. Bank B (44 to 51): macro slots A, B and C (held while the pad is, so a tap runs a recipe with a length), pump, drop and throw (held), rise, all in. Knobs (CC 70 to 77, or 1 to 8): filter (the middle is off), drive, delay, reverb, then k1 to k4 of the synth whose tab you last opened. Keys do nothing for now
+- On the Pi, Pd now starts with MIDI on (it was off), and `tools/pi/ockm-midi-connect.sh` connects any controller to it as it's plugged in. MIDI clock in and out work there too now
+- **Lift** is gentler: the high-pass goes half as far (0.3) and climbs slowly over the whole 4 bars
+
 ## v0.94 (19 October 2026)
 
 - **Lift, on slot B:** breakdown's high-pass twin. The drums go, the high-pass climbs over a bar so the track thins right out, with a gentle touch of reverb and delay, then it all slams back on the 1. Tap for 4 bars or hold, like breakdown. It takes strip's place in your six macros (strip was mutes only, which breakdown and lift now do with effects). Wash is still in the library
