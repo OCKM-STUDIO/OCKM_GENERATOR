@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.77"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.78"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -900,7 +900,7 @@ function ui:layout_live(add)
       local t = TRACKS[n]
       add{ kind="mtile", x=x, y=y, w=LV_COL_W, h=LV_ROW_H, track=t, label=self:track_name(n),
            tap=function()
-             if not self:track_in(t) then self:say(self:track_name(n) .. " is out of this pattern: put it back in on the builder"); return end
+             if not self:track_in(t) then self:say(self:track_name(n) .. " is off in this pattern: switch it on on the builder"); return end
              self:qmute(t, (self:mute_target(t) > 0) and 0 or 1)
            end }
       add{ kind="ms", x=x + LV_COL_W - 40, y=y + LV_ROW_H - 36, w=34, h=30, label="S", hook="ockm-"..t.."-solo" }
@@ -1797,7 +1797,7 @@ function ui:layout_compose(add)
   end
   -- in this pattern: four tiles
   add{ kind="text", x=16, y=196, w=W - 32, h=12, size=10,
-       label="in this pattern: tap a part to put it in or take it out (out is silent, and nothing on Perform brings it back)" }
+       label="in this pattern: tap a part to switch it on or off (off is silent, and nothing on Perform brings it back)" }
   local tw = (W - 32 - 3 * 8) / 4
   local eng = function(part) local e = engines_of(part); return e[(math.floor(self.v["ockm-"..part.."-engine"] or 0)) + 1] or "" end
   for i, p in ipairs({ "drums", "bass", "chords", "lead" }) do
@@ -1811,7 +1811,7 @@ function ui:layout_compose(add)
     else
       l1 = eng(p); l2 = self:part_yours(p) and "yours: you've edited it" or "made for you: follows the harmony"
     end
-    if not on then l1 = "out of this pattern"; l2 = (p == "chords") and "silent: the harmony still steers" or "Perform won't bring it back" end
+    if not on then l1 = "off in this pattern"; l2 = (p == "chords") and "silent: the harmony still steers" or "Perform won't bring it back" end
     add{ kind="parttile", x=16 + (i - 1) * (tw + 8), y=210, w=tw, h=80, label=p, on=on, l1=l1, l2=l2, tap=function()
       self:send(PART_ON[p], on and 0 or 1)
     end }
@@ -3069,7 +3069,7 @@ function ui:draw(g, w)
       armed = p ~= nil
       local q = math.floor(self.v["ockm-mute-quant"] or 0)
       local when = (q == 1) and "beat" or "bar"
-      if not self:track_in(w.track) then muted = true; armed = false; txt = "out of this pattern"
+      if not self:track_in(w.track) then muted = true; armed = false; txt = "off in this pattern"
       elseif armed then txt = (p > 0 and "out on " or "in on ") .. when
       elseif muted then txt = "muted"
       elseif self:silent(w.track) then txt = "not soloed"
@@ -3085,7 +3085,7 @@ function ui:draw(g, w)
     local out = not self:track_in(w.label)
     self:col(g, w.sel and "on" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
     self:col(g, "dim"); g:fill_rounded_rect(w.x + 10, w.y + w.h / 2 - 5, 10, 10, 5)
-    self:text(g, out and (w.label .. " (out)") or w.label, w.x + 28, w.y + w.h / 2 - 8, 13, w.sel and "bg" or (out and "mute" or "txt"), w.w - 96)
+    self:text(g, out and (w.label .. " (off)") or w.label, w.x + 28, w.y + w.h / 2 - 8, 13, w.sel and "bg" or (out and "mute" or "txt"), w.w - 96)
   elseif k == "card" then
     self:col(g, "card"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 8)
   elseif k == "locked" then
@@ -3103,9 +3103,14 @@ function ui:draw(g, w)
   elseif k == "parttile" then
     self:col(g, w.on and "card" or "bg"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 8)
     self:col(g, w.on and "dim" or "off"); g:stroke_rounded_rect(w.x, w.y, w.w, w.h, 8, 1)
-    self:text(g, w.label, w.x + 14, w.y + 12, 20, w.on and "txt" or "mute", w.w - 80)
-    self:col(g, w.on and "acc" or "off"); g:fill_rounded_rect(w.x + w.w - 58, w.y + 14, 44, 22, 11)
-    self:ctext(g, w.on and "in" or "out", { x=w.x + w.w - 58, y=w.y + 14, w=44, h=22 }, 11, w.on and "bg" or "mute")
+    self:text(g, w.label, w.x + 14, w.y + 12, 20, w.on and "txt" or "mute", w.w - 104)
+    -- the same on/off switch as on each part's tab
+    local sx, sy, sw, sh = w.x + w.w - 90, w.y + 12, 78, 24
+    local hw = sw / 2
+    self:col(g, "off"); g:fill_rounded_rect(sx, sy, sw, sh, sh / 2)
+    self:col(g, w.on and "acc" or "dim"); g:fill_rounded_rect(w.on and sx or (sx + hw), sy, hw, sh, sh / 2)
+    self:ctext(g, "on", { x=sx, y=sy, w=hw, h=sh }, 11, w.on and "bg" or "mute")
+    self:ctext(g, "off", { x=sx + hw, y=sy, w=hw, h=sh }, 11, w.on and "mute" or "txt")
     self:text(g, w.l1 or "", w.x + 14, w.y + w.h - 44, 11, "mute", w.w - 24)
     self:text(g, w.l2 or "", w.x + 14, w.y + w.h - 25, 11, "mute", w.w - 24)
   elseif k == "bar" then

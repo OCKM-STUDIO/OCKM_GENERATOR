@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.78 (19 October 2026)
+
+- **The builder's part tiles have an on/off switch** (the same as on each part's tab) instead of in/out, and say "off in this pattern" when off, here and on Perform
+
 ## v0.77 (18 October 2026)
 
 - **Song is now Builder**
