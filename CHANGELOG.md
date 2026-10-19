@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.81 (19 October 2026)
+
+- **The lead's freedom buttons are now one slider, inside to outside.** It builds up as it goes: chord notes, then passing notes between the beats, then colour (7ths and 9ths on some beats), then outside (octave leaps and chromatic notes). It works on one chord, mutate picks where the extra notes land, and the steps show what it plays. Replaces ockm-lead-freedom with ockm-lead-outside
+- Sliders between two named ends show the ends at the sides and what they're doing now in the middle
+
 ## v0.80 (19 October 2026)
 
 - **Reese bass fixed:** each note started with a loud, bright "breath". Two causes: the filter envelope swept up to 6 kHz through a resonant filter (now up to 2.5 kHz, with gentler resonance), and the detuned saws started in phase then cancelled, so the level halved over the first half-second. A steady sine sub now holds the low end under the beating saws

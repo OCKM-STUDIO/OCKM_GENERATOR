@@ -483,7 +483,7 @@ for _t in [n for n,_ in SLOTS]+["bass","lead","chord"]:
     PROJECT_KEYS+=[(f"ockm-{_t}-{k}",v,None) for k,v in EQ_DEF.items()]
 LFO_DEF={"lfo-shape":0,"lfo-rate":4,"lfo-depth":0,"lfo-target":1,"chorus":0}   # sine, one bar, off, the first knob; chorus off
 SYNTH_DEFAULTS={"bass":dict(engine=5,mode=0,sync=1,walk=0,sidechain=0,scshape=1,half=0,lock=0,density=1,seed=0,level=1,k1=0.42,k2=0.25,k3=0.45,k4=0.45,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
-                "lead":dict(engine=4,mode=0,sync=1,sidechain=0,scshape=1,half=0,lock=0,density=1,seed=0,freedom=1,level=1,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
+                "lead":dict(engine=4,mode=0,sync=1,sidechain=0,scshape=1,half=0,lock=0,density=1,seed=0,outside=0.35,level=1,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
                 "chord":dict(engine=0,mode=0,sidechain=0,scshape=1,half=0,level=1,k1=0.45,k2=0.5,k3=0.4,k4=0.3,type=0,smooth=1,verb=0,delay=0,rhythm=0,prog=0,voicing=0,strum=0,**LFO_DEF)}
 PATTERN_KEYS=[("ockm-end",0,None),("ockm-impact",0,None),("ockm-pump",0,None),("ockm-bass-on",1,None),("ockm-lead-on",1,None),("ockm-chord-on",1,None),("ockm-rise",0,None),("ockm-drum-len",16,None),("ockm-bass-len",64,None),("ockm-lead-len",64,None),("ockm-chord-len",64,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None),("ockm-leader",0,None),("ockm-drum-groove",-1,None),("ockm-fill-every",0,None),("ockm-fill-style",0,None),("ockm-drums-on",1,None),("ockm-turn-every",0,None),("ockm-style",-1,None)]
 for t,d in SYNTH_DEFAULTS.items():
@@ -1574,7 +1574,7 @@ for j,(hook,dflt,kind) in enumerate([(f"ockm-{D}1-rhythm",f"{D}3","x"),(f"ockm-{
 rg=p.add(f"#X obj 720 170 r ockm-{D}1-gen;"); p.con(rg,0,ext,0)
 # rhythm lock (0 own rhythm, 1 lock to kick, 2 fill the gaps), density (1 = as the preset), mutate seed (0 = the original)
 var={}
-for j,nm in enumerate(["lock","density","seed","freedom"]):
+for j,nm in enumerate(["lock","density","seed","outside"]):
     x=1200+j*160
     r=p.add(f"#X obj {x} 170 r ockm-{D}1-{nm};"); t=p.add(f"#X obj {x} 195 t b f;"); p.con(r,0,t,0); p.con(t,0,exg,0); var[nm]=t
 lbd=p.add("#X obj 1360 120 loadbang;"); one_d=p.add("#X msg 1360 145 1;"); p.con(lbd,0,one_d,0)
@@ -1632,16 +1632,29 @@ ojump=p.add(f"#X obj 400 850 expr {D}f1 + 7*({D}f4!=512 && {D}f2>0 && (abs(sin({
 p.con(var["seed"],1,ix,2); p.con(var["seed"],1,ojump,1); p.con(ti,1,ojump,2); p.con(ti,1,ix,3); p.con(ll,0,ojump,3)
 # the lead (arg 7): on the beat, a note that isn't in the chord moves to the nearest one that is
 _R=f"((int({D}f1)%7+7)%7)"
-# freedom (ockm-<track>-freedom, the lead): 0 every note moves onto the chord, 1 the notes on the beat do, 2 none do
-snap=p.add(f"#X obj 400 860 expr if({D}f3>0 && ({D}f4<0.5 || ({D}f4<1.5 && int({D}f2)%4==0)) \\, {D}f1 - ({_R}==1 || {_R}==3 || {_R}==5) + ({_R}==6) \\, {D}f1);")
+# inside to outside (ockm-<track>-outside 0-1, the lead; v0.81). Degrees here are counted from the chord's root, so 0 2 4 are
+# chord notes. Below 0.25 every note moves onto the chord. From 0.25 only the notes on the beat do, and more and more notes
+# between the beats step to a neighbour (passing notes). From 0.5 some notes on the beat become the chord's 7th or 9th
+# (colour). From 0.75 some leap up an octave, and (after the note is worked out, below) some off-beat notes slip a semitone
+# down (chromatic). Which notes is decided by the step and the mutate seed, so each variation decorates differently but repeats.
+def _h(k): return f"(abs(sin({D}f2*12.9898+{D}f5*78.233+{k})*43758.5453)-floor(abs(sin({D}f2*12.9898+{D}f5*78.233+{k})*43758.5453)))"
+_SN=f"({D}f1 - ({_R}==1 || {_R}==3 || {_R}==5) + ({_R}==6))"
+_ST=f"(int({D}f2)%4==0)"
+_IN=f"if({_ST} \\, if({D}f4>=0.5 && {_h(1.1)}<({D}f4-0.5) \\, {D}f1-{_R}+6+2*({_h(2.3)}<0.5) \\, {_SN}) \\, if({_h(3.7)}<({D}f4-0.25)*1.2 \\, {D}f1+1-2*({_h(4.1)}<0.5) \\, {D}f1))"
+_LP=f"7*({D}f4>=0.75 && {_h(5.3)}<({D}f4-0.75)*1.2)"
+snap=p.add(f"#X obj 400 860 expr if({D}f3>0 \\, if({D}f4<0.25 \\, {_SN} \\, {_IN} + {_LP}) \\, {D}f1);")
 fsn=p.add(f"#X obj 560 820 f {D}7;"); p.con(lbm,0,fsn,0); p.con(fsn,0,snap,2); p.con(ti,1,snap,1)
-p.con(var["freedom"],1,snap,3); fr1=p.add("#X msg 640 820 1;"); p.con(lbm,0,fr1,0); p.con(fr1,0,snap,3)
+p.con(var["outside"],1,snap,3); fr1=p.add("#X msg 640 820 0.35;"); p.con(lbm,0,fr1,0); p.con(fr1,0,snap,3)
+p.con(var["seed"],1,snap,4)
 nx=p.add(f"#X obj 400 930 expr {D}f2 + 12*floor({D}f1/7) + {D}f3;")
 # a hold writes the note before it again (the same pitch, sliding on), without moving on through the note list
 hsel=p.add("#X obj 700 780 sel 1;"); hlast=p.add("#X obj 700 805 f;")
-for c in [(cx,4,hsel,0),(hsel,0,hlast,0),(hlast,0,tws["note"],0),(nx,0,hlast,1)]: p.con(*c)
+_HC=f"(abs(sin({D}f2*12.9898+{D}f4*78.233+6.7)*43758.5453)-floor(abs(sin({D}f2*12.9898+{D}f4*78.233+6.7)*43758.5453)))"
+chrom=p.add(f"#X obj 400 945 expr {D}f1 - ({D}f5>0 && {D}f3>=0.75 && int({D}f2)%4!=0 && {_HC}<({D}f3-0.75)*1.6);")
+p.con(ti,1,chrom,1); p.con(var["outside"],1,chrom,2); p.con(fr1,0,chrom,2); p.con(var["seed"],1,chrom,3); p.con(fsn,0,chrom,4)
+for c in [(cx,4,hsel,0),(hsel,0,hlast,0),(hlast,0,tws["note"],0),(chrom,0,hlast,1)]: p.con(*c)
 for c in [(cx,0,tws["on"],0),(cx,3,s1,0),(s1,0,fh,0),(fh,0,th,0),(th,1,ph,0),(ph,0,fh,1),(th,0,ix,0),(ll,0,ix,1),(ix,0,rn,0),(rn,0,ojump,0),(ojump,0,snap,0),(snap,0,addc,0),(fold,0,addc,1),(addc,0,td,0),
-          (td,1,sx,0),(sx,0,rs,0),(rs,0,nx,2),(td,0,nx,0),(ro,0,nx,1),(nx,0,tws["note"],0)]: p.con(*c)
+          (td,1,sx,0),(sx,0,rs,0),(rs,0,nx,2),(td,0,nx,0),(ro,0,nx,1),(nx,0,chrom,0),(chrom,0,tws["note"],0)]: p.con(*c)
 p.add("#X text 20 980 hooks: ockm-<track>-rhythm 0-7 \\, ockm-<track>-notes 0-11 \\, ockm-<track>-gen (rebuild) \\, ockm-<track>-mode (0 auto \\, 1 manual) \\, ockm-<track>-sync (follow the chords) \\, ockm-<track>-lock (0 own rhythm \\, 1 lock to kick \\, 2 fill the gaps) \\, ockm-<track>-density (0-2 \\, 1 = the preset) \\, ockm-<track>-seed (mutate: 0 = the original) \\, and the shared ockm-root 0-11 and ockm-scale 0-5. Args: track \\, octave \\, rhythm \\, notes \\, default mode \\, default sync.;")
 p.save("seq/ockm-monogen.pd","#N canvas 120 120 1100 1020 12;")
 

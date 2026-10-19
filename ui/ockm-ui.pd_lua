@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.80"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.81"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -159,7 +159,7 @@ function ui:defaults()
   for _, t in ipairs(TRACKS) do
     v["ockm-"..t.."-lowcut"] = 20; v["ockm-"..t.."-eqlow"] = 0; v["ockm-"..t.."-eqmid"] = 0; v["ockm-"..t.."-eqmidf"] = 400; v["ockm-"..t.."-eqhigh"] = 0
   end
-  v["ockm-bass-on"] = 1; v["ockm-lead-on"] = 1; v["ockm-chord-on"] = 1; v["ockm-drums-on"] = 1; v["ockm-turn-every"] = 0; v["ockm-bass-walk"] = 0; v["ockm-lead-freedom"] = 1; v["ockm-rise"] = 0; v["ockm-end"] = 0; v["ockm-impact"] = 0; v["ockm-pump"] = 0
+  v["ockm-bass-on"] = 1; v["ockm-lead-on"] = 1; v["ockm-chord-on"] = 1; v["ockm-drums-on"] = 1; v["ockm-turn-every"] = 0; v["ockm-bass-walk"] = 0; v["ockm-lead-outside"] = 0.35; v["ockm-rise"] = 0; v["ockm-end"] = 0; v["ockm-impact"] = 0; v["ockm-pump"] = 0
   v["ockm-bass-scshape"] = 1; v["ockm-lead-scshape"] = 1; v["ockm-chord-scshape"] = 1
   v["ockm-style"] = -1; v["ockm-bass-half"] = 0; v["ockm-lead-half"] = 0; v["ockm-chord-half"] = 0
   v["ockm-bass-mode"] = 0; v["ockm-lead-mode"] = 0; v["ockm-chord-mode"] = 0   -- 0 auto, 1 manual
@@ -203,7 +203,7 @@ function ui:hooks()
   end
   for _, k in ipairs({ "ockm-drum-len", "ockm-bass-len", "ockm-lead-len", "ockm-chord-len" }) do h[#h+1] = k end
   for _, k in ipairs({ "ockm-drum-loop", "ockm-swing", "ockm-accent", "ockm-sync", "ockm-fill-every", "ockm-fill-style" }) do h[#h+1] = k end
-  for _, k in ipairs({ "ockm-drums-on", "ockm-turn-every", "ockm-bass-walk", "ockm-lead-freedom", "ockm-bass-sidechain", "ockm-lead-sidechain", "ockm-chord-sidechain",
+  for _, k in ipairs({ "ockm-drums-on", "ockm-turn-every", "ockm-bass-walk", "ockm-lead-outside", "ockm-bass-sidechain", "ockm-lead-sidechain", "ockm-chord-sidechain",
                          "ockm-style", "ockm-bass-half", "ockm-lead-half", "ockm-chord-half",
                          "ockm-bass-scshape", "ockm-lead-scshape", "ockm-chord-scshape" }) do h[#h+1] = k end
   for _, k in ipairs({ "ockm-volume", "ockm-verb-mix", "ockm-delay-mix", "ockm-drive", "ockm-delay-fb", "ockm-delay-steps", "ockm-verb-size", "ockm-verb-tone" }) do h[#h+1] = k end
@@ -1728,7 +1728,7 @@ local STYLES = {
     drums={ kick={ 0, 100, 0.1, 0.2 }, clap={ 0, 100, 0, 0 } },
     bass={ engine=5, rhythm=0, notes=2, move=1 },
     chord={ engine=0, rhythm=2, verb=0.15, delay=0.15 },
-    lead={ engine=1, rhythm=10, notes=15, freedom=1, verb=0.15, delay=0.2 } },
+    lead={ engine=1, rhythm=10, notes=15, outside=0.35, verb=0.15, delay=0.2 } },
   { "deep house", bpm=123, swing=56, groove=2, prog=3, type=6,
     drums={ kick={ -1, 110, 0.1, 0 }, clap={ 0, 100, 0, 0.1 } },
     bass={ engine=5, rhythm=9, notes=2, move=1, k={ 0.35, 0.2, 0.4, 0.45 } },
@@ -1748,7 +1748,7 @@ local STYLES = {
     drums={ kick={ 0, 110, 0.7, 0.8 }, clap={ 0, 90, 0.3, -0.3 } },
     bass={ engine=6, rhythm=0, notes=1, move=1 },
     chord=false,
-    lead={ engine=3, rhythm=0, notes=1, freedom=0, delay=0.15 } },
+    lead={ engine=3, rhythm=0, notes=1, outside=0, delay=0.15 } },
   { "acid", bpm=128, swing=50, groove=29, prog=0, type=0,
     drums={ kick={ 0, 110, 0.4, 0.4 }, clap={ 0, 90, 0.1, -0.3 } },
     bass={ engine=0, rhythm=13, notes=3, move=0, delay=0.15 },
@@ -1934,7 +1934,7 @@ function ui:apply_style(i)
       self:send("ockm-"..part.."-rhythm", ps.rhythm)
       if ps.notes then self:send("ockm-"..part.."-notes", ps.notes) end
       if ps.move then self:set_bass_move(ps.move) end
-      if ps.freedom then self:send("ockm-lead-freedom", ps.freedom) end
+      if ps.outside then self:send("ockm-lead-outside", ps.outside) end
       self:send("ockm-"..part.."-half", ps.half or 0)
       self:send("ockm-"..part.."-sidechain", ps.sidechain or 0)
       self:send("ockm-"..part.."-scshape", ps.shape or 1)
@@ -1949,7 +1949,11 @@ end
 -- a part's settings on its own tab (v0.74): what it plays and how it sits on the harmony
 local COLOURS = { { 0, "triads" }, { 1, "7ths" }, { 6, "9ths" }, { 7, "11ths" } }
 local MOVES = { { "pedal", "stays on the key" }, { "follows", "moves with the chords" }, { "walks", "steps into changes" } }
-local FREEDOM = { "chord notes", "passing notes", "free" }
+-- the lead's inside-to-outside slider (ockm-lead-outside 0-1): what each stretch of it adds
+local function outside_zone(v)
+  if v < 0.25 then return "chord notes" elseif v < 0.5 then return "passing notes" elseif v < 0.75 then return "colour: 7ths and 9ths" end
+  return "outside: leaps and chromatic notes"
+end
 local SC_SHAPES = { "duck", "pump", "gate" }   -- ockm-<part>-scshape 0, 1, 2
 -- how far a sidechain shape has dipped, t beats after the kick (0 to 1): the same curves as the engine
 local function sc_dip(shape, t)
@@ -2022,11 +2026,10 @@ function ui:gen_controls(add, p, ix, cy, iw, k)
       add{ kind="choice", x=ix + (i - 1) * (w3 + 6), y=400, w=w3, h=38, label=mv[1], small=true, sel=(m == i - 1), tap=function() self:set_bass_move(i - 1) end }
     end
   else
-    add{ kind="text", x=ix, y=386, w=iw, h=12, label="freedom: how loosely it hugs the chords", size=10 }
-    local fr = math.floor((self.v["ockm-lead-freedom"] or 1) + 0.5)
-    for i, nm in ipairs(FREEDOM) do
-      add{ kind="choice", x=ix + (i - 1) * (w3 + 6), y=400, w=w3, h=38, label=nm, small=true, sel=(fr == i - 1), tap=function() self:send("ockm-lead-freedom", i - 1) end }
-    end
+    -- v0.81: one slider, inside to outside: how far the tune strays from the chords (it rewrites a line made for you)
+    add{ kind="text", x=ix, y=386, w=iw, h=12, label="inside to outside: how far the tune strays from the chords", size=10 }
+    add{ kind="hbar", x=ix, y=400, w=iw, h=40, hook="ockm-lead-outside", lo=0, hi=1, label="inside to outside", ends={ "inside", "outside" }, bold=true,
+         valtext=function(v) return outside_zone(v) end }
   end
   -- sidechain: how far it dips each time the kick hits (the Perform pump does all the synths at once)
   if p == "bass" then
@@ -3194,9 +3197,13 @@ function ui:draw(g, w)
     else
       self:col(g, "dim"); g:fill_rounded_rect(w.x, w.y, math.max(6, w.w * f), w.h, 4)
     end
-    if w.h >= 40 then
+    if w.ends then   -- a slider between two named ends: the ends at the sides, what it's doing now in the middle
+      self:text(g, w.ends[1], w.x + 10, w.y + w.h / 2 - 6, 10, "mute", 80)
+      self:text(g, w.ends[2], w.x + w.w - 10 - #w.ends[2] * 6.2, w.y + w.h / 2 - 6, 10, "mute", 80)
+      self:ctext(g, w.valtext and w.valtext(v) or w.label, { x=w.x, y=w.y + w.h / 2 - 7, w=w.w, h=14 }, 12, "txt")
+    elseif w.h >= 40 then
       self:ctext(g, w.label, { x=w.x, y=w.y + w.h / 2 - 16, w=w.w, h=14 }, 12, "txt")
-      self:ctext(g, fmt(v), { x=w.x, y=w.y + w.h / 2 + 2, w=w.w, h=12 }, 10, "txt")
+      self:ctext(g, w.valtext and w.valtext(v) or fmt(v), { x=w.x, y=w.y + w.h / 2 + 2, w=w.w, h=12 }, 10, "txt")
     else
       self:ctext(g, w.label, w, 10, w.off and "mute" or "txt")
     end

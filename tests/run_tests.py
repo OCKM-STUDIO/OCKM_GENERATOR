@@ -1313,6 +1313,35 @@ def sidechain_pump_ducks_the_synths(work):
     assert d2 < 0.55, f"the chords' own sidechain should dip them after the kick ({d2:.2f})"
 
 @test
+def lead_inside_to_outside(work):
+    """The lead's inside-to-outside slider, over one chord (A minor) with an arp tune (all chord notes as written). Inside: every
+    note is A, C or E. A little out: passing notes off the beat. Further: some 7ths and 9ths, octave leaps, and notes outside
+    the key (chromatic). The same seed gives the same line twice."""
+    h = Harness()
+    def grab(ms, label):
+        g = h.add(f"#X obj 10 300 r test-{label};"); t = h.add("#X obj 10 330 t b b;")
+        for i, nm in enumerate(["note", "on"]):
+            a = h.add(f"#X obj 10 360 array get ockm-pat-lead-{nm} 0 64;"); l = h.add(f"#X obj 10 390 list prepend {label}-{nm};")
+            pr = h.add("#X obj 10 420 list trim;"); pp = h.add("#X obj 10 450 print GEN;")
+            h.con(t, a, 1 - i); h.con(a, l); h.con(l, pr); h.con(pr, pp)
+        h.con(g, t); h.at(ms, f"test-{label} bang")
+    h.at(100, "ockm-root 9 ; ockm-scale 0 ; ockm-chord-prog 0 ; ockm-length 64 ; ockm-lead-len 64 ; ockm-lead-sync 1 ; ockm-lead-seed 0 ; ockm-lead-density 1 ; ockm-lead-rhythm 1 ; ockm-lead-notes 8")
+    for i, (lab, o) in enumerate([("in", 0), ("pass", 0.45), ("out", 1), ("out2", 1)]):
+        h.at(200 + i * 100, f"ockm-lead-outside {o}"); grab(250 + i * 100, lab)
+    f = os.path.join(work, "t_outside.pd"); h.finish(700, f)
+    out = run(work, f)
+    got = {v.split()[0]: [int(float(x)) for x in v.split()[1:]] for v in printed(out, "GEN")}
+    def pcs(k):
+        return [n % 12 for n, o in zip(got[k + "-note"], got[k + "-on"]) if o]
+    chord, key = {9, 0, 4}, {9, 11, 0, 2, 4, 5, 7}
+    pi, pp, po = pcs("in"), pcs("pass"), pcs("out")
+    assert pi and all(p in chord for p in pi), f"inside: every note on A minor's chord notes: {sorted(set(pi))}"
+    assert any(p not in chord for p in pp) and all(p in key for p in pp), f"a little out: passing notes, still in key: {sorted(set(pp))}"
+    assert any(p not in key for p in po), f"outside: some chromatic notes: {sorted(set(po))}"
+    assert sum(1 for p in po if p not in chord) > sum(1 for p in pp if p not in chord), "further out: more notes off the chord"
+    assert got["out-note"] == got["out2-note"], "the same setting and seed: the same line"
+
+@test
 def sidechain_shapes_duck_pump_gate(work):
     """Held organ chords, a kick on every beat (muted), the chords' sidechain all the way up, in each shape. 120 bpm, so a step is
     125 ms. Duck: gone under the kick, back within a step. Pump: still deep at 100 ms, half back by 300 ms. Gate: silent for an eighth
