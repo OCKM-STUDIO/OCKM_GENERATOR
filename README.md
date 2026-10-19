@@ -535,6 +535,8 @@ Audio is recorded as it plays, so you hear the export; the effects get 2.5 secon
 
 **Chord rhythms**, simplest first: 1 bar pads, 2 two beat, 3 offbeat, 4 dub stabs, 5 house organ, 6 tresillo (3-3-2), 7 syncopated, 8 garage skip (2 bars), 9 call and answer (2 bars), 10 eighths
 
+**Synth tab controls** (v1.03): four knobs, drive (bass and lead), reverb and delay sends, chorus on/off, movement (a sine on the first knob, every bar, 2 or 4 bars, with depth), sidechain and half-time. Level is on the mixer only. Half-time for all three synths is also on the builder's phrase row.
+
 **Bass riffs, slide and octave** (v1.02): the bass has its own eight riffs (root, octaves, fifth, seventh below, dub, walk up, acid, arp: scale steps from the chord root, `ockm-bass-riff` 0-7; -1 keeps an older loop's notes setting). **Slide** (`ockm-bass-slideamt` 0-1) makes more notes glide into the next; **low/high** (`ockm-bass-octave` 0/1) moves the riff an octave up.
 
 **Chord vary, sustained and drift** (v1.01): on the chord tab, **vary** is still, breathe (the loop's last bar changes: a push before the 1 on stab rhythms, a rest on the last beat for pads) or move (bars alternate A B A B', one hit fewer, then one more). **Sustained** is a chord rhythm that hits only where the chord changes. **Drift** (voicing row) lifts chords built from the key one inversion every second time round. Hooks: `ockm-chord-vary` (0 still, 1 breathe, 2 move), `ockm-chord-drift` (0/1); chord rhythm 11 is sustained (6 and 7 are retired).

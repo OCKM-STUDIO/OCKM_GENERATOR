@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v1.02"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v1.03"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -67,8 +67,8 @@ local ENGINE_K = {
 -- retired engines: what a saved project's engine becomes, and the knobs that make it sound like the old one
 local RETIRED = {
   bass  = { [4] = { 5, { k4 = 0.7 } } },
-  lead  = { [0] = { 4, { k2 = 0.8 } }, [1] = { 4, { chorus = 1 } } },
-  chord = { [2] = { 0, { k3 = 0.8, k4 = 0.6 } }, [5] = { 0, { k3 = 0.7, k4 = 0.6, chorus = 3 } } },
+  lead  = { [0] = { 4, { k2 = 0.8 } }, [1] = { 4, { chorus = 2 } } },
+  chord = { [2] = { 0, { k3 = 0.8, k4 = 0.6 } }, [5] = { 0, { k3 = 0.7, k4 = 0.6, chorus = 2 } } },
 }
 local function engines_of(part) if part == "chord" then return CHORD_ENG elseif part == "lead" then return LEAD_ENG end return MONO_ENG end
 local KNOBS = {
@@ -192,7 +192,7 @@ local DRUM_PARAMS = {
   { "tone", -1, 1 }, { "drive", 0, 1 }, { "start", 0, 1 }, { "synth", 0, 2 },
   { "labchar", -1, 1 }, { "labmorph", 0, 1 }, { "labrseed", 0, 99999 }, { "labramt", 0, 1 }, { "labpseed", 0, 99999 },
 }
-local SYNTH_SLIDERS  = { { "level", 0, 1.5 }, { "tune", -12, 12 }, { "decay", 10, 400 }, { "tone", -1, 1 }, { "drive", 0, 1 } }
+local SYNTH_SLIDERS  = { { "level", 0, 1.5 }, { "tune", -12, 12 }, { "decay", 10, 400 }, { "drive", 0, 1 } }   -- v1.03: no tone (character does it)
 local SAMPLE_SLIDERS = { { "level", 0, 1.5 }, { "tune", -12, 12, "pitch" }, { "decay", 10, 100, "length" }, { "tone", -1, 1 }, { "start", 0, 1 } }
 -- the built-in sounds are the drum lab's. Each drum has one; the perc slots choose rim, conga or shaker (ockm-<slot>-synth 0-2)
 local LAB_SOUND = { [0] = "kick", [1] = "snare", [2] = "clap", [4] = "closed hat", [5] = "open hat", [6] = "tom" }
@@ -338,6 +338,14 @@ function ui:postinitialize()
         local part = hook:match("^ockm%-(%a+)%-engine$")
         if part and RETIRED[part] and RETIRED[part][math.floor(x)] then o:retire_engine(part, math.floor(x)) end
         if hook == "ockm-chord-rhythm" and HIDE_CHORD_RHY[math.floor(x)] then o:send("ockm-chord-rhythm", 5) end
+        -- v1.03: the LFO is a sine on k1 every bar, 2 or 4 bars; the chorus is off or on (II)
+        local lp, lk = hook:match("^ockm%-(%a+)%-lfo%-(%a+)$")
+        if lp then
+          if lk == "shape" and x ~= 0 then o:send(hook, 0) end
+          if lk == "target" and x ~= 1 then o:send(hook, 1) end
+          if lk == "rate" and (x < 4 or x > 6) then o:send(hook, (x < 4) and 4 or 6) end
+        end
+        if hook:match("^ockm%-%a+%-chorus$") and (x == 1 or x == 3) then o:send(hook, 2) end
       end
     end
     listen(hook, set)
@@ -1757,9 +1765,9 @@ function ui:layout_drums(add)
   local y = 388
   add{ kind="hbar", x=16, y=y, w=128, h=30, hook="ockm-"..nm.."-labchar", lo=-1, hi=1, label=off and "character" or (LAB_CHAR[sname] or "character"), bold=true, off=off, preview=slot }
   add{ kind="hbar", x=150, y=y, w=110, h=30, hook="ockm-"..nm.."-labmorph", lo=0, hi=1, label="morph", bold=true, off=off, preview=slot }
-  add{ kind="btn", x=266, y=y, w=70, h=30, small=true, label="random", off=off, flash="random", tap=function() self:lab_random(slot, 0.35) end }
-  add{ kind="btn", x=342, y=y, w=56, h=30, small=true, label="wild", off=off, flash="wild", tap=function() self:lab_random(slot, 1) end }
-  add{ kind="btn", x=404, y=y, w=half - 388, h=30, small=true, quiet=true, label="reset", off=off, flash="reset", tap=function() self:lab_reset(slot) end }
+  -- v1.03: new sound (was random; wild is gone: morph with a new path travels far) and reset
+  add{ kind="btn", x=266, y=y, w=100, h=30, small=true, label="new sound", off=off, flash="random", tap=function() self:lab_random(slot, 0.35) end }
+  add{ kind="btn", x=372, y=y, w=half - 356, h=30, small=true, quiet=true, label="reset", off=off, flash="reset", tap=function() self:lab_reset(slot) end }
   for j, p in ipairs((smp > 0) and SAMPLE_SLIDERS or SYNTH_SLIDERS) do
     add{ kind="slider", x=16, y=424 + (j - 1) * 27, w=half, h=24, hook="ockm-"..nm.."-"..p[1], lo=p[2], hi=p[3], label=p[4] or p[1], preview=slot }
   end
@@ -1940,9 +1948,9 @@ function ui:layout_synth_sound(add, part, mono)
     local col, row = (k - 1) % 2, math.floor((k - 1) / 2)
     add{ kind="hbar", x=rx + col * (kw + 6), y=376 + row * 44, w=kw, h=40, hook="ockm-"..part.."-k"..k, lo=0, hi=1, label=kn[k], bold=true }
   end
-  -- drive on its own, the reverb and delay sends on one panel, then level and chorus
-  local n = mono and 5 or 4
-  local gaps = mono and (6 + 6 + 14 + 14) or (6 + 6 + 14)
+  -- drive on its own, the reverb and delay sends on one panel, then the chorus (v1.03: level lives on the mixer only)
+  local n = mono and 4 or 3
+  local gaps = mono and (6 + 14 + 14) or (6 + 14)
   local tw = (rw - gaps) / n
   local x = rx
   if mono then
@@ -1953,20 +1961,19 @@ function ui:layout_synth_sound(add, part, mono)
   add{ kind="hbar", x=x, y=466, w=tw, h=40, hook="ockm-"..part.."-verb", lo=0, hi=1, label="reverb", bold=true }
   add{ kind="hbar", x=x + tw + 6, y=466, w=tw, h=40, hook="ockm-"..part.."-delay", lo=0, hi=1, label="delay", bold=true }
   x = x + 2 * tw + 6 + 14
-  add{ kind="hbar", x=x, y=466, w=tw, h=40, hook="ockm-"..part.."-level", lo=0, hi=LEVEL_MAX, label="level", bold=true }
-  -- chorus, Juno-style: tap to step through off, I, II, I+II
+  -- chorus on or off (v1.03; on is II: I and I+II are hard to tell apart on a small screen through monitors)
   local ch = math.floor(self.v["ockm-"..part.."-chorus"] or 0)
-  add{ kind="choice", x=x + tw + 6, y=466, w=tw, h=40, small=true, accent=true, sel=(ch > 0), label="chorus " .. CHORUS[ch + 1],
-       tap=function() self:send("ockm-"..part.."-chorus", (ch + 1) % #CHORUS) end }
-  -- movement: an LFO on one of the four knobs, in time with the loop. Tap a box to step through it
+  add{ kind="choice", x=x, y=466, w=tw, h=40, small=true, accent=true, sel=(ch > 0), label=(ch > 0) and "chorus on" or "chorus off",
+       tap=function() self:send("ockm-"..part.."-chorus", (ch > 0) and 0 or 2) end }
+  -- movement (v1.03): a sine on the first knob (cutoff or brightness), every bar, 2 bars or 4 bars, and how deep
   local key = function(k) return "ockm-"..part.."-lfo-"..k end
-  local shape, rate, tgt = math.floor(self.v[key("shape")] or 0), math.floor(self.v[key("rate")] or 4), math.floor(self.v[key("target")] or 1)
-  local lw = (rw - 18) / 4
+  local rate = math.floor(self.v[key("rate")] or 4)
+  local lw = (rw - 12) / 3
   self:group(add, rx, 514, rw, 34)
-  add{ kind="btn", x=rx, y=514, w=lw, h=34, small=true, label="lfo " .. LFO_SHAPES[shape + 1], tap=function() self:send(key("shape"), (shape + 1) % #LFO_SHAPES) end }
-  add{ kind="btn", x=rx + (lw + 6), y=514, w=lw, h=34, small=true, label="on " .. (kn[tgt] or "?"), tap=function() self:send(key("target"), tgt % 4 + 1) end }
-  add{ kind="btn", x=rx + 2 * (lw + 6), y=514, w=lw, h=34, small=true, label="every " .. LFO_RATES[rate + 1], tap=function() self:send(key("rate"), (rate + 1) % #LFO_RATES) end }
-  add{ kind="hbar", x=rx + 3 * (lw + 6), y=514, w=lw, h=34, hook=key("depth"), lo=0, hi=1, label="depth", bold=true }
+  add{ kind="text", x=rx + 8, y=525, w=lw - 8, h=12, size=11, label="movement on " .. (kn[1] or "the sound") }
+  add{ kind="btn", x=rx + (lw + 6), y=514, w=lw, h=34, small=true, label="every " .. (LFO_RATES[rate + 1] or "bar"),
+       tap=function() self:send(key("rate"), (rate >= 4 and rate < 6) and (rate + 1) or 4) end }
+  add{ kind="hbar", x=rx + 2 * (lw + 6), y=514, w=lw, h=34, hook=key("depth"), lo=0, hi=1, label="depth", bold=true }
   if part == "chord" then
     local vo = math.floor(self.v["ockm-chord-voicing"] or 0)
     local cw = (rw - 30) / 6
@@ -1980,7 +1987,8 @@ function ui:layout_synth_sound(add, part, mono)
     local dr = (self.v["ockm-chord-drift"] or 0) > 0
     add{ kind="choice", x=rx + 4 * (cw + 6), y=558, w=cw, h=34, label="drift", accent=true, small=true, sel=dr,
          tap=function() self:send("ockm-chord-drift", dr and 0 or 1) end }
-    add{ kind="hbar", x=rx + 5 * (cw + 6), y=558, w=cw, h=34, hook="ockm-chord-strum", lo=0, hi=1, label="strum", bold=true }
+    local ce = math.floor(self.v["ockm-chord-engine"] or 0)
+    add{ kind="hbar", x=rx + 5 * (cw + 6), y=558, w=cw, h=34, hook="ockm-chord-strum", lo=0, hi=(ce == 3 or ce == 4) and 1 or 0.5, label="strum", bold=true }
   end
 end
 
@@ -2129,12 +2137,12 @@ local STYLES = {
   { "deep house", vary={ 1, 2 }, drift=1, evolve=1, rate={ 1, 1, 2 }, kit="909-long", punch=0.4, bpm=122, swing=58, groove={ 2, 16, 17, 21 }, root={ 5, 2, 7, 0 }, scale={ 2, 0 }, prog={ 1, 3, 9, 6 }, type={ 8, 6, 9 },
     drums={ kick={ -1, 110, 0.1, 0 }, clap={ 0, 100, 0, 0.1 } },
     bass={ engine={ 5, 1 }, rhythm={ 9, 3, 1 }, notes={ 2, 0, 6 }, move=1, k={ 0.35, 0.2, 0.4, 0.45 } },
-    chord={ engine={ 4, 3 }, rhythm={ 3, 0, 8, 11 }, verb=0.25, delay=0.12, chorus=1, strum=0.12 },
+    chord={ engine={ 4, 3 }, rhythm={ 3, 0, 8, 11 }, verb=0.25, delay=0.12, chorus=2, strum=0.12 },
     lead=false },
   { "chicago", vary=2, rate={ 1, 0 }, push=1, kit="909", punch=0.6, bpm=125, swing=62, groove={ 13, 14, 22, 1 }, root={ 7, 0, 9, 2 }, scale={ 0, 2 }, prog={ 1, 0, 3 }, type={ 10, 8 },
     drums={ kick={ 0, 90, 0.2, 0.3 }, clap={ 0, 100, 0, 0.2 } },
     bass={ engine={ 5, 0 }, rhythm={ 1, 0, 4 }, notes={ 1, 2, 3 }, move=1 },
-    chord={ engine={ 1, 3 }, rhythm={ 4, 2, 5 }, verb=0.12, chorus=1 },
+    chord={ engine={ 1, 3 }, rhythm={ 4, 2, 5 }, verb=0.12, chorus=2 },
     lead=false },
   { "classic house", vary={ 2, 1 }, rate={ 1, 0 }, push=1, kit="909", punch=0.5, bpm=124, swing=56, groove={ 1, 0, 21, 16 }, root={ 0, 7, 2, 5 }, scale={ 1, 4, 0 }, prog={ 5, 3, 9, 10 }, type={ 6, 1 },
     drums={ kick={ 0, 100, 0.1, 0.2 }, clap={ 0, 100, 0, 0 } },
@@ -2151,7 +2159,7 @@ local STYLES = {
   { "nu disco", vary=2, evolve=1, push=1, kit="808", punch=0.4, bpm=118, swing=54, groove={ 23, 15, 21 }, root={ 2, 9, 4 }, scale={ 2, 4, 0 }, prog={ 1, 3, 5, 9 }, type={ 12, 6 },
     drums={ kick={ 0, 90, 0, 0.1 }, clap={ 0, 90, 0, 0.2 } },
     bass={ engine={ 5, 2 }, rhythm={ 4, 1, 9 }, notes={ 1, 2 }, move=1, k={ 0.5, 0.3, 0.5, 0.7 } },
-    chord={ engine={ 0, 3 }, rhythm={ 2, 9, 0, 5 }, verb=0.2, chorus=3, k={ 0.5, 0.5, 0.7, 0.6 } },
+    chord={ engine={ 0, 3 }, rhythm={ 2, 9, 0, 5 }, verb=0.2, chorus=2, k={ 0.5, 0.5, 0.7, 0.6 } },
     lead={ engine={ 4, 2 }, chorus=2, rhythm={ 11, 10 }, notes={ 16, 15, 17 }, outside=0.45, delay=0.25 } },
   { "tech house", vary=1, kit="909", punch=0.7, bpm=126, swing=54, groove={ 3, 24, 21 }, root={ 9, 7, 2, 4 }, scale={ 0, 2 }, prog={ 0, 1, 2 }, type={ 10, 11 },
     drums={ kick={ 0, 90, 0.3, 0.4 }, clap={ 0, 80, 0, -0.5 } },
@@ -2166,7 +2174,7 @@ local STYLES = {
   { "progressive", vary=1, drift=1, evolve=1, rate={ 2, 1 }, kit="909-long", punch=0.5, bpm=122, swing=50, groove={ 0, 2, 24 }, root={ 2, 9, 4, 7 }, scale={ 0, 5 }, prog={ 3, 6, 7, 5 }, type={ 6, 7 },
     drums={ kick={ -1, 120, 0.2, 0.2 }, clap={ 0, 110, 0, 0.2 } },
     bass={ engine={ 5, 3 }, rhythm={ 2, 1, 4 }, notes={ 0, 2 }, move=1, sidechain=0.3 },
-    chord={ engine=0, rhythm={ 0, 1, 9 }, verb=0.35, sidechain=0.4, chorus=1, k={ 0.45, 0.5, 0.8, 0.7 } },
+    chord={ engine=0, rhythm={ 0, 1, 9 }, verb=0.35, sidechain=0.4, chorus=2, k={ 0.45, 0.5, 0.8, 0.7 } },
     lead={ engine={ 5, 4, 2 }, rhythm={ 13, 10 }, notes={ 18, 8, 9 }, outside=0.3, verb=0.2, delay=0.3 } },
   { "dub techno", vary=0, evolve=1, kit="909-long", punch=0.4, bpm=120, swing=52, groove={ 6, 28, 4 }, root={ 5, 7, 9 }, scale={ 0, 2 }, prog={ 2, 0, 1 }, type={ 10, 8, 11 },
     drums={ kick={ -1, 130, 0.2, 0 }, clap={ 0, 100, 0, 0.3 } },
@@ -2176,7 +2184,7 @@ local STYLES = {
   { "detroit", vary=1, drift=1, kit="909", punch=0.6, bpm=128, swing=53, groove={ 25, 11, 26 }, root={ 0, 9, 5 }, scale={ 0, 2 }, prog={ 1, 0, 2 }, type={ 9, 8 },
     drums={ kick={ 0, 100, 0.3, 0.3 }, clap={ 0, 90, 0.1, 0.1 } },
     bass={ engine={ 2, 5 }, rhythm={ 1, 14, 2 }, notes={ 2, 0 }, move=1 },
-    chord={ engine=0, rhythm={ 0, 1, 3 }, verb=0.3, chorus=3, k={ 0.5, 0.5, 0.7, 0.6 } },
+    chord={ engine=0, rhythm={ 0, 1, 3 }, verb=0.3, chorus=2, k={ 0.5, 0.5, 0.7, 0.6 } },
     lead={ engine={ 2, 4 }, rhythm={ 10, 8 }, notes={ 15, 17 }, outside=0.4, delay=0.2 } },
   { "acid", kit="909", punch=0.7, bpm=130, swing=52, groove={ 29, 5, 14 }, root={ 9, 4, 7 }, scale={ 3, 0 }, prog=0, type=0,
     drums={ kick={ 0, 110, 0.4, 0.4 }, clap={ 0, 90, 0.1, -0.3 } },
@@ -2393,11 +2401,16 @@ function ui:layout_compose(add)
          tap=function() self:set_phrase(e) end }
   end
   local fon, ton = (self.v["ockm-fill-every"] or 0) > 0, te > 0
-  add{ kind="text", x=676, y=380, w=200, h=10, label="at the end of each phrase:", size=9 }
-  add{ kind="choice", x=676, y=393, w=130, h=26, small=true, accent=true, sel=fon, label="drum fill",
+  add{ kind="text", x=676, y=380, w=268, h=10, label="at the end of each phrase:                       all synths:", size=9 }
+  add{ kind="choice", x=676, y=393, w=86, h=26, small=true, accent=true, sel=fon, label="drum fill",
        tap=function() self:phrase_move("ockm-fill-every", not fon) end }
-  add{ kind="choice", x=812, y=393, w=132, h=26, small=true, accent=true, sel=ton, label="turnaround",
+  add{ kind="choice", x=767, y=393, w=86, h=26, small=true, accent=true, sel=ton, label="turnaround",
        tap=function() self:phrase_move("ockm-turn-every", not ton) end }
+  -- v1.03: half-time for the bass, lead and chords together (each tab still has its own)
+  local hon = false
+  for _, sp in ipairs(SYNTHS) do if (self.v["ockm-"..sp.."-half"] or 0) > 0 then hon = true end end
+  add{ kind="choice", x=858, y=393, w=86, h=26, small=true, accent=true, sel=hon, label="half-time",
+       tap=function() for _, sp in ipairs(SYNTHS) do self:send("ockm-"..sp.."-half", hon and 0 or 1) end end }
   -- the map, bar by bar
   local shape0 = PROG_SHAPES[(math.floor(self.v["ockm-chord-prog"] or 0)) + 1] or { { 0, 16 } }
   local rf = ({ [0] = 0.5, [1] = 1, [2] = 2 })[math.floor(self.v["ockm-chord-rate"] or 1)] or 1

@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.03 (19 October 2026)
+
+Step 7 of the harmony and generator proposal: the tab controls trimmed to the ones you hear.
+
+- **Movement** (the LFO) is two controls: how often (every bar, 2 bars or 4 bars) and how deep. It's always a sine on the first knob (cutoff or brightness). Older loops with another shape or target move to that
+- **Chorus** is on or off (on is II). Older loops on I or I+II come in on
+- **Level** lives on the mixer only (styles set the mix); the tabs are for the sound
+- **Strum** goes to 1 on piano and rhodes, 0.5 on poly and organ (they don't follow it further)
+- **Half-time** for all three synths together on the builder's phrase row, beside fill and turnaround (each tab keeps its own)
+- **Drums tab:** random is now **new sound**; wild is gone (morph with a new path travels far); synth drums lose tone (character moves it and more). Samples keep tone
+
 ## v1.02 (19 October 2026)
 
 Step 6 of the harmony and generator proposal: the bass gets its own riffs.

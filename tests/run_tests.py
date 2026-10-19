@@ -959,7 +959,7 @@ def touchscreen_song_parts_in_and_out(work):
     tap(350, 831, 250)                   # lead out
     tap(400, 129, 250)                   # drums back in
     tap(440, 586, 402)                   # phrase: 8 bars (the drum fill comes on with it)
-    tap(450, 878, 406)                   # and the turnaround at the end of each phrase
+    tap(450, 810, 406)                   # and the turnaround at the end of each phrase (v1.03: fill, turnaround, half-time)
     tap(500, 601, 36)                    # bass tab
     tap(550, 916, 283)                   # on/off switch: back on
     tap(600, 338, 36)                    # perform B
@@ -1719,7 +1719,7 @@ def phrase_sets_the_fill_and_turnaround(work):
         return [float(l.split()[3]) for l in lines if l.startswith("sent " + key + " ")]
     L = ui_preview.run(["send ockm-fill-every float 0", "send ockm-turn-every float 0",
                         "test tap 539 36", "test tap 900 569",       # drums tab: breakbeat fill
-                        "test tap 477 36", "test tap 878 406",       # builder: turnaround on
+                        "test tap 477 36", "test tap 810 406",       # builder: turnaround on
                         "test tap 539 36", "test tap 600 529"])      # drums tab: no fill
     assert sends(L, "ockm-fill-style")[-1:] == [4], "breakbeat picked"
     assert sends(L, "ockm-fill-every")[-2:] == [8, 0], f"the fill every 8, then off: {sends(L, 'ockm-fill-every')}"
@@ -1834,9 +1834,9 @@ def retired_engines_move_on_and_engines_load_their_sweet_spot(work):
     b = before("bass")
     assert b.get("ockm-bass-engine") == 5 and b.get("ockm-bass-k4") == 0.7, f"pluck becomes analogue with a long decay: {b}"
     l = before("lead", "bass")
-    assert l.get("ockm-lead-engine") == 4 and l.get("ockm-lead-chorus") == 1, f"juno becomes analogue with the chorus: {l}"
+    assert l.get("ockm-lead-engine") == 4 and l.get("ockm-lead-chorus") == 2, f"juno becomes analogue with the chorus (on): {l}"
     c = before("chord", "lead")
-    assert c.get("ockm-chord-engine") == 0 and c.get("ockm-chord-k3") == 0.7 and c.get("ockm-chord-chorus") == 3, f"strings become poly: {c}"
+    assert c.get("ockm-chord-engine") == 0 and c.get("ockm-chord-k3") == 0.7 and c.get("ockm-chord-chorus") == 2, f"strings become poly: {c}"
     # the bass tab's engine row: analogue, acid, sub 808, wide, fm, donk. Tap acid (the second)
     lines = ui_preview.run(["test tap 601 36", "paint tab"])
     import re as _re
@@ -2317,21 +2317,21 @@ def touchscreen_saves_drum_sounds(work):
 
 @test
 def touchscreen_drum_synth_random_and_reset(work):
-    """Drums tab, the kick's synth sound: random gives it a new seed (near the last sound), wild goes all the way,
-    reset puts it back to the lab's starting sound."""
+    """Drums tab, the kick's synth sound: new sound gives it a new seed (near the last sound), again a different one, and
+    reset puts it back to the lab's starting sound. (v1.03: random is called new sound; wild is gone)"""
     if not PDLUA:
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness(); h.show("ockm-d1-labrseed", "ockm-d1-labramt", "ockm-d1-labchar")
     h.at(100, "ockm-ui-test tap 539 36 ; ockm-d1-sample 0 ; ockm-d1-labchar 0.5")
-    h.at(300, "ockm-ui-test tap 301 403")     # random
-    h.at(500, "ockm-ui-test tap 370 403")     # wild
-    h.at(700, "ockm-ui-test tap 438 403")     # reset
+    h.at(300, "ockm-ui-test tap 316 403")     # new sound
+    h.at(500, "ockm-ui-test tap 316 403")     # and another
+    h.at(700, "ockm-ui-test tap 420 403")     # reset
     f = os.path.join(work, "t_labui.pd"); h.finish(900, f)
     out = run(work, f)
     seeds = [int(float(v)) for v in printed(out, "ockm-d1-labrseed")]
     amts = [float(v) for v in printed(out, "ockm-d1-labramt")]
-    assert len(seeds) >= 3 and seeds[-3] > 0 and seeds[-2] > 0 and seeds[-1] == 0, f"random, wild, then reset: {seeds}"
-    assert amts[-3:] == [0.35, 1.0, 0.0], f"how far each goes: {amts}"
+    assert len(seeds) >= 3 and seeds[-3] > 0 and seeds[-2] > 0 and seeds[-3] != seeds[-2] and seeds[-1] == 0, f"new sound twice, then reset: {seeds}"
+    assert amts[-3:] == [0.35, 0.35, 0.0], f"how far each goes: {amts}"
     assert float(printed(out, "ockm-d1-labchar")[-1]) == 0, "reset puts the character back"
 
 @test
