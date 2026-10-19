@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.01 (19 October 2026)
+
+Step 5 of the harmony and generator proposal: the chords get variation.
+
+- **Vary** (chord tab, bottom left): **still** (as before), **breathe** (the last bar of the loop changes: a stab rhythm gets a push on the last 8th before the 1, a pad rhythm rests for its last beat) or **move** (bars alternate A B A B': B drops its last hit after the downbeat, B' adds one on the latest empty 8th). Saved with the loop and set by styles
+- **Sustained** (new chord rhythm): a hit only where the chord changes, so a pad hangs across the progression. It follows rate and push. Dub techno can roll it
+- **Drift** (voicing row): every second time round, chords built from the key sit one inversion higher, within the smooth band, then back
+- **Chord rhythms named by feel:** pads, halves, offbeat, skank, organ, tresillo, call answer, 8ths, piano riff, sustained. Syncopated and garage skip are gone; a loop saved on either moves to tresillo
+- Styles set vary, drift and evolve too (deep house, nu disco, minimal, progressive and dub techno start with evolve gentle)
+
 ## v1.00 (19 October 2026)
 
 Step 4 of the harmony and generator proposal: evolve.

@@ -65,7 +65,9 @@
 #X obj 700 560 symbol \$0-r;
 #X obj 600 530 loadbang;
 #X obj 300 620 expr \$s5[(int(\$f1+2*(\$f4>0))%int(\$f2)+int(\$f2))%int(\$f2)];
-#X obj 20 620 expr if(\$f4>0 && \$s5[(int(\$f1+2)%int(\$f2)+int(\$f2))%int(\$f2)]!=\$s5[(int(\$f1+1)%int(\$f2)+int(\$f2))%int(\$f2)] && \$s6[(int(\$f1)%int(\$f3)+int(\$f3))%int(\$f3)]==0 && \$s6[(int(\$f1+1)%int(\$f3)+int(\$f3))%int(\$f3)]==0 && \$s6[(int(\$f1+2)%int(\$f3)+int(\$f3))%int(\$f3)]>0 \, \$s6[(int(\$f1+2)%int(\$f3)+int(\$f3))%int(\$f3)] \, if(\$f4>0 && \$s5[(int(\$f1)%int(\$f2)+int(\$f2))%int(\$f2)]!=\$s5[(int(\$f1-1)%int(\$f2)+int(\$f2))%int(\$f2)] && \$s6[(int(\$f1-2)%int(\$f3)+int(\$f3))%int(\$f3)]==0 && \$s6[(int(\$f1-1)%int(\$f3)+int(\$f3))%int(\$f3)]==0 && \$s6[(int(\$f1)%int(\$f3)+int(\$f3))%int(\$f3)]>0 \, 0 \, \$s6[(int(\$f1)%int(\$f3)+int(\$f3))%int(\$f3)]));
+#X obj 20 620 expr if(\$f7>0 \, ((int(\$f1)==0 && (\$f4<=0 || \$f8>0)) || \$s5[(int(\$f1+2*(\$f4>0))%int(\$f2)+int(\$f2))%int(\$f2)]!=\$s5[(int(\$f1-1+2*(\$f4>0))%int(\$f2)+int(\$f2))%int(\$f2)])*2 \, if(\$f4>0 && \$s5[(int(\$f1+2)%int(\$f2)+int(\$f2))%int(\$f2)]!=\$s5[(int(\$f1+1)%int(\$f2)+int(\$f2))%int(\$f2)] && \$s6[(int(\$f1)%int(\$f3)+int(\$f3))%int(\$f3)]==0 && \$s6[(int(\$f1+1)%int(\$f3)+int(\$f3))%int(\$f3)]==0 && \$s6[(int(\$f1+2)%int(\$f3)+int(\$f3))%int(\$f3)]>0 \, \$s6[(int(\$f1+2)%int(\$f3)+int(\$f3))%int(\$f3)] \, if(\$f4>0 && \$s5[(int(\$f1)%int(\$f2)+int(\$f2))%int(\$f2)]!=\$s5[(int(\$f1-1)%int(\$f2)+int(\$f2))%int(\$f2)] && \$s6[(int(\$f1-2)%int(\$f3)+int(\$f3))%int(\$f3)]==0 && \$s6[(int(\$f1-1)%int(\$f3)+int(\$f3))%int(\$f3)]==0 && \$s6[(int(\$f1)%int(\$f3)+int(\$f3))%int(\$f3)]>0 \, 0 \, \$s6[(int(\$f1)%int(\$f3)+int(\$f3))%int(\$f3)])));
+#X obj 120 590 == 11;
+#X obj 220 590 == 0;
 #X text 20 760 hooks: ockm-<track>-rhythm \, ockm-<track>-prog \, ockm-<track>-rate (0 half bar \, 1 bar \, 2 two bars) \, ockm-<track>-push (0/1) \, ockm-<track>-gen (rebuild). Presets live in tools/build.py (PRE and PROGS).;
 #X connect 4 0 7 0;
 #X connect 7 1 8 0;
@@ -149,3 +151,7 @@
 #X connect 62 0 65 4;
 #X connect 62 0 66 4;
 #X connect 63 0 66 5;
+#X connect 25 0 67 0;
+#X connect 67 0 66 6;
+#X connect 28 0 68 0;
+#X connect 68 0 66 7;

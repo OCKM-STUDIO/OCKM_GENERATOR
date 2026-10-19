@@ -557,6 +557,48 @@ def chord_rate_and_push(work):
     assert on[14] == 2 and on[16] == 0 and on[30] == 2 and on[0] == 0, f"push: the hit on each 1 moves two steps early: {on}"
 
 @test
+def chord_sustained_follows_the_changes(work):
+    """v1.01 sustained (chord rhythm 11): a hit only where the chord changes. Dub techno (i . . VII, 4 bars): hits on steps
+    0 and 48 only; with push, on 46 (two steps early) and 62 (the i coming round)."""
+    def take(cmds):
+        h = Harness()
+        h.at(100, "ockm-resync bang ; ockm-chord-rate 1 ; ockm-chord-push 0 ; ockm-chord-rhythm 11 ; ockm-chord-prog 2")
+        h.at(150, cmds)
+        g = h.add("#X obj 10 300 r test-get;"); a2 = h.add("#X obj 200 360 array get ockm-pat-chord-on 0 64;"); p2 = h.add("#X obj 200 390 print ON;")
+        h.con(g, a2); h.con(a2, p2)
+        h.at(250, "test-get bang")
+        f = os.path.join(work, f"t_sus{abs(hash(cmds)) % 1000}.pd"); h.finish(350, f)
+        on = [int(float(x)) for x in printed(run(work, f), "ON")[-1].split()]
+        return [i for i, v in enumerate(on) if v > 0]
+    assert take("ockm-chord-gen bang") == [0, 48], "sustained: hits where the chord changes"
+    assert take("ockm-chord-push 1") == [46, 62], "sustained with push: two steps early"
+
+@test
+def chord_vary_breathes_and_moves(work):
+    """v1.01 vary, after the chords are written. move, on bar pads over 4 bars (hits on 0, 16, 32, 48): bar 2 drops its
+    last hit after the downbeat (none, so nothing), bar 4 gains one on step 62 (the latest empty 8th). breathe on offbeat
+    stabs: a push on step 62. breathe on pads: the last beat rests (nothing to drop there)."""
+    sys.path.insert(0, os.path.join(ROOT, "tests"))
+    import ui_preview
+    if not ui_preview.LUA:
+        raise Skip("no lua to run the screen")
+    pads = " ".join(("2" if i % 16 == 0 else "0") for i in range(64))
+    offb = " ".join(("1" if i % 4 == 2 else "0") for i in range(64))
+    def edits(on, vary):
+        L = ui_preview.run(["send ockm-chord-len float 64", "send ockm-chord-mode float 0", f"array ockm-pat-chord-on {on}",
+                            "array ockm-pat-chord-deg " + " ".join("0" for _ in range(64)), f"send ockm-chord-vary float {vary}",
+                            "mark go", "send ockm-chord-changed bang"])
+        return [tuple(int(float(x)) for x in l.split()[3:5]) for l in L[L.index("mark go"):] if l.startswith("sent ockm-chord-edit ")]
+    assert edits(pads, 2) == [(62, 1)], f"move on pads: {edits(pads, 2)}"
+    assert edits(offb, 1) == [], f"breathe on offbeat stabs: step 62 is already a hit: {edits(offb, 1)}"
+    st = " ".join(("1" if i % 8 == 0 else "0") for i in range(64))   # 8ths on the beat: 2 hits a bar (a pad-like rhythm)
+    assert edits(st, 0) == [], "still: nothing changes"
+    three = " ".join(("1" if i % 16 in (0, 4, 8) else "0") for i in range(64))
+    assert edits(three, 1) == [(62, 1)], f"breathe on a stab rhythm: a push on the last 8th: {edits(three, 1)}"
+    m = edits(three, 2)
+    assert (24, 0) in m and (62, 1) in m, f"move: bar 2 drops its last hit, bar 4 adds one: {m}"
+
+@test
 def chord_engines_sound(work):
     for eng, name, k3 in [(0, "poly", 0.0), (1, "organ", 0.2), (0, "poly-pad", 0.6)]:   # v0.98: poly's k3 is attack
         h = Harness(dut="ockm-chord zz")

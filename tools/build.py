@@ -500,7 +500,7 @@ for _t in [n for n,_ in SLOTS]+["bass","lead","chord"]:
 LFO_DEF={"lfo-shape":0,"lfo-rate":4,"lfo-depth":0,"lfo-target":1,"chorus":0}   # sine, one bar, off, the first knob; chorus off
 SYNTH_DEFAULTS={"bass":dict(engine=5,mode=0,sync=1,walk=0,sidechain=0,scshape=1,half=0,lock=0,density=1,seed=0,level=0.85,k1=0.42,k2=0.25,k3=0.45,k4=0.45,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
                 "lead":dict(engine=4,mode=0,sync=1,sidechain=0,scshape=1,half=0,lock=0,density=1,seed=0,outside=0.35,level=0.7,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
-                "chord":dict(engine=0,mode=0,sidechain=0,scshape=1,half=0,level=0.65,rate=1,push=0,k1=0.45,k2=0.5,k3=0,k4=0.32,type=0,smooth=1,verb=0,delay=0,rhythm=0,prog=0,voicing=0,strum=0,**LFO_DEF)}
+                "chord":dict(engine=0,mode=0,sidechain=0,scshape=1,half=0,level=0.65,rate=1,push=0,vary=0,drift=0,k1=0.45,k2=0.5,k3=0,k4=0.32,type=0,smooth=1,verb=0,delay=0,rhythm=0,prog=0,voicing=0,strum=0,**LFO_DEF)}
 PATTERN_KEYS=[("ockm-end",0,None),("ockm-impact",0,None),("ockm-pump",0,None),("ockm-bass-on",1,None),("ockm-lead-on",1,None),("ockm-chord-on",1,None),("ockm-rise",0,None),("ockm-drum-len",16,None),("ockm-bass-len",64,None),("ockm-lead-len",64,None),("ockm-chord-len",64,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None),("ockm-leader",0,None),("ockm-drum-groove",-1,None),("ockm-fill-every",0,None),("ockm-fill-style",0,None),("ockm-drums-on",1,None),("ockm-turn-every",0,None),("ockm-style",-1,None),
               ("ockm-evolve-every",0,None),("ockm-evolve-mode",1,None),("ockm-evolve-parts",15,None)]   # v1.00 evolve: phrase bars, 1 gentle 2 lively, which parts (1 drums 2 bass 4 lead 8 chords)
 for t,d in SYNTH_DEFAULTS.items():
@@ -1456,12 +1456,15 @@ PRE={"leadrhythm":[("offbeat","0 0 2 0 0 0 1 0 0 0 2 0 0 0 1 0"),("rolling","0 2
               ("motif-high",_bank(lambda k:_melody4(300+k,"motif",7))),("arp-evolve",_bank(lambda k:_arp4(400+k)))],
      "scale":[("minor","0 2 3 5 7 8 10"),("major","0 2 4 5 7 9 11"),("dorian","0 2 3 5 7 9 10"),("phrygian","0 1 3 5 7 8 10"),
               ("mixolydian","0 2 4 5 7 9 10"),("harmonic-minor","0 2 3 5 7 8 11")],
-     "chordrhythm":[("bar-pads","2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"),("two-beat","2 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0"),
-                    ("offbeat","0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0"),("dub-stabs","0 0 0 2 0 0 0 0 0 0 1 0 0 0 0 0"),
-                    ("house-organ","1 0 0 1 0 0 1 0 0 0 1 0 0 1 0 0"),("tresillo","2 0 0 1 0 0 1 0 2 0 0 1 0 0 1 0"),
-                    ("syncopated","0 0 1 0 0 1 0 0 0 1 0 0 1 0 0 0"),("garage-skip","1 0 0 1 0 0 0 0 0 1 0 0 1 0 0 0 1 0 0 1 0 0 0 0 0 1 0 0 0 0 1 0"),
-                    ("call-answer","2 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 1 0 0 1 0 0 0"),("eighths","1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0"),
-                    ("piano-riff","2 0 0 1 0 0 2 0 0 1 0 0 1 0 1 0 2 0 0 1 0 0 2 0 0 1 0 0 2 0 0 0")],   # v0.90: the Italo piano riff, two bars
+     # chord rhythms (v1.01: named by feel; 6 and 7, syncopated and garage skip, are retired and stay as placeholders so saved
+     # loops keep their numbers; the screen moves them to tresillo. 11 sustained is written from the progression instead)
+     "chordrhythm":[("pads","2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0"),("halves","2 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0"),
+                    ("offbeat","0 0 1 0 0 0 1 0 0 0 1 0 0 0 1 0"),("skank","0 0 0 2 0 0 0 0 0 0 1 0 0 0 0 0"),
+                    ("organ","1 0 0 1 0 0 1 0 0 0 1 0 0 1 0 0"),("tresillo","2 0 0 1 0 0 1 0 2 0 0 1 0 0 1 0"),
+                    ("-","2 0 0 1 0 0 1 0 2 0 0 1 0 0 1 0"),("-","2 0 0 1 0 0 1 0 2 0 0 1 0 0 1 0"),
+                    ("call-answer","2 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 1 0 0 1 0 0 0"),("8ths","1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0"),
+                    ("piano-riff","2 0 0 1 0 0 2 0 0 1 0 0 1 0 1 0 2 0 0 1 0 0 2 0 0 1 0 0 2 0 0 0"),
+                    ("sustained","2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0")],   # v0.90: the Italo piano riff, two bars
      # chord types. Plain numbers: scale steps above the chord's root, so the chord follows the key (0 root, 2 third...).
      # "s" then numbers: a fixed shape in semitones above the chord's root, moved as one block with the progression (the
      # chord memory sound of deep house, Detroit and dub techno). v0.90: the 9th and 11th leave the root to the bass
@@ -1578,7 +1581,7 @@ CHORD_LUA=_chord_types_lua()+r"""local CHORD_CENTRE, CHORD_FLOOR = 62, 50   -- s
 -- a chord's notes (MIDI). deg: the chord's root as a scale step; sc: the scale (7 semitones); root: the key (0 C .. 11 B);
 -- smooth: keep every chord at about the same height (inversions for chords in the key, octaves for fixed shapes), so
 -- they move by small steps and stay out of the bass; voicing 0 close, 1 open, 2 wide; turn: the turnaround's major V
-local function chord_voicing(deg, ctype, sc, root, smooth, voicing, turn)
+local function chord_voicing(deg, ctype, sc, root, smooth, voicing, turn, lift)
   local ty = CHORD_TYPES[(ctype or 0) + 1] or CHORD_TYPES[1]
   local rox = (root <= 7) and (48 + root) or (36 + root)
   local function at(a)
@@ -1613,6 +1616,7 @@ local function chord_voicing(deg, ctype, sc, root, smooth, voicing, turn)
       end
     end
     local best, bc
+    local all = {}
     for _, c in ipairs(cands) do
       local sum, lo = 0, c[1]
       for _, v in ipairs(c) do sum = sum + v; if v < lo then lo = v end end
@@ -1622,11 +1626,20 @@ local function chord_voicing(deg, ctype, sc, root, smooth, voicing, turn)
         local cost = math.abs(mean + 12 * mm - CHORD_CENTRE)
         if lo + 12 * mm < CHORD_FLOOR then cost = cost + (CHORD_FLOOR - lo - 12 * mm) end
         for j = 2, #c do if c[j] - c[j - 1] == 1 then cost = cost + 4 end end   -- no semitone rubs inside a chord
-        if not bc or cost < bc - 1e-9 then
-          bc = cost; best = {}
-          for j, v in ipairs(c) do best[j] = v + 12 * mm end
-        end
+        local cand = {}
+        for j, v in ipairs(c) do cand[j] = v + 12 * mm end
+        all[#all + 1] = { cand, mean + 12 * mm, cost }
+        if not bc or cost < bc - 1e-9 then bc = cost; best = cand end
       end
+    end
+    -- drift (v1.01): one inversion higher than the best, if that stays in the band, for chords built from the key
+    if lift and ty.k == 0 then
+      local bm = 0; for _, v in ipairs(best) do bm = bm + v end; bm = bm / #best
+      local up, um
+      for _, a in ipairs(all) do
+        if a[2] > bm + 1 and a[2] - CHORD_CENTRE <= 7 and a[3] < 50 and (not um or a[2] < um) then up, um = a[1], a[2] end
+      end
+      if up then best = up end
     end
     n = best
   end
@@ -1641,12 +1654,13 @@ end
 os.makedirs(os.path.join(R,"seq"),exist_ok=True)
 open(os.path.join(R,"seq","ockm-chordnotes.pd_lua"),"w").write("""-- The chord sequencer's notes: a chord type, key, scale and voicing turned into up to four MIDI notes.
 -- Written by tools/build.py: change it there. In: scale <7 semitones>, type <n>, root <0-11>, smooth <0/1>,
--- voicing <0-2>, hit <strength> <scale step> <turnaround 0/1>. Out: four notes (0 for none) and the strength.
+-- voicing <0-2>, drift <0/1>, hit <strength> <scale step> <turnaround 0/1> <step>. Out: four notes (0 for none) and the strength.
 local cn = pd.Class:new():register("ockm-chordnotes")
 """+CHORD_LUA+"""
 function cn:initialize(sel, atoms)
   self.inlets, self.outlets = 1, 1
   self.sc, self.ty, self.root, self.smooth, self.voicing = { 0, 2, 3, 5, 7, 8, 10 }, 0, 9, true, 0
+  self.drift, self.pass, self.last = false, 0, -1
   return true
 end
 function cn:in_1_scale(a) if #a >= 7 then self.sc = a end end
@@ -1654,8 +1668,12 @@ function cn:in_1_type(a) self.ty = math.max(0, math.floor(a[1] or 0)) end
 function cn:in_1_root(a) self.root = math.floor(a[1] or 9) % 12 end
 function cn:in_1_smooth(a) self.smooth = (a[1] or 1) > 0 end
 function cn:in_1_voicing(a) self.voicing = math.floor(a[1] or 0) end
+function cn:in_1_drift(a) self.drift = (a[1] or 0) > 0 end
 function cn:in_1_hit(a)
-  local n = chord_voicing(a[2] or 0, self.ty, self.sc, self.root, self.smooth, self.voicing, (a[3] or 0) > 0)
+  local st = a[4] or 0
+  if st < self.last then self.pass = self.pass + 1 end   -- the pattern came round again
+  self.last = st
+  local n = chord_voicing(a[2] or 0, self.ty, self.sc, self.root, self.smooth, self.voicing, (a[3] or 0) > 0, self.drift and self.pass % 2 == 1)
   local out = {}
   for k = 1, 4 do out[k] = n[k] or 0 end
   out[5] = math.min(1, (a[1] or 0.75) * (0.92 + 0.16 * math.random()))   -- played, not programmed: no two hits quite the same
@@ -1961,7 +1979,8 @@ rvo=p.add(f"#X obj 1400 120 r ockm-{D}1-voicing;")   # 0 close, 1 open, 2 wide
 rsm=p.add(f"#X obj 1250 120 r ockm-{D}1-smooth;"); one_sm=p.add("#X msg 1250 90 1;"); p.con(lb,0,one_sm,0)   # smooth voicing on by default
 rro=p.add("#X obj 1100 120 r ockm-root;")
 for c in [(lb,0,lbt,0),(lbt,2,d0a,0),(lbt,1,d0b,0),(lbt,0,d9,0),(d0a,0,tsc,0),(rsc,0,tsc,0),(tsc,0,lsc,0)]: p.con(*c)
-for i,(srcs,sel) in enumerate([([lsc],"scale"),([rty,d0b],"type"),([rro,d9],"root"),([rsm,one_sm],"smooth"),([rvo],"voicing")]):
+rdr=p.add(f"#X obj 1550 120 r ockm-{D}1-drift;")
+for i,(srcs,sel) in enumerate([([lsc],"scale"),([rty,d0b],"type"),([rro,d9],"root"),([rsm,one_sm],"smooth"),([rvo],"voicing"),([rdr],"drift")]):
     pp=p.add(f"#X obj {700+i*150} 230 list prepend {sel};"); tr=p.add(f"#X obj {700+i*150} 255 list trim;")
     for sr in srcs: p.con(sr,1 if sr is lsc else 0,pp,0)
     p.con(pp,0,tr,0); p.con(tr,0,cn,0)
@@ -1970,8 +1989,9 @@ ts=p.add("#X obj 30 80 t f f;"); rdeg0=p.add(f"#X obj 200 95 tabread ockm-pat-{D
 rdeg=p.add(f"#X obj 200 115 expr if(ockm_turn_on \\, 4 \\, {D}f1);"); p.con(rdeg0,0,rdeg,0)
 tdeg=p.add("#X obj 200 140 t f f;"); trn=p.add(f"#X obj 300 170 expr ockm_turn_on+0*{D}f1;")
 son=p.add("#X obj 30 140 sel 0;"); vx=p.add(f"#X obj 70 170 expr if({D}f1>1 \\, 1 \\, 0.75);")
-hp=p.add("#X obj 70 230 pack f f f;"); hpp=p.add("#X obj 70 260 list prepend hit;"); hpt=p.add("#X obj 70 285 list trim;")
+hp=p.add("#X obj 70 230 pack f f f f;"); hpp=p.add("#X obj 70 260 list prepend hit;"); hpt=p.add("#X obj 70 285 list trim;")
 sno=p.add(f"#X obj 200 700 s ockm-{D}1-notes-out;")
+p.con(cmod,0,hp,3)   # the step, so the Lua can count passes (drift)
 for c in [(inl,0,cmod,0),(cmod,0,ts,0),(ts,1,rdeg0,0),(rdeg,0,tdeg,0),(tdeg,1,trn,0),(trn,0,hp,2),(tdeg,0,hp,1),(ts,0,ron,0),(ron,0,son,0),
           (son,1,vx,0),(vx,0,hp,0),(hp,0,hpp,0),(hpp,0,hpt,0),(hpt,0,cn,0),(cn,0,out,0),(cn,0,sno,0)]: p.con(*c)
 # store / load / edit / extend
@@ -2034,10 +2054,12 @@ two=p.add(f"#X obj 200 700 tabwrite ockm-pat-{D}1-on;"); twd=p.add(f"#X obj 400 
 # the same table, so it follows. Push 0 writes the pattern exactly as before
 psym=p.add(f"#X obj 600 560 symbol {D}0-p;"); rsym=p.add(f"#X obj 700 560 symbol {D}0-r;"); plb=p.add("#X obj 600 530 loadbang;")   # objects: a message box wouldn't fill in $0
 bx=p.add(f"#X obj 300 620 expr {D}s5[(int({D}f1+2*({D}f4>0))%int({D}f2)+int({D}f2))%int({D}f2)];")
-mr=p.add(f"#X obj 20 620 expr if({D}f4>0 && {D}s5[(int({D}f1+2)%int({D}f2)+int({D}f2))%int({D}f2)]!={D}s5[(int({D}f1+1)%int({D}f2)+int({D}f2))%int({D}f2)] && {D}s6[(int({D}f1)%int({D}f3)+int({D}f3))%int({D}f3)]==0 && {D}s6[(int({D}f1+1)%int({D}f3)+int({D}f3))%int({D}f3)]==0 && {D}s6[(int({D}f1+2)%int({D}f3)+int({D}f3))%int({D}f3)]>0 \\, {D}s6[(int({D}f1+2)%int({D}f3)+int({D}f3))%int({D}f3)] \\, if({D}f4>0 && {D}s5[(int({D}f1)%int({D}f2)+int({D}f2))%int({D}f2)]!={D}s5[(int({D}f1-1)%int({D}f2)+int({D}f2))%int({D}f2)] && {D}s6[(int({D}f1-2)%int({D}f3)+int({D}f3))%int({D}f3)]==0 && {D}s6[(int({D}f1-1)%int({D}f3)+int({D}f3))%int({D}f3)]==0 && {D}s6[(int({D}f1)%int({D}f3)+int({D}f3))%int({D}f3)]>0 \\, 0 \\, {D}s6[(int({D}f1)%int({D}f3)+int({D}f3))%int({D}f3)]));")
+mr=p.add(f"#X obj 20 620 expr if({D}f7>0 \\, ((int({D}f1)==0 && ({D}f4<=0 || {D}f8>0)) || {D}s5[(int({D}f1+2*({D}f4>0))%int({D}f2)+int({D}f2))%int({D}f2)]!={D}s5[(int({D}f1-1+2*({D}f4>0))%int({D}f2)+int({D}f2))%int({D}f2)])*2 \\, if({D}f4>0 && {D}s5[(int({D}f1+2)%int({D}f2)+int({D}f2))%int({D}f2)]!={D}s5[(int({D}f1+1)%int({D}f2)+int({D}f2))%int({D}f2)] && {D}s6[(int({D}f1)%int({D}f3)+int({D}f3))%int({D}f3)]==0 && {D}s6[(int({D}f1+1)%int({D}f3)+int({D}f3))%int({D}f3)]==0 && {D}s6[(int({D}f1+2)%int({D}f3)+int({D}f3))%int({D}f3)]>0 \\, {D}s6[(int({D}f1+2)%int({D}f3)+int({D}f3))%int({D}f3)] \\, if({D}f4>0 && {D}s5[(int({D}f1)%int({D}f2)+int({D}f2))%int({D}f2)]!={D}s5[(int({D}f1-1)%int({D}f2)+int({D}f2))%int({D}f2)] && {D}s6[(int({D}f1-2)%int({D}f3)+int({D}f3))%int({D}f3)]==0 && {D}s6[(int({D}f1-1)%int({D}f3)+int({D}f3))%int({D}f3)]==0 && {D}s6[(int({D}f1)%int({D}f3)+int({D}f3))%int({D}f3)]>0 \\, 0 \\, {D}s6[(int({D}f1)%int({D}f3)+int({D}f3))%int({D}f3)])));")
 for c in [(ti,1,two,1),(ti,1,twd,1),(tl2,1,bx,0),(plen,0,bx,1),(llr,0,bx,2),(store[3],0,bx,3),(bx,0,twd,0),
           (tl2,0,mr,0),(plen,0,mr,1),(llr,0,mr,2),(store[3],0,mr,3),(mr,0,two,0),
           (plb,0,psym,0),(plb,0,rsym,0),(psym,0,bx,4),(psym,0,mr,4),(rsym,0,mr,5)]: p.con(*c)
+sus=p.add("#X obj 120 590 == 11;"); p.con(store[0],0,sus,0); p.con(sus,0,mr,6)   # v1.01 sustained: a hit only where the chord changes
+one=p.add("#X obj 220 590 == 0;"); p.con(store[1],0,one,0); p.con(one,0,mr,7)   # one chord all the way: the hit on step 0 stays, even with push
 p.add("#X text 20 760 hooks: ockm-<track>-rhythm \\, ockm-<track>-prog \\, ockm-<track>-rate (0 half bar \\, 1 bar \\, 2 two bars) \\, ockm-<track>-push (0/1) \\, ockm-<track>-gen (rebuild). Presets live in tools/build.py (PRE and PROGS).;")
 p.save("seq/ockm-chordgen.pd","#N canvas 120 120 900 800 12;")
 

@@ -1,13 +1,13 @@
 -- The chord sequencer's notes: a chord type, key, scale and voicing turned into up to four MIDI notes.
 -- Written by tools/build.py: change it there. In: scale <7 semitones>, type <n>, root <0-11>, smooth <0/1>,
--- voicing <0-2>, hit <strength> <scale step> <turnaround 0/1>. Out: four notes (0 for none) and the strength.
+-- voicing <0-2>, drift <0/1>, hit <strength> <scale step> <turnaround 0/1> <step>. Out: four notes (0 for none) and the strength.
 local cn = pd.Class:new():register("ockm-chordnotes")
 local CHORD_TYPES = { { k=0, name="triad", 0, 2, 4 }, { k=0, name="seventh", 0, 2, 4, 6 }, { k=0, name="sus2", 0, 1, 4 }, { k=0, name="power", 0, 4, 7 }, { k=0, name="sus4", 0, 3, 4 }, { k=0, name="sixth", 0, 2, 4, 5 }, { k=0, name="ninth", 2, 4, 6, 8 }, { k=0, name="eleventh", 2, 6, 8, 10 }, { k=1, name="m9", 3, 7, 10, 14 }, { k=1, name="m11", 3, 10, 14, 17 }, { k=1, name="m7", 0, 7, 10, 15 }, { k=1, name="4ths", 0, 5, 10, 15 }, { k=1, name="maj9", 4, 7, 11, 14 } }
 local CHORD_CENTRE, CHORD_FLOOR = 62, 50   -- smooth chords sit around D4, their lowest note no lower than D3
 -- a chord's notes (MIDI). deg: the chord's root as a scale step; sc: the scale (7 semitones); root: the key (0 C .. 11 B);
 -- smooth: keep every chord at about the same height (inversions for chords in the key, octaves for fixed shapes), so
 -- they move by small steps and stay out of the bass; voicing 0 close, 1 open, 2 wide; turn: the turnaround's major V
-local function chord_voicing(deg, ctype, sc, root, smooth, voicing, turn)
+local function chord_voicing(deg, ctype, sc, root, smooth, voicing, turn, lift)
   local ty = CHORD_TYPES[(ctype or 0) + 1] or CHORD_TYPES[1]
   local rox = (root <= 7) and (48 + root) or (36 + root)
   local function at(a)
@@ -42,6 +42,7 @@ local function chord_voicing(deg, ctype, sc, root, smooth, voicing, turn)
       end
     end
     local best, bc
+    local all = {}
     for _, c in ipairs(cands) do
       local sum, lo = 0, c[1]
       for _, v in ipairs(c) do sum = sum + v; if v < lo then lo = v end end
@@ -51,11 +52,20 @@ local function chord_voicing(deg, ctype, sc, root, smooth, voicing, turn)
         local cost = math.abs(mean + 12 * mm - CHORD_CENTRE)
         if lo + 12 * mm < CHORD_FLOOR then cost = cost + (CHORD_FLOOR - lo - 12 * mm) end
         for j = 2, #c do if c[j] - c[j - 1] == 1 then cost = cost + 4 end end   -- no semitone rubs inside a chord
-        if not bc or cost < bc - 1e-9 then
-          bc = cost; best = {}
-          for j, v in ipairs(c) do best[j] = v + 12 * mm end
-        end
+        local cand = {}
+        for j, v in ipairs(c) do cand[j] = v + 12 * mm end
+        all[#all + 1] = { cand, mean + 12 * mm, cost }
+        if not bc or cost < bc - 1e-9 then bc = cost; best = cand end
       end
+    end
+    -- drift (v1.01): one inversion higher than the best, if that stays in the band, for chords built from the key
+    if lift and ty.k == 0 then
+      local bm = 0; for _, v in ipairs(best) do bm = bm + v end; bm = bm / #best
+      local up, um
+      for _, a in ipairs(all) do
+        if a[2] > bm + 1 and a[2] - CHORD_CENTRE <= 7 and a[3] < 50 and (not um or a[2] < um) then up, um = a[1], a[2] end
+      end
+      if up then best = up end
     end
     n = best
   end
@@ -70,6 +80,7 @@ end
 function cn:initialize(sel, atoms)
   self.inlets, self.outlets = 1, 1
   self.sc, self.ty, self.root, self.smooth, self.voicing = { 0, 2, 3, 5, 7, 8, 10 }, 0, 9, true, 0
+  self.drift, self.pass, self.last = false, 0, -1
   return true
 end
 function cn:in_1_scale(a) if #a >= 7 then self.sc = a end end
@@ -77,8 +88,12 @@ function cn:in_1_type(a) self.ty = math.max(0, math.floor(a[1] or 0)) end
 function cn:in_1_root(a) self.root = math.floor(a[1] or 9) % 12 end
 function cn:in_1_smooth(a) self.smooth = (a[1] or 1) > 0 end
 function cn:in_1_voicing(a) self.voicing = math.floor(a[1] or 0) end
+function cn:in_1_drift(a) self.drift = (a[1] or 0) > 0 end
 function cn:in_1_hit(a)
-  local n = chord_voicing(a[2] or 0, self.ty, self.sc, self.root, self.smooth, self.voicing, (a[3] or 0) > 0)
+  local st = a[4] or 0
+  if st < self.last then self.pass = self.pass + 1 end   -- the pattern came round again
+  self.last = st
+  local n = chord_voicing(a[2] or 0, self.ty, self.sc, self.root, self.smooth, self.voicing, (a[3] or 0) > 0, self.drift and self.pass % 2 == 1)
   local out = {}
   for k = 1, 4 do out[k] = n[k] or 0 end
   out[5] = math.min(1, (a[1] or 0.75) * (0.92 + 0.16 * math.random()))   -- played, not programmed: no two hits quite the same
