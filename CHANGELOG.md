@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.99 (19 October 2026)
+
+Step 3 of the harmony and generator proposal: rate and push, on the builder beside the progression.
+
+- **Rate:** how fast the chords change: **half bar**, **a bar each** (as before) or **two bars**. Every progression works at all three, so the 12 progressions become 36. Vamp at half a bar is jackin' house; deep house at two bars is the progressive version. The map below shows it bar by bar
+- **Push:** every chord change lands an eighth early. Where a chord hit fell on the change, it moves to just before the 1 and holds over it, the house piano feel. The bass follows, since it reads the same chords. The Italo piano riff did this in its own rhythm; now any rhythm can
+- Both are saved with the loop, and styles set them: push on for Chicago, classic house, Italo piano and nu disco; Chicago and classic house sometimes roll half-bar changes, progressive and deep house sometimes two bars
+
 ## v0.98 (19 October 2026)
 
 Step 2 of the harmony and generator proposal: fewer engines, each sounding right the moment it's picked.

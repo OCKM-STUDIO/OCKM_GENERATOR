@@ -532,6 +532,31 @@ def chord_progressions_fill_and_lengthen(work):
     assert on[0] == 2 and on[16] == 2 and sum(on) == 4, f"bar-pads rhythm: one accented chord per bar: {on}"
 
 @test
+def chord_rate_and_push(work):
+    """v0.99. Vamp (i iv, a bar each) at rate 0 (half bar) is i for 8 steps then iv for 8; at rate 2 (two bars) the pattern
+    grows to 64 steps, i for 32 then iv for 32. Push (rate 1, bar pads): every change lands two steps early (iv from step
+    14, i again from step 30), and the hit that was on each 1 moves to two steps before it."""
+    def take(cmds, n):
+        h = Harness(); h.show("ockm-len")
+        h.at(100, "ockm-resync bang ; ockm-chord-rhythm 0 ; ockm-chord-rate 1 ; ockm-chord-push 0 ; ockm-chord-prog 1")
+        h.at(150, cmds)
+        g = h.add("#X obj 10 300 r test-get;"); t = h.add("#X obj 10 330 t b b;")
+        a1 = h.add(f"#X obj 10 360 array get ockm-pat-chord-deg 0 {n};"); p1 = h.add("#X obj 10 390 print DEG;")
+        a2 = h.add(f"#X obj 200 360 array get ockm-pat-chord-on 0 {n};"); p2 = h.add("#X obj 200 390 print ON;")
+        h.con(g, t); h.con(t, a1, 1); h.con(t, a2, 0); h.con(a1, p1); h.con(a2, p2)
+        h.at(250, "test-get bang")
+        f = os.path.join(work, f"t_rate{abs(hash(cmds)) % 1000}.pd"); h.finish(350, f)
+        out = run(work, f)
+        return ([int(float(x)) for x in printed(out, "DEG")[-1].split()], [int(float(x)) for x in printed(out, "ON")[-1].split()], printed(out, "ockm-len"))
+    deg, on, ln = take("ockm-chord-rate 0", 16)
+    assert deg == [0] * 8 + [3] * 8, f"half-bar vamp: {deg}"
+    deg, on, ln = take("ockm-chord-rate 2", 64)
+    assert deg == [0] * 32 + [3] * 32 and "64" in ln, f"two-bar vamp, 64 steps: {deg[:40]}... {ln}"
+    deg, on, ln = take("ockm-chord-push 1", 32)
+    assert deg == [0] * 14 + [3] * 16 + [0] * 2, f"push: each change two steps early: {deg}"
+    assert on[14] == 2 and on[16] == 0 and on[30] == 2 and on[0] == 0, f"push: the hit on each 1 moves two steps early: {on}"
+
+@test
 def chord_engines_sound(work):
     for eng, name, k3 in [(0, "poly", 0.0), (1, "organ", 0.2), (0, "poly-pad", 0.6)]:   # v0.98: poly's k3 is attack
         h = Harness(dut="ockm-chord zz")
@@ -740,7 +765,7 @@ def touchscreen_drives_the_engine(work):
     tap(290, 262, 36)                    # perform tab
     tap(310, 716, 215)                   # perform: the filter, middle
     tap(320, 477, 36)                    # song tab
-    tap(335, 324, 345)                   # harmony: next progression
+    tap(335, 228, 345)                   # harmony: next progression (v0.99: the stepper is narrower, rate and push beside it)
     tap(338, 725, 36)                    # chord tab
     tap(340, 298, 421)                   # colour: 9ths
     tap(345, 262, 36); tap(346, 74, 186)   # perform tab, mute the kick tile

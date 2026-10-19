@@ -535,6 +535,8 @@ Audio is recorded as it plays, so you hear the export; the effects get 2.5 secon
 
 **Chord rhythms**, simplest first: 1 bar pads, 2 two beat, 3 offbeat, 4 dub stabs, 5 house organ, 6 tresillo (3-3-2), 7 syncopated, 8 garage skip (2 bars), 9 call and answer (2 bars), 10 eighths
 
+**Rate and push** (v0.99, on the builder beside the progression): **rate** sets how long each chord lasts, half a bar, a bar (the table below) or two bars, so every progression comes at three speeds. **Push** lands every chord change an eighth early; a chord hit that fell on the change moves to just before the 1 and holds over it, and the bass follows. Both are saved with the loop (`ockm-chord-rate` 0, 1, 2; `ockm-chord-push` 0, 1) and set by styles.
+
 **Progressions**, simplest first (chords in the minor key, they follow whatever key and scale you pick):
 
 | # | Name | Chords | Bars |
