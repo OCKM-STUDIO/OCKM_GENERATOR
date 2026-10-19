@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.90 (19 October 2026)
+
+- **Chords that don't sound like a home keyboard.** New fixed shapes (m9, m11, dub m7, 4ths, maj9) that move as one block with the progression, the chord memory sound of deep house, Detroit and dub techno. They sit on a second row on the chord tab, under the chords built from the key
+- **9ths and 11ths leave the root to the bass,** and a flat 9th becomes the root, so they no longer grind
+- **Smooth voicing keeps chords up around D4** (never below D3), picking the inversion or octave that sits there. Before, it folded chords into the octave above the key's root, which was low and muddy, and squashed 9ths into semitone clusters. Smooth is now on the voicing row, next to close, open and wide
+- **Every hit varies a little,** accents hit harder, and on the stab engine the hit opens the filter more or less
+- **Styles:** every style with chords now uses shapes or rich chords (Chicago dub m7 organ stabs, Detroit m11 strings with chorus, deep house m9 Rhodes, dub techno dub m7 stabs and so on), sets the chorus and strum, and cuts the chord track below 150 Hz
+- The chord notes are worked out in one place (`seq/ockm-chordnotes.pd_lua`), shared by the sound and the screen
+
 ## v0.89 (19 October 2026)
 
 - **909 and 808 kits:** three kits from your Analog Drums packs (909, 909 long, 808), and every style loads one, tuned as the style tunes its drums

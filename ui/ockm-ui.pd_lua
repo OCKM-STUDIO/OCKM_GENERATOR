@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.89"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.90"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -81,7 +81,70 @@ local SPICE = { { 0, "triad" }, { 1, "7th" }, { 6, "9th" }, { 7, "11th" } }
 local FILLS = { "snare roll", "tom run", "cut out", "snare build", "breakbeat" }
 local GROOVES = { "four floor", "house", "deep house", "tech house", "minimal", "techno", "dub techno", "garage", "breakbeat", "boom bap", "trip hop", "electro", "clear", "chicago", "jackin", "disco", "soulful", "afro house", "lofi house", "2 step", "speed garage", "funky house", "ghetto house", "nu disco", "rolling", "detroit", "berlin", "industrial", "hypnotic", "acid techno", "think break", "jungle", "big beat", "downtempo", "one drop", "half time", "lofi hip hop", "hard house", "dnb two step", "dnb rolling" }
 local GROOVE_BANKS = { { "classics", 0 }, { "house + garage", 13 }, { "techno + breaks", 25 }, { "hard + fast", 37 } }
-local CHORD_TYPES = { { 0, 2, 4, -1 }, { 0, 2, 4, 6 }, { 0, 1, 4, -1 }, { 0, 4, 7, -1 }, { 0, 3, 4, -1 }, { 0, 2, 4, 5 }, { 0, 2, 6, 8 }, { 0, 6, 8, 10 } }
+local CHORD_TYPES = { { k=0, name="triad", 0, 2, 4 }, { k=0, name="seventh", 0, 2, 4, 6 }, { k=0, name="sus2", 0, 1, 4 }, { k=0, name="power", 0, 4, 7 }, { k=0, name="sus4", 0, 3, 4 }, { k=0, name="sixth", 0, 2, 4, 5 }, { k=0, name="ninth", 2, 4, 6, 8 }, { k=0, name="eleventh", 2, 6, 8, 10 }, { k=1, name="m9", 3, 7, 10, 14 }, { k=1, name="m11", 3, 10, 14, 17 }, { k=1, name="m7", 0, 7, 10, 15 }, { k=1, name="4ths", 0, 5, 10, 15 }, { k=1, name="maj9", 4, 7, 11, 14 } }
+local CHORD_CENTRE, CHORD_FLOOR = 62, 50   -- smooth chords sit around D4, their lowest note no lower than D3
+-- a chord's notes (MIDI). deg: the chord's root as a scale step; sc: the scale (7 semitones); root: the key (0 C .. 11 B);
+-- smooth: keep every chord at about the same height (inversions for chords in the key, octaves for fixed shapes), so
+-- they move by small steps and stay out of the bass; voicing 0 close, 1 open, 2 wide; turn: the turnaround's major V
+local function chord_voicing(deg, ctype, sc, root, smooth, voicing, turn)
+  local ty = CHORD_TYPES[(ctype or 0) + 1] or CHORD_TYPES[1]
+  local rox = (root <= 7) and (48 + root) or (36 + root)
+  local function at(a)
+    local s = sc[(a % 7) + 1]
+    if turn and s == 10 then s = 11 end   -- the turnaround raises the minor 7th: E major in A minor
+    return rox + 12 * math.floor(a / 7) + s
+  end
+  deg = math.floor(deg)
+  local n = {}
+  if ty.k == 1 then
+    local r = at(deg)
+    for _, o in ipairs(ty) do
+      if turn and o % 12 == 3 then o = o + 1 end   -- a minor shape turns major on the turnaround
+      n[#n + 1] = r + o
+    end
+  else
+    for _, o in ipairs(ty) do
+      local v = at(deg + o)
+      if o == 8 and v - at(deg) == 13 then v = at(deg + 7) end   -- a flat 9th grinds on the bass: the root instead
+      n[#n + 1] = v
+    end
+  end
+  if smooth then
+    local cands = {}
+    if ty.k == 1 then cands[1] = n
+    else
+      table.sort(n)
+      for i = 0, #n - 1 do
+        local c = {}
+        for j, v in ipairs(n) do c[j] = (j <= i) and v + 12 or v end
+        table.sort(c); cands[#cands + 1] = c
+      end
+    end
+    local best, bc
+    for _, c in ipairs(cands) do
+      local sum, lo = 0, c[1]
+      for _, v in ipairs(c) do sum = sum + v; if v < lo then lo = v end end
+      local mean = sum / #c
+      local m = math.floor((CHORD_CENTRE - mean) / 12 + 0.5)
+      for mm = m - 1, m + 1 do
+        local cost = math.abs(mean + 12 * mm - CHORD_CENTRE)
+        if lo + 12 * mm < CHORD_FLOOR then cost = cost + (CHORD_FLOOR - lo - 12 * mm) end
+        for j = 2, #c do if c[j] - c[j - 1] == 1 then cost = cost + 4 end end   -- no semitone rubs inside a chord
+        if not bc or cost < bc - 1e-9 then
+          bc = cost; best = {}
+          for j, v in ipairs(c) do best[j] = v + 12 * mm end
+        end
+      end
+    end
+    n = best
+  end
+  -- open lifts the second note an octave; wide also drops the lowest an octave and lifts the fourth
+  if voicing == 1 or voicing == 2 then
+    if n[2] then n[2] = n[2] + 12 end
+    if voicing == 2 then n[1] = n[1] - 12; if n[4] then n[4] = n[4] + 12 end end
+  end
+  return n, ty
+end
 local PROG_SHAPES = { { { 0, 16 } }, { { 0, 16 }, { 3, 16 } }, { { 0, 48 }, { 6, 16 } }, { { 0, 16 }, { 3, 16 }, { 5, 16 }, { 4, 16 } }, { { 0, 8 }, { 5, 8 }, { 3, 8 }, { 4, 8 } }, { { 0, 16 }, { 5, 16 }, { 2, 16 }, { 6, 16 } }, { { 5, 16 }, { 6, 16 }, { 0, 32 } }, { { 0, 16 }, { 6, 16 }, { 5, 16 }, { 4, 16 } }, { { 0, 32 }, { 6, 32 }, { 5, 32 }, { 4, 32 } }, { { 1, 16 }, { 4, 16 }, { 0, 32 } } }
 -- END PRESETS
 -- the rhythm list for a part (the bass has its own, the classic dance bass rhythms)
@@ -1637,7 +1700,10 @@ function ui:layout_synth_sound(add, part, mono)
     for i, nm in ipairs({ "close", "open", "wide" }) do
       add{ kind="choice", x=rx + (i - 1) * (cw + 6), y=558, w=cw, h=34, label=nm, small=true, sel=(vo == i - 1), tap=function() self:send("ockm-chord-voicing", i - 1) end }
     end
-    add{ kind="hbar", x=rx + 3 * (cw + 6), y=558, w=2 * cw + 6, h=34, hook="ockm-chord-strum", lo=0, hi=1, label="strum", bold=true }
+    -- smooth: every chord at about the same height (moved here from the left in v0.90)
+    add{ kind="choice", x=rx + 3 * (cw + 6), y=558, w=cw, h=34, label="smooth", accent=true, small=true, sel=(self.v["ockm-chord-smooth"] or 1) > 0,
+         tap=function() self:send("ockm-chord-smooth", ((self.v["ockm-chord-smooth"] or 1) > 0) and 0 or 1) end }
+    add{ kind="hbar", x=rx + 4 * (cw + 6), y=558, w=cw, h=34, hook="ockm-chord-strum", lo=0, hi=1, label="strum", bold=true }
   end
 end
 
@@ -1740,11 +1806,20 @@ function ui:chord_name(d, turn)
   local third = (sc[((d + 2) % 7) + 1] - r) % 12
   local fifth = (sc[((d + 4) % 7) + 1] - r) % 12
   if turn then third = 4; fifth = 7 end
-  local q = (third == 3) and ((fifth == 6) and "dim" or "m") or ""
-  local ext = ({ [1] = "7", [6] = "9", [7] = "11" })[math.floor(self.v["ockm-chord-type"] or 0)] or ""
-  if q == "dim" and ext ~= "" then q = "m" end
+  local ct = math.floor(self.v["ockm-chord-type"] or 0)
+  local ty = CHORD_TYPES[ct + 1]
   local rn = ROMAN[d + 1]
   if third == 4 then rn = string.upper(rn) end
+  if ty and ty.k == 1 then
+    -- a fixed shape: its own quality whatever the key says (the turnaround makes a minor shape major)
+    local nm = ty.name
+    if turn and nm:sub(1, 1) == "m" and nm:sub(1, 3) ~= "maj" then nm = nm:sub(2) end
+    if nm == "4ths" then nm = "sus" end
+    return NOTES[((root + r) % 12) + 1] .. nm, rn
+  end
+  local q = (third == 3) and ((fifth == 6) and "dim" or "m") or ""
+  local ext = ({ [1] = "7", [6] = "9", [7] = "11" })[ct] or ""
+  if q == "dim" and ext ~= "" then q = "m" end
   return NOTES[((root + r) % 12) + 1] .. q .. ext, rn
 end
 -- kits (v0.77): a kit is one file per sound folder called kit-<name> (samples/kick/kit-breaks.wav and so on)
@@ -1774,56 +1849,56 @@ end
 -- Numbers: roots 0 C .. 9 A; scales 0 minor 1 major 2 dorian 3 phrygian; grooves, progressions, rhythms and riffs as listed
 -- in the presets block. Knobs (k) only go with the first engine in the list.
 local STYLES = {
-  { "deep house", kit="909-long", punch=0.4, bpm=122, swing=58, groove={ 2, 16, 17 }, root={ 5, 2, 7, 0 }, scale={ 2, 0 }, prog={ 3, 1, 9, 6 }, type={ 6, 1 },
+  { "deep house", kit="909-long", punch=0.4, bpm=122, swing=58, groove={ 2, 16, 17 }, root={ 5, 2, 7, 0 }, scale={ 2, 0 }, prog={ 1, 3, 9, 6 }, type={ 8, 6, 9 },
     drums={ kick={ -1, 110, 0.1, 0 }, clap={ 0, 100, 0, 0.1 } },
     bass={ engine={ 5, 1 }, rhythm={ 9, 3, 8 }, notes={ 2, 0 }, move=1, k={ 0.35, 0.2, 0.4, 0.45 } },
-    chord={ engine={ 4, 3 }, rhythm={ 6, 3, 8 }, verb=0.25, delay=0.12 },
+    chord={ engine={ 4, 3 }, rhythm={ 6, 3, 8 }, verb=0.25, delay=0.12, chorus=1, strum=0.12 },
     lead=false },
-  { "chicago", kit="909", punch=0.6, bpm=125, swing=62, groove={ 13, 14, 22 }, root={ 7, 0, 9 }, scale={ 0, 2 }, prog={ 1, 0, 3 }, type={ 1, 0 },
+  { "chicago", kit="909", punch=0.6, bpm=125, swing=62, groove={ 13, 14, 22 }, root={ 7, 0, 9 }, scale={ 0, 2 }, prog={ 1, 0 }, type={ 10, 8 },
     drums={ kick={ 0, 90, 0.2, 0.3 }, clap={ 0, 100, 0, 0.2 } },
     bass={ engine={ 5, 0 }, rhythm={ 1, 0, 7 }, notes={ 1, 2, 3 }, move=1 },
-    chord={ engine={ 1, 3 }, rhythm={ 4, 2, 7 }, verb=0.1 },
+    chord={ engine={ 1, 3 }, rhythm={ 4, 2, 7 }, verb=0.12, chorus=1 },
     lead=false },
-  { "classic house", kit="909", punch=0.5, bpm=124, swing=56, groove={ 1, 0, 21 }, root={ 0, 7, 2 }, scale={ 1, 4, 0 }, prog={ 5, 3, 9 }, type={ 1, 0 },
+  { "classic house", kit="909", punch=0.5, bpm=124, swing=56, groove={ 1, 0, 21 }, root={ 0, 7, 2 }, scale={ 1, 4, 0 }, prog={ 5, 3, 9 }, type={ 6, 1 },
     drums={ kick={ 0, 100, 0.1, 0.2 }, clap={ 0, 100, 0, 0 } },
     bass={ engine={ 5, 4 }, rhythm={ 0, 1, 9 }, notes={ 2, 1 }, move=1, sidechain=0.2 },
-    chord={ engine={ 3, 1 }, rhythm={ 6, 2, 5 }, verb=0.15, delay=0.1 },
+    chord={ engine={ 3, 1 }, rhythm={ 6, 2, 5 }, verb=0.15, delay=0.1, strum=0.1 },
     lead={ engine={ 1, 2 }, rhythm={ 10, 11, 8 }, notes={ 15, 16 }, outside=0.4, verb=0.15, delay=0.2 } },
-  { "nu disco", kit="808", punch=0.4, bpm=118, swing=54, groove={ 23, 15, 21 }, root={ 2, 9, 4 }, scale={ 2, 4, 0 }, prog={ 1, 3, 5 }, type={ 1, 6 },
+  { "nu disco", kit="808", punch=0.4, bpm=118, swing=54, groove={ 23, 15, 21 }, root={ 2, 9, 4 }, scale={ 2, 4, 0 }, prog={ 1, 3, 5 }, type={ 12, 6 },
     drums={ kick={ 0, 90, 0, 0.1 }, clap={ 0, 90, 0, 0.2 } },
     bass={ engine={ 4, 5 }, rhythm={ 4, 1, 9 }, notes={ 1, 2 }, move=1 },
-    chord={ engine={ 5, 3 }, rhythm={ 2, 6, 0 }, verb=0.2 },
+    chord={ engine={ 5, 3 }, rhythm={ 2, 6, 0 }, verb=0.2, chorus=2 },
     lead={ engine={ 1, 4 }, rhythm={ 11, 10 }, notes={ 16, 15, 17 }, outside=0.45, delay=0.25 } },
-  { "tech house", kit="909", punch=0.7, bpm=126, swing=54, groove={ 3, 24, 21 }, root={ 9, 7, 2, 4 }, scale={ 0, 2 }, prog={ 0, 1 }, type={ 1, 0 },
+  { "tech house", kit="909", punch=0.7, bpm=126, swing=54, groove={ 3, 24, 21 }, root={ 9, 7, 2, 4 }, scale={ 0, 2 }, prog={ 0, 1 }, type={ 10, 11 },
     drums={ kick={ 0, 90, 0.3, 0.4 }, clap={ 0, 80, 0, -0.5 } },
     bass={ engine={ 5, 4, 2 }, rhythm={ 14, 2, 10 }, notes={ 0, 3, 5 }, move=1, sidechain=0.3, k={ 0.35, 0.3, 0.5, 0.35 } },
     chord={ engine={ 0, 1 }, rhythm={ 3, 2, 6 }, delay=0.25 },
     lead=false },
-  { "minimal", kit="808", punch=0.5, bpm=125, swing=55, groove={ 4, 28 }, root={ 4, 2, 9 }, scale={ 0, 3, 2 }, prog=0, type={ 0, 1 },
+  { "minimal", kit="808", punch=0.5, bpm=125, swing=55, groove={ 4, 28 }, root={ 4, 2, 9 }, scale={ 0, 3, 2 }, prog=0, type={ 11, 10 },
     drums={ kick={ 1, 70, 0.1, 0.3 }, clap={ 2, 60, 0, -0.6 } },
     bass={ engine={ 1, 5 }, rhythm={ 15, 6, 10 }, notes={ 0, 6 }, move=0 },
     chord={ engine=0, rhythm={ 3, 0 }, delay=0.4 },
     lead={ engine={ 4, 2 }, rhythm={ 9, 12 }, notes={ 6, 10, 11 }, outside=0.3, verb=0.1, delay=0.35 } },
-  { "progressive", kit="909-long", punch=0.5, bpm=122, swing=50, groove={ 0, 2 }, root={ 2, 9, 4, 7 }, scale={ 0, 5 }, prog={ 3, 6, 7 }, type={ 6, 0 },
+  { "progressive", kit="909-long", punch=0.5, bpm=122, swing=50, groove={ 0, 2 }, root={ 2, 9, 4, 7 }, scale={ 0, 5 }, prog={ 3, 6, 7 }, type={ 6, 7 },
     drums={ kick={ -1, 120, 0.2, 0.2 }, clap={ 0, 110, 0, 0.2 } },
     bass={ engine={ 5, 3 }, rhythm={ 2, 1 }, notes={ 0, 2 }, move=1, sidechain=0.3 },
-    chord={ engine={ 2, 5 }, rhythm={ 0, 1 }, verb=0.35, sidechain=0.4 },
+    chord={ engine={ 2, 5 }, rhythm={ 0, 1 }, verb=0.35, sidechain=0.4, chorus=1 },
     lead={ engine={ 1, 2, 4 }, rhythm={ 13, 10 }, notes={ 18, 8, 9 }, outside=0.3, verb=0.2, delay=0.3 } },
-  { "dub techno", kit="909-long", punch=0.4, bpm=120, swing=52, groove={ 6, 28 }, root={ 5, 7, 9 }, scale={ 0, 2 }, prog={ 2, 0 }, type={ 1, 6 },
+  { "dub techno", kit="909-long", punch=0.4, bpm=120, swing=52, groove={ 6, 28 }, root={ 5, 7, 9 }, scale={ 0, 2 }, prog={ 2, 0 }, type={ 10, 8, 11 },
     drums={ kick={ -1, 130, 0.2, 0 }, clap={ 0, 100, 0, 0.3 } },
     bass={ engine=1, rhythm={ 5, 15 }, notes=0, move=1 },
     chord={ engine={ 0, 5 }, rhythm=3, verb=0.35, delay=0.55 },
     lead=false },
-  { "detroit", kit="909", punch=0.6, bpm=128, swing=53, groove={ 25, 11, 26 }, root={ 0, 9, 5 }, scale={ 0, 2 }, prog={ 1, 3, 6 }, type={ 1, 6 },
+  { "detroit", kit="909", punch=0.6, bpm=128, swing=53, groove={ 25, 11, 26 }, root={ 0, 9, 5 }, scale={ 0, 2 }, prog={ 1, 0, 2 }, type={ 9, 8 },
     drums={ kick={ 0, 100, 0.3, 0.3 }, clap={ 0, 90, 0.1, 0.1 } },
     bass={ engine={ 2, 5 }, rhythm={ 1, 14 }, notes={ 2, 0 }, move=1 },
-    chord={ engine={ 5, 2 }, rhythm={ 0, 1 }, verb=0.25 },
+    chord={ engine={ 5, 2 }, rhythm={ 0, 1 }, verb=0.3, chorus=3 },
     lead={ engine={ 2, 1 }, rhythm={ 10, 8 }, notes={ 15, 17 }, outside=0.4, delay=0.2 } },
   { "acid", kit="909", punch=0.7, bpm=130, swing=52, groove={ 29, 5, 14 }, root={ 9, 4, 7 }, scale={ 3, 0 }, prog=0, type=0,
     drums={ kick={ 0, 110, 0.4, 0.4 }, clap={ 0, 90, 0.1, -0.3 } },
     bass={ engine=0, rhythm={ 13, 12 }, notes={ 3, 4 }, move=0, delay=0.15 },
     chord=false, lead=false },
-  { "peak time", kit="909", punch=0.8, bpm=132, swing=50, groove={ 5, 26, 24 }, root={ 5, 4, 2 }, scale={ 3, 0 }, prog={ 0, 2 }, type=0,
+  { "peak time", kit="909", punch=0.8, bpm=132, swing=50, groove={ 5, 26, 24 }, root={ 5, 4, 2 }, scale={ 3, 0 }, prog={ 0, 2 }, type={ 11, 10 },
     drums={ kick={ -2, 150, 0.5, 0.5 }, clap={ 0, 70, 0.2, -0.6 } },
     bass={ engine={ 5, 1 }, rhythm={ 10, 2 }, notes=0, move=0, sidechain=0.5, k={ 0.25, 0.2, 0.35, 0.3 } },
     chord={ engine=0, rhythm={ 3, 2 }, delay=0.35 },
@@ -2034,6 +2109,11 @@ function ui:apply_style(i, shuf)
       self:send("ockm-"..part.."-sidechain", ps.sidechain or 0)
       self:send("ockm-"..part.."-scshape", ps.shape or 1)
       self:send("ockm-"..part.."-verb", ps.verb or 0); self:send("ockm-"..part.."-delay", ps.delay or 0)
+      self:send("ockm-"..part.."-chorus", ps.chorus or 0)
+      if part == "chord" then   -- v0.90: every chord kept at the same height, voiced and rolled the style's way
+        self:send("ockm-chord-smooth", 1); self:send("ockm-chord-voicing", ps.voicing or 0); self:send("ockm-chord-strum", ps.strum or 0)
+        self:send("ockm-chord-lowcut", ps.lowcut or 150)   -- the low end is the kick's and the bass's
+      end
       if part ~= "chord" then
         self:send("ockm-"..part.."-seed", shuf and math.random(1, 60) or 0)   -- shuffle: a variation of the riff too
         self:send("ockm-"..part.."-mode", 0)   -- made for you again, so it follows the new style
@@ -2055,6 +2135,8 @@ end
 
 -- a part's settings on its own tab (v0.74): what it plays and how it sits on the harmony
 local COLOURS = { { 0, "triads" }, { 1, "7ths" }, { 6, "9ths" }, { 7, "11ths" } }
+-- v0.90 fixed shapes: one chord shape moved around with the progression (chord memory), not built from the key
+local SHAPES = { { 8, "m9" }, { 9, "m11" }, { 10, "dub m7" }, { 11, "4ths" }, { 12, "maj9" } }
 local MOVES = { { "pedal", "stays on the key" }, { "follows", "moves with the chords" }, { "walks", "steps into changes" } }
 -- the lead's inside-to-outside slider (ockm-lead-outside 0-1): what each stretch of it adds
 local function outside_zone(v)
@@ -2114,14 +2196,18 @@ function ui:gen_controls(add, p, ix, cy, iw, k)
   if p == "chord" then
     add{ kind="text", x=ix, y=318, w=iw, h=12, label="rhythm", size=10 }
     self:stepper(add, ix, 332, iw, 44, CHORD_RHY, "ockm-chord-rhythm")
-    add{ kind="text", x=ix, y=388, w=iw, h=12, label="colour: how rich the chords are", size=10 }
+    add{ kind="text", x=ix, y=388, w=iw, h=12, label="chords: built from the key, or one shape moved around", size=10 }
+    local ct = math.floor(self.v["ockm-chord-type"] or 0)
     local cw = (iw - 18) / 4
     for i, c in ipairs(COLOURS) do
-      add{ kind="choice", x=ix + (i - 1) * (cw + 6), y=402, w=cw, h=38, label=c[2], small=true,
-           sel=(math.floor(self.v["ockm-chord-type"] or 0) == c[1]), tap=function() self:send("ockm-chord-type", c[1]) end }
+      add{ kind="choice", x=ix + (i - 1) * (cw + 6), y=402, w=cw, h=36, label=c[2], small=true,
+           sel=(ct == c[1]), tap=function() self:send("ockm-chord-type", c[1]) end }
     end
-    add{ kind="choice", x=ix, y=450, w=iw, h=34, label="smooth voicing", accent=true, small=true, sel=(self.v["ockm-chord-smooth"] or 1) > 0,
-         tap=function() self:send("ockm-chord-smooth", ((self.v["ockm-chord-smooth"] or 1) > 0) and 0 or 1) end }
+    local sw = (iw - 24) / 5
+    for i, c in ipairs(SHAPES) do
+      add{ kind="choice", x=ix + (i - 1) * (sw + 6), y=444, w=sw, h=36, label=c[2], small=true,
+           sel=(ct == c[1]), tap=function() self:send("ockm-chord-type", c[1]) end }
+    end
     self:sidechain_row(add, "chord", ix, 494, iw)
     if self:part_empty("chord") then
       add{ kind="btn", x=ix, y=532, w=iw, h=34, accent=true, label=START.chord, tap=function() self:start_part("chord") end }
@@ -2182,11 +2268,13 @@ end
 function ui:chord_pcs(i)
   local cl = self:plen("chord")
   local d = math.floor(self:get("ockm-pat-chord-deg", i % cl))
-  local sc, root = self:scale(), math.floor(self.v["ockm-root"] or 9)
   local pcs = {}
-  for _, o in ipairs(CHORD_TYPES[(math.floor(self.v["ockm-chord-type"] or 0)) + 1] or { 0, 2, 4 }) do
-    if o >= 0 then local dd = d + o; pcs[(root + sc[(dd % 7) + 1]) % 12] = true end
+  for _, n in ipairs(chord_voicing(d, math.floor(self.v["ockm-chord-type"] or 0), self:scale(), math.floor(self.v["ockm-root"] or 9), false, 0, false)) do
+    pcs[n % 12] = true
   end
+  -- a chord that leaves its root to the bass still counts the root as a chord note
+  local sc, root = self:scale(), math.floor(self.v["ockm-root"] or 9)
+  pcs[(root + sc[(((d % 7) + 7) % 7) + 1]) % 12] = true
   return pcs
 end
 -- notes of your line that no longer sit on the chords (the bass: every note; the lead: notes on the beat)
@@ -2370,6 +2458,7 @@ end
 function ui:collect_pattern()
   local d = { len = self:loop_len(), root = math.floor(self.v["ockm-root"] or 9), scale = self:scale(),
               ctype = math.floor(self.v["ockm-chord-type"] or 0), smooth = (self.v["ockm-chord-smooth"] or 1) > 0,
+              voicing = math.floor(self.v["ockm-chord-voicing"] or 0),
               loop = 0, on = {}, drums = {}, mono = {}, chord = {} }
   -- every step of the loop, each part repeating inside it at its own length
   local dl, bl, ll, cl = self:plen("drum"), self:plen("bass"), self:plen("lead"), self:plen("chord")
@@ -2391,20 +2480,9 @@ function ui:collect_pattern()
   for st = 0, d.len - 1 do d.chord[st] = { on = self:get("ockm-pat-chord-on", st % cl), deg = self:get("ockm-pat-chord-deg", st % cl) } end
   return d
 end
--- a chord's notes, worked out the way the chord sequencer does it
+-- a chord's notes, worked out the way the chord sequencer does it (the same Lua: chord_voicing, in the presets block)
 local function chord_notes(d, deg)
-  local rox = (d.root <= 7) and (48 + d.root) or (36 + d.root)
-  local ty = CHORD_TYPES[d.ctype + 1] or CHORD_TYPES[1]
-  local out = {}
-  for k = 1, 4 do
-    if ty[k] >= 0 then
-      local a = math.floor(deg) + ty[k]
-      local n = rox + 12 * math.floor(a / 7) + d.scale[(a % 7) + 1]
-      if d.smooth then n = n - 12 * math.floor((n - rox) / 12) end
-      out[#out + 1] = n
-    end
-  end
-  return out
+  return (chord_voicing(deg, d.ctype, d.scale, d.root, d.smooth, d.voicing or 0, false))
 end
 local function vlq(n)
   local b = { n % 128 }

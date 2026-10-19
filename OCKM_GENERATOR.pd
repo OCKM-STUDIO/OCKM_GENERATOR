@@ -860,7 +860,7 @@
 #X floatatom 500 260 5 0 1 0 - - ockm-chord-k4;
 #X obj 545 242 r ockm-show-chord-k4;
 #X text 595 242 type;
-#X floatatom 595 260 5 0 7 0 - - ockm-chord-type;
+#X floatatom 595 260 5 0 12 0 - - ockm-chord-type;
 #X obj 640 242 r ockm-show-chord-type;
 #X text 690 242 smooth;
 #X floatatom 690 260 5 0 1 0 - - ockm-chord-smooth;

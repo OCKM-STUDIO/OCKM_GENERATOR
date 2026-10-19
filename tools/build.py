@@ -768,7 +768,7 @@ row(140,"bass",[("engine",5,0,6,"ockm-bass-engine",True),("k1",0.42,0,1,"ockm-ba
 row(200,"lead",[("engine",4,0,6,"ockm-lead-engine",True),("k1",0.55,0,1,"ockm-lead-k1",True),("k2",0.3,0,1,"ockm-lead-k2",True),("k3",0.4,0,1,"ockm-lead-k3",True),
                 ("k4",0.45,0,1,"ockm-lead-k4",True),("drive",0,0,1,"ockm-lead-drive",True),("rhythm",6,0,7,"ockm-lead-rhythm",False),("notes",8,0,11,"ockm-lead-notes",False)])
 row(260,"chord",[("engine",0,0,5,"ockm-chord-engine",True),("k1",0.45,0,1,"ockm-chord-k1",True),("k2",0.5,0,1,"ockm-chord-k2",True),("k3",0.4,0,1,"ockm-chord-k3",True),
-                 ("k4",0.3,0,1,"ockm-chord-k4",True),("type",0,0,7,"ockm-chord-type",True),("smooth",1,0,1,"ockm-chord-smooth",True),("rhythm",0,0,9,"ockm-chord-rhythm",False),("prog",0,0,9,"ockm-chord-prog",False)])
+                 ("k4",0.3,0,1,"ockm-chord-k4",True),("type",0,0,12,"ockm-chord-type",True),("smooth",1,0,1,"ockm-chord-smooth",True),("rhythm",0,0,9,"ockm-chord-rhythm",False),("prog",0,0,9,"ockm-chord-prog",False)])
 sub.add("#X text 20 300 key root: 0 C ... 9 A ... 11 B. Scale: 0 minor 1 major 2 dorian 3 phrygian 4 mixolydian 5 harmonic minor;")
 sub.add("#X text 20 320 bass engines: 0 acid 1 sub/808 2 FM 3 reese 4 pluck 5 analogue (default) 6 donk. Chord engines: 0 stab 1 organ 2 pad 3 piano 4 rhodes 5 strings. Chord type: 0 triad 1 seventh 2 sus2 3 power 4 sus4 5 sixth 6 ninth 7 eleventh;")
 sub.add("#X text 20 340 bass/lead rhythm: 0 offbeat 1 rolling 2 gallop 3 acid 4 dub 5 bounce 6 acid16 7 trip-hop. Notes: 0 root 1 octaves 2 root-fifth 3 acid-riff 4 walk-up 5 stab 6 dub 7 pedal 8 arp-up 9 arp-updown 10 call 11 descend;")
@@ -1410,8 +1410,12 @@ PRE={"leadrhythm":[("offbeat","0 0 2 0 0 0 1 0 0 0 2 0 0 0 1 0"),("rolling","0 2
                     ("house-organ","1 0 0 1 0 0 1 0 0 0 1 0 0 1 0 0"),("tresillo","2 0 0 1 0 0 1 0 2 0 0 1 0 0 1 0"),
                     ("syncopated","0 0 1 0 0 1 0 0 0 1 0 0 1 0 0 0"),("garage-skip","1 0 0 1 0 0 0 0 0 1 0 0 1 0 0 0 1 0 0 1 0 0 0 0 0 1 0 0 0 0 1 0"),
                     ("call-answer","2 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 1 0 0 1 0 0 0"),("eighths","1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0")],
+     # chord types. Plain numbers: scale steps above the chord's root, so the chord follows the key (0 root, 2 third...).
+     # "s" then numbers: a fixed shape in semitones above the chord's root, moved as one block with the progression (the
+     # chord memory sound of deep house, Detroit and dub techno). v0.90: the 9th and 11th leave the root to the bass
      "chordtype":[("triad","0 2 4 -1"),("seventh","0 2 4 6"),("sus2","0 1 4 -1"),("power","0 4 7 -1"),
-                  ("sus4","0 3 4 -1"),("sixth","0 2 4 5"),("ninth","0 2 6 8"),("eleventh","0 6 8 10")]}
+                  ("sus4","0 3 4 -1"),("sixth","0 2 4 5"),("ninth","2 4 6 8"),("eleventh","2 6 8 10"),
+                  ("m9","s 3 7 10 14"),("m11","s 3 10 14 17"),("m7","s 0 7 10 15"),("4ths","s 0 5 10 15"),("maj9","s 4 7 11 14")]}
 # Chord progressions: (name, label shown on screen, [(chord root as scale step, length in bars), ...]).
 # The first 8 are the v0.10 ones (one chord per bar). Each is written out as its natural length in steps,
 # then one chord root per step, so the generator only has to look things up.
@@ -1498,6 +1502,103 @@ for nm,_,chords in PROGS:
     for deg,bars in chords: steps+=[deg]*int(bars*16)
     assert len(steps) in (16,32,64,128), (nm,len(steps))
     PRE["progx"].append((nm," ".join(str(v) for v in [len(steps)]+steps)))
+# v0.90 chord voicing, in Lua, shared by the chord sequencer (seq/ockm-chordnotes.pd_lua) and the touchscreen (its
+# chord names, the notes it checks lines against, MIDI export), so the screen and the sound always agree
+def _chord_types_lua():
+    out=[]
+    for nm,v in PRE["chordtype"]:
+        t=v.split()
+        if t[0]=="s": out.append(f'{{ k=1, name="{nm}", '+", ".join(t[1:])+" }")
+        else: out.append(f'{{ k=0, name="{nm}", '+", ".join(x for x in t if int(x)>=0)+" }")
+    return "local CHORD_TYPES = { "+", ".join(out)+" }\n"
+CHORD_LUA=_chord_types_lua()+r"""local CHORD_CENTRE, CHORD_FLOOR = 62, 50   -- smooth chords sit around D4, their lowest note no lower than D3
+-- a chord's notes (MIDI). deg: the chord's root as a scale step; sc: the scale (7 semitones); root: the key (0 C .. 11 B);
+-- smooth: keep every chord at about the same height (inversions for chords in the key, octaves for fixed shapes), so
+-- they move by small steps and stay out of the bass; voicing 0 close, 1 open, 2 wide; turn: the turnaround's major V
+local function chord_voicing(deg, ctype, sc, root, smooth, voicing, turn)
+  local ty = CHORD_TYPES[(ctype or 0) + 1] or CHORD_TYPES[1]
+  local rox = (root <= 7) and (48 + root) or (36 + root)
+  local function at(a)
+    local s = sc[(a % 7) + 1]
+    if turn and s == 10 then s = 11 end   -- the turnaround raises the minor 7th: E major in A minor
+    return rox + 12 * math.floor(a / 7) + s
+  end
+  deg = math.floor(deg)
+  local n = {}
+  if ty.k == 1 then
+    local r = at(deg)
+    for _, o in ipairs(ty) do
+      if turn and o % 12 == 3 then o = o + 1 end   -- a minor shape turns major on the turnaround
+      n[#n + 1] = r + o
+    end
+  else
+    for _, o in ipairs(ty) do
+      local v = at(deg + o)
+      if o == 8 and v - at(deg) == 13 then v = at(deg + 7) end   -- a flat 9th grinds on the bass: the root instead
+      n[#n + 1] = v
+    end
+  end
+  if smooth then
+    local cands = {}
+    if ty.k == 1 then cands[1] = n
+    else
+      table.sort(n)
+      for i = 0, #n - 1 do
+        local c = {}
+        for j, v in ipairs(n) do c[j] = (j <= i) and v + 12 or v end
+        table.sort(c); cands[#cands + 1] = c
+      end
+    end
+    local best, bc
+    for _, c in ipairs(cands) do
+      local sum, lo = 0, c[1]
+      for _, v in ipairs(c) do sum = sum + v; if v < lo then lo = v end end
+      local mean = sum / #c
+      local m = math.floor((CHORD_CENTRE - mean) / 12 + 0.5)
+      for mm = m - 1, m + 1 do
+        local cost = math.abs(mean + 12 * mm - CHORD_CENTRE)
+        if lo + 12 * mm < CHORD_FLOOR then cost = cost + (CHORD_FLOOR - lo - 12 * mm) end
+        for j = 2, #c do if c[j] - c[j - 1] == 1 then cost = cost + 4 end end   -- no semitone rubs inside a chord
+        if not bc or cost < bc - 1e-9 then
+          bc = cost; best = {}
+          for j, v in ipairs(c) do best[j] = v + 12 * mm end
+        end
+      end
+    end
+    n = best
+  end
+  -- open lifts the second note an octave; wide also drops the lowest an octave and lifts the fourth
+  if voicing == 1 or voicing == 2 then
+    if n[2] then n[2] = n[2] + 12 end
+    if voicing == 2 then n[1] = n[1] - 12; if n[4] then n[4] = n[4] + 12 end end
+  end
+  return n, ty
+end
+"""
+os.makedirs(os.path.join(R,"seq"),exist_ok=True)
+open(os.path.join(R,"seq","ockm-chordnotes.pd_lua"),"w").write("""-- The chord sequencer's notes: a chord type, key, scale and voicing turned into up to four MIDI notes.
+-- Written by tools/build.py: change it there. In: scale <7 semitones>, type <n>, root <0-11>, smooth <0/1>,
+-- voicing <0-2>, hit <strength> <scale step> <turnaround 0/1>. Out: four notes (0 for none) and the strength.
+local cn = pd.Class:new():register("ockm-chordnotes")
+"""+CHORD_LUA+"""
+function cn:initialize(sel, atoms)
+  self.inlets, self.outlets = 1, 1
+  self.sc, self.ty, self.root, self.smooth, self.voicing = { 0, 2, 3, 5, 7, 8, 10 }, 0, 9, true, 0
+  return true
+end
+function cn:in_1_scale(a) if #a >= 7 then self.sc = a end end
+function cn:in_1_type(a) self.ty = math.max(0, math.floor(a[1] or 0)) end
+function cn:in_1_root(a) self.root = math.floor(a[1] or 9) % 12 end
+function cn:in_1_smooth(a) self.smooth = (a[1] or 1) > 0 end
+function cn:in_1_voicing(a) self.voicing = math.floor(a[1] or 0) end
+function cn:in_1_hit(a)
+  local n = chord_voicing(a[2] or 0, self.ty, self.sc, self.root, self.smooth, self.voicing, (a[3] or 0) > 0)
+  local out = {}
+  for k = 1, 4 do out[k] = n[k] or 0 end
+  out[5] = math.min(1, (a[1] or 0.75) * (0.92 + 0.16 * math.random()))   -- played, not programmed: no two hits quite the same
+  self:outlet(1, "list", out)
+end
+""")
 # spice 1 to 4 on screen picks one of these chord types (index into chordtype)
 SPICE=[(0,"triad"),(1,"7th"),(6,"9th"),(7,"11th")]
 # the touchscreen shows the same preset names: write them into the Lua file between its PRESETS markers
@@ -1515,7 +1616,7 @@ if os.path.exists(_ui_src):
             "local FILLS = { "+", ".join(f'"{n.replace("-"," ")}"' for n,_ in FILLS)+" }\n"
             "local GROOVES = { "+", ".join(f'"{n.replace("-"," ")}"' for n,_,_ in GROOVES)+" }\n"
             "local GROOVE_BANKS = { "+", ".join(f'{{ "{n}", {i} }}' for n,i in GROOVE_BANKS)+" }\n"
-            "local CHORD_TYPES = { "+", ".join("{ "+", ".join(v.split())+" }" for _,v in PRE["chordtype"])+" }\n"
+            +CHORD_LUA+
             "local PROG_SHAPES = { "+", ".join("{ "+", ".join(f"{{ {d}, {int(b*16)} }}" for d,b in ch)+" }" for _,_,ch in PROGS)+" }\n")
     os.makedirs(os.path.join(R,"ui"),exist_ok=True)
     open(os.path.join(R,"ui","ockm-ui.pd_lua"),"w").write(_t[:_a]+_block+_t[_b:])
@@ -1787,37 +1888,29 @@ p=P()
 p.add("#X text 20 10 Chord pattern. Each step has on/accent and a chord root (scale step). Notes are worked out as it plays \\, so key \\, scale and chord type changes apply straight away.;")
 inl=p.add("#X obj 30 50 inlet;"); out=p.add("#X obj 30 700 outlet;")
 p.add(f"#X obj 30 760 table ockm-pat-{D}1-on {STEPS};"); p.add(f"#X obj 230 760 table ockm-pat-{D}1-deg {STEPS};")
-p.add(f"#X obj 430 760 array define {D}0-sc 7;"); p.add(f"#X obj 600 760 array define {D}0-ty 4;")
+# v0.90: the notes are worked out in Lua (seq/ockm-chordnotes.pd_lua, written above), shared with the screen
+cn=p.add("#X obj 30 600 ockm-chordnotes;")
 lb=p.add("#X obj 700 40 loadbang;"); lbt=p.add("#X obj 700 65 t b b b;")
 d0a=p.add("#X msg 700 90 0;"); d0b=p.add("#X msg 760 90 0;"); d9=p.add("#X msg 820 90 9;")
-rsc=p.add("#X obj 700 120 r ockm-scale;"); tsc=p.add("#X obj 700 150 text get ockm-presets-scale;"); lsc=p.add("#X obj 700 175 list split 1;"); asc=p.add(f"#X obj 700 200 array set {D}0-sc;")
-rty=p.add(f"#X obj 900 120 r ockm-{D}1-type;"); tty=p.add("#X obj 900 150 text get ockm-presets-chordtype;"); lty=p.add("#X obj 900 175 list split 1;"); aty=p.add(f"#X obj 900 200 array set {D}0-ty;")
+rsc=p.add("#X obj 700 120 r ockm-scale;"); tsc=p.add("#X obj 700 150 text get ockm-presets-scale;"); lsc=p.add("#X obj 700 175 list split 1;")
+rty=p.add(f"#X obj 900 120 r ockm-{D}1-type;")
 rvo=p.add(f"#X obj 1400 120 r ockm-{D}1-voicing;")   # 0 close, 1 open, 2 wide
 rsm=p.add(f"#X obj 1250 120 r ockm-{D}1-smooth;"); one_sm=p.add("#X msg 1250 90 1;"); p.con(lb,0,one_sm,0)   # smooth voicing on by default
-rro=p.add("#X obj 1100 120 r ockm-root;"); rox=p.add(f"#X obj 1100 150 expr if({D}f1<=7 \\, 48+{D}f1 \\, 36+{D}f1);")
-for c in [(lb,0,lbt,0),(lbt,2,d0a,0),(lbt,1,d0b,0),(lbt,0,d9,0),(d0a,0,tsc,0),(d0b,0,tty,0),(d9,0,rox,0),
-          (rsc,0,tsc,0),(tsc,0,lsc,0),(lsc,1,asc,0),(rty,0,tty,0),(tty,0,lty,0),(lty,1,aty,0),(rro,0,rox,0)]: p.con(*c)
+rro=p.add("#X obj 1100 120 r ockm-root;")
+for c in [(lb,0,lbt,0),(lbt,2,d0a,0),(lbt,1,d0b,0),(lbt,0,d9,0),(d0a,0,tsc,0),(rsc,0,tsc,0),(tsc,0,lsc,0)]: p.con(*c)
+for i,(srcs,sel) in enumerate([([lsc],"scale"),([rty,d0b],"type"),([rro,d9],"root"),([rsm,one_sm],"smooth"),([rvo],"voicing")]):
+    pp=p.add(f"#X obj {700+i*150} 230 list prepend {sel};"); tr=p.add(f"#X obj {700+i*150} 255 list trim;")
+    for sr in srcs: p.con(sr,1 if sr is lsc else 0,pp,0)
+    p.con(pp,0,tr,0); p.con(tr,0,cn,0)
 cmod=p.add("#X obj 30 65 mod 256;"); p.con(p.add(f"#X obj 100 40 r ockm-{D}1-len;"),0,cmod,1)
 ts=p.add("#X obj 30 80 t f f;"); rdeg0=p.add(f"#X obj 200 95 tabread ockm-pat-{D}1-deg;"); ron=p.add(f"#X obj 30 110 tabread ockm-pat-{D}1-on;")
 rdeg=p.add(f"#X obj 200 115 expr if(ockm_turn_on \\, 4 \\, {D}f1);"); p.con(rdeg0,0,rdeg,0)
-son=p.add("#X obj 30 140 sel 0;"); vx=p.add(f"#X obj 70 170 expr if({D}f1>1 \\, 1 \\, 0.75);"); tv=p.add("#X obj 70 200 t b f;")
-t4=p.add("#X obj 70 230 t b b b b;")
-pk=p.add("#X obj 30 640 pack 0 0 0 0 0;"); sno=p.add(f"#X obj 200 700 s ockm-{D}1-notes-out;")
-for c in [(inl,0,cmod,0),(cmod,0,ts,0),(ts,1,rdeg0,0),(ts,0,ron,0),(ron,0,son,0),(son,1,vx,0),(vx,0,tv,0),(tv,1,pk,4),(tv,0,t4,0),(pk,0,out,0),(pk,0,sno,0)]: p.con(*c)
-for k in range(4):
-    x=70+k*260
-    mk=p.add(f"#X msg {x} 270 {k};"); rt=p.add(f"#X obj {x} 300 tabread {D}0-ty;"); tt=p.add(f"#X obj {x} 330 t f f;")
-    ad=p.add(f"#X obj {x} 360 + 0;"); td=p.add(f"#X obj {x} 390 t f f;")
-    sx=p.add(f"#X obj {x+90} 420 expr ((int({D}f1)%7)+7)%7;"); rs0=p.add(f"#X obj {x+90} 440 tabread {D}0-sc;")
-    rs=p.add(f"#X obj {x+90} 460 expr if(ockm_turn_on && {D}f1==10 \\, 11 \\, {D}f1);"); p.con(rs0,0,rs,0)
-    nx=p.add(f"#X obj {x} 500 expr if({D}f4<0 \\, 0 \\, {D}f2+12*floor({D}f1/7)+{D}f3);")
-    # smooth voicing: fold the note into the octave above the key's root, so chords move by small steps
-    fo=p.add(f"#X obj {x} 560 expr if({D}f1<=0 \\, 0 \\, if({D}f2 \\, {D}f1-12*floor(({D}f1-{D}f3)/12) \\, {D}f1));")
-    for c in [(t4,k,mk,0),(mk,0,rt,0),(rt,0,tt,0),(tt,1,nx,3),(tt,0,ad,0),(ad,0,td,0),(td,1,sx,0),(sx,0,rs0,0),(rs,0,nx,2),(td,0,nx,0),(rox,0,nx,1),(rdeg,0,ad,1),
-              (nx,0,fo,0),(rsm,0,fo,1),(one_sm,0,fo,1),(rox,0,fo,2)]: p.con(*c)
-    off={0:f"-12*({D}f2==2)",1:f"12*({D}f2>=1)",2:f"0*{D}f2",3:f"12*({D}f2==2)"}[k]
-    vo=p.add(f"#X obj {x} 600 expr if({D}f1<=0 \\, 0 \\, {D}f1+{off});")
-    p.con(fo,0,vo,0); p.con(rvo,0,vo,1); p.con(vo,0,pk,k)
+tdeg=p.add("#X obj 200 140 t f f;"); trn=p.add(f"#X obj 300 170 expr ockm_turn_on+0*{D}f1;")
+son=p.add("#X obj 30 140 sel 0;"); vx=p.add(f"#X obj 70 170 expr if({D}f1>1 \\, 1 \\, 0.75);")
+hp=p.add("#X obj 70 230 pack f f f;"); hpp=p.add("#X obj 70 260 list prepend hit;"); hpt=p.add("#X obj 70 285 list trim;")
+sno=p.add(f"#X obj 200 700 s ockm-{D}1-notes-out;")
+for c in [(inl,0,cmod,0),(cmod,0,ts,0),(ts,1,rdeg0,0),(rdeg,0,tdeg,0),(tdeg,1,trn,0),(trn,0,hp,2),(tdeg,0,hp,1),(ts,0,ron,0),(ron,0,son,0),
+          (son,1,vx,0),(vx,0,hp,0),(hp,0,hpp,0),(hpp,0,hpt,0),(hpt,0,cn,0),(cn,0,out,0),(cn,0,sno,0)]: p.con(*c)
 # store / load / edit / extend
 re=p.add(f"#X obj 1300 600 r ockm-{D}1-edit;"); tl=p.add("#X obj 1300 630 t l l;"); ls=p.add("#X obj 1480 660 list split 1;"); up=p.add("#X obj 1300 690 unpack f f f;")
 p.con(re,0,tl,0); p.con(tl,1,ls,0); p.con(tl,0,up,0)
@@ -1947,11 +2040,15 @@ def chord_voice(sp,kind):
         fe=sp.add("#X obj 400 200 vline~;"); fa=sp.add("#X obj 400 225 *~ 3000;"); fb=sp.add("#X obj 400 250 +~ 600;"); fc=sp.add("#X obj 400 275 clip~ 40 15000;")
         l1=sp.add("#X obj 80 290 lop~;"); l2=sp.add("#X obj 80 310 lop~;")
         dk=sp.add("#X obj 300 130 f 280;"); tbb=sp.add("#X obj 20 140 t b b;")
-        pa=sp.add("#X obj 200 200 pack f 280;"); ma=sp.add(f"#X msg 200 230 {D}1 2 \\, 0 {D}2 2;"); mf=sp.add(f"#X msg 400 170 1 \\, 0 {D}1;")
+        # v0.90: how hard the hit is opens the filter, so stabs aren't all the same (accents bite, soft ones stay round)
+        tdk=sp.add("#X obj 300 150 t b f;"); fv2=sp.add("#X obj 470 150 f 1;"); sp.con(vi,0,fv2,1)
+        vcv=sp.add(f"#X obj 470 170 expr 0.3+0.7*{D}f1*{D}f1;"); mpk=sp.add("#X obj 400 150 pack f f;")
+        for c in [(dk,0,tdk,0),(tdk,1,mpk,1),(tdk,0,fv2,0),(fv2,0,vcv,0),(vcv,0,mpk,0)]: sp.con(*c)
+        pa=sp.add("#X obj 200 200 pack f 280;"); ma=sp.add(f"#X msg 200 230 {D}1 2 \\, 0 {D}2 2;"); mf=sp.add(f"#X msg 400 170 {D}1 \\, 0 {D}2;")
         x1=sp.add(f"#X obj 600 140 expr 150*pow(2\\,6*{D}f1);"); x2=sp.add(f"#X obj 690 140 expr 1+0.02*{D}f1;"); x3=sp.add("#X obj 780 140 * 8000;"); x4=sp.add(f"#X obj 870 140 expr 40+{D}f1*800;")
         for c in [(mt,0,tf,0),(tf,1,dt,0),(dt,0,p2,0),(tf,0,p1,0),(p1,0,sm,0),(p2,0,sm,1),(sm,0,ce,0),(ce,0,l1,0),(l1,0,l2,0),(l2,0,am,0),
                   (fe,0,fa,0),(fa,0,fb,0),(fb,0,fc,0),(fc,0,l1,1),(fc,0,l2,1),
-                  (tb,0,tbb,0),(tbb,1,fv,0),(fv,0,pa,0),(pa,0,ma,0),(ma,0,av,0),(tbb,0,dk,0),(dk,0,mf,0),(mf,0,fe,0),
+                  (tb,0,tbb,0),(tbb,1,fv,0),(fv,0,pa,0),(pa,0,ma,0),(ma,0,av,0),(tbb,0,dk,0),(mpk,0,mf,0),(mf,0,fe,0),
                   (k[0],0,x1,0),(x1,0,fb,1),(k[1],0,x2,0),(x2,0,dt,1),(k[2],0,x3,0),(x3,0,fa,1),(k[3],0,x4,0),(x4,0,dk,1),(x4,0,pa,1)]: sp.con(*c)
     elif kind=="organ":
         tf=sp.add("#X obj 80 140 t f f f f;")
@@ -2054,7 +2151,7 @@ def chord_voice(sp,kind):
                   (k[0],0,x1,0),(x1,0,l1,1),(x1,0,l2,1),(k[1],0,x2,0),(x2,0,du,1),(x2,1,dd,1),
                   (k[2],0,x3,0),(x3,0,fa3,0),(fa3,1,ad,1),(fa3,0,pa,1),(k[3],0,x4,0),(x4,0,ad,0),(ad,0,pa,2)]: sp.con(*c)
 
-CHORD_GAIN={"stab":0.42,"organ":0.135,"pad":0.25,"piano":0.4,"rhodes":0.13,"strings":0.36}   # measured: stab was a third as loud as the bass, organ a little loud
+CHORD_GAIN={"stab":0.42,"organ":0.135,"pad":0.3,"piano":0.4,"rhodes":0.13,"strings":0.36}   # measured: stab was a third as loud as the bass, organ a little loud
 CHORD_ENGINES=[("stab","Stab: two detuned saws through a filter that snaps shut. Dub techno with the delay"),
                ("organ","Organ: sine drawbars plus a percussive click. House organ stabs"),
                ("pad","Pad: three detuned saws with a slow attack. Long chords"),

@@ -76,10 +76,10 @@ Tap a track's name on the mixer, or in the drums tab's all drums view, to jump s
 - **Sidechain shape** (bass, lead and chords): **duck** (a quick dip under the kick, back within a step: makes room, barely heard), **pump** (dips hard, holds a moment, swells back over the beat: the house breathing) or **gate** (cut for an eighth note, then straight back in). The little picture shows one beat at the amount you've set
 - Bass, lead and chords each have a **sidechain** slider: how far that part dips each time the kick hits (it swells back over an eighth note). The **pump** on Perform does all three at once
 - Bass and lead also have: **density** (left for fewer notes, right for more; the middle is the preset as written); **mutate** (a new variation of the same idea: the notes move, and since v0.86 a hit or two of the rhythm too, while accents and held notes stay), **back** (the variation before, as many times as you like), **original**, and **make it for me**
-- **Chords:** **rhythm**, **colour** (triads, 7ths, 9ths or 11ths) and smooth voicing
+- **Chords:** **rhythm**, and the chords themselves: built **from the key** (triads, 7ths, 9ths or 11ths) or **one shape moved around** with the progression (m9, m11, dub m7, 4ths, maj9: the chord memory sound of deep house, Detroit and dub techno)
 - **Sound** (bottom right): engine, its four knobs (named for the engine), drive, reverb and delay sends, level, and **chorus** (tap: off, I, II, I+II, like a Juno's buttons; off is exactly the dry sound. The juno lead engine also has its own chorus knob)
 - **Movement** (under the sound): an LFO on one of the four knobs. Tap the boxes to step through the shape (sine, triangle, square, saw, random), which knob it moves, and how often (from a 16th to 8 bars, in time with the loop); drag depth to set how far it swings. At depth 0 the knob is exactly where you set it. It's saved with the loop
-- **Chords only:** **voicing** (close; open, with the third up an octave; or wide, with the root down and the third and seventh up) and **strum** (each note of the chord a little later than the last, up to about 75 ms across the chord)
+- **Chords only:** **voicing** (close; open, with the second note up an octave; or wide, with the lowest down and the second and fourth up), **smooth** (on by default: every chord kept at about the same height) and **strum** (each note of the chord a little later than the last, up to about 75 ms across the chord)
 
 **Settings** (☰, or tap the tempo). Four sections:
 - **This project** (saved with it): tempo with -5, -1, +1, +5 and a slider, swing, how strong accents are, reverb tone, and MIDI clock: lead (send clock out) or follow (play to incoming clock). Dragging the tempo up or down in the top bar still changes it directly
@@ -320,7 +320,7 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 | `ockm-drum-groove` | Fill every drum slot with a groove, 0 to 11, or 12 to clear. Sets the swing too |
 | `ockm-chord-rhythm` | Chord rhythm preset, 0 to 7, and rebuild |
 | `ockm-chord-prog` | Chord progression, 0 to 9, and rebuild |
-| `ockm-chord-type` | 0 triad, 1 seventh, 2 sus2, 3 power chord. Applies straight away |
+| `ockm-chord-type` | From the key: 0 triad, 1 seventh, 2 sus2, 3 power, 4 sus4, 5 sixth, 6 ninth, 7 eleventh. Fixed shapes: 8 m9, 9 m11, 10 dub m7, 11 4ths, 12 maj9. Applies straight away |
 | `ockm-edit` | Set one drum step: slot, step (0 to 127), value (0 off, 1 on, 2 accent, anything between 0 and 1 a velocity). For example `d1 4 2` |
 | `ockm-nudge` | One drum step's timing: slot, step, -0.25 (a quarter step early) to 0.25 (late). Saved with the pattern |
 | `ockm-drum-loop` | Older screens: the drums' length when shorter than the synths (0 = not shorter). Setting it sets the drum length |
@@ -469,11 +469,16 @@ Five more are planned: whistle, supersaw, hoover, melodica and vox. Until then, 
 
 ## Chord synth
 
-Plays up to four notes at once, worked out as it plays from the step's chord root, the shared key and scale, and the chord type. Change the key or the spice and the chords follow straight away.
+Plays up to four notes at once, worked out as it plays from the step's chord root, the shared key and scale, and the chord type. Change the key or the type and the chords follow straight away. The notes come from one small piece of Lua (`seq/ockm-chordnotes.pd_lua`, written by the build), which the screen uses too, so chord names and MIDI export always match what plays.
 
-**Spice** picks the chord type: 1 triad, 2 seventh, 3 ninth (root, third, seventh, ninth), 4 eleventh (root, seventh, ninth, eleventh). The old test panel also offers sus2, power, sus4 and sixth.
+**Chord types** come in two kinds:
 
-**Smooth** (on by default) folds every chord into the octave above the key's root, so each chord is played in the shape closest to the last. Off plays every chord from its root upwards.
+- **From the key:** triad, 7th, 9th, 11th (plus sus2, power, sus4 and sixth by number). Each chord is stacked from the scale, so it changes quality as the progression moves (minor on i, major on VI). The 9th and 11th leave the root out (third, fifth, seventh, ninth; third, seventh, ninth, eleventh): the bass plays it, and the chord stays clear. A flat 9th (v in a minor key) becomes the root instead, so it doesn't grind
+- **Fixed shapes:** m9 (b3 5 b7 9), m11 (b3 b7 9 11), dub m7 (root 5 b7 b3, spread), 4ths (stacked fourths) and maj9 (3 5 7 9). One shape moved as a block with the progression, whatever the key says, like a sampler with one chord on it or a synth's chord memory. That's the deep house, Detroit and dub techno sound. On the turnaround a minor shape turns major
+
+**Smooth** (on by default) keeps every chord at about the same height (around D4, and never below D3, out of the bass's way): chords from the key pick the inversion that sits there, fixed shapes move by octaves. Off plays every chord from its root upwards, exactly parallel.
+
+Every hit varies a little in strength, and accents hit harder. On the stab engine, how hard a hit is also opens the filter, so accents bite. Styles set the chord track's low cut (mixer EQ) to 150 Hz, leaving the low end to the kick and bass.
 
 | Engine | k1 | k2 | k3 | k4 | Character |
 |---|---|---|---|---|---|
@@ -548,7 +553,7 @@ The presets live in `tools/build.py` (`PRE` and `PROGS`). The build writes their
 
 **Suggest chords** (melody or bass leads) scores each progression against the leading part's notes: a note on the chord's root scores 3, another note of the chord 2, anything else -1. Notes on the beat and accented notes count for more. The best average wins.
 
-**Chord types**: 0 triad, 1 seventh, 2 sus2, 3 power
+**Chord types**: 0 triad, 1 seventh, 2 sus2, 3 power, 4 sus4, 5 sixth, 6 ninth, 7 eleventh, 8 m9, 9 m11, 10 dub m7, 11 4ths, 12 maj9
 
 **Scales**: 0 minor, 1 major, 2 dorian, 3 phrygian, 4 mixolydian, 5 harmonic minor
 

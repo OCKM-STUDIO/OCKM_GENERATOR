@@ -438,8 +438,9 @@ def chord_voicing_opens_and_widens(work):
     h.at(170, "ockm-zz-voicing 2"); h.at(180, "test-in 0")
     f = os.path.join(work, "t_voicing.pd"); h.finish(250, f)
     got = [[float(x) for x in v.split()] for v in printed(run(work, f, with_main=False), "CHORD")]
-    want = [[45, 48, 52, 55, 0.75], [45, 60, 52, 55, 0.75], [33, 60, 52, 67, 0.75]]
-    assert got == want, f"voicings wrong (A minor 7: close, open, wide): {got}"
+    want = [[45, 48, 52, 55], [45, 60, 52, 55], [33, 60, 52, 67]]
+    assert [g[:4] for g in got] == want, f"voicings wrong (A minor 7: close, open, wide): {got}"
+    assert all(0.68 <= g[4] <= 0.82 for g in got), f"a plain hit plays at about 0.75, varied a little: {[g[4] for g in got]}"
 
 @test
 def lfo_moves_a_knob_in_time_and_lets_go(work):
@@ -487,9 +488,31 @@ def chord_notes_follow_key_scale_and_type(work):
     h.at(240, "ockm-zz-type 7"); h.at(250, "test-in 0")                                      # spice 4: eleventh
     f = os.path.join(work, "t_chord.pd"); h.finish(300, f)
     got = [[float(x) for x in v.split()] for v in printed(run(work, f, with_main=False), "CHORD")]
-    want = [[45, 48, 52, 0, 0.75], [53, 57, 60, 0, 0.75], [45, 48, 52, 55, 0.75], [48, 52, 55, 0, 1],
-            [53, 45, 48, 0, 0.75], [45, 55, 47, 50, 0.75]]
-    assert got == want, f"chords wrong (A minor i, VI, i7, C major i accented, smooth VI, A minor 11): {got}"
+    # v0.90: smooth keeps chords around D4 (VI: A C F, not F A C below it); the 11th leaves the root to the bass (C D G B)
+    want = [[45, 48, 52, 0], [53, 57, 60, 0], [45, 48, 52, 55], [48, 52, 55, 0], [57, 60, 65, 0], [60, 62, 67, 71]]
+    assert [g[:4] for g in got] == want, f"chords wrong (A minor i, VI, i7, C major i accented, smooth VI, A minor 11): {got}"
+    vel = [g[4] for g in got]
+    assert vel[3] >= 0.92 and all(0.68 <= v <= 0.82 for i, v in enumerate(vel) if i != 3), f"accents hit harder, every hit varies a little: {vel}"
+
+@test
+def chord_shapes_move_as_one_block(work):
+    """v0.90 fixed shapes: an m9 shape on i then iv in A minor keeps its intervals (3 7 10 14 above the root), and with
+    smooth on both sit between D3 and about D5. On the turnaround the minor shape turns major. The 9ths in the key drop a
+    flat 9th (v in A minor: E, F would grind) for the root."""
+    h = Harness(dut="ockm-chordseq zz")
+    h.add("#X obj 400 120 ockm-presets;")
+    pr = h.add("#X obj 400 90 print CHORD;"); h.con(h.dut, pr)
+    h.at(100, "ockm-pat-zz-on 0 1 1 1 ; ockm-pat-zz-deg 0 0 3 4 ; ockm-zz-smooth 1 ; ockm-zz-type 8")
+    h.at(120, "test-in 0"); h.at(130, "test-in 1")
+    h.at(140, "ockm-zz-type 6"); h.at(150, "test-in 2")
+    f = os.path.join(work, "t_shape.pd"); h.finish(220, f)
+    got = [[int(float(x)) for x in v.split()[:4]] for v in printed(run(work, f, with_main=False), "CHORD")]
+    assert len(got) == 3, got
+    for g, root in zip(got[:2], (9, 2)):
+        assert sorted((n - root) % 12 for n in g) == [2, 3, 7, 10], f"m9 shape (b3 5 b7 9 over the root): {got}"
+        assert g == sorted(g) and g[1] - g[0] == 4 and g[2] - g[1] == 3 and g[3] - g[2] == 4, f"same intervals each time: {got}"
+        assert 50 <= min(g) and max(g) <= 76, f"smooth keeps it out of the bass and not too high: {got}"
+    assert 5 not in [n % 12 for n in got[2]], f"no flat 9th (F) on E in A minor: {got[2]}"
 
 @test
 def chord_progressions_fill_and_lengthen(work):
