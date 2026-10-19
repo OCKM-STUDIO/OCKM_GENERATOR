@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.82 (19 October 2026)
+
+- **The Pi no longer breaks up on build, wash and the macros.** The screen draws on the same core as the sound. A sweep that changes a value every few milliseconds made it redraw every 5 ms, which on the Pi (at double size) starved the audio. Redraws are now capped at 25 a second however many values change. Measured on the Pi: Pd went from 40 to 100% of a core to 10 to 20%. The sound engine itself is only about 8%
+- The Pi's audio buffer is 30 ms (was 20), for a little more headroom
+
 ## v0.81.1 (19 October 2026)
 
 - **Pi: sound through the DAC Pro.** The start script turned the DAC's card number into Pd's device number the wrong way, so the sound went to the second HDMI port. It now finds the DAC by name in Pd's own device list

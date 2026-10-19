@@ -168,6 +168,7 @@ The Pi runs the same app as the Mac, drawn at double size (`--ui-scale 2`), so t
 - **Drum steps, M and S act the moment a finger lands,** like pads on a drum machine. Everything else acts when the finger lifts. Swiping sideways after pressing a step puts the step back and turns the page
 - **Screen rotation** is in `~/.config/kanshi/config` (`transform 90`). Touch follows it automatically
 - **Remote access:** SSH (`ssh simon@ockm.local`) and Raspberry Pi Connect. Claude reaches it through your Mac with the key in `.pi/` (kept out of git)
+- **Load:** Pd does the sound and draws the screen on one core. The sound engine is cheap (about 8% of a core with everything playing); drawing is the expensive part at double size, so redraws are capped at 25 a second. To check: `top -H -p $(pgrep -x pd)` over SSH while it plays
 - **Tests run on the Pi too:** `PDLUA=/usr/lib/pd/extra/pdlua python3 tests/run_tests.py`. They only ever use a clean copy of the blank project, never yours
 
 ## Roadmap

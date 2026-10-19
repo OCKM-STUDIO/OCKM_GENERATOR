@@ -9,7 +9,7 @@ N=$(timeout 10 pd -nogui -alsa -listdev -send "pd quit" 2>&1 \
     | sed -n '/^audio output devices:/,/^API/p' \
     | grep -i "dac.*(hardware)" | head -1 | sed 's/^\([0-9]*\)\..*/\1/')
 if [ -n "$N" ]; then
-    SOUND="-alsa -audiooutdev $((N + 1)) -noadc -r 48000 -audiobuf 20"
+    SOUND="-alsa -audiooutdev $((N + 1)) -noadc -r 48000 -audiobuf 30"
 else
     SOUND="-nosound"
 fi

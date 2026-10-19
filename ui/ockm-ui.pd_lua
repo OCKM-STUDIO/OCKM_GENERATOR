@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.81"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.82"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -482,7 +482,13 @@ function ui:finalize()
 end
 
 -- one repaint for a burst of changes
-function ui:dirty() if self.clock then self.clock:delay(5) end end
+-- redraws are capped at 25 a second (v0.82). The screen draws on the same core as the sound, so a sweep that changes a value
+-- every few milliseconds (the filter on build, a macro) used to redraw every 5 ms and starve the audio on the Pi. Now any
+-- number of changes inside one frame make one redraw at the end of it
+local FRAME_MS = 40
+function ui:dirty()
+  if self.clock and not self.frame_due then self.frame_due = true; self.clock:delay(FRAME_MS) end
+end
 -- a short message under the steps, gone after a few seconds
 function ui:say(text) self.msg = text; self.msg_undo = nil; if self.msgclock then self.msgclock:delay(4000) end; self:dirty() end
 function ui:clear_msg() self.msg = nil; self.msg_undo = nil; self:repaint() end
@@ -501,7 +507,7 @@ function ui:undo()
   psend("ockm-undo", "bang", {})
   self:say("undone: " .. label)
 end
-function ui:redraw() self:repaint() end
+function ui:redraw() self.frame_due = nil; self:repaint() end
 
 function ui:on_step(n)
   local old = math.floor(self.step / 16)
@@ -2913,7 +2919,7 @@ end
 
 -- redraw on a press only when the press itself changed something (most buttons act when the finger lifts)
 function ui:mouse_down(x, y) self:press(x / self.s, y / self.s); if self.touch and self.touch.mode then self:repaint() end end
-function ui:mouse_drag(x, y) self:move(x / self.s, y / self.s); self:repaint() end
+function ui:mouse_drag(x, y) self:move(x / self.s, y / self.s); self:dirty() end
 function ui:mouse_up(x, y) self:release(x / self.s, y / self.s); self:repaint() end
 
 -- headless test hook: same code paths as the mouse
