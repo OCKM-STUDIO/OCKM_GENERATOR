@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.84"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.85"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -1447,18 +1447,16 @@ function ui:layout_drums(add)
          end }
   end
   -- fills: the last bar of every 4, 8 or 16 bars plays a fill instead (your steps aren't changed)
-  add{ kind="text", x=gx, y=498, w=half, h=12, label="fill on the last bar of every", size=10 }
-  local fw = (half - 3 * 6) / 4
   local every = math.floor(self.v["ockm-fill-every"] or 0)
-  for i, e in ipairs({ 0, 4, 8, 16 }) do
-    add{ kind="choice", x=gx + (i - 1) * (fw + 6), y=512, w=fw, h=34, small=true, label=(e == 0) and "no fills" or (e .. " bars"),
-         sel=(every == e), accent=(e > 0), tap=function() self:send("ockm-fill-every", e) end }
-  end
+  local ph = self:phrase()
+  add{ kind="text", x=gx, y=498, w=half, h=12, size=10,
+       label="fill at the end of each phrase (" .. ((ph > 0) and ("every " .. ph .. " bars") or "phrase off") .. ": set on the builder)" }
+  add{ kind="choice", x=gx, y=514, w=half, h=30, small=true, sel=(every == 0), label="no fill", tap=function() self:phrase_move("ockm-fill-every", false) end }
   local style = math.floor(self.v["ockm-fill-style"] or 0)
   local sw = (half - (#FILLS - 1) * 6) / #FILLS
   for i, name in ipairs(FILLS) do
-    add{ kind="choice", x=gx + (i - 1) * (sw + 6), y=552, w=sw, h=34, small=true, label=name, sel=(style == i - 1), disabled=(every == 0),
-         tap=function() self:send("ockm-fill-style", i - 1); if every == 0 then self:send("ockm-fill-every", 4) end end }
+    add{ kind="choice", x=gx + (i - 1) * (sw + 6), y=552, w=sw, h=34, small=true, label=name, sel=(every > 0 and style == i - 1), accent=true,
+         tap=function() self:send("ockm-fill-style", i - 1); if every == 0 then self:phrase_move("ockm-fill-every", true) end end }
   end
 end
 
@@ -1802,6 +1800,30 @@ local STYLES = {
     chord=false,
     lead={ engine={ 4, 0 }, rhythm={ 12, 1 }, notes={ 11, 3 }, outside=0.8, delay=0.3 } },
 }
+-- the phrase (v0.85): one length, set on the builder, for everything that happens at the end of a phrase. The engine still
+-- counts with ockm-fill-every (the drum fill) and ockm-turn-every (the turnaround); the phrase sets both, and each part's
+-- switch decides whether it does its thing. Both count bars from play, on the same counter
+function ui:phrase()
+  local f, t = math.floor(self.v["ockm-fill-every"] or 0), math.floor(self.v["ockm-turn-every"] or 0)
+  if f > 0 then return f end
+  if t > 0 then return t end
+  return 0
+end
+function ui:set_phrase(n)
+  local fill_on = (self.v["ockm-fill-every"] or 0) > 0
+  local turn_on = (self.v["ockm-turn-every"] or 0) > 0
+  if self:phrase() == 0 then fill_on = true; turn_on = self.turn_wanted or false end   -- from off: fills on, the turnaround as you left it
+  self:send("ockm-fill-every", (n > 0 and fill_on) and n or 0)
+  self:send("ockm-turn-every", (n > 0 and turn_on) and n or 0)
+  self.last_phrase = (n > 0) and n or self.last_phrase
+end
+-- switch one end-of-phrase move on or off (the phrase comes on at its last length if it was off)
+function ui:phrase_move(key, on)
+  local n = self:phrase()
+  if n == 0 then n = self.last_phrase or 8 end
+  if key == "ockm-turn-every" then self.turn_wanted = on end
+  self:send(key, on and n or 0)
+end
 function ui:layout_compose(add)
   -- style: one tap sets the lot
   add{ kind="text", x=16, y=114, w=W - 32, h=12, size=10,
@@ -1861,12 +1883,20 @@ function ui:layout_compose(add)
          label=(self.rank_src == src and self.ranking) and ("next for my " .. src) or ("my " .. src),
          tap=ok and function() self:fit_chords(src) end or nil }
   end
-  add{ kind="text", x=W - 16 - 4 * 70 - 90, y=397, w=88, h=12, label="turnaround", size=10 }
   local te = math.floor(self.v["ockm-turn-every"] or 0)
+  local ph = self:phrase()
+  add{ kind="text", x=396, y=391, w=50, h=12, label="phrase", size=10 }
+  add{ kind="text", x=396, y=404, w=50, h=12, label="(bars)", size=9 }
   for i, e in ipairs({ 0, 4, 8, 16 }) do
-    add{ kind="choice", x=W - 16 - (5 - i) * 70, y=388, w=64, h=28, small=true, sel=(te == e), label=(e == 0) and "off" or ("every " .. e),
-         tap=function() self:send("ockm-turn-every", e) end }
+    add{ kind="choice", x=448 + (i - 1) * 56, y=388, w=52, h=28, small=true, sel=(ph == e), label=(e == 0) and "off" or tostring(e),
+         tap=function() self:set_phrase(e) end }
   end
+  local fon, ton = (self.v["ockm-fill-every"] or 0) > 0, te > 0
+  add{ kind="text", x=676, y=380, w=200, h=10, label="at the end of each phrase:", size=9 }
+  add{ kind="choice", x=676, y=393, w=130, h=26, small=true, accent=true, sel=fon, label="drum fill",
+       tap=function() self:phrase_move("ockm-fill-every", not fon) end }
+  add{ kind="choice", x=812, y=393, w=132, h=26, small=true, accent=true, sel=ton, label="turnaround",
+       tap=function() self:phrase_move("ockm-turn-every", not ton) end }
   -- the map, bar by bar
   local shape = PROG_SHAPES[(math.floor(self.v["ockm-chord-prog"] or 0)) + 1] or { { 0, 16 } }
   local bars, at = {}, 0

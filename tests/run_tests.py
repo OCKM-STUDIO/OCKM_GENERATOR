@@ -811,10 +811,11 @@ def bass_lock_density_and_mutate(work):
 @test
 def touchscreen_song_parts_in_and_out(work):
     """Song screen: tapping a part's tile takes it out of the pattern and back (drums, bass, chords, lead); the part tab's
-    on/off switch is the same setting. Turnaround buttons set ockm-turn-every. Perform B can't bring an out part back."""
+    on/off switch is the same setting. The phrase (8 bars) sets the drum fill and, switched on, the turnaround to the same length.
+    Perform B can't bring an out part back."""
     if not PDLUA:
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
-    h = Harness(); h.show("ockm-drums-on", "ockm-bass-on", "ockm-chord-on", "ockm-lead-on", "ockm-turn-every", "ockm-bass-mute")
+    h = Harness(); h.show("ockm-drums-on", "ockm-bass-on", "ockm-chord-on", "ockm-lead-on", "ockm-turn-every", "ockm-fill-every", "ockm-bass-mute")
     tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
     tap(150, 477, 36)                    # song
     tap(200, 129, 250)                   # drums out
@@ -822,7 +823,8 @@ def touchscreen_song_parts_in_and_out(work):
     tap(300, 597, 250)                   # chords out
     tap(350, 831, 250)                   # lead out
     tap(400, 129, 250)                   # drums back in
-    tap(450, 836, 402)                   # turnaround every 8
+    tap(440, 586, 402)                   # phrase: 8 bars (the drum fill comes on with it)
+    tap(450, 878, 406)                   # and the turnaround at the end of each phrase
     tap(500, 601, 36)                    # bass tab
     tap(550, 916, 283)                   # on/off switch: back on
     tap(600, 338, 36)                    # perform B
@@ -834,6 +836,7 @@ def touchscreen_song_parts_in_and_out(work):
     assert v("ockm-bass-on")[-2:] == [0, 1], f"bass out on the song screen, back on from its tab: {v('ockm-bass-on')}"
     assert v("ockm-chord-on")[-1:] == [0] and v("ockm-lead-on")[-1:] == [0], "chords and lead out"
     assert v("ockm-turn-every")[-1:] == [8], f"turnaround every 8: {v('ockm-turn-every')}"
+    assert v("ockm-fill-every")[-1:] == [8], f"the drum fill every 8, the same phrase: {v('ockm-fill-every')}"
 
 @test
 def dub_throw_rings_out_and_filter_springs_back(work):
@@ -1546,6 +1549,24 @@ def song_styles_set_the_lot(work):
     assert k.get("ockm-d1-sample") == 0, "a kick on a kit goes back to the synth kick"
     own = sent(ui_preview.run(["send ockm-d1-sample float 2", "test tap 477 36", PEAK]))
     assert "ockm-d1-drive" not in own and own.get("ockm-d1-sample") != 0, "a kick on your own sample keeps it"
+
+@test
+def phrase_sets_the_fill_and_turnaround(work):
+    """The phrase on the builder drives both end-of-phrase moves. From off, picking a fill style on the drums tab brings the
+    phrase in at 8 bars; no fill switches just the fill off; the turnaround comes on at the same length."""
+    sys.path.insert(0, os.path.join(ROOT, "tests"))
+    import ui_preview
+    if not ui_preview.LUA:
+        raise Skip("no lua to run the screen")
+    def sends(lines, key):
+        return [float(l.split()[3]) for l in lines if l.startswith("sent " + key + " ")]
+    L = ui_preview.run(["send ockm-fill-every float 0", "send ockm-turn-every float 0",
+                        "test tap 539 36", "test tap 900 569",       # drums tab: breakbeat fill
+                        "test tap 477 36", "test tap 878 406",       # builder: turnaround on
+                        "test tap 539 36", "test tap 716 529"])      # drums tab: no fill
+    assert sends(L, "ockm-fill-style")[-1:] == [4], "breakbeat picked"
+    assert sends(L, "ockm-fill-every")[-2:] == [8, 0], f"the fill every 8, then off: {sends(L, 'ockm-fill-every')}"
+    assert sends(L, "ockm-turn-every")[-1:] == [8], f"the turnaround on the same 8-bar phrase: {sends(L, 'ockm-turn-every')}"
 
 @test
 def refit_my_line_when_the_harmony_moves(work):

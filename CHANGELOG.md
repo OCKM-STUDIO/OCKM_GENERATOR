@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.85 (19 October 2026)
+
+- **Phrase on the builder:** one length (off, 4, 8 or 16 bars) for everything at the end of a phrase, with a switch for each move: drum fill and turnaround. The drums tab keeps the fill style (plus no fill) and says the phrase length. Before, the fill and the turnaround each had their own count on different tabs
+
 ## v0.84 (19 October 2026)
 
 - **Styles, house through to techno:** deep house, Chicago, classic house, nu disco, tech house, minimal, progressive, dub techno, Detroit, acid, peak time and hard techno. Garage, speed garage, drum and bass, boom bap and lofi are gone. Each style now sets a key and scale too, uses its own engines and progressions, and seven of them bring the lead in
