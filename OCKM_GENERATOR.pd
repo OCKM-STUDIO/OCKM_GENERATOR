@@ -986,6 +986,10 @@
 #X obj 600 1040 ctlin;
 #X obj 600 1065 pack f f f;
 #X obj 600 1090 s ockm-midi-cc;
+#X obj 750 1040 pgmin;
+#X obj 750 1065 - 1;
+#X obj 750 1090 pack f f;
+#X obj 750 1115 s ockm-midi-pgm;
 #X text 250 985 effects and sends;
 #X text 1100 800 (the declare is in the main window);
 #X connect 7 0 6 0;
@@ -1600,6 +1604,10 @@
 #X connect 636 1 637 1;
 #X connect 636 0 637 0;
 #X connect 637 0 638 0;
+#X connect 639 1 641 1;
+#X connect 639 0 640 0;
+#X connect 640 0 641 0;
+#X connect 641 0 642 0;
 #X restore 20 624 pd engine;
 #N canvas 80 80 1140 840 test-panel 0;
 #X obj 0 0 ockm-panel;

@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.96 (19 October 2026)
+
+- **Pads in Prog Change mode work.** The MPK mini's pads were set to send program changes (its PROG CHANGE button), which the app ignored, so the pads did nothing useful. Now both modes work. In Prog Change there's no let go, so a macro pad is a tap (breakdown and lift run their 4 bars; build and wash stay on until the next tap) and pump, drop and throw toggle. In notes mode they're held, as before
+- **Pads read like the screen, top row first.** Bank A's top row is kick, snare, clap, hat; its bottom row the other four drums. Bank B's top row is macro slots A, B, C and pump; its bottom row drop, throw, rise and all in
+
 ## v0.95 (19 October 2026)
 
 - **MIDI controllers: pads and knobs.** Plug in an MPK mini (or an MPC, or most pad controllers) and it's picked up within a couple of seconds, no setup. Pads, by note on any channel. Bank A (36 to 43): mute or bring back drums 1 to 8, landing like the Perform tiles. Bank B (44 to 51): macro slots A, B and C (held while the pad is, so a tap runs a recipe with a length), pump, drop and throw (held), rise, all in. Knobs (CC 70 to 77, or 1 to 8): filter (the middle is off), drive, delay, reverb, then k1 to k4 of the synth whose tab you last opened. Keys do nothing for now

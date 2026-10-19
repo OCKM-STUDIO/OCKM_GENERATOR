@@ -813,6 +813,9 @@ p.add("#X obj 450 1010 ockm-clock;")
 nin=p.add("#X obj 450 1040 notein;"); npk=p.add("#X obj 450 1065 pack f f f;"); nsd=p.add("#X obj 450 1090 s ockm-midi-note;")
 cin=p.add("#X obj 600 1040 ctlin;"); cpk=p.add("#X obj 600 1065 pack f f f;"); csd=p.add("#X obj 600 1090 s ockm-midi-cc;")
 for c in [(nin,2,npk,2),(nin,1,npk,1),(nin,0,npk,0),(npk,0,nsd,0),(cin,2,cpk,2),(cin,1,cpk,1),(cin,0,cpk,0),(cpk,0,csd,0)]: p.con(*c)
+# v0.96: pads in program change mode (the MPK mini's PROG CHANGE button): ockm-midi-pgm <program 0-127> <channel>
+pin=p.add("#X obj 750 1040 pgmin;"); pm1=p.add("#X obj 750 1065 - 1;"); ppk=p.add("#X obj 750 1090 pack f f;"); psd=p.add("#X obj 750 1115 s ockm-midi-pgm;")
+for c in [(pin,1,ppk,1),(pin,0,pm1,0),(pm1,0,ppk,0),(ppk,0,psd,0)]: p.con(*c)
 p.add("#X text 250 985 effects and sends;")
 p.add("#X obj 1100 800 declare -path voices -path seq -path lab;")
 # ---- the main window: the touchscreen UI on top; the engine and the old test panel in closed subpatches ----

@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.95"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.96"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -378,6 +378,7 @@ function ui:postinitialize()
   listen("ockm-bar",     function(o, sel, a) o:on_bar() end)
   listen("ockm-midi-note", function(o, sel, a) o:midi_pad(tonumber(a[1]) or 0, tonumber(a[2]) or 0) end)
   listen("ockm-midi-cc",   function(o, sel, a) o:midi_knob(tonumber(a[2]) or 0, tonumber(a[1]) or 0) end)
+  listen("ockm-midi-pgm",  function(o, sel, a) o:midi_pgm(tonumber(a[1]) or 0) end)
   for _, n in ipairs({ "ockm-refresh","ockm-edit","ockm-extend","ockm-bass-edit","ockm-lead-edit","ockm-chord-edit",
                        "ockm-bass-gen","ockm-lead-gen","ockm-chord-gen","ockm-drums-changed" }) do
     listen(n, function(o) o:dirty() end)
@@ -1337,34 +1338,60 @@ function ui:macro_sub(i)
 end
 
 -- ------------------------------------------------------------------ MIDI controller (v0.95)
--- Pads and knobs from a controller such as an MPK mini or an MPC (no keys). Pads by note, on any channel:
--- bank A (36-43): mute or bring back drums 1-8, landing like the Perform tiles. Bank B (44-51): macro slots A, B, C,
--- then pump, drop and throw (held while the pad is), rise (a tap), all in. Knobs by CC (70-77, or 1-8):
--- filter, drive, delay, reverb, then k1-k4 of the synth whose tab you last opened.
-local PAD_MOVES = { "ockm-pump", "ockm-drop", "ockm-delay-throw" }
+-- Pads and knobs from a controller such as an MPK mini or an MPC (no keys). Each bank of 8 pads reads like the screen,
+-- top row first (v0.96): bank A's top row is drums 1-4, its bottom row drums 5-8 (tap: mute or bring back, landing like the
+-- Perform tiles). Bank B's top row: macro slots A, B, C, pump; bottom row: drop, throw, rise, all in. Pads as notes (36-43
+-- bank A, 44-51 bank B, bottom row first, on any channel) are held while the pad is; pads in program change mode (0-7,
+-- 8-15) have no let go, so a macro taps (a recipe with a length runs its bars) and pump, drop and throw toggle.
+-- Knobs by CC (70-77, or 1-8): filter, drive, delay, reverb, then k1-k4 of the synth whose tab you last opened.
 local MIDI_KNOBS = { { "ockm-filter", -1, 1 }, { "ockm-drive", 0, 1 }, { "ockm-delay-mix", 0, 1 }, { "ockm-verb-mix", 0, 1 } }
-function ui:midi_pad(n, vel)
-  n = math.floor(n)
-  local i = n - 35
-  if i < 1 or i > 16 then return end
-  local down = vel > 0
+-- pad k (0-15, bottom row first in each bank: 0-3 bottom, 4-7 top) to its place in reading order (1-16)
+local function pad_place(k)
+  local bank, j = math.floor(k / 8), k % 8
+  return bank * 8 + ((j >= 4) and (j - 3) or (j + 5))
+end
+-- what pad p (1-16, in reading order) does. down: true pressed, false let go, nil a tap with no let go
+function ui:pad_action(i, down)
   if i <= 8 then
-    if not down then return end
+    if down == false then return end
     local t = TRACKS[i]
     if not self:track_in(t) then return end
     self:qmute(t, (self:mute_target(t) > 0) and 0 or 1)
-  else
-    local b = i - 8
-    if b <= 3 then
-      if down then self:macro_down(b) else self:macro_up(b) end
-    elseif b <= 6 then
-      psend(PAD_MOVES[b - 3], "float", { down and 1 or 0 }); self.pad_on = down and PAD_MOVES[b - 3] or nil
-    elseif b == 7 then
-      if down then self:send("ockm-rise", 1) end
-    elseif down then
-      self:scene(function() return true end)
-    end
+    return
   end
+  local b = i - 8
+  local MOVES = { [4] = "ockm-pump", [5] = "ockm-drop", [6] = "ockm-delay-throw" }
+  if b <= 3 then
+    if down == nil then
+      -- a tap with no let go: a recipe with a length runs its bars; any other macro stays on until the next tap
+      local mc = self.macro
+      self:macro_down(b)
+      local now = self.macro
+      if now and now ~= mc then
+        if now.run then self:macro_up(b) else now.latched = true end
+      end
+    elseif down then self:macro_down(b) else self:macro_up(b) end
+  elseif MOVES[b] then
+    local h = MOVES[b]
+    local on = down
+    if down == nil then on = (self.pad_on ~= h) end   -- no let go: a tap toggles it
+    psend(h, "float", { on and 1 or 0 }); self.pad_on = on and h or nil
+  elseif b == 7 then
+    if down ~= false then self:send("ockm-rise", 1) end
+  elseif down ~= false then
+    self:scene(function() return true end)
+  end
+end
+function ui:midi_pad(n, vel)
+  n = math.floor(n)
+  if n < 36 or n > 51 then return end
+  self:pad_action(pad_place(n - 36), vel > 0)
+  self:dirty()
+end
+function ui:midi_pgm(pg)
+  pg = math.floor(pg)
+  if pg < 0 or pg > 15 then return end
+  self:pad_action(pad_place(pg), nil)
   self:dirty()
 end
 function ui:midi_knob(cc, val)

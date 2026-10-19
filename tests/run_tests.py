@@ -1675,26 +1675,35 @@ def breakdown_recipe_runs_for_bars_or_while_held(work):
 
 @test
 def midi_pads_and_knobs(work):
-    """v0.95 a MIDI controller: pad 36 (bank A, pad 1) mutes the kick and again brings it back; pad 45 (bank B, pad 2)
-    holds macro slot B while held; pad 47 (pump) is 1 while held; knob CC 70 sweeps the filter (64 is the middle: off),
-    CC 74 sets k1 of the synth on screen, and CC 1 works too (older MPK minis). Keys outside the pads do nothing."""
+    """A MIDI controller (v0.95, v0.96). Pads read like the screen, top row first. As notes: 40 (bank A, top left) mutes the
+    kick and again brings it back; 49 (bank B, top row, second) holds macro slot B while held; 51 (top right) is pump, 1
+    while held. In program change mode (the MPK mini's PROG CHANGE): program 4 (top left) toggles the kick too; program 13
+    (bank B, slot B) taps lift, which runs its bars; program 15 (bank B top right, pump) toggles. Knob CC 70 sweeps the
+    filter (64, the middle, is off), CC 74 sets k1 of the synth on screen, CC 1 works too. Keys outside the pads do nothing."""
     sys.path.insert(0, os.path.join(ROOT, "tests"))
     import ui_preview
     if not ui_preview.LUA:
         raise Skip("no lua to run the screen")
     N = lambda n, v: f"send ockm-midi-note list {n} {v} 10"
     C = lambda cc, v: f"send ockm-midi-cc list {v} {cc} 1"
-    L = ui_preview.run([N(36, 100), N(36, 0), "send ockm-d1-mute float 1", N(36, 100), N(45, 100), "mark held", N(45, 0), "mark up", N(47, 90), N(47, 0),
-                        C(70, 0), C(70, 64), C(70, 127), "test tap 663 36", C(74, 127), C(1, 127), "mark keys", N(60, 100), N(60, 0)])
-    kick = [l.split()[3] for l in L if l.startswith("sent ockm-d1-mute-q ")]
-    assert kick[:2] == ["1", "0"], f"pad 1 toggles the kick: {kick}"
+    P = lambda pg: f"send ockm-midi-pgm list {pg} 10"
+    L = ui_preview.run([N(40, 100), N(40, 0), "send ockm-d1-mute float 1", N(40, 100), N(49, 100), "mark held", N(49, 0), "mark up", N(51, 90), N(51, 0),
+                        C(70, 0), C(70, 64), C(70, 127), "test tap 663 36", C(74, 127), C(1, 127), "mark keys", N(60, 100), N(60, 0), "mark pgm",
+                        "send ockm-d1-mute float 0", "send ockm-playing float 1", P(4), P(13), "mark tapped", P(15), P(15)])
+    kick = [l.split()[3] for l in L[:L.index("mark keys")] if l.startswith("sent ockm-d1-mute-q ")]
+    assert kick[:2] == ["1", "0"], f"the top-left pad toggles the kick: {kick}"
     held = L.index("mark held")
     assert any(l.startswith("sent ockm-filter-glide ") for l in L[:held]), "slot B (lift) moves the filter while held"
-    assert [l.split()[3] for l in L if l.startswith("sent ockm-pump ")] == ["1", "0"], "the pump pad is held"
+    pump = [l.split()[3] for l in L[:L.index("mark keys")] if l.startswith("sent ockm-pump ")]
+    assert pump == ["1", "0"], f"the pump pad is held: {pump}"
     fl = [float(l.split()[3]) for l in L if l.startswith("sent ockm-filter ")]
     assert fl[:3] == [-1, 0, 1], f"knob 1 is the filter, off in the middle: {fl}"
     assert [float(l.split()[3]) for l in L if l.startswith("sent ockm-lead-k1 ")][-1:] == [1], "knob 5 is k1 of the synth on screen (the lead tab)"
-    assert not [l for l in L[L.index("mark keys"):] if l.startswith("sent ") and not l.startswith("sent ockm-midi-")], "keys do nothing"
+    assert not [l for l in L[L.index("mark keys"):L.index("mark pgm")] if l.startswith("sent ") and not l.startswith("sent ockm-midi-")], "keys do nothing"
+    pg = L[L.index("mark pgm"):]
+    assert any(l.startswith("sent ockm-d1-mute-q ") and l.endswith(" 1") for l in pg), "program 4 (top left) toggles the kick"
+    assert any(l.startswith("sent ockm-filter-glide ") for l in pg[:pg.index("mark tapped")]), "program 13 taps lift"
+    assert [l.split()[3] for l in pg if l.startswith("sent ockm-pump ")] == ["1", "0"], "program 15 toggles pump on, then off"
 
 @test
 def refit_my_line_when_the_harmony_moves(work):
