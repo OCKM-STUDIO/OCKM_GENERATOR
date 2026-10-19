@@ -599,6 +599,30 @@ def chord_vary_breathes_and_moves(work):
     assert (24, 0) in m and (62, 1) in m, f"move: bar 2 drops its last hit, bar 4 adds one: {m}"
 
 @test
+def bass_riffs_slide_and_octave(work):
+    """v1.02 the bass's own riffs. Riff 2 (fifth: 0 4) on 8ths over one chord in A minor plays A and E in turn. Octave 1 lifts
+    it an octave. Slide 1 makes notes slide into the next (8ths have no slides of their own)."""
+    def take(cmds):
+        h = Harness()
+        h.at(100, "ockm-resync bang ; ockm-root 9 ; ockm-scale 0 ; ockm-chord-prog 0 ; ockm-bass-sync 1 ; ockm-bass-rhythm 1 ; ockm-bass-seed 0 ; ockm-bass-octave 0 ; ockm-bass-slideamt 0")
+        h.at(150, cmds)
+        g = h.add("#X obj 10 300 r test-get;"); t = h.add("#X obj 10 330 t b b;")
+        a1 = h.add("#X obj 10 360 array get ockm-pat-bass-note 0 16;"); p1 = h.add("#X obj 10 390 print NOTE;")
+        a2 = h.add("#X obj 200 360 array get ockm-pat-bass-slide 0 16;"); p2 = h.add("#X obj 200 390 print SLIDE;")
+        h.con(g, t); h.con(t, a1, 1); h.con(t, a2, 0); h.con(a1, p1); h.con(a2, p2)
+        h.at(300, "test-get bang")
+        f = os.path.join(work, f"t_riff{abs(hash(cmds)) % 1000}.pd"); h.finish(400, f)
+        out = run(work, f)
+        return [int(float(x)) for x in printed(out, "NOTE")[-1].split()], [int(float(x)) for x in printed(out, "SLIDE")[-1].split()]
+    n, sl = take("ockm-bass-riff 2")
+    hit = [n[i] for i in range(0, 16, 2)]
+    assert sorted({x % 12 for x in hit}) == [4, 9], f"fifth: A and E: {hit}"
+    n2, _ = take("ockm-bass-riff 2 ; ockm-bass-octave 1")
+    assert [b - a for a, b in zip(n, n2)][0] == 12, f"octave up: {n[:4]} -> {n2[:4]}"
+    _, sl2 = take("ockm-bass-riff 2 ; ockm-bass-slideamt 1")
+    assert sum(sl) == 0 and sum(sl2) >= 4, f"slide: none on plain 8ths, most notes slide at 1: {sl} {sl2}"
+
+@test
 def chord_engines_sound(work):
     for eng, name, k3 in [(0, "poly", 0.0), (1, "organ", 0.2), (0, "poly-pad", 0.6)]:   # v0.98: poly's k3 is attack
         h = Harness(dut="ockm-chord zz")

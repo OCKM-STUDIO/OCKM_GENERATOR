@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.02 (19 October 2026)
+
+Step 6 of the harmony and generator proposal: the bass gets its own riffs.
+
+- **Eight bass riffs**, its own list (it used to step through the lead's tunes, motifs and arps included): root, octaves, fifth, seventh below (the bVII under the root every house bass does), dub, walk up, acid, arp. A loop saved before keeps the riff it had, shown as "as saved", until you pick one
+- **Slide** (bass tab): how many notes glide into the next, on top of the rhythm's own slides. Any rhythm goes from clipped to 303. Acid rolls with some on
+- **Low (sub) / high (mid bass)** (bass tab): the same riff an octave up. The lead has the same octave setting underneath, for step 10
+- Styles pick riffs from the new list
+
 ## v1.01 (19 October 2026)
 
 Step 5 of the harmony and generator proposal: the chords get variation.

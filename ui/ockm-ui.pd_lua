@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v1.01"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v1.02"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -95,6 +95,7 @@ local KNOBS = {
 local RHYTHMS = { { "offbeat" }, { "rolling" }, { "gallop" }, { "acid classic" }, { "sparse dub" }, { "tech bounce" }, { "acid 16ths" }, { "trip hop" }, { "hook" }, { "sparse melody" }, { "phrase" }, { "question answer" }, { "pickup" }, { "arp gate" } }
 local BASS_RHYTHMS = { { "offbeat donk" }, { "straight 8ths" }, { "rolling 16ths" }, { "dotted 8ths" }, { "octave jump" }, { "sustained" }, { "quarters" }, { "dembow" }, { "two step" }, { "3 2 3 cluster" }, { "round the kick" }, { "gallop" }, { "acid classic" }, { "acid 16ths" }, { "tech bounce" }, { "sparse dub" }, { "trip hop" }, { "speed garage" } }
 local MONO_NOTES = { "root", "octaves", "root fifth", "acid riff", "walk up", "minor stab", "dub", "pedal", "arp up", "arp updown", "call", "descend", "melody", "melody steps", "melody high", "motif", "motif call", "motif high", "arp evolve" }
+local BASS_RIFFS = { { "root" }, { "octaves" }, { "fifth" }, { "seventh below" }, { "dub" }, { "walk up" }, { "acid" }, { "arp" } }
 local CHORD_RHY = { { "pads" }, { "halves" }, { "offbeat" }, { "skank" }, { "organ" }, { "tresillo" }, { " " }, { " " }, { "call answer" }, { "8ths" }, { "piano riff" }, { "sustained" } }
 local PROGS = { { "one chord", "i" }, { "vamp", "i iv" }, { "dub techno", "i . . VII" }, { "deep house", "i iv VI v" }, { "garage", "i VI iv v" }, { "pop", "i VI III VII" }, { "uplift", "VI VII i" }, { "andalusian", "i VII VI V" }, { "trip hop", "i VII VI v" }, { "soul", "ii V I" }, { "piano house", "I V vi IV" }, { "anthem", "vi IV I V" } }
 local SPICE = { { 0, "triad" }, { 1, "7th" }, { 6, "9th" }, { 7, "11th" } }
@@ -258,6 +259,7 @@ function ui:defaults()
   end
   v["ockm-bass-on"] = 1; v["ockm-lead-on"] = 1; v["ockm-chord-on"] = 1; v["ockm-drums-on"] = 1; v["ockm-turn-every"] = 0; v["ockm-bass-walk"] = 0; v["ockm-lead-outside"] = 0.35; v["ockm-rise"] = 0; v["ockm-end"] = 0; v["ockm-impact"] = 0; v["ockm-pump"] = 0
   v["ockm-bass-scshape"] = 1; v["ockm-lead-scshape"] = 1; v["ockm-chord-scshape"] = 1
+  v["ockm-bass-riff"] = -1; v["ockm-bass-slideamt"] = 0; v["ockm-bass-octave"] = 0; v["ockm-lead-octave"] = 0
   v["ockm-chord-rate"] = 1; v["ockm-chord-push"] = 0; v["ockm-chord-vary"] = 0; v["ockm-chord-drift"] = 0   -- analogue, analogue, poly (as the engine starts)
   v["ockm-drum-punch"] = 0.5
   v["ockm-style"] = -1; v["ockm-bass-half"] = 0; v["ockm-lead-half"] = 0; v["ockm-chord-half"] = 0
@@ -294,8 +296,9 @@ function ui:hooks()
     h[#h+1] = "ockm-"..nm.."-sound"; h[#h+1] = "ockm-"..nm.."-sample"
   end
   for _, t in ipairs({"bass","lead"}) do
-    for _, k in ipairs({"engine","k1","k2","k3","k4","drive","verb","delay","rhythm","notes"}) do h[#h+1] = "ockm-"..t.."-"..k end
+    for _, k in ipairs({"engine","k1","k2","k3","k4","drive","verb","delay","rhythm","notes","octave"}) do h[#h+1] = "ockm-"..t.."-"..k end
   end
+  h[#h+1] = "ockm-bass-riff"; h[#h+1] = "ockm-bass-slideamt"
   for _, k in ipairs({"engine","k1","k2","k3","k4","type","smooth","verb","delay","rhythm","prog","voicing","strum","rate","push","vary","drift"}) do h[#h+1] = "ockm-chord-"..k end
   for _, t in ipairs(SYNTHS) do for _, k in ipairs({ "lfo-shape", "lfo-rate", "lfo-depth", "lfo-target", "chorus" }) do h[#h+1] = "ockm-"..t.."-"..k end end
   for _, t in ipairs(TRACKS) do h[#h+1] = "ockm-"..t.."-mute"; h[#h+1] = "ockm-"..t.."-solo" end
@@ -2177,7 +2180,7 @@ local STYLES = {
     lead={ engine={ 2, 4 }, rhythm={ 10, 8 }, notes={ 15, 17 }, outside=0.4, delay=0.2 } },
   { "acid", kit="909", punch=0.7, bpm=130, swing=52, groove={ 29, 5, 14 }, root={ 9, 4, 7 }, scale={ 3, 0 }, prog=0, type=0,
     drums={ kick={ 0, 110, 0.4, 0.4 }, clap={ 0, 90, 0.1, -0.3 } },
-    bass={ engine=0, rhythm={ 13, 12, 2 }, notes={ 3, 4 }, move=0, delay=0.15 },
+    bass={ engine=0, rhythm={ 13, 12, 2 }, notes={ 3, 4 }, move=0, delay=0.15, slide=0.3 },
     chord=false, lead=false },
   { "peak time", vary=1, kit="909", punch=0.8, bpm=132, swing=50, groove={ 5, 26, 24 }, root={ 5, 4, 2 }, scale={ 3, 0 }, prog={ 0, 2 }, type={ 11, 10 },
     drums={ kick={ -2, 150, 0.5, 0.5 }, clap={ 0, 70, 0.2, -0.6 } },
@@ -2529,7 +2532,11 @@ function ui:apply_style(i, classic)
       local first = (type(ps.engine) == "table") and ps.engine[1] or ps.engine
       self:pick_engine(part, eng, (ps.k and eng == first) and ps.k or nil)
       self:send("ockm-"..part.."-rhythm", spick(ps.rhythm, shuf))
-      if ps.notes then self:send("ockm-"..part.."-notes", spick(ps.notes, shuf)) end
+      if ps.notes and part == "bass" then
+        local OLD2RIFF = { [0] = 0, [1] = 1, [2] = 2, [3] = 6, [4] = 5, [5] = 3, [6] = 4, [7] = 0, [8] = 7, [9] = 7 }
+        self:send("ockm-bass-riff", OLD2RIFF[spick(ps.notes, shuf)] or 0)
+        self:send("ockm-bass-slideamt", ps.slide or 0); self:send("ockm-bass-octave", ps.octave or 0)
+      elseif ps.notes then self:send("ockm-"..part.."-notes", spick(ps.notes, shuf)) end
       if ps.move then self:set_bass_move(ps.move) end
       if ps.outside then self:send("ockm-lead-outside", ps.outside) end
       self:send("ockm-"..part.."-half", ps.half or 0)
@@ -2660,11 +2667,24 @@ function ui:gen_controls(add, p, ix, cy, iw, k)
   local notes = {}
   for i, nm in ipairs(MONO_NOTES) do notes[i] = { nm } end
   add{ kind="text", x=ix, y=318, w=half, h=12, label=(p == "bass") and "riff: which notes, in each chord" or "tune: the shape of the line", size=10 }
-  self:stepper(add, ix, 332, half, 44, notes, "ockm-"..p.."-notes", nil, HIDE_NOTES)
+  if p == "bass" then
+    -- v1.02: the bass's own eight riffs. A loop from before keeps the riff it had (shown by name) until you pick one
+    local rf = math.floor(self.v["ockm-bass-riff"] or -1)
+    if rf >= 0 then
+      self:stepper(add, ix, 332, half, 44, BASS_RIFFS, "ockm-bass-riff")
+    else
+      add{ kind="arrow", x=ix, y=332, w=44, h=44, dir=-1, on=false }
+      add{ kind="preset", x=ix + 50, y=332, w=half - 100, h=44, num="", label=(MONO_NOTES[math.floor(self.v["ockm-bass-notes"] or 0) + 1] or "root"),
+           sub="as saved", sel=true }
+      add{ kind="arrow", x=ix + half - 44, y=332, w=44, h=44, dir=1, on=true, tap=function() self:send("ockm-bass-riff", 0) end }
+    end
+  else
+    self:stepper(add, ix, 332, half, 44, notes, "ockm-"..p.."-notes", nil, HIDE_NOTES)
+  end
   add{ kind="text", x=ix + half + 8, y=318, w=half, h=12, label="rhythm", size=10 }
   self:stepper(add, ix + half + 8, 332, half, 44, rhythms_for(p), "ockm-"..p.."-rhythm", function(v)
     -- the octave jump is a rhythm and a note pattern together: it brings the octaves notes with it
-    if p == "bass" and (BASS_RHYTHMS[v + 1] or {})[1] == "octave jump" then self:send("ockm-bass-notes", 1) end
+    if p == "bass" and (BASS_RHYTHMS[v + 1] or {})[1] == "octave jump" then self:send("ockm-bass-riff", 1) end
   end, (p == "lead") and HIDE_LEAD_RHY or nil)
   local w3 = (iw - 12) / 3
   if p == "bass" then
@@ -2681,7 +2701,18 @@ function ui:gen_controls(add, p, ix, cy, iw, k)
   end
   -- sidechain: how far it dips each time the kick hits (the Perform pump does all the synths at once)
   self:sidechain_row(add, p, ix, 446, iw)
-  add{ kind="hbar", x=ix, y=482, w=iw, h=30, hook="ockm-"..p.."-density", lo=0, hi=2, label="density", bold=true }
+  -- v1.02: density, slide (the bass: how many notes glide into the next) and the octave switch
+  local okey = "ockm-"..p.."-octave"
+  local oc = math.floor(self.v[okey] or 0)
+  if p == "bass" then
+    local w3b = (iw - 12) / 3
+    add{ kind="hbar", x=ix, y=482, w=w3b, h=30, hook="ockm-bass-density", lo=0, hi=2, label="density", bold=true }
+    add{ kind="hbar", x=ix + w3b + 6, y=482, w=w3b, h=30, hook="ockm-bass-slideamt", lo=0, hi=1, label="slide", bold=true }
+    add{ kind="choice", x=ix + 2 * (w3b + 6), y=482, w=w3b, h=30, small=true, accent=true, sel=(oc > 0), label=(oc > 0) and "high (mid bass)" or "low (sub)",
+         tap=function() self:send(okey, (oc > 0) and 0 or 1) end }
+  else
+    add{ kind="hbar", x=ix, y=482, w=iw, h=30, hook="ockm-"..p.."-density", lo=0, hi=2, label="density", bold=true }
+  end
   local skey = "ockm-"..p.."-seed"
   local seed = math.floor(self.v[skey] or 0)
   if self:part_empty(p) then
