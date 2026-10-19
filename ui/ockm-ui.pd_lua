@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v0.96"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v0.97"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -2012,75 +2012,75 @@ end
 
 -- styles (v0.84: house through to techno). One tap sets the tempo, swing, groove, key and scale, the kick and clap
 -- character, which parts are in, what each plays and on which sound, the progression and colour, sends, sidechain.
--- A value can be a list: the style uses the first, and shuffle picks any of them, so a shuffle stays inside the style.
+-- A value can be a list: each tap rolls any of them (v0.97), so every take stays inside the style; classic plays the first.
 -- drums: per voice { tune, decay, drive, character }. Parts: false = out of the pattern. Bass move 0 pedal, 1 follows, 2 walks.
 -- Numbers: roots 0 C .. 9 A; scales 0 minor 1 major 2 dorian 3 phrygian; grooves, progressions, rhythms and riffs as listed
 -- in the presets block. Knobs (k) only go with the first engine in the list.
 local STYLES = {
-  { "deep house", kit="909-long", punch=0.4, bpm=122, swing=58, groove={ 2, 16, 17 }, root={ 5, 2, 7, 0 }, scale={ 2, 0 }, prog={ 1, 3, 9, 6 }, type={ 8, 6, 9 },
+  { "deep house", kit="909-long", punch=0.4, bpm=122, swing=58, groove={ 2, 16, 17, 21 }, root={ 5, 2, 7, 0 }, scale={ 2, 0 }, prog={ 1, 3, 9, 6 }, type={ 8, 6, 9 },
     drums={ kick={ -1, 110, 0.1, 0 }, clap={ 0, 100, 0, 0.1 } },
-    bass={ engine={ 5, 1 }, rhythm={ 9, 3, 8 }, notes={ 2, 0 }, move=1, k={ 0.35, 0.2, 0.4, 0.45 } },
-    chord={ engine={ 4, 3 }, rhythm={ 6, 3, 8 }, verb=0.25, delay=0.12, chorus=1, strum=0.12 },
+    bass={ engine={ 5, 1 }, rhythm={ 9, 3, 1 }, notes={ 2, 0, 6 }, move=1, k={ 0.35, 0.2, 0.4, 0.45 } },
+    chord={ engine={ 4, 3 }, rhythm={ 6, 3, 8, 0 }, verb=0.25, delay=0.12, chorus=1, strum=0.12 },
     lead=false },
-  { "chicago", kit="909", punch=0.6, bpm=125, swing=62, groove={ 13, 14, 22 }, root={ 7, 0, 9 }, scale={ 0, 2 }, prog={ 1, 0 }, type={ 10, 8 },
+  { "chicago", kit="909", punch=0.6, bpm=125, swing=62, groove={ 13, 14, 22, 1 }, root={ 7, 0, 9, 2 }, scale={ 0, 2 }, prog={ 1, 0, 3 }, type={ 10, 8 },
     drums={ kick={ 0, 90, 0.2, 0.3 }, clap={ 0, 100, 0, 0.2 } },
-    bass={ engine={ 5, 0 }, rhythm={ 1, 0, 7 }, notes={ 1, 2, 3 }, move=1 },
-    chord={ engine={ 1, 3 }, rhythm={ 4, 2, 7 }, verb=0.12, chorus=1 },
+    bass={ engine={ 5, 0 }, rhythm={ 1, 0, 4 }, notes={ 1, 2, 3 }, move=1 },
+    chord={ engine={ 1, 3 }, rhythm={ 4, 2, 5 }, verb=0.12, chorus=1 },
     lead=false },
-  { "classic house", kit="909", punch=0.5, bpm=124, swing=56, groove={ 1, 0, 21 }, root={ 0, 7, 2 }, scale={ 1, 4, 0 }, prog={ 5, 3, 9 }, type={ 6, 1 },
+  { "classic house", kit="909", punch=0.5, bpm=124, swing=56, groove={ 1, 0, 21, 16 }, root={ 0, 7, 2, 5 }, scale={ 1, 4, 0 }, prog={ 5, 3, 9, 10 }, type={ 6, 1 },
     drums={ kick={ 0, 100, 0.1, 0.2 }, clap={ 0, 100, 0, 0 } },
-    bass={ engine={ 5, 4 }, rhythm={ 0, 1, 9 }, notes={ 2, 1 }, move=1, sidechain=0.2 },
-    chord={ engine={ 3, 1 }, rhythm={ 6, 2, 5 }, verb=0.15, delay=0.1, strum=0.1 },
-    lead={ engine={ 1, 2 }, rhythm={ 10, 11, 8 }, notes={ 15, 16 }, outside=0.4, verb=0.15, delay=0.2 } },
+    bass={ engine={ 5, 4 }, rhythm={ 0, 1, 9, 4 }, notes={ 2, 1, 0 }, move=1, sidechain=0.2 },
+    chord={ engine={ 3, 1 }, rhythm={ 6, 2, 5, 10 }, verb=0.15, delay=0.1, strum=0.1 },
+    lead={ engine={ 1, 2 }, rhythm={ 10, 11, 8 }, notes={ 15, 16, 8 }, outside=0.4, verb=0.15, delay=0.2 } },
   -- v0.90: Italian piano house (Black Box, Cappella, late 80s Italy): an M1-style piano playing open triads in a major key
   -- on the big four-chord turn, a riff that pushes ahead of the beat, the M1 organ bass bouncing on the offbeats
-  { "italo piano", kit="909", punch=0.5, bpm=124, swing=55, groove={ 1, 21, 0 }, root={ 0, 7, 5, 2 }, scale=1, prog={ 10, 11, 3 }, type={ 0, 1 },
+  { "italo piano", kit="909", punch=0.5, bpm=124, swing=55, groove={ 1, 21, 0, 16 }, root={ 0, 7, 5, 2 }, scale={ 1, 4 }, prog={ 10, 11, 3 }, type={ 0, 1 },
     drums={ kick={ 0, 100, 0.1, 0.2 }, clap={ 0, 100, 0, 0.1 } },
-    bass={ engine={ 6, 5 }, rhythm={ 0, 4 }, notes={ 0, 1 }, move=1 },
+    bass={ engine={ 6, 5 }, rhythm={ 0, 4, 1 }, notes={ 0, 1 }, move=1 },
     chord={ engine=3, rhythm={ 10, 5, 6 }, verb=0.2, delay=0.08, voicing=1, strum=0.04 },
     lead=false },
-  { "nu disco", kit="808", punch=0.4, bpm=118, swing=54, groove={ 23, 15, 21 }, root={ 2, 9, 4 }, scale={ 2, 4, 0 }, prog={ 1, 3, 5 }, type={ 12, 6 },
+  { "nu disco", kit="808", punch=0.4, bpm=118, swing=54, groove={ 23, 15, 21 }, root={ 2, 9, 4 }, scale={ 2, 4, 0 }, prog={ 1, 3, 5, 9 }, type={ 12, 6 },
     drums={ kick={ 0, 90, 0, 0.1 }, clap={ 0, 90, 0, 0.2 } },
     bass={ engine={ 4, 5 }, rhythm={ 4, 1, 9 }, notes={ 1, 2 }, move=1 },
-    chord={ engine={ 5, 3 }, rhythm={ 2, 6, 0 }, verb=0.2, chorus=2 },
+    chord={ engine={ 5, 3 }, rhythm={ 2, 6, 0, 9 }, verb=0.2, chorus=2 },
     lead={ engine={ 1, 4 }, rhythm={ 11, 10 }, notes={ 16, 15, 17 }, outside=0.45, delay=0.25 } },
-  { "tech house", kit="909", punch=0.7, bpm=126, swing=54, groove={ 3, 24, 21 }, root={ 9, 7, 2, 4 }, scale={ 0, 2 }, prog={ 0, 1 }, type={ 10, 11 },
+  { "tech house", kit="909", punch=0.7, bpm=126, swing=54, groove={ 3, 24, 21 }, root={ 9, 7, 2, 4 }, scale={ 0, 2 }, prog={ 0, 1, 2 }, type={ 10, 11 },
     drums={ kick={ 0, 90, 0.3, 0.4 }, clap={ 0, 80, 0, -0.5 } },
-    bass={ engine={ 5, 4, 2 }, rhythm={ 14, 2, 10 }, notes={ 0, 3, 5 }, move=1, sidechain=0.3, k={ 0.35, 0.3, 0.5, 0.35 } },
+    bass={ engine={ 5, 4, 2 }, rhythm={ 14, 2, 9 }, notes={ 0, 3, 5 }, move=1, sidechain=0.3, k={ 0.35, 0.3, 0.5, 0.35 } },
     chord={ engine={ 0, 1 }, rhythm={ 3, 2, 6 }, delay=0.25 },
     lead=false },
-  { "minimal", kit="808", punch=0.5, bpm=125, swing=55, groove={ 4, 28 }, root={ 4, 2, 9 }, scale={ 0, 3, 2 }, prog=0, type={ 11, 10 },
+  { "minimal", kit="808", punch=0.5, bpm=125, swing=55, groove={ 4, 28, 26 }, root={ 4, 2, 9 }, scale={ 0, 3, 2 }, prog=0, type={ 11, 10 },
     drums={ kick={ 1, 70, 0.1, 0.3 }, clap={ 2, 60, 0, -0.6 } },
-    bass={ engine={ 1, 5 }, rhythm={ 15, 6, 10 }, notes={ 0, 6 }, move=0 },
-    chord={ engine=0, rhythm={ 3, 0 }, delay=0.4 },
+    bass={ engine={ 1, 5 }, rhythm={ 15, 6, 14 }, notes={ 0, 6 }, move=0 },
+    chord={ engine=0, rhythm={ 3, 0, 2 }, delay=0.4 },
     lead={ engine={ 4, 2 }, rhythm={ 9, 12 }, notes={ 6, 10, 11 }, outside=0.3, verb=0.1, delay=0.35 } },
-  { "progressive", kit="909-long", punch=0.5, bpm=122, swing=50, groove={ 0, 2 }, root={ 2, 9, 4, 7 }, scale={ 0, 5 }, prog={ 3, 6, 7 }, type={ 6, 7 },
+  { "progressive", kit="909-long", punch=0.5, bpm=122, swing=50, groove={ 0, 2, 24 }, root={ 2, 9, 4, 7 }, scale={ 0, 5 }, prog={ 3, 6, 7, 5 }, type={ 6, 7 },
     drums={ kick={ -1, 120, 0.2, 0.2 }, clap={ 0, 110, 0, 0.2 } },
-    bass={ engine={ 5, 3 }, rhythm={ 2, 1 }, notes={ 0, 2 }, move=1, sidechain=0.3 },
-    chord={ engine={ 2, 5 }, rhythm={ 0, 1 }, verb=0.35, sidechain=0.4, chorus=1 },
+    bass={ engine={ 5, 3 }, rhythm={ 2, 1, 4 }, notes={ 0, 2 }, move=1, sidechain=0.3 },
+    chord={ engine={ 2, 5 }, rhythm={ 0, 1, 9 }, verb=0.35, sidechain=0.4, chorus=1 },
     lead={ engine={ 1, 2, 4 }, rhythm={ 13, 10 }, notes={ 18, 8, 9 }, outside=0.3, verb=0.2, delay=0.3 } },
-  { "dub techno", kit="909-long", punch=0.4, bpm=120, swing=52, groove={ 6, 28 }, root={ 5, 7, 9 }, scale={ 0, 2 }, prog={ 2, 0 }, type={ 10, 8, 11 },
+  { "dub techno", kit="909-long", punch=0.4, bpm=120, swing=52, groove={ 6, 28, 4 }, root={ 5, 7, 9 }, scale={ 0, 2 }, prog={ 2, 0, 1 }, type={ 10, 8, 11 },
     drums={ kick={ -1, 130, 0.2, 0 }, clap={ 0, 100, 0, 0.3 } },
-    bass={ engine=1, rhythm={ 5, 15 }, notes=0, move=1 },
-    chord={ engine={ 0, 5 }, rhythm=3, verb=0.35, delay=0.55 },
+    bass={ engine=1, rhythm={ 5, 15, 6 }, notes={ 0, 6 }, move=1 },
+    chord={ engine={ 0, 5 }, rhythm={ 3, 0, 2 }, verb=0.35, delay=0.55 },
     lead=false },
   { "detroit", kit="909", punch=0.6, bpm=128, swing=53, groove={ 25, 11, 26 }, root={ 0, 9, 5 }, scale={ 0, 2 }, prog={ 1, 0, 2 }, type={ 9, 8 },
     drums={ kick={ 0, 100, 0.3, 0.3 }, clap={ 0, 90, 0.1, 0.1 } },
-    bass={ engine={ 2, 5 }, rhythm={ 1, 14 }, notes={ 2, 0 }, move=1 },
-    chord={ engine={ 5, 2 }, rhythm={ 0, 1 }, verb=0.3, chorus=3 },
+    bass={ engine={ 2, 5 }, rhythm={ 1, 14, 2 }, notes={ 2, 0 }, move=1 },
+    chord={ engine={ 5, 2 }, rhythm={ 0, 1, 3 }, verb=0.3, chorus=3 },
     lead={ engine={ 2, 1 }, rhythm={ 10, 8 }, notes={ 15, 17 }, outside=0.4, delay=0.2 } },
   { "acid", kit="909", punch=0.7, bpm=130, swing=52, groove={ 29, 5, 14 }, root={ 9, 4, 7 }, scale={ 3, 0 }, prog=0, type=0,
     drums={ kick={ 0, 110, 0.4, 0.4 }, clap={ 0, 90, 0.1, -0.3 } },
-    bass={ engine=0, rhythm={ 13, 12 }, notes={ 3, 4 }, move=0, delay=0.15 },
+    bass={ engine=0, rhythm={ 13, 12, 2 }, notes={ 3, 4 }, move=0, delay=0.15 },
     chord=false, lead=false },
   { "peak time", kit="909", punch=0.8, bpm=132, swing=50, groove={ 5, 26, 24 }, root={ 5, 4, 2 }, scale={ 3, 0 }, prog={ 0, 2 }, type={ 11, 10 },
     drums={ kick={ -2, 150, 0.5, 0.5 }, clap={ 0, 70, 0.2, -0.6 } },
-    bass={ engine={ 5, 1 }, rhythm={ 10, 2 }, notes=0, move=0, sidechain=0.5, k={ 0.25, 0.2, 0.35, 0.3 } },
-    chord={ engine=0, rhythm={ 3, 2 }, delay=0.35 },
+    bass={ engine={ 5, 1 }, rhythm={ 10, 2, 1 }, notes={ 0, 1 }, move=0, sidechain=0.5, k={ 0.25, 0.2, 0.35, 0.3 } },
+    chord={ engine=0, rhythm={ 3, 2, 9 }, delay=0.35 },
     lead={ engine={ 3, 0 }, rhythm={ 0, 1 }, notes={ 1, 7 }, outside=0.1, delay=0.2 } },
-  { "hard techno", kit="909", punch=1.0, bpm=140, swing=50, groove={ 27, 26, 37 }, root={ 2, 6, 1 }, scale=3, prog=0, type=0,
+  { "hard techno", kit="909", punch=1.0, bpm=140, swing=50, groove={ 27, 26, 37 }, root={ 2, 6, 1 }, scale={ 3, 0 }, prog=0, type=0,
     drums={ kick={ -3, 170, 0.8, 0.8 }, clap={ 0, 90, 0.4, -0.3 } },
-    bass={ engine={ 1, 3 }, rhythm={ 10, 2 }, notes=0, move=0, sidechain=0.6, k={ 0.4, 0.8, 0.3, 0.4 } },
+    bass={ engine={ 1, 3 }, rhythm={ 10, 2, 1 }, notes={ 0, 1 }, move=0, sidechain=0.6, k={ 0.4, 0.8, 0.3, 0.4 } },
     chord=false,
     lead={ engine={ 4, 0 }, rhythm={ 12, 1 }, notes={ 11, 3 }, outside=0.8, delay=0.3 } },
 }
@@ -2111,11 +2111,12 @@ end
 function ui:layout_compose(add)
   -- style: one tap sets the lot
   add{ kind="text", x=16, y=114, w=W - 32, h=12, size=10,
-       label="style: sets the tempo, key, groove, drums, sounds and parts in one go. Shuffle re-rolls it within the style (undo puts it back)" }
+       label="style: a fresh take every tap (tempo, key, groove, drums, sounds, parts), always in the style. Classic is the canonical one. Undo puts it back" }
   local per = math.ceil(#STYLES / 2)
   local SHW = 96   -- the shuffle button, right of the chips
   local stw = (W - 32 - SHW - 6 - (per - 1) * 4) / per
-  add{ kind="btn", x=W - 16 - SHW, y=128, w=SHW, h=60, accent=true, label="shuffle", tap=function() self:shuffle_style() end }
+  add{ kind="btn", x=W - 16 - SHW, y=128, w=SHW, h=28, accent=true, small=true, label="shuffle", tap=function() self:shuffle_style() end }
+  add{ kind="btn", x=W - 16 - SHW, y=160, w=SHW, h=28, small=true, label="classic", tap=function() self:classic_style() end }
   local cst = math.floor(self.v["ockm-style"] or -1)
   for i, st in ipairs(STYLES) do
     local col, row = (i - 1) % per, math.floor((i - 1) / per)
@@ -2230,12 +2231,15 @@ function ui:fit_chords(src)
   self:say(string.format("chords for your %s, %d of %d: %s (fits %d%%)", what, self.rank_at, #self.ranking, (PROGS[pick[1] + 1] or { "" })[1], fit))
 end
 
--- a style value: the first of a list, or (shuffling) any of them
-local function spick(v, shuf)
+-- a style's value: a list rolls one at random (the first is the classic pick)
+local function spick(v, roll)
   if type(v) ~= "table" then return v end
-  return shuf and v[math.random(#v)] or v[1]
+  return roll and v[math.random(#v)] or v[1]
 end
-function ui:apply_style(i, shuf)
+-- v0.97: tapping a style rolls a fresh combination from its lists every time, always inside the style; classic (or
+-- apply_style(i, true)) plays the first of every list, the canonical version. Undo puts the previous one back
+function ui:apply_style(i, classic)
+  local shuf = not classic
   local st = STYLES[i]
   if not st then return end
   self:snapshot(st[1])
@@ -2305,12 +2309,17 @@ function ui:apply_style(i, shuf)
   end
   self:send("ockm-style", i - 1)
   local key = NOTES[root + 1] .. " " .. SCALE_NAMES[scale + 1]
-  self:say_undo(st[1] .. (shuf and " shuffled: " or ": ") .. key .. ", " .. ((PROGS[prog + 1] or { "" })[1]) .. ", " .. table.concat(said, " / "))
+  self:say_undo(st[1] .. (classic and " (classic): " or ": ") .. key .. ", " .. ((PROGS[prog + 1] or { "" })[1]) .. ", " .. table.concat(said, " / "))
 end
--- shuffle: the style that's lit (or any style), re-rolled within its own choices
+-- shuffle: the style that's lit (or any style), rolled again; classic: the lit style's first pick of everything
 function ui:shuffle_style()
   local cur = math.floor(self.v["ockm-style"] or -1) + 1
   if cur < 1 or cur > #STYLES then cur = math.random(#STYLES) end
+  self:apply_style(cur)
+end
+function ui:classic_style()
+  local cur = math.floor(self.v["ockm-style"] or -1) + 1
+  if cur < 1 or cur > #STYLES then cur = 1 end
   self:apply_style(cur, true)
 end
 

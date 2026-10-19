@@ -1555,8 +1555,8 @@ def suggest_chords_fit_the_melody(work):
 def song_styles_set_the_lot(work):
     """Builder styles, house through to techno. Peak time sets 132 bpm, straight swing, the techno groove, F phrygian, a harder
     lower kick, the bass round the kick on the home note, and a lead. Deep house: 122, F dorian, Rhodes chords, no lead.
-    Shuffle re-rolls the lit style from its own choices. A kick on a kit sample goes back to the synth; one on your own
-    sample keeps it."""
+    v0.97: every tap rolls a fresh take from the style's own lists, and classic gives the first of each (the values checked
+    here); shuffle rolls the lit style again. A kick on a kit sample goes back to the synth; one on your own sample keeps it."""
     sys.path.insert(0, os.path.join(ROOT, "tests"))
     import ui_preview
     if not ui_preview.LUA:
@@ -1568,14 +1568,14 @@ def song_styles_set_the_lot(work):
                 v = l.split()
                 out[v[1]] = float(v[3]) if len(v) > 3 and v[3] not in ("bang",) else None
         return out
-    PEAK, DEEP, SHUFFLE = "test tap 547 174", "test tap 83 142", "test tap 896 158"
-    t = sent(ui_preview.run(["test tap 477 36", PEAK]))
+    PEAK, DEEP, SHUFFLE, CLASSIC = "test tap 547 174", "test tap 83 142", "test tap 896 142", "test tap 896 174"
+    t = sent(ui_preview.run(["test tap 477 36", PEAK, CLASSIC]))
     assert t["ockm-bpm"] == 132 and t["ockm-swing"] == 50 and t["ockm-drum-groove"] == 5, t
     assert t["ockm-root"] == 5 and t["ockm-scale"] == 3, "F phrygian"
     assert t["ockm-d1-drive"] == 0.5 and t["ockm-d1-tune"] == -2, "the kick gets harder and lower"
     assert t["ockm-lead-on"] == 1 and t["ockm-bass-rhythm"] == 10 and t["ockm-bass-sync"] == 0 and t["ockm-chord-on"] == 1, t
     assert t["ockm-style"] == 11, t
-    d = sent(ui_preview.run(["test tap 477 36", DEEP]))
+    d = sent(ui_preview.run(["test tap 477 36", DEEP, CLASSIC]))
     assert d["ockm-bpm"] == 122 and d["ockm-scale"] == 2 and d["ockm-chord-engine"] == 4 and d["ockm-lead-on"] == 0, d
     lines = ui_preview.run(["test tap 477 36", DEEP] + [SHUFFLE] * 4)
     chunks, cur = [], []
@@ -1584,9 +1584,9 @@ def song_styles_set_the_lot(work):
             cur.append(l)
             if l.startswith("sent ockm-style "): chunks.append(sent(cur)); cur = []
     seen = set()
-    for sh in chunks[1:]:   # the first is the plain deep house tap
+    for sh in chunks:   # the tap, then four shuffles: every one a fresh take
         assert sh["ockm-style"] == 0 and sh["ockm-bpm"] == 122, "shuffle stays in deep house"
-        assert sh["ockm-drum-groove"] in (2, 16, 17) and sh["ockm-root"] in (5, 2, 7, 0) and sh["ockm-chord-prog"] in (3, 1, 9, 6), sh
+        assert sh["ockm-drum-groove"] in (2, 16, 17, 21) and sh["ockm-root"] in (5, 2, 7, 0) and sh["ockm-chord-prog"] in (3, 1, 9, 6), sh
         assert sh["ockm-bass-seed"] >= 1, "a shuffled riff is a variation"
         seen.add((sh["ockm-root"], sh["ockm-chord-prog"], sh["ockm-drum-groove"], sh["ockm-bass-seed"]))
     assert len(chunks) == 5, f"four shuffles: {len(chunks)}"
@@ -1596,6 +1596,24 @@ def song_styles_set_the_lot(work):
     k = sent(ui_preview.run(kit))
     assert k.get("ockm-d1-sample") == 0, "a kick on a kit goes back to the synth kick"
     own = sent(ui_preview.run(["send ockm-d1-sample float 2", "test tap 477 36", PEAK]))
+    # every style's lists only point at presets that exist
+    import re as _re
+    src = open(os.path.join(ROOT, "ui", "ockm-ui.pd_lua")).read()
+    sizes = {n: len(_re.findall(r"\{ \"", _re.search(r"^local " + n + r" = (.*)$", src, _re.M).group(1))) for n in ("RHYTHMS", "BASS_RHYTHMS", "CHORD_RHY", "PROGS")}
+    sizes["GROOVES"] = len(_re.findall(r'"', _re.search(r"^local GROOVES = (.*)$", src, _re.M).group(1))) // 2
+    sizes["MONO_NOTES"] = len(_re.findall(r'"', _re.search(r"^local MONO_NOTES = (.*)$", src, _re.M).group(1))) // 2
+    block = src[src.index("local STYLES = {"):src.index("\n}\n", src.index("local STYLES = {"))]
+    def ints(v): return [int(x) for x in _re.findall(r"-?\d+", v)]
+    bad = []
+    for key, table in (("groove", "GROOVES"), ("prog", "PROGS")):
+        for m in _re.finditer(r"\b" + key + r"=(\{[^}]*\}|\d+)", block):
+            bad += [(key, i) for i in ints(m.group(1)) if not 0 <= i < sizes[table]]
+    for part, table in (("bass", "BASS_RHYTHMS"), ("chord", "CHORD_RHY"), ("lead", "RHYTHMS")):
+        for m in _re.finditer(part + r"=\{ engine=[^\n]*?rhythm=(\{[^}]*\}|\d+)", block):
+            bad += [(part, i) for i in ints(m.group(1)) if not 0 <= i < sizes[table]]
+    for m in _re.finditer(r"notes=(\{[^}]*\}|\d+)", block):
+        bad += [("notes", i) for i in ints(m.group(1)) if not 0 <= i < sizes["MONO_NOTES"]]
+    assert not bad, f"styles point at presets that don't exist: {bad}"
     assert "ockm-d1-drive" not in own and own.get("ockm-d1-sample") != 0, "a kick on your own sample keeps it"
 
 @test

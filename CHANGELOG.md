@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.97 (19 October 2026)
+
+First step of the harmony and generator proposal.
+
+- **A style never sounds the same twice.** Every tap on a style rolls a fresh take from its own lists: groove, key, scale, progression, bass rhythm and riff, chord rhythm, lead rhythm and tune, engines, and a new variation of the riffs. It always stays inside the style. **Classic** (under shuffle) plays the first of every list, the canonical version. **Shuffle** rolls the lit style again. Undo puts the last one back
+- **Wider lists, so a roll has somewhere to go:** every style now has at least three grooves, three keys, two scales, three bass rhythms, two riffs and three chord rhythms, and three progressions where the style moves chords at all (techno and acid stay on one chord)
+
 ## v0.96 (19 October 2026)
 
 - **Pads in Prog Change mode work.** The MPK mini's pads were set to send program changes (its PROG CHANGE button), which the app ignored, so the pads did nothing useful. Now both modes work. In Prog Change there's no let go, so a macro pad is a tap (breakdown and lift run their 4 bars; build and wash stay on until the next tap) and pump, drop and throw toggle. In notes mode they're held, as before
