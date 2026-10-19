@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.92 (19 October 2026)
+
+- **A fatter, more real piano.** The piano engine is rebuilt as a struck string: ten partials, each a touch sharp the way a stiff string's overtones are, the first four doubled by a second string 3 cents up so they beat. Harder hits put more into the upper partials, and the higher partials die sooner, so each note starts bright and mellows. Plus a hammer knock. About twice the energy in the body (150 to 1000 Hz) with the same top end. The knobs do the same jobs: brightness, octave (the even partials), snap, length (now up to 4 seconds)
+
 ## v0.91 (19 October 2026)
 
 - **Italo piano style:** Italian piano house. The M1-style piano on open triads in a major key, a new two-bar **piano riff** that pushes ahead of the beat, the M1 organ bass (donk) bouncing on the offbeats, the 909 kit

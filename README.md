@@ -485,7 +485,7 @@ Every hit varies a little in strength, and accents hit harder. On the stab engin
 | 0 stab | brightness | detune | filter snap | length | Dub techno stabs. Great with the delay |
 | 1 organ | upper drawbars | percussion click | sub drawbar | length | House organ |
 | 2 pad | brightness | detune (width) | attack | length | Slow, wide chords |
-| 3 piano | brightness | octave layer | snap (how fast the first bright hit drops away) | length | House piano, M1-style (v0.84): two strings a few cents apart beating gently, a hammer click, an octave layer, bright as it rings out. Classic house |
+| 3 piano | brightness | octave (the even partials) | snap (how fast the first bright hit drops away) | length | House piano (v0.92): a struck string. Ten slightly stretched partials, the first four doubled by a second string that beats against them, the upper ones dying first, a hammer knock. Brighter the harder you hit. Classic house and Italo piano |
 | 4 rhodes | tone (body and tine brightness) | bark (how much a hard hit drives it) | tremolo | length | Electric piano (v0.84): a warm body with the tine ringing on the attack (the 14:1 partial of the DX7 pianos), barks when hit hard. Deep house |
 | 5 strings | tone | ensemble depth | attack | release | String machine with an ensemble chorus. Dub techno and builds |
 

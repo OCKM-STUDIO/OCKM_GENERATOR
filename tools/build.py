@@ -16,7 +16,7 @@ Usage:
 
 It only creates project files that are missing, and never touches sketches/, README or CHANGELOG.
 """
-import os, sys, argparse
+import os, math, sys, argparse
 ap=argparse.ArgumentParser()
 ap.add_argument("--out",default=os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 ap.add_argument("--reset-patterns",action="store_true")
@@ -2068,37 +2068,43 @@ def chord_voice(sp,kind):
                   (tb,0,tbb,0),(tbb,1,fv,0),(fv,0,pa,0),(pa,0,ma,0),(ma,0,av,0),(tbb,0,pp,0),(pp,0,pe,0),
                   (k[0],0,x1,0),(x1,0,g2,1),(x1,1,g3,1),(k[1],0,x2,0),(x2,0,pg,1),(k[2],0,x3,0),(x3,0,g4,1),(k[3],0,x4,0),(x4,0,pa,1)]: sp.con(*c)
     elif kind=="piano":
-        # v0.84 house piano (M1-style): two strings a few cents apart so it beats like a piano, FM that stays bright as it
-        # decays (an index that falls to a rich level, not to a pure sine: that was the electric piano sound), an octave
-        # layer, and a hammer click. Amp: a quick drop after the hit, then a longer tail. k1 brightness, k2 octave, k3 snap, k4 length
-        tf=sp.add("#X obj 80 140 t f f f f;"); mo=sp.add("#X obj 80 170 osc~;"); ixv=sp.add("#X obj 300 200 vline~;")
-        m1=sp.add("#X obj 80 200 *~;"); m2=sp.add("#X obj 80 225 *~ 0;")
-        ad=sp.add("#X obj 80 250 +~ 0;"); car=sp.add("#X obj 80 275 osc~;")
-        dt=sp.add("#X obj 140 170 * 1.0035;"); adb=sp.add("#X obj 140 250 +~ 0;"); carb=sp.add("#X obj 140 275 osc~;"); cbg=sp.add("#X obj 140 290 *~ 0.5;")   # the second string quieter: a gentle beat, not a deep one
-        h2=sp.add("#X obj 200 170 * 2;"); m22=sp.add("#X obj 200 225 *~ 2;"); ad2=sp.add("#X obj 200 250 +~ 0;"); car2=sp.add("#X obj 200 275 osc~;"); g2=sp.add("#X obj 200 300 *~ 0.3;")
-        nz=sp.add("#X obj 260 250 noise~;"); hb=sp.add("#X obj 260 275 bp~ 2800 1.5;"); hv=sp.add("#X obj 340 250 vline~;"); hg=sp.add("#X obj 260 300 *~;")
-        sm=sp.add("#X obj 80 305 +~;"); sm2=sp.add("#X obj 80 320 +~;"); sm3=sp.add("#X obj 80 335 +~;"); hl=sp.add("#X obj 80 350 *~ 0.5;")
-        tbb=sp.add("#X obj 20 140 t b b b;"); tv=sp.add("#X obj 400 80 t f f f;")
-        # amp: velocity in 2 ms, down to 45% by the snap time, then out over the length
-        pa=sp.add("#X obj 400 140 pack f 1200 0.45 150;"); ma=sp.add(f"#X msg 400 170 {D}1 2 \\, {D}3 {D}4 2 \\, 0 {D}2 {D}4;")   # the tail starts as the drop ends
-        v45=sp.add("#X obj 480 110 * 0.45;")
-        # index: a hard hit is brighter; falls over the snap time to a level that keeps the tone rich
-        ixe=sp.add(f"#X obj 300 110 expr (1.5+5*{D}f2)*(0.55+0.45*{D}f1) \\; 0.9+1.4*{D}f2 \\; {D}f3;")
-        pk=sp.add("#X obj 300 140 pack f f f;"); mi=sp.add(f"#X msg 300 170 {D}1 \\, {D}2 {D}3;")
-        hm=sp.add(f"#X msg 340 220 {D}1 1 \\, 0 14 1;"); hvx=sp.add("#X obj 340 200 * 0.35;")
-        x2=sp.add("#X obj 690 140 * 0.6;"); x3=sp.add(f"#X obj 780 140 expr 260-200*{D}f1;"); x4=sp.add(f"#X obj 870 140 expr 300+{D}f1*2700;")
-        fk1=sp.add("#X obj 600 170 f 0.5;"); fsn=sp.add("#X obj 780 170 f 150;")
-        for c in [(mt,0,tf,0),(tf,3,mo,0),(tf,2,m2,1),(tf,2,ad,1),(tf,1,dt,0),(dt,0,adb,1),(tf,0,h2,0),(h2,0,ad2,1),
-                  (mo,0,m1,0),(ixv,0,m1,1),(m1,0,m2,0),(m2,0,ad,0),(ad,0,car,0),(m2,0,adb,0),(adb,0,carb,0),
-                  (m2,0,m22,0),(m22,0,ad2,0),(ad2,0,car2,0),(car2,0,g2,0),
-                  (nz,0,hb,0),(hb,0,hg,0),(hv,0,hg,1),
-                  (car,0,sm,0),(carb,0,cbg,0),(cbg,0,sm,1),(sm,0,hl,0),(hl,0,sm2,0),(g2,0,sm2,1),(sm2,0,sm3,0),(hg,0,sm3,1),(sm3,0,am,0),
-                  (tb,0,tbb,0),(tbb,2,fv,0),(fv,0,tv,0),(tv,2,v45,0),(v45,0,pa,2),(tv,1,hvx,0),(hvx,0,hm,0),(hm,0,hv,0),
-                  (tv,0,ixe,0),(ixe,2,pk,2),(ixe,1,pk,1),(ixe,0,pk,0),(pk,0,mi,0),(mi,0,ixv,0),
-                  (tbb,1,fsn,0),(fsn,0,pa,3),(fsn,0,ixe,2),(tbb,0,pa,0),(pa,0,ma,0),(ma,0,av,0),
-                  (k[0],0,fk1,0),(fk1,0,ixe,1),(k[1],0,x2,0),(x2,0,g2,1),(k[2],0,x3,0),(x3,0,fsn,1),(k[3],0,x4,0),(x4,0,pa,1)]: sp.con(*c)
-        # the amp pack takes the velocity on its left inlet: re-route so the hot inlet fires last with it
-        sp.C=[c for c in sp.C if c!=(tbb,0,pa,0)]; sp.con(tv,0,pa,0)
+        # v0.92 house piano, rebuilt as a struck string (it was two FM sines, which sounded thin). Ten partials, each a
+        # touch sharper than a whole multiple (a real string is stiff, so its overtones run sharp: B 0.0004), the first four
+        # doubled by a second string 3 cents up so they beat. A harder hit, or more brightness, puts more into the upper
+        # partials; the higher a partial the sooner it dies, so the note starts bright and mellows. Each partial's level falls
+        # to about half over the snap time, then away over the length (squared, so it tails off like a real decay, not a
+        # straight line). A felt-and-wood hammer knock on top. k1 brightness, k2 octave (the even partials), k3 snap, k4 length
+        NP=10; B=0.0004
+        ratios=[n*math.sqrt(1+B*n*n) for n in range(1,NP+1)]
+        tm=sp.add("#X obj 80 140 t f f;")
+        prm=sp.add("#X obj 400 120 pack f 0.5 0.3 150 1100;")   # velocity, brightness, octave, snap ms, length ms
+        mix=sp.add("#X obj 80 380 lop~ 9000;")
+        for i,r in enumerate(ratios):
+            n=i+1; x=80+i*110
+            fr=sp.add(f"#X obj {x} 170 * {r:.5f};"); o=sp.add(f"#X obj {x} 200 osc~;")
+            # level: the hammer's spectrum, brighter with velocity and k1; k2 lifts the even partials (the octave)
+            ex=sp.add(f"#X obj {x} 230 expr sqrt({D}f1*pow({n}\\, -(2.0-1.5*{D}f2*(0.5+0.5*{D}f1)))*(1+{1.6 if n%2==0 else 0}*{D}f3)) \; "
+                      f"0.7*sqrt({D}f1*pow({n}\\, -(2.0-1.5*{D}f2*(0.5+0.5*{D}f1)))*(1+{1.6 if n%2==0 else 0}*{D}f3)) \; {D}f4 \; "
+                      f"{D}f5/(1+0.55*{n-1}) \; {D}f4+2;")
+            pk=sp.add(f"#X obj {x} 260 pack f f f f f;")
+            ms=sp.add(f"#X msg {x} 285 {D}1 2 \\, {D}2 {D}3 2 \\, 0 {D}4 {D}5;")
+            ev=sp.add(f"#X obj {x} 310 vline~;"); sq=sp.add(f"#X obj {x} 330 *~;"); g=sp.add(f"#X obj {x} 350 *~;")
+            for c in [(tm,0,fr,0),(fr,0,o,0),(prm,0,ex,0),(ex,4,pk,4),(ex,3,pk,3),(ex,2,pk,2),(ex,1,pk,1),(ex,0,pk,0),(pk,0,ms,0),(ms,0,ev,0),
+                      (ev,0,sq,0),(ev,0,sq,1),(o,0,g,0),(sq,0,g,1),(g,0,mix,0)]: sp.con(*c)
+            if n<=4:   # the second string
+                f2=sp.add(f"#X obj {x+50} 170 * {r*1.0017:.5f};"); o2=sp.add(f"#X obj {x+50} 200 osc~;"); g2=sp.add(f"#X obj {x+50} 350 *~;"); h=sp.add(f"#X obj {x+50} 365 *~ 0.8;")
+                for c in [(tm,1,f2,0),(f2,0,o2,0),(o2,0,g2,0),(sq,0,g2,1),(g2,0,h,0),(h,0,mix,0)]: sp.con(*c)
+        # the hammer: a short knock of filtered noise, harder with velocity
+        nz=sp.add("#X obj 900 250 noise~;"); hb=sp.add("#X obj 900 275 bp~ 2500 1;"); hv=sp.add("#X obj 980 250 vline~;"); hg=sp.add("#X obj 900 300 *~;")
+        hm=sp.add(f"#X msg 980 220 {D}1 1 \\, 0 18 1;"); hvx=sp.add("#X obj 980 200 * 0.45;")
+        hl=sp.add("#X obj 80 400 *~ 0.42;")
+        # the overall gate: open on the hit (the partials shape the note), closed by an off
+        gt=sp.add("#X msg 300 120 1 2;")
+        tbb=sp.add("#X obj 20 140 t b b;")
+        x3=sp.add(f"#X obj 780 140 expr 260-200*{D}f1;"); x4=sp.add(f"#X obj 870 140 expr 400+{D}f1*3600;")
+        for c in [(mt,0,tm,0),(tb,0,tbb,0),(tbb,1,fv,0),(fv,0,prm,0),(fv,0,hvx,0),(hvx,0,hm,0),(hm,0,hv,0),(tbb,0,gt,0),(gt,0,av,0),
+                  (nz,0,hb,0),(hb,0,hg,0),(hv,0,hg,1),(hg,0,mix,0),(mix,0,hl,0),(hl,0,am,0),
+                  (k[0],0,prm,1),(k[1],0,prm,2),(k[2],0,x3,0),(x3,0,prm,3),(k[3],0,x4,0),(x4,0,prm,4)]: sp.con(*c)
     elif kind=="rhodes":
         # v0.84 Rhodes: a warm body (gentle FM, ratio 1) plus the tine: a high partial (14x, as on the DX7 electric pianos)
         # that rings for a moment on the attack. Bark: the harder the hit, the more the body is driven (k2 sets how much),
@@ -2158,7 +2164,7 @@ CHORD_GAIN={"stab":0.42,"organ":0.135,"pad":0.3,"piano":0.4,"rhodes":0.13,"strin
 CHORD_ENGINES=[("stab","Stab: two detuned saws through a filter that snaps shut. Dub techno with the delay"),
                ("organ","Organ: sine drawbars plus a percussive click. House organ stabs"),
                ("pad","Pad: three detuned saws with a slow attack. Long chords"),
-               ("piano","House piano: M1-style. Two strings beating gently \\, a hammer click \\, bright as it rings. Classic house"),
+               ("piano","House piano: a struck string. Ten stretched partials \\, a second string beating \\, a hammer knock. Classic house and Italo piano"),
                ("rhodes","Rhodes: a warm body with the tine ringing on the attack \\, barks when hit hard \\, tremolo. Deep house"),
                ("strings","Strings: a string machine with a slow swell and an ensemble chorus. Dub techno and builds")]
 for idx,(kind,title) in enumerate(CHORD_ENGINES):
