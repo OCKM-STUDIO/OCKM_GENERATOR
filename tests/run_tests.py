@@ -919,7 +919,7 @@ def touchscreen_screens_draw(work):
         raise Skip("Pillow not installed")
     p = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_preview.py"), os.path.join(work, "preview")], capture_output=True, text=True)
     assert p.returncode == 0, p.stderr[-800:]
-    assert len(os.listdir(os.path.join(work, "preview"))) == 34, "expected thirty-four screen pictures"
+    assert len(os.listdir(os.path.join(work, "preview"))) == 36, "expected thirty-six screen pictures"
 
 @test
 def mute_solo_and_levels(work):
@@ -1010,7 +1010,7 @@ def touchscreen_song_parts_in_and_out(work):
     tap(450, 810, 406)                   # and the turnaround at the end of each phrase (v1.03: fill, turnaround, half-time)
     tap(500, 601, 36)                    # bass tab
     tap(550, 916, 283)                   # on/off switch: back on
-    tap(600, 338, 36)                    # perform B
+    tap(600, 270, 36)                    # perform B
     tap(650, 360, 190)                   # the lead's tile: it's out, so nothing changes
     f = os.path.join(work, "t_song.pd"); h.finish(800, f)
     out = run(work, f)
@@ -1070,7 +1070,7 @@ def live_mutes_land_on_the_bar(work):
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness(); h.show("ockm-d1-mute", "ockm-bass-mute", "ockm-bar", "ockm-d2-mute")
     h.at(100, "ockm-bpm 120 ; ockm-play 1")
-    h.at(150, "ockm-ui-test tap 338 36")       # live tab
+    h.at(150, "ockm-ui-test tap 270 36")       # live tab
     h.at(200, "ockm-ui-test tap 400 97")       # mutes land: next bar
     h.at(700, "test-mark 1 ; ockm-ui-test tap 60 180")      # kick tile, part way through the first bar (a bar is 2 s)
     h.at(2600, "ockm-ui-test tap 74 556")      # scene: drums only (after the kick has gone)
@@ -1097,7 +1097,7 @@ def live_macros_move_several_things_and_put_them_back(work):
     if not PDLUA:
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness(); h.show("ockm-verb-mix", "ockm-d2-mute", "ockm-d1-mute", "ockm-bass-mute", "ockm-filter-glide")
-    h.at(100, "ockm-ui-test tap 338 36")       # perform
+    h.at(100, "ockm-ui-test tap 270 36")       # perform
     h.at(200, "ockm-ui-test press 700 500")    # lift, held
     h.at(300, "ockm-ui-test release 700 500")
     h.at(400, "ockm-ui-test press 850 500")    # breakdown, held
@@ -1126,7 +1126,7 @@ def settings_macro_library_and_slots(work):
     h.at(200, "ockm-ui-test tap 90 272")       # macros
     h.at(250, "ockm-ui-test tap 260 371")      # recipe 4: sink
     h.at(300, "ockm-ui-test tap 532 552")      # on slot A
-    h.at(350, "ockm-ui-test tap 338 36")       # Perform B
+    h.at(350, "ockm-ui-test tap 270 36")       # Perform B
     h.at(400, "ockm-ui-test press 550 520")    # hold slot A
     h.at(2600, "ockm-ui-test release 550 520")
     f = os.path.join(work, "t_settings.pd"); h.finish(2800, f)
@@ -1900,6 +1900,62 @@ def gap_before_the_drop(work):
     before, gap, after = rms(2.6, 3.3), rms(3.55, 3.9), rms(4.1, 4.6)
     assert before > 0.01 and after > 0.01, f"it plays either side of the gap: {before:.4f} {after:.4f}"
     assert gap < before / 30, f"the last beat should be silent, effects and all: {gap:.5f} against {before:.4f}"
+
+@test
+def bus_effects_shape_their_bus(work):
+    """v1.23: the bus effects. Crush on the drums bus changes its sound but not its level much; the music bus's filter,
+    pulled left, takes the top off the music; out, the mix is untouched."""
+    try:
+        import numpy as np
+    except ImportError:
+        raise Skip("numpy not installed")
+    def rec(name, msgs):
+        h = Harness(); h.record(os.path.join(work, name + ".wav"))
+        h.at(100, "ockm-bpm 124 ; ockm-drum-groove 3 ; ockm-chord-engine 3 ; ockm-chord-rhythm 9 ; " + msgs + " ; ockm-play 1")
+        h.at(4000, "ockm-play 0"); f = os.path.join(work, name + ".pd"); h.finish(4100, f)
+        subprocess.run([PD, "-nogui", "-nosound", "-nomidi", "-batch"] + (["-path", PDLUA, "-lib", "pdlua"] if PDLUA else []) +
+                       ["-open", "OCKM_GENERATOR.pd", "-open", f], cwd=work, capture_output=True, text=True, timeout=300)
+        wv = wave.open(os.path.join(work, name + ".wav")); sr = wv.getframerate()
+        x = np.frombuffer(wv.readframes(wv.getnframes()), np.int16).astype(float)[::wv.getnchannels()] / 32768
+        x = x[int(0.5 * sr):]
+        X = np.abs(np.fft.rfft(x)) ** 2; fr = np.fft.rfftfreq(len(x), 1 / sr)
+        return 10 * np.log10((x ** 2).mean() + 1e-12), 10 * np.log10(X[fr > 4000].sum() / max(1e-12, X[fr > 20].sum()) + 1e-12)
+    drums = "ockm-bass-on 0 ; ockm-lead-on 0 ; ockm-chord-on 0"
+    d0, dh0 = rec("bfx_d0", drums)
+    d1, dh1 = rec("bfx_d1", drums + " ; ockm-bfx-drums-type 1 ; ockm-bfx-drums-on 1 ; ockm-bfx-drums-x 0.8 ; ockm-bfx-drums-y 0.8")
+    assert abs(dh1 - dh0) > 3, f"crush should change the drums' top end: {dh0:.1f} to {dh1:.1f} dB"
+    assert abs(d1 - d0) < 4, f"crush keeps the level about even: {d0:.1f} to {d1:.1f} dB"
+    music = "ockm-drums-on 0 ; ockm-chord-verb 0 ; ockm-chord-delay 0 ; ockm-lead-verb 0 ; ockm-lead-delay 0"
+    m0, mh0 = rec("bfx_m0", music)
+    m1, mh1 = rec("bfx_m1", music + " ; ockm-bfx-music-type 0 ; ockm-bfx-music-on 1 ; ockm-bfx-music-x 0.15 ; ockm-bfx-music-y 0.3")
+    assert mh1 < mh0 - 6, f"the low-pass should take the top off the music: {mh0:.1f} to {mh1:.1f} dB"
+    m2, mh2 = rec("bfx_m2", music + " ; ockm-bfx-music-type 0 ; ockm-bfx-music-on 0 ; ockm-bfx-music-x 0.15")
+    assert abs(m2 - m0) < 0.3 and abs(mh2 - mh0) < 0.3, "out, the effect leaves the bus alone"
+
+@test
+def touchscreen_fx_pad_plays_and_latches(work):
+    """v1.23: on the fx page a finger on the pad brings the bus's effect in at that spot and lifting takes it out;
+    latched, it stays in. Macros can move a bus effect too."""
+    sys.path.insert(0, os.path.join(ROOT, "tests"))
+    import ui_preview
+    if not ui_preview.LUA:
+        raise Skip("no lua to run the screen")
+    L = ui_preview.run(["test tap 346 36", "test press 400 100", "test release 400 100"])
+    sent = [l for l in L if l.startswith("sent ockm-bfx-drums-")]
+    assert "sent ockm-bfx-drums-on float 1" in sent and sent[-1] == "sent ockm-bfx-drums-on float 0", sent
+    x = [float(l.split()[3]) for l in sent if "-x " in l][0]
+    assert x < 0.2, f"near the left edge: {x}"
+    L = ui_preview.run(["test tap 346 36", "test tap 100 198", "test press 700 300", "test release 700 300"])
+    sent = [l for l in L if l.startswith("sent ockm-bfx-drums-on")]
+    assert sent == ["sent ockm-bfx-drums-on float 1"], f"latched: stays in after lifting: {sent}"
+    # the music bus, its filter picked
+    L = ui_preview.run(["test tap 346 36", "test tap 100 262", "test press 900 500", "test release 900 500"])
+    assert any(l.startswith("sent ockm-bfx-music-on float 1") for l in L), "the music bus is the pad's now"
+    # a macro with a drums fx move (added in the editor: + add a move, then step the move round to drums fx), tried
+    s = ["test tap 919 36", "test tap 830 195", "test tap 90 216", "test tap 90 272", "test tap 260 119", "send ockm-playing float 1",
+         "test tap 600 390"] + ["test tap 490 394"] * 8 + ["test press 800 550"]
+    L = ui_preview.run(s)
+    assert "sent ockm-bfx-drums-on float 1" in L and "sent ockm-bfx-drums-type float 1" in L, [l for l in L if "bfx" in l]
 
 @test
 def eight_bar_lift_pushes_late(work):

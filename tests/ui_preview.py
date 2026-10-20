@@ -89,13 +89,13 @@ SHOTS = [
     ("perform-synths", ["array ockm-pat-d1 2 0 0 0 1 0 0 0 2 0 0 0 1 0 0 0", "array ockm-pat-d5 1 1 0 1 1 1 0 1 1 1 0 1 1 1 0 1",
                         "array ockm-pat-bass-on 1 0 1 1 0 1 1 0 1 0 1 1 0 1 1 0", "array ockm-pat-chord-on 1 0 0 0 0 0 0 0 1",
                         "send ockm-bass-seed float 2", "send ockm-play float 1", "send ockm-step float 2", "test tap 902 163"]),   # playing, filter hold on
-    ("live", ["array ockm-pat-d1 2 0 0 0 1 0 0 0 2 0 0 0 1 0 0 0", "send ockm-playing float 1", "send ockm-step float 4", "test tap 338 36",
+    ("live", ["array ockm-pat-d1 2 0 0 0 1 0 0 0 2 0 0 0 1 0 0 0", "send ockm-playing float 1", "send ockm-step float 4", "test tap 270 36",
               "test tap 400 97", "test tap 60 180", "send ockm-d3-mute float 1"]),          # next bar, kick waiting to mute, clap muted
-    ("live-macro", ["test tap 338 36", "test press 700 500"]),                              # holding wash
+    ("live-macro", ["test tap 270 36", "test press 700 500"]),                              # holding wash
     ("menu", ["send ockm-bpm float 124", "test tap 919 36"]),                                # the menu, open (unsaved: the disc is orange)
     ("settings-device", ["test release 700 500", "test tap 830 195", "test tap 90 216"]),   # the menu is still open from the shot before
     ("settings-macros", ["test tap 90 272", "test tap 260 119"]),
-    ("perform-b-pick", ["test tap 338 36", "test tap 610 447"]),                                # the v on slot A: pick a recipe
+    ("perform-b-pick", ["test tap 270 36", "test tap 610 447"]),                                # the v on slot A: pick a recipe
     ("drums-all", ["test tap 539 36", "test tap 539 36", "test tap 896 134"]),           # drums tab, all drums (v0.87: Perform A's grid)
     ("drums", ["test tap 879 428"]),                                  # back to one drum
     ("bass", ["test tap 601 36", "test tap 89 158"]),                 # bass tab; tapping a step on auto just explains the lock
@@ -105,6 +105,8 @@ SHOTS = [
     ("compose", ["test tap 477 36"]),
     ("perform-mutes", ["test tap 262 36", "test tap 74 186", "test tap 103 503"]),   # mute the kick, solo the bass
     ("mixer", ["test tap 407 36"]),
+    ("fx", ["test tap 346 36", "test press 700 250"]),                   # v1.23: the fx page, a finger on the pad (drums: crush in)
+    ("fx-settings", ["test release 700 250", "test tap 250 198"]),      # the drums bus's settings
     ("mixer-eq", ["send ockm-d4-lowcut float 300", "send ockm-d4-eqmid float -6", "send ockm-d4-eqmidf float 500", "send ockm-d4-eqhigh float 5", "test tap 407 36", "test tap 288 232"]),
     ("drums-long", ["test tap 750 546", "test tap 539 36", "test tap 861 88", "test tap 194 88"]),        # 64 steps, forward to the second block
     ("compose-melody", ["test tap 477 36", "test tap 363 250", "test tap 831 250", "test tap 586 402", "test tap 878 406"]),   # bass and lead out, phrase 8 with the turnaround

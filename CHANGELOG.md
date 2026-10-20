@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.23 (20 October 2026)
+
+- **FX page** (next to perform): three buses, each with one effect: **drums**, **music** (lead and chords) and **master**. Pick a bus and its effect (**filter**, **crush**, **drive** or **saturate**), then play it on the **XY pad**: put a finger down and it comes in, move to play it, lift and it goes
+- **Latch** keeps a bus's effect in after you lift. The screen takes one finger at a time, so latch one bus and play another
+- **Settings** per bus and effect: mix (dry to wet), the effect's own setting (crush tone, drive character, saturate bias) and glide (how slowly it follows your finger)
+- **The bass** goes with the drums (the default: it carries the floor while you filter the music) or with the music
+- The pad: filter is low-pass to the left, open in the middle, high-pass to the right, resonance up; crush is sample rate across, bits up; drive is drive across, tone up; saturate is amount across, warmth up. Each is level-matched so it doesn't jump
+- **Macros can play bus effects:** new moves drums fx, music fx and master fx, each with its effect and an amount, over a time and back like any other move. Recipes can now have six moves
+- Reverb and delay stay shared on the master, so a filter on the music bus doesn't filter its reverb tail
+- Mono for now: stereo, flanger and phaser come later
+- The perform tab is narrower to make room for fx; everything else stays where it was
+
 ## v1.22 (20 October 2026)
 
 - **A gap before the drop:** the lifts now take the whole mix out, reverb and delay tails included, just before everything slams back on the 1. A beat on the 8 bar lift, half a beat on the 4 bar lift. Each recipe with a length has a gap button in the macro editor (no gap, half a beat, a beat). Hold a lift and let go late in the bar and the gap is skipped rather than cut short

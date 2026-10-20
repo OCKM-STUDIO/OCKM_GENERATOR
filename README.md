@@ -6,7 +6,7 @@ Tap a style and it builds a whole loop in that style: tempo, groove, key, chords
 
 ![Perform screen](docs/img/perform.png)
 
-**Status:** v1.20, a personal project that works and gets played, moving fast. I'm looking for collaborators (see [below](#looking-for-collaborators)).
+**Status:** v1.23, a personal project that works and gets played, moving fast. I'm looking for collaborators (see [below](#looking-for-collaborators)).
 
 ## What's in it
 
@@ -16,6 +16,7 @@ Tap a style and it builds a whole loop in that style: tempo, groove, key, chords
 - **The builder:** key, scale and progression shared by every part, phrase length, turnarounds, and an evolve setting that changes one part every phrase and brings it back
 - **Fifteen styles,** from deep house and Chicago through Italo piano, filter house and trance to peak time and hard techno. Every tap is a fresh take inside the style
 - **Perform:** mutes that land on the beat or bar, solos, a DJ filter, drive, rise, drop, a DJ rewind, beat repeat, and macros (8 bar lift, 4 bar lift, breakdown) that combine mutes and effects over 4 bars
+- **FX page:** three buses (drums, music, master), each with a filter, crush, drive or saturator played on an XY pad, latchable, and movable from macros
 - **Mixer:** dB faders, sends, mute and solo, and a 4-band EQ per track
 - **Arrange and export:** turn the loop into a track; export the mix, stems and MIDI
 - **MIDI:** USB controllers (pads mute and fire macros, knobs move the effects and the synth you're on), and MIDI clock in and out

@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v1.22"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v1.23"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -64,6 +64,15 @@ local LEAD_TUNE_ORDER = { 0, 1, 8, 9, 18, 15, 16, 19 }
 local LEAD_TUNE_NAME = { [0] = "one note", [16] = "question", [19] = "answer the bass" }
 local PROG_ORDER = { 0, 1, 12, 13, 14, 15, 3, 16, 17, 5, 6, 7, 2, 10, 11, 18, 9 }   -- v1.01: retired (syncopated, garage skip); old loops move to tresillo
 -- names shown on screen, where they differ from the engine's own
+-- v1.23 bus effects: three buses, one effect slot each, played from the fx page's XY pad (one finger) and from macros
+local BUSES = { "drums", "music", "master" }
+local BFX = { "filter", "crush", "drive", "saturate" }          -- ockm-bfx-<bus>-type 0-3
+local BFX_DEF = { drums = 1, music = 0, master = 3 }
+local BFX_P = { filter = 0, crush = 0.2, drive = 0.3, saturate = 0.4 }
+-- what the pad's two directions do, and the effect's own setting (nil: none)
+local BFX_AXES = { filter = { "low-pass  <  open  >  high-pass", "resonance" }, crush = { "sample rate (lower to the right)", "bits (fewer up)" },
+                   drive = { "drive", "tone (brighter up)" }, saturate = { "amount", "warmth" } }
+local BFX_SET = { crush = "tone (darker)", drive = "character (grit)", saturate = "bias (tape)" }
 local VOICINGS = { "close", "open", "wide" }
 local LH_PATTERNS = { "anchor", "pulse", "synco", "broken", "answer" }   -- v1.20 the left hand (ockm-chord-hands 1-5)
 local ENG_LABEL = { reese = "wide", mini = "analogue", stab = "poly", hard = "hard stab" }
@@ -345,6 +354,12 @@ function ui:defaults()
   v["ockm-lead-repeat"] = 0; v["ockm-lead-rests"] = 0
   v["ockm-chord-rate"] = 1; v["ockm-chord-push"] = 0; v["ockm-chord-vary"] = 0; v["ockm-chord-drift"] = 0; v["ockm-chord-hands"] = 0   -- analogue, analogue, poly (as the engine starts)
   v["ockm-drum-punch"] = 0.5
+  v["ockm-bass-bus"] = 1   -- v1.23: the bass with the drums for the bus effects
+  for _, b in ipairs(BUSES) do
+    v["ockm-bfx-"..b.."-type"] = BFX_DEF[b]; v["ockm-bfx-"..b.."-glide"] = 0.15; v["ockm-bfx-"..b.."-on"] = 0
+    v["ockm-bfx-"..b.."-x"] = 0.5; v["ockm-bfx-"..b.."-y"] = 0.5
+    for _, e in ipairs(BFX) do v["ockm-bfx-"..b.."-"..e.."-mix"] = 1; v["ockm-bfx-"..b.."-"..e.."-p"] = BFX_P[e] end
+  end
   v["ockm-style"] = -1; v["ockm-bass-half"] = 0; v["ockm-lead-half"] = 0; v["ockm-chord-half"] = 0
   v["ockm-bass-mode"] = 0; v["ockm-lead-mode"] = 0; v["ockm-chord-mode"] = 0   -- 0 auto, 1 manual
   v["ockm-bass-sync"] = 1; v["ockm-lead-sync"] = 1; v["ockm-leader"] = 0; v["ockm-drum-groove"] = -1
@@ -385,6 +400,11 @@ function ui:hooks()
   for _, k in ipairs({"engine","k1","k2","k3","k4","type","smooth","verb","delay","rhythm","prog","voicing","strum","rate","push","vary","drift","hands"}) do h[#h+1] = "ockm-chord-"..k end
   for _, t in ipairs(SYNTHS) do for _, k in ipairs({ "lfo-shape", "lfo-rate", "lfo-depth", "lfo-target", "chorus" }) do h[#h+1] = "ockm-"..t.."-"..k end end
   for _, t in ipairs(TRACKS) do h[#h+1] = "ockm-"..t.."-mute"; h[#h+1] = "ockm-"..t.."-solo" end
+  h[#h+1] = "ockm-bass-bus"   -- v1.23 bus effects
+  for _, b in ipairs(BUSES) do
+    h[#h+1] = "ockm-bfx-"..b.."-type"; h[#h+1] = "ockm-bfx-"..b.."-glide"
+    for _, e in ipairs(BFX) do h[#h+1] = "ockm-bfx-"..b.."-"..e.."-mix"; h[#h+1] = "ockm-bfx-"..b.."-"..e.."-p" end
+  end
   for _, t in ipairs(SYNTHS) do h[#h+1] = "ockm-"..t.."-level"; h[#h+1] = "ockm-"..t.."-mode" end
   for _, t in ipairs(SYNTHS) do h[#h+1] = "ockm-"..t.."-on" end
   for _, t in ipairs(TRACKS) do for _, k in ipairs({ "lowcut", "eqlow", "eqmid", "eqmidf", "eqhigh" }) do h[#h+1] = "ockm-"..t.."-"..k end end
@@ -821,6 +841,7 @@ function ui:layout()
   self:layout_top(add)
   if self.screen == "perform" then self:layout_perform(add)
   elseif self.screen == "live" then self:layout_live(add)
+  elseif self.screen == "fx" then self:layout_fx(add)
   elseif self.screen == "drums" then self:layout_drums(add)
   elseif self.screen == "mixer" then self:layout_mixer(add)
   elseif self.screen == "compose" then self:layout_compose(add)
@@ -832,8 +853,9 @@ function ui:layout()
   if self.sheet == "eq" then self:layout_eq(add) end
   if self.sheet == "variations" then self:layout_variations(add) end
   if self.sheet == "slotpick" then self:layout_slotpick(add) end
+  if self.sheet == "fxset" then self:layout_fxset(add) end
   -- messages on screens that have no message line of their own
-  if self.msg and (self.screen == "perform" or self.screen == "live" or self.screen == "compose" or self.screen == "mixer" or self.screen == "arrange" or self.screen == "setup" or self.screen == "drums"
+  if self.msg and (self.screen == "perform" or self.screen == "live" or self.screen == "fx" or self.screen == "compose" or self.screen == "mixer" or self.screen == "arrange" or self.screen == "setup" or self.screen == "drums"
                    or (self.msg_undo and self.undo_label)) then
     if self.msg_undo and self.undo_label then
       add{ kind="toast", x=W / 2 - 330, y=H - 50, w=556, h=38, label=self.msg }
@@ -854,7 +876,7 @@ end
 -- the tabs, in three groups: playing (perform A, perform B, mixer), making (compose and the four parts), arranging.
 -- { screen, label, part, width, gap before }
 -- v0.87: one perform screen ("live" inside), as wide as the two it replaces so the other tabs stay where they were
-local TABS = { { "live", "perform", nil, 148 }, { "mixer", "mixer", nil, 58 },
+local TABS = { { "live", "perform", nil, 88 }, { "fx", "fx", nil, 56 }, { "mixer", "mixer", nil, 58 },   -- v1.23: fx takes part of perform's width
                { "compose", "builder", nil, 58, 8 }, { "drums", "drums", nil, 58 }, { "synth", "bass", 1, 58 }, { "synth", "lead", 2, 58 }, { "synth", "chord", 3, 58 },
                { "arrange", "arrange", nil, 58, 8 } }
 local NAV_Y, NAV_H = 70, 36
@@ -889,7 +911,7 @@ function ui:layout_top(add)
     add{ kind="disc", x=W - 120, y=12, w=50, h=48, tap=function() self:save_variation() end }
   end
   add{ kind="menubtn", x=W - 66, y=12, w=50, h=48, sel=(self.menu or self.screen == "project" or self.screen == "setup"), tap=function() self.menu = not self.menu end }
-  if self.screen ~= "project" and self.screen ~= "setup" and self.screen ~= "live" then self:layout_nav(add) end
+  if self.screen ~= "project" and self.screen ~= "setup" and self.screen ~= "live" and self.screen ~= "fx" then self:layout_nav(add) end
 end
 
 -- the menu (top right): everything that isn't a screen you play or make on
@@ -1250,6 +1272,78 @@ function ui:layout_live(add)
   end
 end
 
+-- ------------------------------------------------------------------ fx (v1.23)
+-- Three buses (drums, music, master), one effect each. Pick a bus, pick its effect, then play it on the XY pad: put a
+-- finger down and the effect comes in, move it to play it, lift and it goes (unless latched: then it stays where you
+-- left it). The screen takes one finger at a time, so latch one bus, then play another on the pad
+function ui:bfx_on(b) return (self.v["ockm-bfx-"..b.."-on"] or 0) > 0 end
+function ui:bfx_name(b) return BFX[math.floor(self.v["ockm-bfx-"..b.."-type"] or BFX_DEF[b]) + 1] or "filter" end
+function ui:bfx_set_on(b, on)
+  if self:bfx_on(b) ~= on then self:send("ockm-bfx-"..b.."-on", on and 1 or 0) end
+end
+function ui:bfx_pad(x, y, phase)
+  local b = self.fx_target or "drums"
+  if phase == "up" then
+    if not (self.fx_latch and self.fx_latch[b]) then self:bfx_set_on(b, false) end
+    return
+  end
+  self:send("ockm-bfx-"..b.."-x", x); self:send("ockm-bfx-"..b.."-y", y)
+  if phase == "down" then self:bfx_set_on(b, true) end
+end
+function ui:layout_fx(add)
+  self.fx_latch = self.fx_latch or {}
+  local tb = self.fx_target or "drums"
+  local cx, cw, ch = 16, 320, 146
+  for i, b in ipairs(BUSES) do
+    local y = 80 + (i - 1) * (ch + 8)
+    local on, nm = self:bfx_on(b), self:bfx_name(b)
+    add{ kind="card", x=cx, y=y, w=cw, h=ch }
+    add{ kind="choice", x=cx + 8, y=y + 8, w=cw - 16, h=40, sel=(tb == b), label=b .. ": " .. nm .. (on and "  (in)" or ""),
+         tap=function() self.fx_target = b end }
+    local fw = (cw - 16 - 18) / 4
+    for k, e in ipairs(BFX) do
+      add{ kind="choice", x=cx + 8 + (k - 1) * (fw + 6), y=y + 54, w=fw, h=38, small=true, label=e, sel=(nm == e), accent=true,
+           tap=function() self.fx_target = b; self:send("ockm-bfx-"..b.."-type", k - 1) end }
+    end
+    local hw = (cw - 16 - 6) / 2
+    local lat = self.fx_latch[b] and true or false
+    add{ kind="choice", x=cx + 8, y=y + 98, w=hw, h=40, small=true, accent=true, sel=lat, label=lat and "latched" or "latch",
+         tap=function()
+           self.fx_latch[b] = not lat
+           if lat then self:bfx_set_on(b, false) end   -- unlatching lets it go
+         end }
+    add{ kind="btn", x=cx + 8 + hw + 6, y=y + 98, w=hw, h=40, small=true, label="settings",
+         tap=function() self.fx_target = b; self.sheet = "fxset" end }
+  end
+  -- the bass: with the drums (it goes where the kick goes) or with the music
+  local bb = (self.v["ockm-bass-bus"] or 1) > 0
+  local by = 80 + 3 * (ch + 8)
+  add{ kind="text", x=cx + 8, y=by + 14, w=80, h=12, label="bass goes", size=11 }
+  local bw = (cw - 96 - 6) / 2
+  add{ kind="choice", x=cx + 90, y=by, w=bw, h=40, small=true, label="with drums", sel=bb, tap=function() self:send("ockm-bass-bus", 1) end }
+  add{ kind="choice", x=cx + 90 + bw + 6, y=by, w=bw, h=40, small=true, label="with music", sel=not bb, tap=function() self:send("ockm-bass-bus", 0) end }
+  -- the pad
+  local nm = self:bfx_name(tb)
+  add{ kind="xy", x=352, y=80, w=W - 352 - 16, h=H - 80 - 12, bus=tb, fx=nm, axes=BFX_AXES[nm],
+       down=function(x, y) self:bfx_pad(x, y, "down") end, drag=function(x, y) self:bfx_pad(x, y, "move") end, up=function() self:bfx_pad(0, 0, "up") end }
+end
+-- an effect's settings: how much of it (mix), its own setting, and how quickly it follows the pad (glide)
+function ui:layout_fxset(add)
+  local b = self.fx_target or "drums"
+  local nm = self:bfx_name(b)
+  add{ kind="scrim", x=0, y=0, w=W, h=H, tap=function() self.sheet = nil end }
+  local x0, y0, w0 = W / 2 - 240, 120, 480
+  local rows = { { "ockm-bfx-"..b.."-"..nm.."-mix", "mix (dry to wet)" } }
+  if BFX_SET[nm] then rows[#rows + 1] = { "ockm-bfx-"..b.."-"..nm.."-p", BFX_SET[nm] } end
+  rows[#rows + 1] = { "ockm-bfx-"..b.."-glide", "glide (how slowly it follows your finger)" }
+  add{ kind="sheet", x=x0, y=y0, w=w0, h=60 + #rows * 62 + 56 }
+  add{ kind="text", x=x0 + 16, y=y0 + 16, w=w0 - 32, h=14, label=b .. " bus: " .. nm .. " settings", size=13, col="txt" }
+  for i, r in ipairs(rows) do
+    add{ kind="hbar", x=x0 + 16, y=y0 + 48 + (i - 1) * 62, w=w0 - 32, h=54, hook=r[1], lo=0, hi=1, label=r[2], bold=true }
+  end
+  add{ kind="btn", x=x0 + w0 - 116, y=y0 + 56 + #rows * 62, w=100, h=40, small=true, label="done", tap=function() self.sheet = nil end }
+end
+
 -- ------------------------------------------------------------------ my settings
 -- Things that belong to you, not to a project: your macros, which three are on Perform B, defaults for new
 -- projects and how this device behaves. Kept in my-settings.lua beside the patch (not inside any project).
@@ -1265,7 +1359,20 @@ local TARGETS = {
   { id = "rise",     hook = "ockm-rise",        switch = true },
   { id = "throw",    hook = "ockm-delay-throw", switch = true },
   { id = "mutes",    choices = { "kick + bass", "drums only", "no drums", "no kick" } },
+  -- v1.23: a bus effect (its effect picked in the move; the amount runs from none to full, or for the filter from
+  -- closed low-pass through open to high-pass)
+  { id = "drums fx", bus = "drums" }, { id = "music fx", bus = "music" }, { id = "master fx", bus = "master" },
 }
+-- where an amount puts a bus effect on the pad (x, y)
+local function bus_xy(fx, v)
+  local e = BFX[(fx or 0) + 1] or "filter"
+  if e == "filter" then return 0.5 + 0.5 * clamp(v, -1, 1), 0.35 end
+  v = clamp(v, 0, 1)
+  if e == "crush" then return 0.9 * v, v end
+  if e == "drive" then return v, 0.6 end
+  return v, 0.4
+end
+local function bus_range(fx) return ((fx or 0) == 0) and -1 or 0, 1 end
 local TARGET = {}; for _, t in ipairs(TARGETS) do TARGET[t.id] = t end
 local HOW = { { "jump", 0 }, { "1 beat", 4 }, { "1 bar", 16 }, { "2 bars", 32 }, { "4 bars", 64 }, { "8 bars", 128 } }   -- in steps (8 bars: v1.18)
 local BACK = { "snap back", "glide back", "stay" }
@@ -1397,6 +1504,7 @@ local function move_label(m)
   if not t then return "?" end
   if t.choices then return t.choices[m.v] or "mutes" end
   local word = m.t
+  if t.bus then word = t.bus .. " " .. (BFX[(m.fx or 0) + 1] or "fx") end
   if m.t == "filter" then word = (m.v >= 0) and "filter up" or "filter down" end
   if t.switch then return word end
   if HOW[m.how] and HOW[m.how][2] > 0 then word = word .. " over " .. HOW[m.how][1] end
@@ -1415,10 +1523,10 @@ end
 -- unless it stays, in which case the macro stays lit until you tap it again
 local function steps_ms(self, steps) return steps * 15000 / math.max(40, self.v["ockm-bpm"] or 124) end
 function ui:mset(hook, x) self.v[hook] = x; pd.send(hook, "float", { x }) end
-function ui:ramp(hook, to, ms)
+function ui:ramp(hook, to, ms, done)
   self.ramps = self.ramps or {}
-  if ms <= 0 then self.ramps[hook] = nil; self:mset(hook, to); return end
-  self.ramps[hook] = { from = self.v[hook] or 0, to = to, t = 0, dur = ms }
+  if ms <= 0 then self.ramps[hook] = nil; self:mset(hook, to); if done then done() end; return end
+  self.ramps[hook] = { from = self.v[hook] or 0, to = to, t = 0, dur = ms, done = done }
   if self.rampclock then self.rampclock:delay(30) end
 end
 function ui:ramp_tick()
@@ -1427,7 +1535,7 @@ function ui:ramp_tick()
     r.t = r.t + 30
     local f = math.min(1, r.t / r.dur)
     self:mset(hook, r.from + (r.to - r.from) * f)
-    if f >= 1 then self.ramps[hook] = nil else any = true end
+    if f >= 1 then self.ramps[hook] = nil; if r.done then r.done() end else any = true end
   end
   self:dirty()
   if any and self.rampclock then self.rampclock:delay(30) end
@@ -1461,6 +1569,15 @@ function ui:macro_down(slot)
         local want = keep(tr) and 0 or 1
         if want ~= saved.mutes[tr] then self:qmute(tr, want) end
       end
+    elseif t and t.bus then
+      -- a bus effect: in at its starting point, then over its time to the amount
+      local b, pre = t.bus, "ockm-bfx-" .. t.bus .. "-"
+      saved.bus = saved.bus or {}
+      saved.bus[b] = { type = self.v[pre .. "type"] or BFX_DEF[b], on = self.v[pre .. "on"] or 0, x = self.v[pre .. "x"] or 0.5, y = self.v[pre .. "y"] or 0.5 }
+      local x0, y0 = bus_xy(m.fx, 0)
+      local x1, y1 = bus_xy(m.fx, m.v)
+      self:mset(pre .. "type", m.fx or 0); self:mset(pre .. "x", x0); self:mset(pre .. "y", y0); self:mset(pre .. "on", 1)
+      self:ramp(pre .. "x", x1, ms); self:ramp(pre .. "y", y1, ms)
     elseif t and t.id == "filter" and m.late and ms > 0 then
       -- late (v1.21): 60% of the way over the first half of the time, the rest by seven eighths, then held
       pd.send("ockm-filter-glide", "list", { m.v * 0.6, math.max(30, ms * 0.5) }); self.v["ockm-filter"] = m.v
@@ -1494,6 +1611,20 @@ function ui:macro_restore(all, force)
       local glide = (back == 2) and steps_ms(self, 16) or 0
       if t and t.choices then
         for tr, x in pairs(saved.mutes) do if self:mute_target(tr) ~= x then self:qmute(tr, x) end end
+      elseif t and t.bus then
+        -- back to how the bus was: snap, or glide to the starting point over a bar, then out
+        local b, pre = t.bus, "ockm-bfx-" .. t.bus .. "-"
+        local sv = saved.bus and saved.bus[b] or { type = BFX_DEF[b], on = 0, x = 0.5, y = 0.5 }
+        local function back_to()
+          self:mset(pre .. "on", sv.on); self:mset(pre .. "type", sv.type); self:mset(pre .. "x", sv.x); self:mset(pre .. "y", sv.y)
+        end
+        if glide > 0 then
+          local x0, y0 = bus_xy(m.fx, 0)
+          self:ramp(pre .. "y", y0, glide); self:ramp(pre .. "x", x0, glide, back_to)
+        else
+          if self.ramps then self.ramps[pre .. "x"] = nil; self.ramps[pre .. "y"] = nil end
+          back_to()
+        end
       elseif t and t.id == "filter" then
         if self.filter_hold then pd.send("ockm-filter-glide", "list", { saved.filter, math.max(50, glide) }); self.v["ockm-filter"] = saved.filter
         elseif glide > 0 then pd.send("ockm-filter-glide", "list", { 0, glide }); self.v["ockm-filter"] = 0
@@ -1765,7 +1896,7 @@ function ui:layout_set_macros(add)
   add{ kind="preset", x=ix + 50, y=88, w=iw - 100, h=44, num="", label=r.name, sel=true, inline=true }
   add{ kind="arrow", x=ix + iw - 44, y=88, w=44, h=44, dir=1, on=true, tap=function() r.name = MACRO_NAMES[ni % #MACRO_NAMES + 1]; self:save_settings() end }
   -- the moves: what, how much, how it gets there, how it lets go. Tap a box to step through its choices
-  local cols = { 112, iw - 112 - 104 - 104 - 34 - 24, 104, 104, 34 }
+  local cols = { 100, iw - 100 - 90 - 90 - 34 - 24, 90, 90, 34 }
   local function colx(c) local x = ix; for k = 1, c - 1 do x = x + cols[k] + 6 end; return x end
   add{ kind="text", x=colx(1), y=140, w=100, h=10, label="move", size=9 }
   add{ kind="text", x=colx(2), y=140, w=100, h=10, label="amount", size=9 }
@@ -1777,8 +1908,20 @@ function ui:layout_set_macros(add)
     add{ kind="btn", x=colx(1), y=y, w=cols[1], h=48, small=true, label=m.t, tap=function()
       local ti = 1; for q, tt in ipairs(TARGETS) do if tt.id == m.t then ti = q end end
       local nt = TARGETS[ti % #TARGETS + 1]
-      m.t = nt.id; m.v = nt.choices and 1 or (nt.switch and 1 or ((nt.lo + nt.hi) / 2)); self:save_settings() end }
-    if t.choices then
+      m.t = nt.id
+      if nt.bus then m.fx = BFX_DEF[nt.bus]; m.v = 0.6 else m.fx = nil; m.v = nt.choices and 1 or (nt.switch and 1 or ((nt.lo + nt.hi) / 2)) end
+      self:save_settings() end }
+    if t.bus then
+      -- which effect (tap to step through), then how much
+      local fw = 72
+      add{ kind="btn", x=colx(2), y=y, w=fw, h=48, small=true, label=BFX[(m.fx or 0) + 1] or "filter", tap=function()
+        m.fx = ((m.fx or 0) + 1) % #BFX
+        local lo, hi = bus_range(m.fx); m.v = clamp(m.v or 0.5, lo, hi); self:save_settings() end }
+      local hk = "macro-edit-" .. k
+      self.v[hk] = m.v
+      local lo, hi = bus_range(m.fx)
+      add{ kind="hbar", x=colx(2) + fw + 6, y=y, w=cols[2] - fw - 6, h=48, hook=hk, lo=lo, hi=hi, label="how much", bold=true, edit=function(x) m.v = x; self:save_settings() end }
+    elseif t.choices then
       add{ kind="btn", x=colx(2), y=y, w=cols[2], h=48, small=true, label=t.choices[m.v] or "?", tap=function() m.v = m.v % #t.choices + 1; self:save_settings() end }
     elseif t.switch then
       add{ kind="locked", x=colx(2), y=y, w=cols[2], h=48, label="on while held" }
@@ -1791,8 +1934,8 @@ function ui:layout_set_macros(add)
     add{ kind="btn", x=colx(4), y=y, w=cols[4], h=48, small=true, label=BACK[m.back or 1], tap=function() m.back = (m.back or 1) % #BACK + 1; self:save_settings() end }
     add{ kind="btn", x=colx(5), y=y, w=cols[5], h=48, small=true, quiet=true, label="x", tap=function() table.remove(r.moves, k); self:save_settings() end }
   end
-  if #r.moves < 4 then
-    add{ kind="btn", x=ix, y=154 + #r.moves * 54, w=iw, h=40, small=true, quiet=true, label="+ add a move (up to 4)", tap=function()
+  if #r.moves < 6 then   -- v1.23: six (room for bus effects alongside a lift's four)
+    add{ kind="btn", x=ix, y=154 + #r.moves * 54, w=iw, h=40, small=true, quiet=true, label="+ add a move (up to 6)", tap=function()
       r.moves[#r.moves + 1] = { t = "reverb", v = 0.6, how = 1, back = 1 }; self:save_settings() end }
   end
   -- v0.93: how long a tap plays it (hold always lasts while held)
@@ -3926,7 +4069,7 @@ function ui:hit(x, y)
   for k = #L, 1, -1 do
     local w = L[k]
     if not w.off and inside(w, x, y) and (w.tap or w.swipe or w.kind == "slider" or w.kind == "bpm" or w.kind == "vfader" or w.kind == "hbar" or w.kind == "ms"
-       or w.kind == "dstep" or w.kind == "mstep" or w.kind == "cstep" or w.kind == "pad" or w.kind == "vlane" or w.kind == "hold") then return w end
+       or w.kind == "dstep" or w.kind == "mstep" or w.kind == "cstep" or w.kind == "pad" or w.kind == "vlane" or w.kind == "hold" or w.kind == "xy") then return w end
   end
   return nil
 end
@@ -3937,6 +4080,7 @@ function ui:press(x, y)
   if not w then return end
   if w.kind == "pad" then self.touch.mode = "pad"; self.pad_on = w.hook; psend(w.hook, "float", { 1 })
   elseif w.kind == "hold" then self.touch.mode = "hold"; w.down()
+  elseif w.kind == "xy" then self.touch.mode = "xy"; w.down(self:xy_at(w, x, y))
   elseif w.kind == "slider" or w.kind == "vfader" or w.kind == "hbar" then self.touch.mode = "slider"; self:slide(w, x, y)
   elseif w.kind == "bpm" then self.touch.v0 = self.v["ockm-bpm"] or 124
   elseif w.kind == "vlane" then self.touch.mode = "vlane"; self:lane_set(w, x, y)
@@ -3958,6 +4102,8 @@ function ui:press(x, y)
   end
 end
 
+-- the XY pad's position, 0-1 each way (up is 1)
+function ui:xy_at(w, x, y) return clamp((x - w.x) / w.w, 0, 1), clamp(1 - (y - w.y) / w.h, 0, 1) end
 function ui:slide(w, x, y)
   local f
   if w.kind == "vfader" then f = clamp(1 - (y - w.y - 8) / (w.h - 16), 0, 1)
@@ -3982,6 +4128,7 @@ function ui:move(x, y)
   if not t or not t.w then return end
   local dx, dy = x - t.x0, y - t.y0
   if t.mode == "slider" then self:slide(t.w, x, y); return end
+  if t.mode == "xy" then t.w.drag(self:xy_at(t.w, x, y)); return end
   if t.mode == "vlane" then self:lane_set(t.w, x, y); return end
   if t.mode == nil and t.w.kind == "bpm" and math.abs(dy) > 8 then t.mode = "bpm" end
   if t.mode == "bpm" then
@@ -4024,6 +4171,7 @@ function ui:release(x, y)
   if t.mode == "pad" then
     self.pad_on = nil; psend(w.hook, "float", { 0 })
   elseif t.mode == "hold" then w.up()
+  elseif t.mode == "xy" then w.up()
   elseif t.mode == "slider" and w.spring then
     self:filter_spring()     -- let go: snap back to off
   elseif t.mode == "slider" and w.preview then
@@ -4320,6 +4468,25 @@ function ui:draw(g, w)
   elseif k == "strip" then
     self:col(g, "card"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
     self:ctext(g, w.label, { x=w.x, y=w.y + 6, w=w.w, h=16 }, 11, w.silent and "mute" or "txt")
+  elseif k == "xy" then
+    -- v1.23 the bus effects' pad: quarter lines, the centre line for the filter, where it is (filled while it's in)
+    self:col(g, "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 8)
+    self:col(g, "dim")
+    for q = 1, 3 do g:fill_rect(w.x + w.w * q / 4, w.y + 8, 1, w.h - 16); g:fill_rect(w.x + 8, w.y + w.h * q / 4, w.w - 16, 1) end
+    if w.fx == "filter" then self:col(g, "mute"); g:fill_rect(w.x + w.w / 2 - 1, w.y + 8, 2, w.h - 16) end
+    local b = w.bus
+    local on = (self.v["ockm-bfx-"..b.."-on"] or 0) > 0
+    self:text(g, b .. " bus: " .. w.fx, w.x + 16, w.y + 14, 16, "txt", w.w - 32)
+    self:text(g, on and "in" or "touch to play it", w.x + 16, w.y + 38, 11, on and "acc" or "mute", 200)
+    if w.axes then
+      self:text(g, "across: " .. w.axes[1], w.x + 16, w.y + w.h - 26, 11, "mute", w.w - 32)
+      self:text(g, "up: " .. w.axes[2], w.x + w.w - 16 - #("up: " .. w.axes[2]) * 6.6, w.y + 14, 11, "mute", 260)
+    end
+    local px = w.x + w.w * (self.v["ockm-bfx-"..b.."-x"] or 0.5)
+    local py = w.y + w.h * (1 - (self.v["ockm-bfx-"..b.."-y"] or 0.5))
+    self:col(g, on and "acc" or "mute")
+    g:fill_rect(px - 1, w.y + 8, 2, w.h - 16); g:fill_rect(w.x + 8, py - 1, w.w - 16, 2)
+    if on then g:fill_ellipse(px - 22, py - 22, 44, 44) else g:stroke_rounded_rect(px - 18, py - 18, 36, 36, 18, 2) end
   elseif k == "hbar" then
     local v = self.v[w.hook] or 0
     local f = w.db and fader_pos(v, w.db) or clamp((v - w.lo) / (w.hi - w.lo), 0, 1)

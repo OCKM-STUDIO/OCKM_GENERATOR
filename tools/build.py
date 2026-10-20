@@ -496,6 +496,9 @@ DLY=[0]*8    # default delay send per sound: likewise
 MONO=["note","on","acc","slide"]; CHORD=["on","deg"]
 def show(h): return "ockm-show-"+h[5:]
 # Settings registry: (hook, default, hook the store listens to if different)
+BFX=["filter","crush","drive","saturate"]   # v1.23 bus effects, in ockm-bfx-<bus>-type order
+BFX_DEF={"drums":1,"music":0,"master":3}   # each bus's effect out of the box
+BFX_P={"filter":0,"crush":0.2,"drive":0.3,"saturate":0.4}
 PROJECT_KEYS=[("ockm-drum-punch",0.5,None),("ockm-bpm",124,"ockm-tempo"),("ockm-volume",1,None),("ockm-accent",0.3,None),("ockm-filter",0,"ockm-filter-now"),("ockm-drive",0,None),
     ("ockm-delay-mix",0.5,None),("ockm-delay-fb",0.4,None),("ockm-delay-steps",3,None),("ockm-verb-mix",0.3,None),
     ("ockm-verb-size",0.6,None),("ockm-verb-tone",0.5,None),("ockm-sync",0,None),("ockm-clock-out",1,None)]
@@ -509,6 +512,11 @@ for nm,snd in SLOTS:
                    (f"ockm-{nm}-labchar",0,None),(f"ockm-{nm}-labmorph",0,None),(f"ockm-{nm}-labrseed",0,None),(f"ockm-{nm}-labramt",0,None),(f"ockm-{nm}-labpseed",1,None)]
 for _t in [n for n,_ in SLOTS]+["bass","lead","chord"]:
     PROJECT_KEYS+=[(f"ockm-{_t}-{k}",v,None) for k,v in EQ_DEF.items()]
+# v1.23 bus effects: which effect each bus has, its glide, and each effect's mix and setting; the bass's bus (1 drums, 0 music)
+PROJECT_KEYS+=[("ockm-bass-bus",1,None)]
+for _b,_k in BFX_DEF.items():
+    PROJECT_KEYS+=[(f"ockm-bfx-{_b}-type",_k,None),(f"ockm-bfx-{_b}-glide",0.15,None)]
+    for _e in BFX: PROJECT_KEYS+=[(f"ockm-bfx-{_b}-{_e}-mix",1,None),(f"ockm-bfx-{_b}-{_e}-p",BFX_P[_e],None)]
 LFO_DEF={"lfo-shape":0,"lfo-rate":4,"lfo-depth":0,"lfo-target":1,"chorus":0}   # sine, one bar, off, the first knob; chorus off
 SYNTH_DEFAULTS={"bass":dict(engine=5,mode=0,sync=1,walk=0,riff=-1,slideamt=0,octave=0,sidechain=0,scshape=1,half=0,lock=0,density=1,seed=0,level=0.85,k1=0.42,k2=0.25,k3=0.45,k4=0.45,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
                 "lead":dict(engine=4,mode=0,sync=1,octave=0,repeat=0,rests=0,sidechain=0,scshape=1,half=0,lock=0,density=1,seed=0,outside=0.35,level=0.7,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
@@ -597,7 +605,7 @@ stut=p.add("#X obj 640 1040 ockm-stutter 1 0;")   # v1.17: rewind, on the whole 
 p.con(mix,0,fx,0); p.con(fx,0,stut,0);
 # v1.22 the gap before the drop: ockm-gap-arm <steps> (from a lift macro on its way out) silences the whole mix, effects and
 # all, for the last <steps> of the bar, and the drop comes back in on the 1. 0 lets go straight away (so does stopping)
-hsh=p.add("#X obj 600 1044 *~;"); hln=p.add("#X obj 700 1100 vline~;"); p.con(stut,0,hsh,0); p.con(hsh,0,vol,0); p.con(hln,0,hsh,1)
+hsh=p.add("#X obj 600 1044 *~;"); hln=p.add("#X obj 700 1100 vline~;"); mafx=p.add("#X obj 640 1042 ockm-busfx master 1;"); p.con(stut,0,mafx,0); p.con(mafx,0,hsh,0); p.con(hsh,0,vol,0); p.con(hln,0,hsh,1)
 hlb=p.add("#X msg 700 1075 1;"); p.con(lb,0,hlb,0); p.con(hlb,0,hln,0)
 rga=p.add("#X obj 900 1000 r ockm-gap-arm;"); tga=p.add("#X obj 900 1020 t f f;"); vga=p.add("#X obj 900 1045 v ockm_gaparm;"); sga0=p.add("#X obj 960 1045 sel 0;")
 hoff=p.add("#X msg 900 1100 1 3;"); vh0=p.add("#X msg 960 1100 0;"); vhd=p.add("#X obj 960 1125 v ockm_hushed;")
@@ -689,7 +697,12 @@ for r,(nm,snd) in enumerate(SLOTS):
     p.con(v,0,ds,0); p.con(ds,0,dt_,0); p.con(dr_,0,ds,1)
 # the drum bus: the eight drums together, then into the mix
 cdb=p.add("#X obj 400 960 catch~ ockm-drumbus;"); dbus=p.add("#X obj 400 980 ockm-drumbus;"); p.con(cdb,0,dbus,0)
-dstut=p.add("#X obj 400 990 ockm-stutter 0 1;"); p.con(dbus,0,dstut,0); p.con(dstut,0,mix,0)   # v1.17: beat repeat on the drums only
+dstut=p.add("#X obj 400 990 ockm-stutter 0 1;"); p.con(dbus,0,dstut,0)   # v1.17: beat repeat on the drums only
+# v1.23 the bus effects: drums (plus the bass when it's with the drums, after the repeat), music (lead, chords and the bass
+# when it's with them), and the master (below)
+dfxs=p.add("#X obj 400 1000 +~;"); p.con(dstut,0,dfxs,0); p.con(p.add("#X obj 470 1000 catch~ ockm-dfxin;"),0,dfxs,1)
+dfx=p.add("#X obj 400 1010 ockm-busfx drums 0.25;"); p.con(dfxs,0,dfx,0); p.con(dfx,0,mix,0)
+mfx=p.add("#X obj 300 1010 ockm-busfx music 0.25;"); p.con(p.add("#X obj 300 1000 catch~ ockm-musbus;"),0,mfx,0); p.con(mfx,0,mix,0)
 rsm=p.add("#X obj 1600 380 r ockm-stepms;"); vsm=p.add("#X obj 1600 405 v ockm_stepms;"); p.con(rsm,0,vsm,0)
 # build and drop (v0.83). ockm-rise 1 starts a build that ends on a loop start at least 2 bars away: the high-pass climbs
 # (slowly at first), a noise riser comes in over the last bar's first 3 beats, the last beat drops out (ockm-gap), and on
@@ -775,7 +788,14 @@ for r,(nm,seqo,voi) in enumerate(SYN):
     p.con(lq,0,hx,0); p.con(hx,0,hm,0)
     for c in [(hm,1,pon,0),(pon,0,sq,0),(ron,0,ton,0),(ton,1,pon,1),(ton,0,s0n,0),(s0n,0,ofn,0),(ofn,0,vo,0)]: p.con(*c)
     cho=p.add(f"#X obj 560 {y+20} ockm-chorus {nm};")
-    p.con(sq,0,vo,0); p.con(vo,0,cho,0); p.con(cho,0,gt0,0); p.con(gt,0,mix,0)
+    p.con(sq,0,vo,0); p.con(vo,0,cho,0); p.con(cho,0,gt0,0)
+    if nm=="bass":   # v1.23: the bass goes with the drums (ockm-bass-bus 1) or with the music (0), for the bus effects
+        rbb=p.add(f"#X obj 1150 {y} r ockm-bass-bus;"); bbx=p.add(f"#X obj 1150 {y+14} expr {D}f1>0.5 \\; {D}f1<=0.5;")
+        for j,(bus) in enumerate(("ockm-dfxin","ockm-musbus")):
+            pb=p.add(f"#X obj {1150+j*90} {y+28} pack f 20;"); lb_=p.add(f"#X obj {1150+j*90} {y+42} line~;"); gb=p.add(f"#X obj {1150+j*90} {y+56} *~;")
+            for c in [(bbx,j,pb,0),(pb,0,lb_,0),(gt,0,gb,0),(lb_,0,gb,1),(gb,0,p.add(f"#X obj {1150+j*90} {y+70} throw~ {bus};"),0)]: p.con(*c)
+        bb1=p.add(f"#X msg 1250 {y} 1;"); p.con(p.add(f"#X obj 1250 {y-20} loadbang;"),0,bb1,0); p.con(bb1,0,bbx,0)   # with the drums until a setting says otherwise
+    else: p.con(gt,0,p.add(f"#X obj 640 {y+40} throw~ ockm-musbus;"),0)
     p.con(gt,0,p.add(f"#X obj 700 {y+22} throw~ ockm-stem-{nm};"),0)
     vs=p.add(f"#X obj 760 {y} *~ 0;"); vt=p.add(f"#X obj 830 {y} throw~ ockm-revbus;"); vr=p.add(f"#X obj 760 {y-18} r ockm-{nm}-verb;")
     p.con(gt,0,vs,0); p.con(vs,0,vt,0); p.con(vr,0,vs,1)
@@ -1405,6 +1425,94 @@ for c in [(pon,0,srp,0),(srp,0,a1,0),(a1,0,arm,1),(srp,1,trl,0),(trl,3,a0,0),(a0
 q.add("#X text 300 760 the delay returns to 0 when a repeat starts \\, and to the live mix (dry) when it ends;")
 zr=q.add("#X msg 520 535 0;"); q.con(tgo,1,zr,0); q.con(zr,0,dd,1)
 q.save("seq/ockm-stutter.pd","#N canvas 120 120 900 800 12;")
+
+# ================= bus effects (v1.23) =================
+# [ockm-busfx <bus>]: one effect slot on a bus (drums, music, master), played from the FX page's XY pad and from macros.
+# ockm-bfx-<bus>-type 0 filter 1 crush 2 drive 3 saturate; -on 0/1 (in or out, with a short fade); -x and -y 0-1 (the pad);
+# -glide 0-1 (how fast x and y follow, 15 ms to 1 s). Per effect: ockm-bfx-<bus>-<effect>-mix (dry/wet) and -p (its setting:
+# filter none, crush tone, drive character, saturate bias). Only the effect in use runs (switch~), and only while it's in.
+def busfx_effect(sp,k,name):
+    """One effect, in its own subpatch (switched on only while it's the bus's effect and in). Params from $0-x/$0-y (smoothed)."""
+    ii=sp.add("#X obj 20 20 inlet~;"); oo=sp.add("#X obj 20 420 outlet~;")
+    rsw=sp.add(f"#X obj 600 20 r {D}0-sw{k};"); sw=sp.add("#X obj 600 45 switch~;"); sp.con(rsw,0,sw,0)
+    # x, y and the setting into one list (any of them changing re-sends it)
+    rx=sp.add(f"#X obj 300 20 r {D}0-x;"); ry=sp.add(f"#X obj 380 20 r {D}0-y;"); rp=sp.add(f"#X obj 460 20 r ockm-bfx-{D}1-{name}-p;")
+    pk=sp.add(f"#X obj 300 80 pack 0.5 0.5 {BFX_P[name]};"); ty=sp.add("#X obj 380 45 t b f;"); tp=sp.add("#X obj 460 45 t b f;")
+    for c in [(rx,0,pk,0),(ry,0,ty,0),(ty,1,pk,1),(ty,0,pk,0),(rp,0,tp,0),(tp,1,pk,2),(tp,0,pk,0)]: sp.con(*c)
+    # dry/wet: this effect's own mix
+    rm=sp.add(f"#X obj 200 300 r ockm-bfx-{D}1-{name}-mix;"); pm=sp.add("#X obj 200 325 pack f 20;"); lm=sp.add("#X obj 200 350 line~;")
+    mx=sp.add(f"#X obj 20 380 expr~ {D}v1+{D}v3*({D}v2-{D}v1);")
+    ml=sp.add("#X obj 260 300 loadbang;"); m1=sp.add("#X msg 260 325 1;")
+    for c in [(rm,0,pm,0),(pm,0,lm,0),(ml,0,m1,0),(m1,0,lm,0),(ii,0,mx,0),(lm,0,mx,2),(mx,0,oo,0)]: sp.con(*c)
+    if name=="filter":
+        # left of centre a resonant low-pass closes (bob~), right of it a high-pass opens (two hip~ plus a resonant peak
+        # from vcf~'s band-pass); y is the resonance. The middle is open
+        px=sp.add(f"#X obj 300 110 expr if({D}f1<0.47 \\, 60*pow(2\\, 8*{D}f1/0.47) \\, 15000) \; if({D}f1<0.47 \\, 0.2+3.4*{D}f2 \\, 0.1) \; if({D}f1>0.53 \\, 20*pow(2\\, 9*({D}f1-0.53)/0.47) \\, 5) \; if({D}f1>0.53 \\, 1.6*{D}f2 \\, 0) \; 1+10*{D}f2 \; 1+0.3*if({D}f1<0.47 \\, 0.2+3.4*{D}f2 \\, 0.1);")
+        bob=sp.add("#X obj 20 120 bob~;"); bg=sp.add("#X obj 20 145 *~ 1;"); h1=sp.add("#X obj 20 170 hip~ 5;"); h2=sp.add("#X obj 20 195 hip~ 5;")
+        vc=sp.add("#X obj 120 195 vcf~ 1;"); vg=sp.add("#X obj 120 220 *~ 0;"); sm=sp.add("#X obj 20 250 +~;")
+        for c in [(pk,0,px,0),(ii,0,bob,0),(px,0,bob,1),(px,1,bob,2),(bob,0,bg,0),(px,5,bg,1),(bg,0,h1,0),(h1,0,h2,0),(px,2,h1,1),(px,2,h2,1),
+                  (h2,0,sm,0),(bg,0,vc,0),(px,2,vc,1),(px,4,vc,2),(vc,0,vg,0),(px,3,vg,1),(vg,0,sm,1),(sm,0,mx,1)]: sp.con(*c)
+    elif name=="crush":
+        # x: the sample rate falls (22 kHz to 700 Hz); y: the bits fall (16 to 4); setting: tone (a low-pass after)
+        px=sp.add(f"#X obj 300 110 expr 22000*pow(2\\, -5*{D}f1) \; pow(2\\, 15-11*{D}f2) \; 18000*pow(2\\, -4*{D}f3);")
+        ph=sp.add("#X obj 120 120 phasor~;"); sh=sp.add("#X obj 20 145 samphold~;")
+        qz=sp.add(f"#X obj 20 175 expr~ floor({D}v1*{D}f2+0.5)/{D}f2;"); lp=sp.add("#X obj 20 205 lop~ 18000;")
+        for c in [(pk,0,px,0),(px,0,ph,0),(ii,0,sh,0),(ph,0,sh,1),(sh,0,qz,0),(px,1,qz,1),(qz,0,lp,0),(px,2,lp,1),(lp,0,mx,1)]: sp.con(*c)
+    elif name=="drive":
+        # x: how hard (1 to 41 times), y: tone (a low-pass from 1.5 kHz to 18 kHz after), setting: character (the bias that
+        # makes it asymmetric: gritty, more even harmonics). Level kept roughly even as it gets harder
+        px=sp.add(f"#X obj 300 110 expr 1+40*pow({D}f1\\, 1.5) \; 0.6*{D}f3 \; 1500*pow(2\\, 3.6*{D}f2) \; max(1/(1+40*pow({D}f1\\, 1.5))\\, 0.37/pow(1+40*pow({D}f1\\, 1.5)\\, 0.335));")
+        dv=sp.add(f"#X obj 20 140 expr~ (tanh({D}f2*{D}v1+{D}f3)-tanh({D}f3))*{D}f4;")
+        hp=sp.add("#X obj 20 170 hip~ 20;"); lp=sp.add("#X obj 20 195 lop~ 18000;")
+        for c in [(pk,0,px,0),(ii,0,dv,0),(px,0,dv,1),(px,1,dv,2),(px,3,dv,3),(dv,0,hp,0),(hp,0,lp,0),(px,2,lp,1),(lp,0,mx,1)]: sp.con(*c)
+    else:  # saturate
+        # gentle: tanh around a bias (even harmonics, like tape), scaled so quiet signals pass at the same level and only the
+        # peaks round off. x: how much (1 to 7 times), y: warmth (rolls the top off, lifts the low end), setting: bias
+        px=sp.add(f"#X obj 300 110 expr 1+6*pow({D}f1\\, 1.2) \; 0.1+0.4*{D}f3 \; 1/((1+6*pow({D}f1\\, 1.2))*(1-pow(tanh(0.1+0.4*{D}f3)\\, 2))) \; 0.7*{D}f2 \; 0.4*{D}f2;")
+        sv=sp.add(f"#X obj 20 140 expr~ (tanh({D}f2*{D}v1+{D}f3)-tanh({D}f3))*{D}f4;")
+        l1=sp.add("#X obj 120 170 lop~ 3500;"); l2=sp.add("#X obj 220 170 lop~ 120;")
+        wm=sp.add(f"#X obj 20 200 expr~ {D}v1+{D}f4*({D}v2-{D}v1)+{D}f5*{D}v3;"); hp=sp.add("#X obj 20 230 hip~ 15;")
+        for c in [(pk,0,px,0),(ii,0,sv,0),(px,0,sv,1),(px,1,sv,2),(px,2,sv,3),(sv,0,wm,0),(sv,0,l1,0),(sv,0,l2,0),(l1,0,wm,1),(l2,0,wm,2),
+                  (px,3,wm,3),(px,4,wm,4),(wm,0,hp,0),(hp,0,mx,1)]: sp.con(*c)
+q=P()
+q.add("#X text 20 10 Bus effect (v1.23): one slot on a bus. ockm-bfx-<bus>-type 0 filter 1 crush 2 drive 3 saturate \\, -on \\, -x \\, -y \\, -glide \; per effect -<effect>-mix and -<effect>-p.;")
+inl=q.add("#X obj 30 50 inlet~;"); out=q.add("#X obj 30 500 outlet~;")
+# x and y, smoothed (glide)
+rgl=q.add(f"#X obj 600 40 r ockm-bfx-{D}1-glide;"); gx=q.add(f"#X obj 600 65 expr 15+985*{D}f1*{D}f1;")
+q.con(rgl,0,gx,0)
+for j,nm in enumerate(("x","y")):
+    r_=q.add(f"#X obj {400+j*100} 40 r ockm-bfx-{D}1-{nm};"); pk_=q.add(f"#X obj {400+j*100} 90 pack f 30;"); ln_=q.add(f"#X obj {400+j*100} 115 line 0 5;")
+    s_=q.add(f"#X obj {400+j*100} 140 s {D}0-{nm};")
+    for c in [(r_,0,pk_,0),(gx,0,pk_,1),(pk_,0,ln_,0),(ln_,0,s_,0)]: q.con(*c)
+# in or out: a 10 ms fade; the effect keeps running 60 ms after it's taken out, so the fade finishes
+ron=q.add(f"#X obj 30 80 r ockm-bfx-{D}1-on;"); ton=q.add("#X obj 30 105 t f f;"); pon=q.add("#X obj 30 130 pack f 10;"); lon=q.add("#X obj 30 155 line~;")
+sel=q.add("#X obj 150 130 sel 0;"); dly=q.add("#X obj 150 155 delay 60;"); a0=q.add("#X msg 150 180 0;"); a1=q.add("#X msg 220 155 1;")
+ta1=q.add("#X obj 220 130 t b b;")
+act=q.add("#X obj 150 210 t b f;")
+rty=q.add(f"#X obj 300 180 r ockm-bfx-{D}1-type;"); pka=q.add("#X obj 300 240 pack 0 0;")
+for c in [(ron,0,ton,0),(ton,1,pon,0),(pon,0,lon,0),(ton,0,sel,0),(sel,0,dly,0),(dly,0,a0,0),(sel,1,ta1,0),(ta1,1,a1,0),(ta1,0,dly,0),
+          (a0,0,act,0),(a1,0,act,0),(act,1,pka,1),(act,0,pka,0),(rty,0,pka,0)]: q.con(*c)
+# the stop message: 'stop' on the delay when it goes back in
+q.C=[c for c in q.C if c!=(ta1,0,dly,0)]; stp=q.add("#X msg 220 180 stop;"); q.con(ta1,0,stp,0); q.con(stp,0,dly,0)
+wsum=q.add("#X obj 30 420 +~;"); subs=[]
+for k,name in enumerate(BFX):
+    e=q.add(f"#X obj {300+k*110} 270 expr ({D}f1=={k})*({D}f2>0);"); ch=q.add(f"#X obj {300+k*110} 295 change;"); ss=q.add(f"#X obj {300+k*110} 320 s {D}0-sw{k};")
+    for c in [(pka,0,e,0),(e,0,ch,0),(ch,0,ss,0)]: q.con(*c)
+    sp=P(); busfx_effect(sp,k,name)
+    q.L.append(sp.text(f"#N canvas 0 0 900 460 {name} 0;").rstrip("\n"))
+    o=q.add(f"#X restore {30+k*110} 380 pd {name};"); subs.append(o); q.con(o,0,wsum,0)
+lb=q.add("#X obj 700 200 loadbang;"); z=q.add("#X msg 700 225 0;"); q.con(lb,0,z,0)
+for k in range(len(BFX)): q.con(z,0,q.add(f"#X obj {700+k*40} 250 s {D}0-sw{k};"),0)
+# out = dry, faded into the effect while it's in (the effect does its own dry/wet inside). The effects see the bus at a
+# set level ($2: the drums and music buses run about 4 times hotter than the master), so a pad position does the same
+# on every bus
+xo=q.add(f"#X obj 30 460 expr~ {D}v1+{D}v3*({D}v2-{D}v1);")
+tin=q.add(f"#X obj 100 300 *~ {D}2;"); tout=q.add(f"#X obj 30 430 expr~ {D}v1/max({D}f2\\, 0.01);")
+rarg=q.add("#X obj 700 300 loadbang;"); targ=q.add(f"#X obj 700 325 f {D}2;")
+for c in [(inl,0,xo,0),(wsum,0,tout,0),(rarg,0,targ,0),(targ,0,tout,1),(tout,0,xo,1),(lon,0,xo,2),(xo,0,out,0)]: q.con(*c)
+q.con(inl,0,tin,0)
+for o in subs: q.con(tin,0,o,0)
+q.save("seq/ockm-busfx.pd","#N canvas 120 120 900 560 12;")
 
 # ================= master effects =================
 q=P()
