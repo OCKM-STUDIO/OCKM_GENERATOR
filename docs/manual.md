@@ -375,6 +375,10 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 | `ockm-<slot>-decay` | Decay in %, 100 is normal |
 | `ockm-<slot>-level` | Level, 0 to 1 |
 
+## Knobs
+
+Every synth knob is meant to make a clear difference from its first quarter turn, across its whole travel, without the loudness jumping (v1.14). `every_synth_knob_makes_a_difference` in the tests measures each one from 0 to 1 and fails the build if one stops counting.
+
 ## Drums
 
 **Hat choke** (v1.09): a slot playing the closed hat cuts any slot playing the open hat in 8 ms, as on an 808 or 909.
@@ -451,7 +455,7 @@ The screen shows them by family: analogue first (the default), then acid, sub 80
 | Engine | k1 | k2 | k3 | Character |
 |---|---|---|---|---|
 | 0 acid | cutoff | resonance | envelope amount | The 303 squelch |
-| 1 sub 808 | tone | weight (the second harmonic: body on small speakers) | pitch drop (quick, up to 30 semitones) | Deep and clean. Turn the decay up and it rings on past the step like an 808 boom. Its k2 was a second drive, beside the drive slider |
+| 1 sub 808 | tone (v1.14: how hard the sine is driven, clean to a growl, the filter opening with it) | weight (the second harmonic: body on small speakers) | pitch drop (up to 36 semitones) | Deep and clean. Turn the decay up and it rings on past the step like an 808 boom. Its k2 was a second drive, beside the drive slider |
 | 2 FM | brightness | ratio | envelope on brightness | Punchy, metallic, plucky |
 | 3 wide (was reese) | cutoff | detune (width) | envelope amount | The detuned-saw techno bass: three saws beating over a steady sine sub |
 | 5 analogue | cutoff | saw to square | filter envelope | The workhorse house and techno bass (Minimoog, SH-101, Pro-One): saw to square with a square sub an octave down, through a resonant 24 dB low-pass. Past decay 0.6 a note rings on after its step and fades, so a long decay is a pluck. The default |

@@ -13,7 +13,7 @@
 #X obj 700 170 switch~;
 #X obj 760 140 sel 0;
 #X msg 760 170 off;
-#X obj 650 50 expr 20*pow(100\,\$f1);
+#X obj 650 50 expr 60*pow(33\,\$f1);
 #X obj 30 560 outlet~;
 #X obj 30 200 mtof~;
 #X obj 160 240 *~ 1;

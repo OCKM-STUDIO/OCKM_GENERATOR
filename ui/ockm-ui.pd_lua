@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v1.13"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v1.14"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -70,7 +70,7 @@ local function eng_label(nm) return ENG_LABEL[nm] or nm end
 local ENGINE_K = {
   bass  = { [0] = { 0.35, 0.6, 0.55, 0.4 }, [1] = { 0.45, 0.3, 0.35, 0.55 }, [2] = { 0.4, 0.35, 0.45, 0.4 },
             [3] = { 0.45, 0.5, 0.35, 0.5 }, [5] = { 0.42, 0.25, 0.45, 0.45 }, [6] = { 0.5, 0.5, 0.35, 0.45 }, [7] = { 0.3, 0.75, 0.6, 0.35 } },
-  lead  = { [2] = { 0.45, 0.1, 0.25, 0.5 }, [3] = { 0.4, 0.55, 0.5, 0.45 }, [4] = { 0.55, 0.3, 0.4, 0.45 }, [5] = { 0.55, 0.55, 0.3, 0.5 }, [6] = { 0.35, 0.82, 0.7, 0.35 } },
+  lead  = { [2] = { 0.45, 0.1, 0.25, 0.5 }, [3] = { 0.4, 0.55, 0.5, 0.45 }, [4] = { 0.55, 0.3, 0.4, 0.45 }, [5] = { 0.55, 0.55, 0.3, 0.5 }, [6] = { 0.55, 0.82, 0.7, 0.35 } },
   chord = { [0] = { 0.45, 0.5, 0.0, 0.32 }, [1] = { 0.5, 0.4, 0.3, 0.4 }, [3] = { 0.5, 0.3, 0.4, 0.4 }, [4] = { 0.5, 0.4, 0.3, 0.5 }, [6] = { 0.45, 0.6, 0.6, 0.3 } },
 }
 -- retired engines: what a saved project's engine becomes, and the knobs that make it sound like the old one

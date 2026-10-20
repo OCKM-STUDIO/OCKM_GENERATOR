@@ -131,8 +131,8 @@
 #X obj 30 215 lop~ 20000;
 #X obj 30 235 hip~ 5;
 #X obj 500 160 r ockm-\$1-drive;
-#X obj 500 185 expr 1+\$f1*6;
-#X obj 30 255 expr~ if(\$f2>1.001 \, tanh(\$v1*\$f2)/tanh(\$f2) \, \$v1);
+#X obj 500 185 expr 1+14*pow(\$f1\, 1.3);
+#X obj 30 255 expr~ if(\$f2>1.001 \, tanh(\$v1*\$f2+0.2*(\$f2-1)*\$v1*\$v1)/tanh(\$f2)*pow(\$f2\, -0.6) \, \$v1);
 #X obj 30 290 outlet~;
 #X obj 700 20 r ockm-\$1-sound;
 #X obj 700 70 f;

@@ -700,7 +700,8 @@ def lead_engines_play_in_tune_and_level(work):
     for eng, name in [(2, "dx"), (3, "sync"), (4, "analogue"), (5, "supersaw")]:   # 0 acid and 1 juno retired in v0.98
         h = Harness(dut="ockm-lead zz")
         h.record(os.path.join(work, f"l_{name}.wav"), source="dut")
-        k1, k3 = (0, 0) if name == "sync" else (0.15, 0.3) if name == "supersaw" else (0.5, 0.3)   # sync: zero sync, so the pitch counter sees the fundamental
+        k1, k3 = (0, 0) if name == "sync" else (0.15, 0.3) if name == "supersaw" else (0.5, 0) if name == "dx" else (0.5, 0.3)   # sync: zero sync, so the pitch counter sees the fundamental
+        # dx: no detune (its second voice beats against the first, which a zero-crossing counter can't read: v1.14 widened it)
         h.at(20, f"ockm-zz-engine {eng} ; ockm-zz-k1-m {k1} ; ockm-zz-k2-m 0.1 ; ockm-zz-k3-m {k3} ; ockm-zz-k4-m 0.9 ; ockm-zz-drive 0")
         h.at(50, "test-in 45 0 0 1")
         _, (x, sr) = play(work, h, f"t_lead_{name}", with_main=False, ms=650)
@@ -1723,6 +1724,79 @@ def lua_generators_plain_tests(work):
             p = subprocess.run([lua, os.path.join(tdir, fn), work], capture_output=True, text=True)
             assert p.returncode == 0 and p.stdout.strip().endswith("ok"), f"{fn}: {p.stdout} {p.stderr}"
 
+# v1.14: every synth knob has to make an audible difference. Each engine's knobs are taken from 0 to 1 (the others at the
+# engine's sweet spot) while a phrase plays, and the change is measured: tone (the spectrum's shape, in dB across 24
+# bands) or length (how much of the time it sounds). 1.0 is clearly audible (6 dB of tone or 15% longer notes); below
+# KNOB_MIN fails. Knobs whose change is movement rather than tone (detune, spread, drift, tremolo) are listed apart:
+# the spectrum barely moves when they turn, so they're checked by ear. Loudness mustn't jump either (except length).
+KNOB_ENGINES = {
+    "lead": {2: [0.45, 0.1, 0.25, 0.5], 3: [0.4, 0.55, 0.5, 0.45], 4: [0.55, 0.3, 0.4, 0.45], 5: [0.55, 0.55, 0.3, 0.5], 6: [0.55, 0.82, 0.7, 0.35]},
+    "bass": {0: [0.35, 0.6, 0.55, 0.4], 1: [0.45, 0.3, 0.35, 0.55], 2: [0.4, 0.35, 0.45, 0.4], 3: [0.45, 0.5, 0.35, 0.5], 5: [0.42, 0.25, 0.45, 0.45],
+             6: [0.5, 0.5, 0.35, 0.45], 7: [0.3, 0.75, 0.6, 0.35]},
+    "chord": {0: [0.45, 0.5, 0.0, 0.32], 6: [0.45, 0.6, 0.6, 0.3], 1: [0.5, 0.4, 0.3, 0.4], 3: [0.5, 0.3, 0.4, 0.4], 4: [0.5, 0.4, 0.3, 0.5]},
+}
+KNOB_MOVEMENT = {("lead", 2, 3), ("lead", 5, 1), ("lead", 5, 3), ("bass", 3, 2), ("bass", 5, 2), ("chord", 0, 2), ("chord", 4, 3)}   # (part, engine, knob 1-4)
+KNOB_LENGTH = 4          # k4 is decay or length: it may change the loudness
+KNOB_MIN, KNOB_LEVEL_MAX = 0.4, 10.0
+KNOB_PHRASE = {"lead": "ockm-lead-rhythm 10 ; ockm-lead-notes 15", "bass": "ockm-bass-rhythm 0 ; ockm-bass-riff 1",
+               "chord": "ockm-chord-rhythm 2 ; ockm-chord-prog 1 ; ockm-chord-type 1"}
+
+@test
+def every_synth_knob_makes_a_difference(work):
+    """Every knob on every synth engine changes the sound clearly from 0 to 1, without a big jump in loudness."""
+    try:
+        import numpy as np
+    except ImportError:
+        raise Skip("numpy not installed")
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness()
+    w_ = h.add("#X obj 600 40 writesf~ 1;"); r_ = h.add("#X obj 600 10 r test-wav;"); s_ = h.add("#X obj 700 10 r~ ockm-master;")
+    h.con(r_, w_); h.con(s_, w_)
+    cases, t = [], 300
+    quiet = " ; ".join(f"ockm-{p}-{k} 0" for p in ("bass", "lead", "chord") for k in ("verb", "delay", "lfo-depth", "chorus", "sidechain"))
+    h.at(200, f"ockm-length 32 ; ockm-fill-every 0 ; ockm-bpm 124 ; ockm-drum-groove 12 ; ockm-root 9 ; ockm-scale 0 ; {quiet}")
+    for part, engines in KNOB_ENGINES.items():
+        others = " ; ".join(f"ockm-{p}-on {1 if p == part else 0}" for p in ("bass", "lead", "chord"))
+        h.at(t, f"{others} ; {KNOB_PHRASE[part]} ; ockm-play 1"); t += 100
+        for eng, dk in engines.items():
+            for j in range(4):
+                for v in (0, 1):
+                    k = list(dk); k[j] = v
+                    path = os.path.join(work, f"knob-{part}-{eng}-{j}-{v}.wav")
+                    h.at(t, f"ockm-{part}-engine {eng} ; " + " ; ".join(f"ockm-{part}-k{i+1} {k[i]}" for i in range(4)))
+                    h.at(t + 150, f"test-wav open {path} , start"); h.at(t + 2100, "test-wav stop")
+                    cases.append((part, eng, j, v, path)); t += 2200
+    f = os.path.join(work, "t_knobs.pd"); h.finish(t + 100, f)
+    p = subprocess.run([PD, "-nogui", "-nosound", "-nomidi", "-batch", "-path", PDLUA, "-lib", "pdlua", "-open", "OCKM_GENERATOR.pd", "-open", f],
+                       cwd=work, capture_output=True, text=True, timeout=900)
+    import wave
+    edges = np.geomspace(60, 16000, 25)
+    def feats(fn):
+        wv = wave.open(fn); sr = wv.getframerate()
+        x = np.frombuffer(wv.readframes(wv.getnframes()), np.int16 if wv.getsampwidth() == 2 else np.int32).astype(float)
+        x = x.reshape(-1, wv.getnchannels())[:, 0]; x = x / (np.abs(x).max() + 1e-9) * 0.5 if False else x
+        X = np.abs(np.fft.rfft(x)) ** 2; fr = np.fft.rfftfreq(len(x), 1 / sr)
+        bands = np.array([10 * np.log10(X[(fr >= a) & (fr < b)].sum() + 1e-12) for a, b in zip(edges[:-1], edges[1:])]) - 10 * np.log10(X.sum() + 1e-12)
+        env = np.convolve(np.abs(x), np.ones(441) / 441, "same")
+        return bands, float((env > env.max() * 0.1).mean()) if env.max() > 0 else 0.0, 10 * np.log10((x ** 2).mean() + 1e-12)
+    F = {}
+    for part, eng, j, v, path in cases:
+        assert os.path.exists(path), f"no recording for {part} engine {eng} k{j+1}={v}: {p.stdout[-300:]} {p.stderr[-300:]}"
+        F[(part, eng, j, v)] = feats(path)
+    weak, loud = [], []
+    for part, engines in KNOB_ENGINES.items():
+        for eng in engines:
+            for j in range(4):
+                (b0, o0, l0), (b1, o1, l1) = F[(part, eng, j, 0)], F[(part, eng, j, 1)]
+                impact = max(float(np.mean(np.abs(b1 - b0))) / 6, abs(o1 - o0) / 0.15)
+                if impact < KNOB_MIN and (part, eng, j + 1) not in KNOB_MOVEMENT:
+                    weak.append(f"{part} engine {eng} k{j+1}: {impact:.2f}")
+                if j + 1 != KNOB_LENGTH and abs(l1 - l0) > KNOB_LEVEL_MAX:
+                    loud.append(f"{part} engine {eng} k{j+1}: {l1 - l0:+.1f} dB")
+    assert not weak, "knobs that hardly change the sound: " + ", ".join(weak)
+    assert not loud, "knobs that change the loudness more than the sound: " + ", ".join(loud)
+
 @test
 def drum_grooves_fill_every_slot(work):
     """A groove lands on each slot by the sound it plays, makes the drums 1 bar (a groove's natural length) and sets the swing."""
@@ -2179,7 +2253,9 @@ def drum_slot_lab_sounds_randomise_and_character(work):
     assert diff(segs[8], segs[5]) > 0.05 or abs(bright(segs[8]) - bright(segs[5])) > 0.05 * bright(segs[5]), "morph should change the kick"
     assert bright(segs[9]) < bright(segs[5]) < bright(segs[10]), f"tone should darken then brighten: {bright(segs[9]):.3f} {bright(segs[5]):.3f} {bright(segs[10]):.3f}"
     rms = lambda sg: math.sqrt(sum(v * v for v in sg) / len(sg))
-    assert rms(segs[11]) > rms(segs[5]) * 1.1, "drive should make it denser"
+    crest = lambda sg: max(abs(v) for v in sg) / (rms(sg) + 1e-9)
+    # v1.14: drive keeps the loudness, so denser means a lower crest factor: the quiet parts pushed up towards the peaks
+    assert crest(segs[11]) < crest(segs[5]) * 0.9, f"drive should make it denser: crest {crest(segs[11]):.2f} vs {crest(segs[5]):.2f}"
 
 @test
 def touchscreen_demud_listens_and_cuts(work):

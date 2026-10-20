@@ -353,8 +353,10 @@ for o in outs[1:]:
 # tone (-1 darker \\, 0 as it is \\, 1 brighter) and drive (0 clean \\, 1 gritty), on synth and sample alike
 rtn=p.add(f"#X obj 300 160 r ockm-{D}1-tone;"); tnx=p.add(f"#X obj 300 185 expr if({D}f1<0 \\, 18000*pow(2\\,{D}f1*7) \\, 20000) \\; if({D}f1>0 \\, 20*pow(2\\,{D}f1*8) \\, 5);")
 lpf=p.add("#X obj 30 215 lop~ 20000;"); hpf=p.add("#X obj 30 235 hip~ 5;")
-rdr=p.add(f"#X obj 500 160 r ockm-{D}1-drive;"); drx=p.add(f"#X obj 500 185 expr 1+{D}f1*6;")
-drv=p.add(f"#X obj 30 255 expr~ if({D}f2>1.001 \\, tanh({D}v1*{D}f2)/tanh({D}f2) \\, {D}v1);")
+# v1.14 drive: up to 15 (it was 7), a little asymmetric for grit, and its loudness taken back off (it was mostly a
+# level knob: +10 to +14 dB at the top, which threw the mix out)
+rdr=p.add(f"#X obj 500 160 r ockm-{D}1-drive;"); drx=p.add(f"#X obj 500 185 expr 1+14*pow({D}f1\\, 1.3);")
+drv=p.add(f"#X obj 30 255 expr~ if({D}f2>1.001 \\, tanh({D}v1*{D}f2+0.2*({D}f2-1)*{D}v1*{D}v1)/tanh({D}f2)*pow({D}f2\\, -0.6) \\, {D}v1);")
 out=p.add("#X obj 30 290 outlet~;")
 # v1.09 hat choke, by role: a hit on a slot playing the closed hat (sound 4) shuts any slot playing the open hat (sound 5)
 # in 8 ms, as on an 808 or 909. A choke within 2 ms of the open hat's own hit is ignored, so both on one step still opens
@@ -919,6 +921,11 @@ def mono_core(fn,lead=False):
             (tn,2,fl,0),(fl,0,ma,0),(ma,0,av,0),(tn,1,spR,0),(spR,0,mR,0),(mR,0,av,0),(tn,0,spF,0),(spF,0,fd,0),(fd,0,mF,0),(mF,0,ev,0),(ev,0,es,0),
             (dec,0,fd,1),(pv,0,o0,0),(es,0,o1,0),(av,0,o2,0)]: q.con(*c)
   if lead:
+      # v1.14 decay rings: the volume follows the filter envelope's fall (shaped) once the step lets go, so decay is how
+      # long the note sounds (20 ms to 2 s), not just how the filter moves. Stop cuts the ring too
+      rng=q.add(f"#X obj 700 420 expr~ max({D}v1 \\, {D}f3*pow(min(1 \\, max(0 \\, {D}v2)) \\, 1.5));")
+      q.C=[c for c in q.C if c!=(av,0,o2,0)]
+      for c in [(av,0,rng,0),(ev,0,rng,1),(fl,0,rng,2),(rng,0,o2,0),(offm,0,ev,0)]: q.con(*c)
       # vibrato: fades in after 350 ms on each fresh (non-slide) note, 5.5 Hz, about a fifth of a semitone
       vm=q.add("#X msg 520 300 0 \\, 1 500 350;"); vv=q.add("#X obj 520 340 vline~;"); vo=q.add("#X obj 620 340 osc~ 5.5;")
       vx=q.add("#X obj 520 370 *~;"); vd=q.add("#X obj 520 400 *~ 0.2;"); vp=q.add("#X obj 420 420 +~;")
@@ -939,7 +946,7 @@ def engine(fn,idx,title,build,core_name="ockm-mono-core",hook="engine",decay=Non
     re=q.add(f"#X obj 700 50 r ockm-{D}1-{hook};"); eq=q.add(f"#X obj 700 80 == {idx};"); tf=q.add("#X obj 700 110 t f f;")
     sw=q.add("#X obj 700 170 switch~;"); s0=q.add("#X obj 760 140 sel 0;"); om=q.add("#X msg 760 170 off;")
     for c in [(inl,0,sp,0),(sp,0,core,0),(re,0,eq,0),(eq,0,tf,0),(tf,1,sw,0),(tf,0,s0,0),(s0,0,om,0),(om,0,core,0),(tf,0,sp,1)]: q.con(*c)
-    dexp=decay or ("20*pow(100\\,"+D+"f1)")   # k4: decay in ms (kept out of the f-string: older Pythons refuse backslashes there)
+    dexp=decay or ("60*pow(33\\,"+D+"f1)")   # v1.14: 60 ms to 2 s (it started at 20 ms, below where anything changed)   # k4: decay in ms (kept out of the f-string: older Pythons refuse backslashes there)
     dx=q.add(f"#X obj 650 50 expr {dexp};"); q.con(ks[3],0,dx,0); q.con(dx,0,core,1)
     out=q.add("#X obj 30 560 outlet~;")
     build(q,core,ks,out)
@@ -951,24 +958,29 @@ def acid(q,core,ks,out):
     em=q.add("#X obj 300 200 *~ 2500;"); ad=q.add("#X obj 300 230 +~ 300;"); cl=q.add("#X obj 300 260 clip~ 30 12000;")
     bob=q.add("#X obj 30 340 bob~;"); am=q.add("#X obj 30 400 *~;"); g=q.add("#X obj 30 430 *~ 1.5;")
     k1=q.add(f"#X obj 200 140 expr 30*pow(2\\,9*{D}f1);"); k2=q.add("#X obj 310 140 * 3.9;"); k3=q.add("#X obj 420 140 * 8000;")
+    rc=q.add("#X obj 30 370 *~ 1;"); rck=q.add(f"#X obj 310 170 expr 1+2.6*{D}f1;")   # v1.14: resonance thins it: make the level back up
+    q.con(ks[1],0,rck,0); q.con(rck,0,rc,1)
     for c in [(core,0,mt,0),(mt,0,ph,0),(ph,0,m2,0),(m2,0,s1,0),(s1,0,bob,0),(core,1,em,0),(em,0,ad,0),(ad,0,cl,0),(cl,0,bob,1),
-              (bob,0,am,0),(core,2,am,1),(am,0,g,0),(g,0,out,0),(ks[0],0,k1,0),(k1,0,ad,1),(ks[1],0,k2,0),(k2,0,bob,2),(ks[2],0,k3,0),(k3,0,em,1)]: q.con(*c)
+              (bob,0,rc,0),(rc,0,am,0),(core,2,am,1),(am,0,g,0),(g,0,out,0),(ks[0],0,k1,0),(k1,0,ad,1),(ks[1],0,k2,0),(k2,0,bob,2),(ks[2],0,k3,0),(k3,0,em,1)]: q.con(*c)
     q.add("#X text 200 110 k1 cutoff / k2 resonance / k3 envelope amount;")
 
 def sub(q,core,ks,out):
     # sub and 808: a driven sine. The pitch drop is quick whatever the decay; with a long decay (k4 up) the note rings
     # on past the step like an 808 boom, with a short one it ends with the step
-    em=q.add(f"#X obj 300 200 expr~ pow(min(1\\, max(0\\, {D}v1))\\, 12)*{D}f2;"); pl=q.add("#X obj 30 230 +~;"); mt=q.add("#X obj 30 260 mtof~;"); osc=q.add("#X obj 30 290 osc~;")
-    gn=q.add("#X obj 30 320 *~ 1.6;"); th=q.add(f"#X obj 30 350 expr~ tanh({D}v1);"); lp=q.add("#X obj 30 380 lop~ 400;")
+    em=q.add(f"#X obj 300 200 expr~ pow(min(1\\, max(0\\, {D}v1))\\, 7)*{D}f2;"); pl=q.add("#X obj 30 230 +~;"); mt=q.add("#X obj 30 260 mtof~;"); osc=q.add("#X obj 30 290 osc~;")
+    # v1.14 tone: how hard the sine is driven (clean to a growling 808) with the filter opening with it; it was only a
+    # filter on a sine, which had almost nothing to take away
+    gn=q.add("#X obj 30 320 *~ 1.6;"); th=q.add(f"#X obj 30 350 expr~ tanh({D}v1)/tanh(min({D}f2\\, 3));"); lp=q.add("#X obj 30 380 lop~ 400;")
+    tgn=q.add(f"#X obj 250 170 expr 1+6*{D}f1*{D}f1 \\; 1+6*{D}f1*{D}f1;")
     # v0.98: k2 is weight, the second harmonic mixed in (body you hear on small speakers); the drive slider does the driving
     h2=q.add("#X obj 130 260 *~ 2;"); o2=q.add("#X obj 130 290 osc~;"); w2=q.add("#X obj 130 320 *~ 0;"); wsum=q.add("#X obj 30 335 +~;")
     ae=q.add(f"#X obj 200 380 expr~ max({D}v1\\, pow(min(1\\, max(0\\, {D}v2))\\, 1.5));")
     am=q.add("#X obj 30 410 *~;"); g=q.add("#X obj 30 440 *~ 0.9;")
-    k1=q.add(f"#X obj 200 140 expr 60*pow(2\\,7*{D}f1);"); k2=q.add("#X obj 310 140 * 0.6;"); k3=q.add("#X obj 420 140 * 30;")
+    k1=q.add(f"#X obj 200 140 expr 150*pow(2\\,5*{D}f1);"); k2=q.add(f"#X obj 310 140 expr 1.4*pow({D}f1\\, 0.7);"); k3=q.add(f"#X obj 420 140 expr 36*pow({D}f1\\, 0.8);")
     for c in [(core,1,em,0),(core,0,pl,0),(em,0,pl,1),(pl,0,mt,0),(mt,0,osc,0),(osc,0,gn,0),(gn,0,wsum,0),(mt,0,h2,0),(h2,0,o2,0),(o2,0,w2,0),(w2,0,wsum,1),
               (wsum,0,th,0),(th,0,lp,0),(lp,0,am,0),
               (core,2,ae,0),(core,1,ae,1),(ae,0,am,1),(am,0,g,0),(g,0,out,0),
-              (ks[0],0,k1,0),(k1,0,lp,1),(ks[1],0,k2,0),(k2,0,w2,1),(ks[2],0,k3,0),(k3,0,em,1)]: q.con(*c)
+              (ks[0],0,k1,0),(k1,0,lp,1),(ks[0],0,tgn,0),(tgn,0,gn,1),(tgn,1,th,1),(ks[1],0,k2,0),(k2,0,w2,1),(ks[2],0,k3,0),(k3,0,em,1)]: q.con(*c)
     q.add("#X text 200 110 k1 tone / k2 weight (the second harmonic) / k3 pitch drop on each note (up to 30 semitones \\, quick) / k4 decay: turn it up for an 808 that rings on;")
 
 def fm(q,core,ks,out):
@@ -991,7 +1003,7 @@ def reese(q,core,ks,out):
     bob=q.add("#X obj 30 400 bob~;"); rs=q.add("#X msg 450 300 0.6;"); lb=q.add("#X obj 450 270 loadbang;")
     so=q.add("#X obj 130 400 osc~;"); sg=q.add("#X obj 130 425 *~ 0.35;"); mx=q.add("#X obj 30 450 +~;")
     am=q.add("#X obj 30 475 *~;"); g=q.add("#X obj 30 500 *~ 1.9;")   # level-matched with the other bass engines
-    k1=q.add(f"#X obj 200 140 expr 40*pow(2\\,8*{D}f1);"); k2=q.add(f"#X obj 310 140 expr 0.003+0.02*{D}f1 \; 0.003+0.02*{D}f1;")
+    k1=q.add(f"#X obj 200 140 expr 40*pow(2\\,8*{D}f1);"); k2=q.add(f"#X obj 310 140 expr 0.002+0.045*pow({D}f1\\, 1.2) \; 0.002+0.045*pow({D}f1\\, 1.2);")   # v1.14: up to 80 cents (it was 40)
     up=q.add("#X obj 310 170 + 1;"); dn=q.add("#X obj 380 170 expr 1-$f1;".replace("$","\\$")); k3=q.add("#X obj 420 140 * 2500;")
     for c in [(core,0,mt,0),(mt,0,p1,0),(mt,0,ua,0),(mt,0,db,0),(ua,0,p2,0),(db,0,p3,0),(p1,0,s1,0),(p2,0,s1,1),(s1,0,s2,0),(p3,0,s2,1),
               (s2,0,sc,0),(sc,0,ce,0),(ce,0,bob,0),(core,1,em,0),(em,0,ad,0),(ad,0,cl,0),(cl,0,bob,1),(lb,0,rs,0),(rs,0,bob,2),
@@ -1019,7 +1031,7 @@ def pluck(q,core,ks,out):
               (ks[0],0,k1,0),(k1,0,ad,1),(ks[2],0,k3,0),(k3,0,em,1)]: q.con(*c)
     q.add("#X text 200 110 k1 brightness / k2 saw to square / k3 filter snap. Notes ring out and fade over the decay time (k4) \\, with a sub an octave down.;")
 
-engine("voices/ockm-mono-acid.pd",0,"Acid engine: saw wave into a resonant filter",acid)
+engine("voices/ockm-mono-acid.pd",0,"Acid engine: saw wave into a resonant filter",acid,decay=f"25*pow(80\\,{D}f1)")   # v1.14: the 303's decay, 25 ms to 2 s
 engine("voices/ockm-mono-sub.pd",1,"Sub engine: a driven sine wave with a pitch drop. Deep and clean",sub)
 engine("voices/ockm-mono-fm.pd",2,"FM engine: one sine wave bending another. Punchy and metallic",fm)
 engine("voices/ockm-mono-reese.pd",3,"Reese engine: three detuned saws beating against each other. Dark and wide",reese)
@@ -1066,16 +1078,16 @@ def donk(q,core,ks,out):
     # donk and organ bass (bassline house \\, UK garage \\, the Korg M1 organ bass): a hollow tone with a quick pitch
     # bounce down onto the note, rings out over its own decay. k1 brightness (more of the organ harmonics), k2 bounce,
     # k3 hollow (odd harmonics: woodier), k4 decay
-    pe=q.add(f"#X obj 300 200 expr~ pow(min(1\\, max(0\\, {D}v1))\\, 12)*{D}f2;"); pl=q.add("#X obj 30 230 +~;"); mt=q.add("#X obj 30 260 mtof~;")
+    pe=q.add(f"#X obj 300 200 expr~ pow(min(1\\, max(0\\, {D}v1))\\, 8)*{D}f2;"); pl=q.add("#X obj 30 230 +~;"); mt=q.add("#X obj 30 260 mtof~;")
     o1=q.add("#X obj 30 290 osc~;"); m2=q.add("#X obj 150 260 *~ 2;"); o2=q.add("#X obj 150 290 osc~;"); m3=q.add("#X obj 270 260 *~ 3;"); o3=q.add("#X obj 270 290 osc~;")
     sq=q.add("#X obj 390 290 ockm-blsquare;"); sl=q.add("#X obj 390 320 lop~ 1200;")
     mx=q.add(f"#X obj 30 350 expr~ {D}v1 + {D}f5*(0.5*{D}v2 + 0.3*{D}v3) + {D}f6*0.7*{D}v4;")
     th=q.add(f"#X obj 30 380 expr~ tanh(1.4*{D}v1)/tanh(1.4);")
     ae=q.add(f"#X obj 200 380 expr~ pow(min(1\\, max(0\\, {D}v1))\\, 1.3);"); am=q.add("#X obj 30 410 *~;"); g=q.add("#X obj 30 440 *~ 0.8;")
-    k2=q.add("#X obj 310 140 * 14;")
+    k2=q.add(f"#X obj 310 140 expr 24*pow({D}f1\\, 0.8);"); kb=q.add(f"#X obj 200 140 expr 1.0*pow({D}f1\\, 0.5);")   # v1.14: bounce up to two octaves; brightness from the first touch
     for c in [(core,1,pe,0),(core,0,pl,0),(pe,0,pl,1),(pl,0,mt,0),(mt,0,o1,0),(mt,0,m2,0),(m2,0,o2,0),(mt,0,m3,0),(m3,0,o3,0),(mt,0,sq,0),(sq,0,sl,0),
               (o1,0,mx,0),(o2,0,mx,1),(o3,0,mx,2),(sl,0,mx,3),(mx,0,th,0),(th,0,am,0),(core,1,ae,0),(ae,0,am,1),(am,0,g,0),(g,0,out,0),
-              (ks[0],0,mx,4),(ks[1],0,k2,0),(k2,0,pe,1),(ks[2],0,mx,5)]: q.con(*c)
+              (ks[0],0,kb,0),(kb,0,mx,4),(ks[1],0,k2,0),(k2,0,pe,1),(ks[2],0,mx,5)]: q.con(*c)
     q.add("#X text 200 110 k1 brightness (organ harmonics) / k2 bounce (pitch drop onto the note) / k3 hollow (woodier) / k4 decay. Rings out on its own.;")
 
 engine("voices/ockm-mono-analogue.pd",5,"Analogue engine: saw to square with a sub \\, through a resonant 24 dB low-pass. The workhorse house and techno bass (the default)",analogue)
@@ -1106,7 +1118,19 @@ q.save("voices/ockm-mono.pd","#N canvas 140 140 900 340 12;")
 # v0.98: acid (0) and juno (1) are retired (analogue with emphasis, and analogue with the chorus, do them); supersaw is 5.
 # The numbers stay as they were, so saved projects keep their engine; the screen moves retired ones on
 LEAD_ENGINES=[("dx",2),("sync",3),("mini",4),("supersaw",5),("raw",6)]
-def lead_engine(name,idx,title,build): engine(f"voices/ockm-lead-{name}.pd",idx,title,build,core_name="ockm-lead-core",hook="voice")
+def lead_engine(name,idx,title,build): engine(f"voices/ockm-lead-{name}.pd",idx,title,build,core_name="ockm-lead-core",hook="voice",
+                                               decay="60*pow(33\\,"+D+"f1)")   # v1.14: 60 ms to 2 s, so a quarter turn already rings past the step
+
+def filt_env_mul(q,core,ks,lo,span,amt,kidx=2,x=450,y=200,cmin=30,cmax=12000):
+    """v1.14: cutoff = base * (1 + amount * envelope). k1 sets the base (lo..lo*2^span, so every bit of the knob moves it);
+    the envelope opens it by a multiple, so it never swamps the knob. kidx: the knob for the amount (0..amt), or None (amt)."""
+    em=q.add(f"#X obj {x} {y} *~ {amt};"); ad=q.add(f"#X obj {x} {y+30} +~ 1;"); mb=q.add(f"#X obj {x} {y+60} *~ 1000;")
+    cl=q.add(f"#X obj {x} {y+90} clip~ {cmin} {cmax};")
+    k1=q.add(f"#X obj 200 140 expr {lo}*pow(2\\,{span}*{D}f1);")
+    for c in [(core,1,em,0),(em,0,ad,0),(ad,0,mb,0),(mb,0,cl,0),(ks[0],0,k1,0),(k1,0,mb,1)]: q.con(*c)
+    if kidx is not None:
+        k3=q.add(f"#X obj 420 140 * {amt};"); q.con(ks[kidx],0,k3,0); q.con(k3,0,em,1)
+    return cl
 
 def filt_env(q,core,ks,lo,span,x=450,y=200,kidx=2,cmin=30,cmax=14000,amt=3000):
     """core's filter envelope -> cutoff in Hz: k1 sets the base (lo..lo*2^span), k3 the envelope amount. Returns the cutoff signal."""
@@ -1134,12 +1158,13 @@ def lead_mini(q,core,ks,out):
     d3=q.add("#X obj 250 200 *~ 0.5;"); o3=q.add("#X obj 250 230 ockm-blsquare;"); g3=q.add("#X obj 250 260 *~ 0.6;")
     m1=q.add("#X obj 30 270 +~;"); m2=q.add("#X obj 30 295 +~;")
     pre=q.add(f"#X obj 30 320 expr~ tanh({D}v1*0.7);")
-    cut=filt_env(q,core,ks,50,8)
-    bob=q.add("#X obj 30 360 bob~;"); k2=q.add(f"#X obj 310 140 expr 0.2+3.4*{D}f1;")
+    cut=filt_env_mul(q,core,ks,60,7.5,10)   # v1.14: cutoff 60 Hz to 11 kHz, contour opens it up to 10 times
+    bob=q.add("#X obj 30 360 bob~;"); k2=q.add(f"#X obj 310 140 expr 0.2+3.6*pow({D}f1\\, 0.6);")
     am=q.add("#X obj 30 400 *~;"); g=q.add("#X obj 30 430 *~ 0.95;")
+    emc=q.add("#X obj 30 380 *~ 1;"); emk=q.add(f"#X obj 420 170 expr 1+1.8*{D}f1;")   # emphasis thins the sound: make the level back up
     for c in [(core,0,mt,0),(mt,0,o1,0),(mt,0,d2,0),(d2,0,o2,0),(mt,0,d3,0),(d3,0,o3,0),(o3,0,g3,0),
               (o1,0,m1,0),(o2,0,m1,1),(m1,0,m2,0),(g3,0,m2,1),(m2,0,pre,0),(pre,0,bob,0),(cut,0,bob,1),(ks[1],0,k2,0),(k2,0,bob,2),
-              (bob,0,am,0),(core,2,am,1),(am,0,g,0),(g,0,out,0)]: q.con(*c)
+              (bob,0,emc,0),(emc,0,am,0),(ks[1],0,emk,0),(emk,0,emc,1),(core,2,am,1),(am,0,g,0),(g,0,out,0)]: q.con(*c)
     q.add("#X text 200 110 k1 cutoff / k2 emphasis / k3 contour (filter envelope);")
 
 def lead_juno(q,core,ks,out):
@@ -1176,24 +1201,29 @@ def lead_dx(q,core,ks,out):
     bi=q.add(f"#X obj 200 170 expr 0.3+4*{D}f1;"); ix=q.add("#X obj 300 260 *~ 1;")
     i1=q.add("#X obj 160 300 *~;"); i2=q.add("#X obj 160 330 *~;")
     ad=q.add("#X obj 30 360 +~;"); car=q.add("#X obj 30 390 osc~;")
-    dt=q.add(f"#X obj 600 140 expr 1+0.006*{D}f1;"); mt2=q.add("#X obj 30 250 *~ 1;"); ad2=q.add("#X obj 130 360 +~;"); car2=q.add("#X obj 130 390 osc~;")
-    sm=q.add("#X obj 30 420 +~;"); sc=q.add("#X obj 30 445 *~ 0.5;")
+    # v1.14: detune up to 35 cents (it was 10)
+    dt=q.add(f"#X obj 600 140 expr 1+0.02*pow({D}f1\\, 1.5);"); mt2=q.add("#X obj 30 250 *~ 1;"); ad2=q.add("#X obj 130 360 +~;"); car2=q.add("#X obj 130 390 osc~;")
+    sm=q.add("#X obj 30 420 +~;"); sc=q.add("#X obj 30 445 *~ 0.5;"); dtg=q.add(f"#X obj 600 170 expr 0.5*(1+0.7*{D}f1);")
+    dxh=q.add("#X obj 30 458 hip~ 20;")   # v1.14: FM at 1:1 puts a sideband at 0 Hz (a DC offset, a slow wobble once detuned): keep it out
     am=q.add("#X obj 30 470 *~;"); am2=q.add("#X obj 30 495 *~;"); g=q.add("#X obj 30 520 *~ 0.65;")
     for c in [(core,0,mt,0),(core,1,ec,0),(ec,0,amp,0),(ks[1],0,rt,0),(rt,0,rm,1),(mt,0,rm,0),(rm,0,mo,0),
               (ks[0],0,bi,0),(bi,0,ix,1),(ec,0,ix,0),(mo,0,i1,0),(ix,0,i1,1),(i1,0,i2,0),(rm,0,i2,1),
               (mt,0,ad,0),(i2,0,ad,1),(ad,0,car,0),(ks[2],0,dt,0),(dt,0,mt2,1),(mt,0,mt2,0),(mt2,0,ad2,0),(i2,0,ad2,1),(ad2,0,car2,0),
-              (car,0,sm,0),(car2,0,sm,1),(sm,0,sc,0),(sc,0,am,0),(amp,0,am,1),(am,0,am2,0),(core,2,am2,1),(am2,0,g,0),(g,0,out,0)]: q.con(*c)
+              (car,0,sm,0),(car2,0,sm,1),(sm,0,sc,0),(ks[2],0,dtg,0),(dtg,0,sc,1),(sc,0,dxh,0),(dxh,0,am,0),(amp,0,am,1),(am,0,am2,0),(core,2,am2,1),(am2,0,g,0),(g,0,out,0)]: q.con(*c)
     q.add("#X text 200 110 k1 brightness / k2 character: tine \\, reed \\, bell \\, glass / k3 detune (a second voice beside it);")
 
 def lead_sync(q,core,ks,out):
     # hard sync: a second saw restarts every cycle of the first, so its pitch shows up as a sweeping tone. The envelope sweeps it
     mt=q.add("#X obj 30 200 mtof~;"); ph=q.add("#X obj 30 230 phasor~;")
-    sr=q.add(f"#X obj 200 170 expr 1+3*{D}f1;"); se=q.add("#X obj 300 230 *~ 4;"); sa=q.add("#X obj 300 260 +~ 1;")
+    # v1.14: sync up to 9 times the note (it was 4), the sweep and the tone further too
+    sr=q.add(f"#X obj 200 170 expr 1+8*pow({D}f1\\, 1.2);"); se=q.add("#X obj 300 230 *~ 4;"); sa=q.add("#X obj 300 260 +~ 1;")
     sy=q.add(f"#X obj 30 290 expr~ fmod({D}v1*{D}v2 \\, 1)*2-1;")
-    lp=q.add("#X obj 30 330 lop~ 6000;"); k2=q.add(f"#X obj 310 140 expr 800*pow(2\\,4*{D}f1);")
-    k3=q.add("#X obj 420 140 * 6;"); am=q.add("#X obj 30 400 *~;"); g=q.add("#X obj 30 430 *~ 0.55;")
+    # tone: 1.2 to 14 kHz through two poles (steep enough to hear), the level made up as it darkens
+    lp=q.add("#X obj 30 330 lop~ 6000;"); lp2=q.add("#X obj 30 345 lop~ 6000;"); k2=q.add(f"#X obj 310 140 expr 1200*pow(2\\,3.6*{D}f1);")
+    tg=q.add("#X obj 30 375 *~ 1;"); tgk=q.add(f"#X obj 420 170 expr 1+1.4*(1-{D}f1);")
+    k3=q.add("#X obj 420 140 * 10;"); am=q.add("#X obj 30 400 *~;"); g=q.add("#X obj 30 430 *~ 0.55;")
     for c in [(core,0,mt,0),(mt,0,ph,0),(core,1,se,0),(ks[2],0,k3,0),(k3,0,se,1),(se,0,sa,0),(ks[0],0,sr,0),(sr,0,sa,1),
-              (ph,0,sy,0),(sa,0,sy,1),(sy,0,lp,0),(ks[1],0,k2,0),(k2,0,lp,1),(lp,0,am,0),(core,2,am,1),(am,0,g,0),(g,0,out,0)]: q.con(*c)
+              (ph,0,sy,0),(sa,0,sy,1),(sy,0,lp,0),(ks[1],0,k2,0),(k2,0,lp,1),(k2,0,lp2,1),(lp,0,lp2,0),(lp2,0,tg,0),(ks[1],0,tgk,0),(tgk,0,tg,1),(tg,0,am,0),(core,2,am,1),(am,0,g,0),(g,0,out,0)]: q.con(*c)
     q.add("#X text 200 110 k1 sync amount / k2 tone / k3 sweep (envelope on the sync);")
 
 def lead_supersaw(q,core,ks,out):
@@ -1202,6 +1232,7 @@ def lead_supersaw(q,core,ks,out):
     # wanders a little on its own slow wobble), k4 decay
     mt=q.add("#X obj 30 200 mtof~;")
     spr=q.add(f"#X obj 600 140 expr {D}f1;"); mix=q.add("#X obj 30 330 +~;")
+    sdt=q.add(f"#X obj 600 165 expr pow({D}f1\\, 0.8);"); q.con(ks[0],0,sdt,0)   # v1.14: the outer pair up to 85 cents out
     det=[-1,-0.62,-0.3,0,0.3,0.62,1]
     for j,dv in enumerate(det):
         x=30+j*95
@@ -1209,18 +1240,22 @@ def lead_supersaw(q,core,ks,out):
             o=q.add(f"#X obj {x} 260 ockm-blsaw;"); q.con(mt,0,o,0); q.con(o,0,mix,0); continue
         # pitch = f * (1 + spread*0.0145*dv + drift*0.004*wobble)
         wb=q.add(f"#X obj {x} 170 osc~ {round(0.07+0.05*j,3)};"); wd=q.add(f"#X obj {x} 190 *~ 0;")
-        ex=q.add(f"#X obj {x} 215 expr~ {D}v1*(1 + {D}f2*{round(0.0145*dv,5)} + {D}v3*0.004);")
+        ex=q.add(f"#X obj {x} 215 expr~ {D}v1*(1 + {D}f2*{round(0.05*dv,5)} + {D}v3*0.015);")
         o=q.add(f"#X obj {x} 260 ockm-blsaw;"); ga=q.add(f"#X obj {x} 290 *~ 0;")
-        for c in [(wb,0,wd,0),(mt,0,ex,0),(wd,0,ex,2),(ex,0,o,0),(o,0,ga,0),(ga,0,mix,0),(spr,0,ex,1),(spr,0,ga,1)]: q.con(*c)
+        for c in [(wb,0,wd,0),(mt,0,ex,0),(wd,0,ex,2),(ex,0,o,0),(o,0,ga,0),(ga,0,mix,0),(sdt,0,ex,1),(spr,0,ga,1)]: q.con(*c)
         q.con(ks[2],0,wd,1)
     q.con(ks[0],0,spr,0)
     nrm=q.add(f"#X obj 700 170 expr 1/sqrt(1+6*{D}f1*{D}f1);"); ng=q.add("#X obj 30 360 *~ 1;")
     q.con(ks[0],0,nrm,0); q.con(nrm,0,ng,1); q.con(mix,0,ng,0)
-    em=q.add("#X obj 450 400 *~ 5000;"); co=q.add(f"#X obj 450 430 expr~ min(16000\\, max(60\\, {D}f2 + {D}v1));")
-    k2=q.add(f"#X obj 310 140 expr 200*pow(2\\,6*{D}f1);")
-    f1=q.add("#X obj 30 400 vcf~ 1.2;"); f2=q.add("#X obj 30 430 lop~ 9000;")
+    # v1.14: the envelope opens the cutoff by a multiple (it used to add 5 kHz, which swamped the knob), and the cutoff
+    # stops below 9 kHz: vcf~ goes silent above a quarter of the sample rate, which is what the top of the knob did
+    em=q.add("#X obj 450 400 *~ 1;"); co=q.add(f"#X obj 450 430 expr~ min(14000\\, max(60\\, {D}f2*(1+3*{D}v1)));")
+    k2=q.add(f"#X obj 310 140 expr 150*pow(2\\,6*{D}f1);")
+    # v1.14: a ladder filter (bob~): vcf~ broke down and went silent once the cutoff ran high
+    f1=q.add("#X obj 30 400 bob~;"); f2=q.add("#X obj 30 430 lop~ 12000;"); frs=q.add("#X msg 120 370 0.5;"); flb=q.add("#X obj 120 345 loadbang;")
+    q.con(flb,0,frs,0); q.con(frs,0,f1,2)
     am=q.add("#X obj 30 460 *~;"); g=q.add("#X obj 30 490 *~ 0.6;")
-    for c in [(core,0,mt,0),(core,1,em,0),(em,0,co,0),(ks[1],0,k2,0),(k2,0,co,1),(ng,0,f1,0),(co,0,f1,1),(f1,1,f2,0),
+    for c in [(core,0,mt,0),(core,1,em,0),(em,0,co,0),(ks[1],0,k2,0),(k2,0,co,1),(ng,0,f1,0),(co,0,f1,1),(f1,0,f2,0),
               (f2,0,am,0),(core,2,am,1),(am,0,g,0),(g,0,out,0)]: q.con(*c)
     q.add("#X text 200 110 k1 spread (one saw to seven) / k2 cutoff / k3 drift / k4 decay;")
 
@@ -1235,12 +1270,13 @@ def raw(q,core,ks,out,hpf=80,gain=0.8,top=9000):
     wv=q.add(f"#X obj 30 260 expr~ (1-{D}f2)*(4*abs({D}v1-0.5)-1) + {D}f2*{D}v3;")
     t1=q.add(f"#X obj 30 395 lop~ {top};"); t2=q.add(f"#X obj 30 400 lop~ {top};")
     hp=q.add(f"#X obj 30 290 hip~ {hpf};"); pre=q.add(f"#X obj 30 315 expr~ tanh(1.6*{D}v1);")
-    cut=filt_env(q,core,ks,45,8,kidx=None,amt=4500,cmax=12000)
-    bob=q.add("#X obj 30 350 bob~;"); k2=q.add(f"#X obj 310 140 expr 0.3+4.1*pow({D}f1\\, 1.3);")
+    cut=filt_env_mul(q,core,ks,50,7.5,5,kidx=None)   # v1.14: cutoff 50 Hz to 9 kHz, the envelope opens it up to 5 times
+    bob=q.add("#X obj 30 350 bob~;"); k2=q.add(f"#X obj 310 140 expr 0.3+4.0*pow({D}f1\\, 0.5);")
     dr=q.add(f"#X obj 30 380 expr~ tanh(2.8*{D}v1)/tanh(2.8);")
+    rgc=q.add("#X obj 30 365 *~ 1;"); rgk=q.add(f"#X obj 420 170 expr 1+1.2*{D}f1;")   # v1.14: resonance keeps the level
     am=q.add("#X obj 30 410 *~;"); g=q.add(f"#X obj 30 440 *~ {gain};")
     for c in [(core,0,mt,0),(mt,0,ph,0),(ph,0,wv,0),(ks[2],0,wv,1),(wv,0,hp,0),(hp,0,pre,0),(pre,0,bob,0),(cut,0,bob,1),
-              (ks[1],0,k2,0),(k2,0,bob,2),(bob,0,dr,0),(dr,0,t1,0),(t1,0,t2,0),(t2,0,am,0),(core,2,am,1),(am,0,g,0),(g,0,out,0),(mt,0,bs,0),(bs,0,wv,2)]: q.con(*c)
+              (ks[1],0,k2,0),(k2,0,bob,2),(bob,0,rgc,0),(rgc,0,dr,0),(ks[1],0,rgk,0),(rgk,0,rgc,1),(dr,0,t1,0),(t1,0,t2,0),(t2,0,am,0),(core,2,am,1),(am,0,g,0),(g,0,out,0),(mt,0,bs,0),(bs,0,wv,2)]: q.con(*c)
     q.add("#X text 200 110 k1 cutoff / k2 resonance (self-oscillates at the top) / k3 triangle to saw / k4 decay;")
 
 engine("voices/ockm-mono-raw.pd",7,"Raw engine (MS-20 style): triangle or saw into a screaming resonant filter \\, driven. Hypnotic techno and big tech house riffs",lambda q,c,k,o: raw(q,c,k,o,hpf=25,gain=1.15,top=3200))
@@ -2082,7 +2118,8 @@ def chord_voice(sp,kind):
         tf=sp.add("#X obj 80 140 t f f f f;")
         dm=[sp.add(f"#X obj {80+j*80} 170 * 1;") for j in range(4)]
         po=[sp.add(f"#X obj {80+j*80} 200 phasor~;") for j in range(4)]
-        ce=sp.add(f"#X obj 80 255 expr~ ({D}v1+{D}v2+{D}v3+{D}v4)*0.5-1;")
+        ce=sp.add(f"#X obj 80 255 expr~ (({D}v1+{D}v2+{D}v3+{D}v4)*0.5-1)*{D}f5;")   # f5: detune's level make-up (v1.14)
+        dlc=sp.add(f"#X obj 690 170 expr 1+0.7*pow({D}f1\\, 2.5);"); sp.con(k[1],0,dlc,0); sp.con(dlc,0,ce,4)
         fe=sp.add("#X obj 400 200 vline~;"); fa=sp.add("#X obj 400 225 *~ 2200;"); fb=sp.add("#X obj 400 250 +~ 600;"); fc=sp.add("#X obj 400 275 clip~ 40 15000;")
         l1=sp.add("#X obj 80 290 lop~;"); l2=sp.add("#X obj 80 310 lop~;")
         dk=sp.add("#X obj 300 130 f 280;"); tbb=sp.add("#X obj 20 140 t b b;")
@@ -2092,7 +2129,7 @@ def chord_voice(sp,kind):
         for c in [(dk,0,tdk,0),(tdk,1,mpk,1),(tdk,0,fv2,0),(fv2,0,vcv,0),(vcv,0,mpk,0)]: sp.con(*c)
         pa=sp.add("#X obj 200 200 pack f 280 2;"); ma=sp.add(f"#X msg 200 230 {D}1 {D}3 \\, 0 {D}2 {D}3;"); mf=sp.add(f"#X msg 400 170 {D}1 {D}3 \\, 0 {D}2 {D}3;")
         # k3 attack (v0.98): the bottom third is all stab, so old projects' snap settings stay stabs; up to about 0.9 s
-        x1=sp.add(f"#X obj 600 140 expr 150*pow(2\\,6*{D}f1);"); x2=sp.add(f"#X obj 690 140 expr 1-(0.008*{D}f1+0.035*{D}f1*{D}f1*{D}f1) \\; 1-0.4*(0.008*{D}f1+0.035*{D}f1*{D}f1*{D}f1) \\; 1+0.4*(0.008*{D}f1+0.035*{D}f1*{D}f1*{D}f1) \\; 1+(0.008*{D}f1+0.035*{D}f1*{D}f1*{D}f1);"); x3=sp.add(f"#X obj 780 140 expr 2+1800*pow(max(0\\, {D}f1-0.3)\\, 2);"); x4=sp.add(f"#X obj 870 140 expr 40+3000*{D}f1*{D}f1;")
+        x1=sp.add(f"#X obj 600 140 expr 150*pow(2\\,6*{D}f1);"); x2=sp.add(f"#X obj 690 140 expr 1-(0.008*{D}f1+0.035*{D}f1*{D}f1*{D}f1) \\; 1-0.4*(0.008*{D}f1+0.035*{D}f1*{D}f1*{D}f1) \\; 1+0.4*(0.008*{D}f1+0.035*{D}f1*{D}f1*{D}f1) \\; 1+(0.008*{D}f1+0.035*{D}f1*{D}f1*{D}f1);"); x3=sp.add(f"#X obj 780 140 expr 2+1200*pow({D}f1\\, 2.2);"); x4=sp.add(f"#X obj 870 140 expr 40+3000*{D}f1*{D}f1;")
         for j in range(4): sp.con(tf,3-j,dm[j],0); sp.con(dm[j],0,po[j],0); sp.con(po[j],0,ce,j); sp.con(x2,j,dm[j],1)
         for c in [(mt,0,tf,0),(ce,0,l1,0),(l1,0,l2,0),(l2,0,am,0),
                   (fe,0,fa,0),(fa,0,fb,0),(fb,0,fc,0),(fc,0,l1,1),(fc,0,l2,1),
@@ -2112,8 +2149,10 @@ def chord_voice(sp,kind):
         hp=sp.add("#X obj 80 255 hip~ 30;")
         fe=sp.add("#X obj 400 200 vline~;")
         co=sp.add(f"#X obj 400 230 expr~ min(15000\\, {D}f2*(1+{D}f3*{D}v1*{D}v1));")
-        vf=sp.add("#X obj 80 285 vcf~ 4;")
-        dr=sp.add(f"#X obj 80 310 expr~ tanh({D}f2*{D}v1)/tanh({D}f2);")
+        vf=sp.add("#X obj 80 285 bob~;")   # v1.14: a ladder filter: vcf~ hardly resonated here
+        # v1.14: drive up to 20 (it was 8), its loudness taken back off so it's heard as grit; resonance up to a Q of 29
+        dr=sp.add(f"#X obj 80 310 expr~ tanh({D}f2*{D}v1+0.25*({D}f2-1)*{D}v1*{D}v1)/tanh({D}f2)/(1+0.06*({D}f2-1));")   # a little asymmetric: grit
+        rsc=sp.add("#X obj 80 298 *~ 1;"); rsk=sp.add(f"#X obj 690 170 expr 1+1.4*{D}f1;")   # resonance keeps the level
         tbb=sp.add("#X obj 20 140 t b b;"); dk=sp.add("#X obj 300 130 f 230;")
         pa=sp.add("#X obj 200 260 pack f 230 0;"); ma=sp.add(f"#X msg 200 285 {D}1 2 \\, {D}3 35 2 \\, 0 {D}2 37;")
         vt=sp.add("#X obj 200 240 t f f;"); vb=sp.add("#X obj 260 240 * 0.5;")
@@ -2121,9 +2160,9 @@ def chord_voice(sp,kind):
         fd=sp.add("#X obj 470 130 * 0.6;"); fdl=sp.add("#X obj 470 155 f 90;"); fm=sp.add("#X obj 400 170 t b;")
         mf=sp.add(f"#X msg 400 185 1 1 \\, 0 {D}1 1;")
         va=sp.add(f"#X obj 560 200 expr 3+11*{D}f1*{D}f1;")
-        x1=sp.add(f"#X obj 600 140 expr 90*pow(2\\,5.5*{D}f1);"); x2=sp.add(f"#X obj 690 140 expr 1.5+12*{D}f1;"); x3=sp.add(f"#X obj 780 140 expr 1+7*{D}f1;"); x4=sp.add(f"#X obj 870 140 expr 50+1400*{D}f1*{D}f1;")
+        x1=sp.add(f"#X obj 600 140 expr 90*pow(2\\,5.5*{D}f1);"); x2=sp.add(f"#X obj 690 140 expr 0.3+3.5*pow({D}f1\\, 0.7);"); x3=sp.add(f"#X obj 780 140 expr 1+29*pow({D}f1\\, 1.3);"); x4=sp.add(f"#X obj 870 140 expr 50+1400*{D}f1*{D}f1;")
         for c in [(mt,0,pf,1),(pe,0,pf,0),(pf,0,o0,0),(pf,0,d1,0),(d1,0,o1,0),(pf,0,d2,0),(d2,0,o2,0),(pf,0,o3,0),(tbb,0,pm,0),(pm,0,pe,0),
-                  (o0,0,mx,0),(o1,0,mx,1),(o2,0,mx,2),(o3,0,mx,3),(mx,0,hp,0),(hp,0,vf,0),(vf,1,dr,0),(dr,0,am,0),
+                  (o0,0,mx,0),(o1,0,mx,1),(o2,0,mx,2),(o3,0,mx,3),(mx,0,hp,0),(hp,0,vf,0),(vf,0,rsc,0),(rsc,0,dr,0),(k[1],0,rsk,0),(rsk,0,rsc,1),(dr,0,am,0),
                   (fe,0,co,0),(co,0,vf,1),
                   (tb,0,tbb,0),(tbb,1,fv,0),(fv,0,vt,0),(vt,1,vb,0),(vb,0,pa,2),(vt,0,pa,0),(pa,0,ma,0),(ma,0,av,0),(fv,0,va,0),(va,0,co,2),
                   (tbb,0,dk,0),(dk,0,fd,0),(fd,0,fdl,0),(fdl,0,mf,0),(mf,0,fe,0),
@@ -2137,7 +2176,8 @@ def chord_voice(sp,kind):
         s1=sp.add("#X obj 80 270 +~;"); s2=sp.add("#X obj 80 290 +~;"); s3=sp.add("#X obj 80 310 +~;")
         pp=sp.add("#X msg 400 170 1 \\, 0 150;"); tbb=sp.add("#X obj 20 140 t b b;")
         pa=sp.add("#X obj 200 140 pack f 400;"); ma=sp.add(f"#X msg 200 170 {D}1 5 \\, 0 40 {D}2;")
-        x1=sp.add(f"#X obj 600 140 expr 0.1+0.6*{D}f1 \; 0.05+0.4*{D}f1;"); x2=sp.add("#X obj 690 170 * 0.6;"); x3=sp.add("#X obj 780 140 * 0.7;"); x4=sp.add(f"#X obj 870 140 expr 60+{D}f1*1200;")
+        # v1.14: drawbars and click twice as far
+        x1=sp.add(f"#X obj 600 140 expr 0.15+1.2*{D}f1 \; 0.08+0.9*{D}f1;"); x2=sp.add("#X obj 690 170 * 1.5;"); x3=sp.add("#X obj 780 140 * 0.7;"); x4=sp.add(f"#X obj 870 140 expr 60+{D}f1*1200;")
         for c in [(mt,0,tf,0),(tf,3,o1,0),(tf,2,h2,0),(h2,0,o2,0),(tf,1,h3,0),(h3,0,o3,0),(tf,0,hs,0),(hs,0,o4,0),(o2,0,g2,0),(o3,0,g3,0),(o4,0,g4,0),
                   (o3,0,p3,0),(pe,0,pg,0),(pg,0,p3,1),(o1,0,s1,0),(g2,0,s1,1),(s1,0,s2,0),(g3,0,s2,1),(s2,0,s3,0),(g4,0,s3,1),(s3,0,am,0),(p3,0,am,0),
                   (tb,0,tbb,0),(tbb,1,fv,0),(fv,0,pa,0),(pa,0,ma,0),(ma,0,av,0),(tbb,0,pp,0),(pp,0,pe,0),
@@ -2158,8 +2198,8 @@ def chord_voice(sp,kind):
             n=i+1; x=80+i*110
             fr=sp.add(f"#X obj {x} 170 * {r:.5f};"); o=sp.add(f"#X obj {x} 200 osc~;")
             # level: the hammer's spectrum, brighter with velocity and k1; k2 lifts the even partials (the octave)
-            ex=sp.add(f"#X obj {x} 230 expr sqrt({D}f1*pow({n}\\, -(2.0-1.5*{D}f2*(0.5+0.5*{D}f1)))*(1+{1.6 if n%2==0 else 0}*{D}f3)) \; "
-                      f"0.7*sqrt({D}f1*pow({n}\\, -(2.0-1.5*{D}f2*(0.5+0.5*{D}f1)))*(1+{1.6 if n%2==0 else 0}*{D}f3)) \; {D}f4 \; "
+            ex=sp.add(f"#X obj {x} 230 expr sqrt({D}f1*pow({n}\\, -(2.6-2.4*{D}f2*(0.5+0.5*{D}f1)))*(1+{4 if n%2==0 else 0}*{D}f3)) \; "
+                      f"0.7*sqrt({D}f1*pow({n}\\, -(2.6-2.4*{D}f2*(0.5+0.5*{D}f1)))*(1+{4 if n%2==0 else 0}*{D}f3)) \; {D}f4 \; "
                       f"{D}f5/(1+0.55*{n-1}) \; {D}f4+2;")
             pk=sp.add(f"#X obj {x} 260 pack f f f f f;")
             ms=sp.add(f"#X msg {x} 285 {D}1 2 \\, {D}2 {D}3 2 \\, 0 {D}4 {D}5;")
@@ -2176,7 +2216,8 @@ def chord_voice(sp,kind):
         # the overall gate: open on the hit (the partials shape the note), closed by an off
         gt=sp.add("#X msg 300 120 1 2;")
         tbb=sp.add("#X obj 20 140 t b b;")
-        x3=sp.add(f"#X obj 780 140 expr 260-200*{D}f1;"); x4=sp.add(f"#X obj 870 140 expr 400+{D}f1*3600;")
+        # v1.14: snap 600 ms (soft) to 20 ms (hard); length 150 ms to 4.5 s; brightness and octave go much further
+        x3=sp.add(f"#X obj 780 140 expr 600*pow(0.033\\, {D}f1);"); x4=sp.add(f"#X obj 870 140 expr 150*pow(30\\, {D}f1);")
         for c in [(mt,0,tm,0),(tb,0,tbb,0),(tbb,1,fv,0),(fv,0,prm,0),(fv,0,hvx,0),(hvx,0,hm,0),(hm,0,hv,0),(tbb,0,gt,0),(gt,0,av,0),
                   (nz,0,hb,0),(hb,0,hg,0),(hv,0,hg,1),(hg,0,mix,0),(mix,0,hl,0),(hl,0,am,0),
                   (k[0],0,prm,1),(k[1],0,prm,2),(k[2],0,x3,0),(x3,0,prm,3),(k[3],0,x4,0),(x4,0,prm,4)]: sp.con(*c)
@@ -2191,13 +2232,16 @@ def chord_voice(sp,kind):
         sm=sp.add("#X obj 80 350 +~;")
         tro=sp.add("#X obj 200 300 osc~ 4.5;"); trd=sp.add("#X obj 200 325 *~ 0;"); tr1=sp.add("#X obj 200 350 +~ 1;"); trm=sp.add("#X obj 80 375 *~;")
         tbb=sp.add("#X obj 20 140 t b b;"); tv=sp.add("#X obj 400 80 t f f f f;")
-        pa=sp.add("#X obj 400 140 pack f 2500 0.6;"); ma=sp.add(f"#X msg 400 170 {D}1 3 \\, {D}3 400 3 \\, 0 {D}2 403;")
+        pa=sp.add("#X obj 400 140 pack f 2500 0.6 400 403;"); ma=sp.add(f"#X msg 400 170 {D}1 3 \\, {D}3 {D}4 3 \\, 0 {D}2 {D}5;")
         v6=sp.add("#X obj 480 110 * 0.6;")
-        ixe=sp.add(f"#X obj 300 140 expr 0.3+1.2*{D}f2 + 2.5*{D}f3*{D}f1 \\; 0.12+0.45*{D}f2;"); pk=sp.add("#X obj 300 170 pack f f;"); mi=sp.add(f"#X msg 300 200 {D}1 \\, {D}2 300;")
-        tne=sp.add(f"#X obj 240 140 expr {D}f1*(0.06+0.22*{D}f2);"); tm=sp.add(f"#X msg 240 170 {D}1 1 \\, 0 70 1;")
+        ixe=sp.add(f"#X obj 300 140 expr 0.2+2.6*{D}f2 + 2.5*{D}f3*{D}f1 \\; 0.08+0.9*{D}f2;"); pk=sp.add("#X obj 300 170 pack f f;"); mi=sp.add(f"#X msg 300 200 {D}1 \\, {D}2 300;")
+        tne=sp.add(f"#X obj 240 140 expr {D}f1*(0.03+0.45*{D}f2);"); tm=sp.add(f"#X msg 240 170 {D}1 1 \\, 0 70 1;")
         bkx=sp.add(f"#X obj 520 110 expr 1+3*{D}f2*{D}f1;")
         fk1=sp.add("#X obj 600 200 f 0.5;"); fk2=sp.add("#X obj 690 200 f 0.4;")
-        x3=sp.add("#X obj 780 140 * 0.35;"); x4=sp.add(f"#X obj 870 140 expr 800+{D}f1*4500;")
+        # v1.14: tremolo up to 75% deep (it was 35%), length 150 ms to 5 s (it started at 800 ms, longer than the gap between hits)
+        x3=sp.add(f"#X obj 780 140 expr 0.75*pow({D}f1\\, 0.7);")
+        # the first fall (to 60%) takes 40% of the length, up to 400 ms, so a short length is short
+        x4=sp.add(f"#X obj 870 140 expr 150*pow(35\\, {D}f1) \\; min(400\\, 60*pow(35\\, {D}f1)) \\; min(400\\, 60*pow(35\\, {D}f1))+3;")
         for c in [(mt,0,tf,0),(tf,2,mo,0),(tf,1,m2,1),(tf,1,ad,1),(tf,0,t14,0),(t14,0,to,0),
                   (mo,0,m1,0),(ixv,0,m1,1),(m1,0,m2,0),(m2,0,ad,0),(ad,0,car,0),(car,0,bk,0),(bk,0,dc,0),(dc,0,sm,0),
                   (to,0,tg,0),(tvl,0,tg,1),(tg,0,sm,1),
@@ -2207,7 +2251,7 @@ def chord_voice(sp,kind):
                   (tv,1,v6,0),(v6,0,pa,2),(tv,1,ixe,0),(ixe,1,pk,1),(ixe,0,pk,0),(pk,0,mi,0),(mi,0,ixv,0),
                   (tv,0,pa,0),(pa,0,ma,0),(ma,0,av,0),
                   (k[0],0,fk1,0),(fk1,0,ixe,1),(fk1,0,tne,1),(k[1],0,fk2,0),(fk2,0,ixe,2),(fk2,0,bkx,1),
-                  (k[2],0,x3,0),(x3,0,trd,1),(k[3],0,x4,0),(x4,0,pa,1)]: sp.con(*c)
+                  (k[2],0,x3,0),(x3,0,trd,1),(k[3],0,x4,0),(x4,0,pa,1),(x4,1,pa,3),(x4,2,pa,4)]: sp.con(*c)
     elif kind=="strings":
         # string machine: three detuned saws through a soft filter, slow swell, long release. The ensemble is added after the voices
         tf=sp.add("#X obj 80 140 t f f f;"); du=sp.add("#X obj 160 170 * 1.004;"); dd=sp.add("#X obj 240 170 * 0.996;")
@@ -2235,7 +2279,7 @@ def chord_voice(sp,kind):
                   (k[0],0,x1,0),(x1,0,l1,1),(x1,0,l2,1),(k[1],0,x2,0),(x2,0,du,1),(x2,1,dd,1),
                   (k[2],0,x3,0),(x3,0,fa3,0),(fa3,1,ad,1),(fa3,0,pa,1),(k[3],0,x4,0),(x4,0,ad,0),(ad,0,pa,2)]: sp.con(*c)
 
-CHORD_GAIN={"stab":0.42,"hard":0.42,"organ":0.135,"piano":0.4,"rhodes":0.13}   # measured: stab was a third as loud as the bass, organ a little loud
+CHORD_GAIN={"stab":0.37,"hard":0.42,"organ":0.135,"piano":0.4,"rhodes":0.13}   # measured: stab was a third as loud as the bass, organ a little loud
 # v0.98: four engines. Stab became poly (its k3 is attack: 0 the dub techno stab, 1 a pad, and a string machine with the
 # chorus on), so pad (2) and strings (5) are retired; the numbers stay so saved projects load, and the screen moves them on
 CHORD_ENGINES=[(0,"stab","Poly: two detuned saws through a filter. Attack 0 is the dub techno stab \\, up is a pad \\, with the chorus a string machine"),

@@ -13,7 +13,7 @@
 #X obj 700 170 switch~;
 #X obj 760 140 sel 0;
 #X msg 760 170 off;
-#X obj 650 50 expr 20*pow(100\,\$f1);
+#X obj 650 50 expr 25*pow(80\,\$f1);
 #X obj 30 560 outlet~;
 #X obj 30 200 mtof~;
 #X obj 30 230 phasor~;
@@ -28,6 +28,8 @@
 #X obj 200 140 expr 30*pow(2\,9*\$f1);
 #X obj 310 140 * 3.9;
 #X obj 420 140 * 8000;
+#X obj 30 370 *~ 1;
+#X obj 310 170 expr 1+2.6*\$f1;
 #X text 200 110 k1 cutoff / k2 resonance / k3 envelope amount;
 #X text 200 25 k1 / k2 / k3 / k4 (0 to 1) \, k4 is always decay;
 #X connect 1 0 2 0;
@@ -41,6 +43,8 @@
 #X connect 10 0 2 1;
 #X connect 7 0 14 0;
 #X connect 14 0 3 1;
+#X connect 5 0 30 0;
+#X connect 30 0 29 1;
 #X connect 3 0 16 0;
 #X connect 16 0 17 0;
 #X connect 17 0 18 0;
@@ -50,7 +54,8 @@
 #X connect 20 0 21 0;
 #X connect 21 0 22 0;
 #X connect 22 0 23 1;
-#X connect 23 0 24 0;
+#X connect 23 0 29 0;
+#X connect 29 0 24 0;
 #X connect 3 2 24 1;
 #X connect 24 0 25 0;
 #X connect 25 0 15 0;

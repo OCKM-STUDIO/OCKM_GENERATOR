@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.14 (20 October 2026)
+
+Every synth knob now makes a clear difference, from the first quarter turn, without the loudness jumping. Each one was measured (rendered at 0, a quarter, half and full, and the change in tone, length, movement and level compared), fixed where it was weak, and measured again. A new test fails the build if a knob stops making a difference.
+
+- **Lead decay rings:** notes sound for the decay time (60 ms to 2 s) instead of stopping about 95 ms after every step whatever the knob said
+- **Cutoff that counts:** on the analogue and raw leads (and raw bass) the envelope opens the filter by a multiple of the cutoff, so the knob works across its whole travel (the envelope used to add a fixed amount that swamped it)
+- **Supersaw:** spread and drift went from almost nothing to a real detuned stack (outer saws up to 85 cents); the cutoff no longer goes silent at the top (a ladder filter replaces vcf~, which broke down)
+- **Sync** sweeps up to 9 times the note (it was 4), with a steeper tone filter that never hides it; **DX detune** up to 35 cents (it was 10), and the DX lead loses a hidden DC offset
+- **Emphasis and resonance** (analogue lead, acid, raw, hard stab) keep their level instead of dropping up to 12 dB, and bite from early on
+- **Sub 808:** tone now drives the sine from clean to a growl (it only filtered a sine); weight and the pitch drop go much further
+- **Donk:** bounce up to two octaves; brightness from the first touch. **Wide:** detune up to 80 cents. **Acid:** decay 25 ms to 2 s
+- **Bass decay** starts at 60 ms, so a quarter turn already counts
+- **Poly:** attack works from the first touch (the bottom third used to be all stab); detune keeps its level
+- **Hard stab:** a resonant ladder filter (resonance doubled), drive up to 30 that's heard as grit, not volume
+- **Organ:** drawbars and click twice as far. **Piano:** snap from soft (600 ms) to hard (20 ms), brightness and octave much further, length from 150 ms. **Rhodes:** tremolo up to 75% deep (it was 35%), tone further, length from 150 ms
+- **Drum drive:** up to 15, a touch asymmetric, and no longer a volume knob (it added 10 to 14 dB)
+
+Saved projects sound different where they lean on these knobs: leads ring longer, the sub is grittier at its default, and stabs saved with an old snap setting get a slower attack.
+
 ## v1.13 (20 October 2026)
 
 - **The bass and lead generator is Lua** (`seq/ockm-linemaker.pd_lua`, replacing `seq/ockm-monogen.pd`): rhythms and siblings, riffs and tunes, answer the bass, lock to the kick, density, mutate, rests, slides, octave, repeat, and the lead's inside-to-outside decorations, in one readable file. The random choices still work in 32-bit floats as Pd's did. Checked against the old one on 664 mixes of every setting, bass and lead: 654 note for note the same; the other 10 each differ by one coin flip at one step, where the old version's 32-bit sine landed exactly on a threshold (Pd's sine also differs slightly between the Mac and the Pi, so the Lua version is the steadier of the two). Saved loops keep their notes, so nothing saved changes

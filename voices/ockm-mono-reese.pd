@@ -13,7 +13,7 @@
 #X obj 700 170 switch~;
 #X obj 760 140 sel 0;
 #X msg 760 170 off;
-#X obj 650 50 expr 20*pow(100\,\$f1);
+#X obj 650 50 expr 60*pow(33\,\$f1);
 #X obj 30 560 outlet~;
 #X obj 30 200 mtof~;
 #X obj 130 230 *~ 1.01;
@@ -37,7 +37,7 @@
 #X obj 30 475 *~;
 #X obj 30 500 *~ 1.9;
 #X obj 200 140 expr 40*pow(2\,8*\$f1);
-#X obj 310 140 expr 0.003+0.02*\$f1 \; 0.003+0.02*\$f1;
+#X obj 310 140 expr 0.002+0.045*pow(\$f1\, 1.2) \; 0.002+0.045*pow(\$f1\, 1.2);
 #X obj 310 170 + 1;
 #X obj 380 170 expr 1-\$f1;
 #X obj 420 140 * 2500;
