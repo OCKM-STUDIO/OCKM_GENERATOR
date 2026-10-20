@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.25 (20 October 2026)
+
+- **The pad springs back:** not latched, lifting your finger sends the effect back to the centre of the pad as it goes out (a filter sweeps back open, like the old DJ filter strip), and the crosshair returns to the middle. Latched, it stays where you left it
+
 ## v1.24 (20 October 2026)
 
 - **The bus effects are on the perform page too,** beside the mutes: pick drums, music or master above the pad, latch, and **set** (its settings sheet, which now also picks the effect). The pad takes the place of the DJ filter strip and the drive: the master bus's filter, unlatched, plays and springs back the same way. The fx tab keeps the big pad and the bass switch

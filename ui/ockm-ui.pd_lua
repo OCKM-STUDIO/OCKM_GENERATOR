@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v1.24"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v1.25"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -560,7 +560,8 @@ function ui:postinitialize()
   self.demudclock = pd.Clock:new():register(self, "demud_finish")
   self.rampclock = pd.Clock:new():register(self, "ramp_tick")
   self.lateclock = pd.Clock:new():register(self, "macro_late")
-  self.gapclock = pd.Clock:new():register(self, "gap_clear")   -- v1.22: a step after the drop, clear a gap that didn't happen
+  self.gapclock = pd.Clock:new():register(self, "gap_clear")
+  self.bfxclock = pd.Clock:new():register(self, "bfx_out")     -- v1.25: the pad's spring back   -- v1.22: a step after the drop, clear a gap that didn't happen
   self.newclock = pd.Clock:new():register(self, "apply_new_defaults")
   self.initclock = pd.Clock:new():register(self, "init_sends")
   self:load_settings()
@@ -710,6 +711,7 @@ function ui:finalize()
   if self.clock then self.clock:destruct() end
   if self.lateclock then self.lateclock:destruct() end
   if self.gapclock then self.gapclock:destruct() end
+  if self.bfxclock then self.bfxclock:destruct() end
   if self.msgclock then self.msgclock:destruct() end
   if self.audclock then self.audclock:destruct() end
   if self.flashclock then self.flashclock:destruct() end
@@ -1295,11 +1297,26 @@ end
 function ui:bfx_pad(x, y, phase)
   local b = self.fx_target or "drums"
   if phase == "up" then
-    if not (self.fx_latch and self.fx_latch[b]) then self:bfx_set_on(b, false) end
+    -- v1.25: not latched, it springs back to the centre as it goes out (a filter sweeps back open), then it's out
+    if not (self.fx_latch and self.fx_latch[b]) then
+      self:send("ockm-bfx-"..b.."-x", 0.5); self:send("ockm-bfx-"..b.."-y", 0.5)
+      self.bfx_going = b; self.bfxclock:delay(60)
+    end
     return
+  end
+  if phase == "down" and self.bfx_going then   -- back on before it had gone: keep it in (or let the other bus go)
+    self.bfxclock:unset()
+    local g = self.bfx_going; self.bfx_going = nil
+    if g ~= b then self:bfx_set_on(g, false) end
   end
   self:send("ockm-bfx-"..b.."-x", x); self:send("ockm-bfx-"..b.."-y", y)
   if phase == "down" then self:bfx_set_on(b, true) end
+end
+function ui:bfx_out()
+  local b = self.bfx_going
+  self.bfx_going = nil
+  if b then self:bfx_set_on(b, false) end
+  self:dirty()
 end
 function ui:layout_fx(add)
   self.fx_latch = self.fx_latch or {}

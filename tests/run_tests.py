@@ -1236,7 +1236,7 @@ def touchscreen_filter_springs_and_throw(work):
     back out; latched it stays in. The repeat pad (v1.17, where throw was) sends 1 then 0."""
     if not PDLUA:
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
-    h = Harness(); h.show("ockm-bfx-master-on", "ockm-repeat")
+    h = Harness(); h.show("ockm-bfx-master-on", "ockm-repeat", "ockm-bfx-master-x")
     h.at(80, "ockm-bfx-master-type 0")
     h.at(100, "ockm-ui-test tap 760 160")                   # the master bus on the pad
     h.at(150, "ockm-ui-test drag 716 300 636 300")          # sweep, let go: out again
@@ -1247,6 +1247,8 @@ def touchscreen_filter_springs_and_throw(work):
     out = run(work, f)
     on = [int(float(v.split()[-1])) for v in printed(out, "ockm-bfx-master-on")]
     assert on == [1, 0, 1], f"in, out when lifted, then in and staying in (latched): {on}"
+    xs = [float(v.split()[-1]) for v in printed(out, "ockm-bfx-master-x")]
+    assert 0.5 in xs[:xs.index(0.5) + 1] and xs[-1] != 0.5, f"unlatched it springs back to the centre; latched it stays put: {xs}"
     assert [int(float(v.split()[-1])) for v in printed(out, "ockm-repeat")] == [1, 0], printed(out, "ockm-repeat")
 
 @test
@@ -1941,7 +1943,8 @@ def touchscreen_fx_pad_plays_and_latches(work):
         raise Skip("no lua to run the screen")
     L = ui_preview.run(["test tap 346 36", "test press 400 100", "test release 400 100"])
     sent = [l for l in L if l.startswith("sent ockm-bfx-drums-")]
-    assert "sent ockm-bfx-drums-on float 1" in sent and sent[-1] == "sent ockm-bfx-drums-on float 0", sent
+    # lifted, not latched: it springs back to the centre (v1.25; it goes out 60 ms later: checked in Pd, the next test)
+    assert "sent ockm-bfx-drums-on float 1" in sent and sent[-2:] == ["sent ockm-bfx-drums-x float 0.5", "sent ockm-bfx-drums-y float 0.5"], sent
     x = [float(l.split()[3]) for l in sent if "-x " in l][0]
     assert x < 0.2, f"near the left edge: {x}"
     L = ui_preview.run(["test tap 346 36", "test tap 100 198", "test press 700 300", "test release 700 300"])
