@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v1.06"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v1.07"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -110,7 +110,7 @@ local PROGS = { { "one chord", "i" }, { "vamp", "i iv" }, { "dub techno", "i . .
 local SPICE = { { 0, "triad" }, { 1, "7th" }, { 6, "9th" }, { 7, "11th" } }
 local FILLS = { "snare roll", "tom run", "cut out", "snare build", "breakbeat" }
 local GROOVES = { "four floor", "house", "deep house", "tech house", "minimal", "techno", "dub techno", "garage", "breakbeat", "boom bap", "trip hop", "electro", "clear", "chicago", "jackin", "disco", "soulful", "afro house", "lofi house", "2 step", "speed garage", "funky house", "ghetto house", "nu disco", "rolling", "detroit", "berlin", "industrial", "hypnotic", "acid techno", "think break", "jungle", "big beat", "downtempo", "one drop", "half time", "lofi hip hop", "hard house", "dnb two step", "dnb rolling" }
-local GROOVE_BANKS = { { "classics", 0 }, { "house + garage", 13 }, { "techno + breaks", 25 }, { "hard + fast", 37 } }
+local GROOVE_BANKS = { { "house", { 0, 1, 2, 13, 14, 15, 16, 17, 21, 22, 23, 24 } }, { "techno", { 3, 4, 5, 6, 25, 26, 27, 28, 29, 11, 37, 32 } } }
 local CHORD_TYPES = { { k=0, name="triad", 0, 2, 4 }, { k=0, name="seventh", 0, 2, 4, 6 }, { k=0, name="sus2", 0, 1, 4 }, { k=0, name="power", 0, 4, 7 }, { k=0, name="sus4", 0, 3, 4 }, { k=0, name="sixth", 0, 2, 4, 5 }, { k=0, name="ninth", 2, 4, 6, 8 }, { k=0, name="eleventh", 2, 6, 8, 10 }, { k=1, name="m9", 3, 7, 10, 14 }, { k=1, name="m11", 3, 10, 14, 17 }, { k=1, name="m7", 0, 7, 10, 15 }, { k=1, name="4ths", 0, 5, 10, 15 }, { k=1, name="maj9", 4, 7, 11, 14 } }
 local CHORD_CENTRE, CHORD_FLOOR = 62, 50   -- smooth chords sit around D4, their lowest note no lower than D3
 -- a chord's notes (MIDI). deg: the chord's root as a scale step; sc: the scale (7 semitones); root: the key (0 C .. 11 B);
@@ -1786,11 +1786,11 @@ function ui:layout_drums(add)
   add{ kind="hbar", x=16, y=562, w=sw, h=30, hook="ockm-"..nm.."-verb", lo=0, hi=1, label="reverb", bold=true, preview=slot }
   add{ kind="hbar", x=16 + sw + 6, y=562, w=sw, h=30, hook="ockm-"..nm.."-delay", lo=0, hi=1, label="delay", bold=true, preview=slot }
   local gx = 16 + half + 16
-  -- grooves, in banks of 12 (plus clear)
+  -- grooves: two banks of twelve, house and techno (plus clear)
   local cur = math.floor(self.v["ockm-drum-groove"] or -1)
   if not self.bank then
     self.bank = 1
-    for b, bk in ipairs(GROOVE_BANKS) do if cur >= bk[2] then self.bank = b end end
+    for b, bk in ipairs(GROOVE_BANKS) do for _, g in ipairs(bk[2]) do if g == cur then self.bank = b end end end
   end
   local nb = #GROOVE_BANKS
   local bkw = (half - (nb - 1) * 4) / nb
@@ -1798,9 +1798,8 @@ function ui:layout_drums(add)
     add{ kind="choice", x=gx + (b - 1) * (bkw + 4), y=342, w=bkw, h=24, small=true, label=bk[1], sel=(self.bank == b), tap=function() self.bank = b end }
   end
   local gw = (half - 4 * 6) / 5
-  local first = GROOVE_BANKS[self.bank][2]
   local shown = {}
-  for n = first, first + 11 do if GROOVES[n + 1] and GROOVES[n + 1] ~= "clear" then shown[#shown + 1] = n end end
+  for _, n in ipairs(GROOVE_BANKS[self.bank][2]) do shown[#shown + 1] = n end
   shown[#shown + 1] = 12   -- clear
   for k, n in ipairs(shown) do
     local name = GROOVES[n + 1]
@@ -2164,6 +2163,14 @@ local STYLES = {
     bass={ engine={ 5, 2 }, rhythm={ 0, 1, 18, 9, 4 }, notes={ 2, 1, 0 }, move=1, sidechain=0.2 },
     chord={ engine={ 3, 1 }, rhythm={ 0, 2, 5, 10 }, verb=0.15, delay=0.1, strum=0.1 },
     lead={ engine={ 4, 2 }, rhythm={ 10, 11, 8 }, notes={ 15, 16, 8 }, outside=0.4, verb=0.15, delay=0.2, chorus=2 } },
+  -- v1.07: filter house (French house): the house groove, two chords changing every half bar, 8ths chords pumping hard
+  -- under the kick, the bass on octaves ringing out, no lead
+  { "filter house", kit="909", punch=0.6, bpm=124, swing=54, groove={ 1, 21, 0 }, root={ 9, 2, 5, 7 }, scale={ 0, 2 }, prog={ 12, 1 }, rate=0,
+    type={ 1, 10 }, vary=2,
+    drums={ kick={ 0, 100, 0.2, 0.3 }, clap={ 0, 90, 0, 0 } },
+    bass={ engine={ 5, 2 }, rhythm={ 4, 1 }, notes=1, move=1, k={ 0.45, 0.3, 0.5, 0.7 }, sidechain=0.3 },
+    chord={ engine={ 3, 1 }, rhythm=9, sidechain=0.75, verb=0.15, delay=0.08 },
+    lead=false },
   -- v0.90: Italian piano house (Black Box, Cappella, late 80s Italy): an M1-style piano playing open triads in a major key
   -- on the big four-chord turn, a riff that pushes ahead of the beat, the M1 organ bass bouncing on the offbeats
   { "italo piano", second={ 1, 0 }, vary=1, push=1, kit="909", punch=0.5, bpm=124, swing=55, groove={ 1, 21, 0, 16 }, root={ 0, 7, 5, 2 }, scale={ 1, 4 }, prog={ 10, 11, 18, 16 }, type={ 0, 1 },

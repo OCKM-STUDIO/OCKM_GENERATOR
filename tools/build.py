@@ -1561,7 +1561,9 @@ GROOVES=[
  ("dnb-two-step",50,dict(kick="X.........X.....",snare="....X.......X...",hat="x.x.x.x.x.x.x.x.",ohat="..............x.")),
  ("dnb-rolling",50,dict(kick="X.....X...X.....",snare="....X..x....X..x",hat="xxXxxxXxxxXxxxXx",perc2="..x.......x.....")),
 ]
-GROOVE_BANKS=[("classics",0),("house + garage",13),("techno + breaks",25),("hard + fast",37)]   # name, first groove number
+# v1.07: two banks of twelve, house and techno (the garage, breaks, hip hop, jungle and downtempo grooves are off the screen;
+# loops and styles saved on them still play them)
+GROOVE_BANKS=[("house",[0,1,2,13,14,15,16,17,21,22,23,24]),("techno",[3,4,5,6,25,26,27,28,29,11,37,32])]
 _SND=["kick","snare","clap","perc1","hat","ohat","tom","perc2"]
 def _groove_line(sw,parts):
     for k,v in parts.items(): assert k in _SND and len(v)==16, (k,v)
@@ -1730,7 +1732,7 @@ if os.path.exists(_ui_src):
             "local SPICE = "+_lua_list([(i,lab) for i,lab in SPICE])+"\n"
             "local FILLS = { "+", ".join(f'"{n.replace("-"," ")}"' for n,_ in FILLS)+" }\n"
             "local GROOVES = { "+", ".join(f'"{n.replace("-"," ")}"' for n,_,_ in GROOVES)+" }\n"
-            "local GROOVE_BANKS = { "+", ".join(f'{{ "{n}", {i} }}' for n,i in GROOVE_BANKS)+" }\n"
+            "local GROOVE_BANKS = { "+", ".join(f'{{ "{n}", {{ '+", ".join(str(x) for x in l)+' } }' for n,l in GROOVE_BANKS)+" }\n"
             +CHORD_LUA+
             "local PROG_SHAPES = { "+", ".join("{ "+", ".join(f"{{ {d}, {int(b*16)} }}" for d,b in ch)+" }" for _,_,ch in PROGS)+" }\n")
     os.makedirs(os.path.join(R,"ui"),exist_ok=True)

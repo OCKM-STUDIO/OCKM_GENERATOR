@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.07 (19 October 2026)
+
+Step 11 of the harmony and generator proposal: the grooves cut to house and techno, and a new style.
+
+- **Groove banks, two:** house (four floor, house, deep house, Chicago, jackin, disco, soulful, afro house, funky house, ghetto house, nu disco, rolling) and techno (tech house, minimal, techno, dub techno, Detroit, Berlin, industrial, hypnotic, acid techno, electro and two harder ones), twelve each, with clear. Garage, breaks, trip hop, drum and bass and the rest are off the screen; loops saved on them still play
+- **Filter house** (new style, between classic house and Italo piano): the house groove at 124, two chords changing every half bar (seven or vamp), 8ths chords on piano or organ pumping hard under the kick, the analogue bass on octaves ringing out, no lead
+
 ## v1.06 (19 October 2026)
 
 Step 10 of the harmony and generator proposal: the lead.

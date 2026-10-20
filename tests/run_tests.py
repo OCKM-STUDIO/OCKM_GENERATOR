@@ -1719,13 +1719,13 @@ def song_styles_set_the_lot(work):
                 v = l.split()
                 out[v[1]] = float(v[3]) if len(v) > 3 and v[3] not in ("bang",) else None
         return out
-    PEAK, DEEP, SHUFFLE, CLASSIC = "test tap 547 174", "test tap 83 142", "test tap 896 142", "test tap 896 174"
+    PEAK, DEEP, SHUFFLE, CLASSIC = "test tap 666 174", "test tap 83 142", "test tap 896 142", "test tap 896 174"
     t = sent(ui_preview.run(["test tap 477 36", PEAK, CLASSIC]))
     assert t["ockm-bpm"] == 132 and t["ockm-swing"] == 50 and t["ockm-drum-groove"] == 5, t
     assert t["ockm-root"] == 5 and t["ockm-scale"] == 3, "F phrygian"
     assert t["ockm-d1-drive"] == 0.5 and t["ockm-d1-tune"] == -2, "the kick gets harder and lower"
     assert t["ockm-lead-on"] == 1 and t["ockm-bass-rhythm"] == 2 and t["ockm-bass-sync"] == 0 and t["ockm-chord-on"] == 1, t
-    assert t["ockm-style"] == 11, t
+    assert t["ockm-style"] == 12, t
     d = sent(ui_preview.run(["test tap 477 36", DEEP, CLASSIC]))
     assert d["ockm-bpm"] == 122 and d["ockm-scale"] == 2 and d["ockm-chord-engine"] == 4 and d["ockm-lead-on"] == 0, d
     lines = ui_preview.run(["test tap 477 36", DEEP] + [SHUFFLE] * 4)
@@ -1985,7 +1985,7 @@ def touchscreen_velocity_timing_loop_and_banks(work):
     h.at(500, "ockm-ui-test drag 45 319 45 336")      # pull step 1 early
     h.at(600, "ockm-ui-test tap 612 88")              # drum length: 1 bar (navigation strip)
     h.at(700, "ockm-ui-test tap 909 88")              # double
-    h.at(800, "ockm-ui-test tap 660 354")             # bank 2
+    h.at(800, "ockm-ui-test tap 900 354")             # bank 2 (techno)
     h.at(900, "ockm-ui-test tap 531 389")             # its first groove
     f = os.path.join(work, "t_lane_ui.pd"); h.finish(1000, f)
     out = run(work, f)
@@ -1995,7 +1995,7 @@ def touchscreen_velocity_timing_loop_and_banks(work):
     assert nud and nud[-1] < -0.2, f"dragging down should pull it early: {nud}"
     loops = [int(float(v)) for v in printed(out, "ockm-drum-len")]
     assert 32 in loops and loops[-1] == 16, f"double should give 2 bars, then the groove makes the drums 1 bar again: {loops}"
-    assert printed(out, "ockm-drum-groove")[-1:] == ["13"], f"bank 2's first groove is number 13: {printed(out, 'ockm-drum-groove')}"
+    assert printed(out, "ockm-drum-groove")[-1:] == ["3"], f"bank 2's first groove is number 3: {printed(out, 'ockm-drum-groove')}"
 
 @test
 def touchscreen_exports_audio_stems_and_midi(work):
