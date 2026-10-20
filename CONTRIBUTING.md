@@ -20,7 +20,7 @@ Pd makes the sound and keeps time; the decisions about what to play are Lua. Gen
 
 - `seq/ockm-chordmaker.pd_lua`: the chord generator (rhythm, progression, rate, push)
 - `seq/ockm-chordnotes.pd_lua`: chord voicing
-- the bass and lead generator is moving next
+- `seq/ockm-linemaker.pd_lua`: the bass and lead generator (rhythms, riffs, tunes, lock, density, mutate, rests, slides, the lead's decorations)
 
 Each keeps its logic in pure functions (no Pd calls), tested in plain Lua in `tests/lua/` with a small stand-in for pdlua. Preset lists still live in `tools/build.py`, which fills each file's `PRESETS` block. New musical logic goes in Lua, not in Pd `expr` chains.
 

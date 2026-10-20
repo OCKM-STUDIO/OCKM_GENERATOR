@@ -765,8 +765,8 @@ for nm in ("bass","lead","chord"): p.con(offm,0,synth_voice[nm],0); p.con(gof,0,
 # generators and shared presets
 gy=by+3*40+20
 p.add(f"#X obj 110 {gy} ockm-presets;")
-p.add(f"#X obj 230 {gy} ockm-monogen bass 0 0 0 0 1 0;")
-p.add(f"#X obj 400 {gy} ockm-monogen lead 24 0 0 0 1 1;")
+p.add(f"#X obj 230 {gy} ockm-linemaker bass 0 0 0 0 1 0;")   # v1.13: the bass and lead generator is Lua (seq/ockm-linemaker.pd_lua)
+p.add(f"#X obj 400 {gy} ockm-linemaker lead 24 0 0 0 1 1;")
 p.add(f"#X obj 530 {gy} ockm-chordmaker chord;")   # v1.12: the chord generator is Lua (seq/ockm-chordmaker.pd_lua)
 p.add(f"#X obj 700 {gy} ockm-grooves;")
 for i,nm in enumerate(("bass","lead","chord")): p.add(f"#X obj {830+i*110} {gy} ockm-lfo-{nm};")
@@ -1849,148 +1849,17 @@ for i,pt in enumerate(PARTS):
 p.save("seq/ockm-lengths.pd","#N canvas 100 100 1900 1000 12;")
 
 # ================= mono generator (bass or lead) =================
-# args: track, octave offset (semitones), default rhythm, default notes
-p=P()
-p.add("#X text 20 10 Mono generator: builds a bass or lead line from a rhythm preset + a note pattern + the shared key. Args: track \\, octave offset \\, default rhythm \\, default notes.;")
-for nm,n in [("r",64),("n",512),("s",7)]: p.add(f"#X obj {700+['r','n','s'].index(nm)*130} 60 array define {D}0-{nm} {n};")
-regen=p.add("#X obj 20 330 t b b b b b;")
-# Two kinds of trigger. Picking a preset (rhythm, notes) or pressing new always generates, and puts the part in auto.
-# Everything else (key, scale, chords changing) only regenerates a part that is in auto. Nothing fires while a pattern loads.
-rld=p.add("#X obj 120 230 r ockm-loading;"); nl0=p.add("#X obj 120 250 == 0;")
-exg=p.add("#X obj 20 270 spigot 1;"); ext=p.add("#X obj 20 295 t b b;"); m0=p.add("#X msg 60 315 0;"); sm0=p.add(f"#X obj 60 340 s ockm-{D}1-mode;")
-img=p.add("#X obj 300 270 spigot 1;"); ima=p.add("#X obj 300 295 spigot 1;")
-rmode=p.add(f"#X obj 460 230 r ockm-{D}1-mode;"); auto=p.add("#X obj 460 255 == 0;")
-lbm=p.add("#X obj 560 205 loadbang;"); fmd=p.add(f"#X obj 560 230 f {D}5;")
-for c in [(rld,0,nl0,0),(nl0,0,exg,1),(nl0,0,img,1),(exg,0,ext,0),(ext,1,m0,0),(m0,0,sm0,0),(ext,0,regen,0),
-          (img,0,ima,0),(ima,0,regen,0),(rmode,0,auto,0),(lbm,0,fmd,0),(fmd,0,auto,0),(auto,0,ima,1)]: p.con(*c)
-store=[]
-for j,(hook,dflt,kind) in enumerate([(f"ockm-{D}1-rhythm",f"{D}3","x"),(f"ockm-{D}1-notes",f"{D}4","x"),("ockm-root","9","i"),("ockm-scale","0","i")]):
-    x=20+j*170
-    r=p.add(f"#X obj {x} 170 r {hook};"); t=p.add(f"#X obj {x} 200 t b f;"); fs=p.add(f"#X obj {x} 290 f {dflt};")
-    p.con(r,0,t,0); p.con(t,1,fs,1); p.con(t,0,exg if kind=="x" else img,0); store.append(fs)
-rg=p.add(f"#X obj 720 170 r ockm-{D}1-gen;"); p.con(rg,0,ext,0)
-# rhythm lock (0 own rhythm, 1 lock to kick, 2 fill the gaps), density (1 = as the preset), mutate seed (0 = the original)
-var={}
-for j,nm in enumerate(["lock","density","seed","outside"]):
-    x=1200+j*160
-    r=p.add(f"#X obj {x} 170 r ockm-{D}1-{nm};"); t=p.add(f"#X obj {x} 195 t b f;"); p.con(r,0,t,0); p.con(t,0,exg,0); var[nm]=t
-lbd=p.add("#X obj 1360 120 loadbang;"); one_d=p.add("#X msg 1360 145 1;"); p.con(lbd,0,one_d,0)
-# a part locked to the kick follows your drum edits
-red=p.add("#X obj 1200 230 r ockm-edit;"); teb=p.add("#X obj 1200 255 t b;"); rdc=p.add("#X obj 1120 230 r ockm-drums-changed;"); p.con(rdc,0,teb,0); lkg=p.add("#X obj 1200 280 spigot;"); lk0=p.add("#X obj 1280 230 != 0;")
-for c in [(red,0,teb,0),(teb,0,lkg,0),(var["lock"],1,lk0,0),(lk0,0,lkg,1),(lkg,0,img,0)]: p.con(*c)
-# a new length: an auto part rebuilds to fill it (after everything else has heard the new length)
-rln=p.add(f"#X obj 1400 230 r ockm-{D}1-len;"); tlb=p.add("#X obj 1400 255 t b;"); lsp=p.add("#X obj 1400 280 spigot 1;"); ldl=p.add("#X obj 1400 305 delay 0;")
-for c in [(rln,0,tlb,0),(tlb,0,lsp,0),(nl0,0,lsp,1),(lsp,0,ldl,0),(ldl,0,ima,0)]: p.con(*c)
-# sync: follow the chord part. When the chords change, a synced part in auto regenerates
-rsy=p.add(f"#X obj 760 230 r ockm-{D}1-sync;"); nsy=p.add("#X obj 760 255 != 0;"); fsy=p.add(f"#X obj 860 230 f {D}6;")
-syg=p.add("#X obj 760 300 spigot;")
-rcc=p.add("#X obj 900 270 r ockm-chord-changed;"); rce=p.add("#X obj 1060 270 r ockm-chord-edit;"); tce=p.add("#X obj 1060 290 t b;")
-for c in [(rsy,0,nsy,0),(lbm,0,fsy,0),(fsy,0,nsy,0),(nsy,0,syg,1),(rcc,0,syg,0),(rce,0,tce,0),(tce,0,syg,0),(syg,0,img,0)]: p.con(*c)
-# a part that follows the chords takes their length too (not while a loop loads: saved lengths stay as they were)
-rcl=p.add("#X obj 760 120 r ockm-chord-len;"); csp=p.add("#X obj 760 145 spigot 1;"); csy=p.add("#X obj 760 170 spigot;")
-ctf=p.add("#X obj 760 195 t f b;"); cvl=p.add(f"#X obj 860 220 v ockm_{D}1len;"); cne=p.add("#X obj 760 245 !=;"); ctf2=p.add("#X obj 760 220 t f f;")
-cgo=p.add("#X obj 700 270 spigot;"); csl=p.add(f"#X obj 700 295 s ockm-{D}1-len;")
-for c in [(rcl,0,csp,0),(nl0,0,csp,1),(csp,0,csy,0),(nsy,0,csy,1),(csy,0,ctf,0),(ctf,1,cvl,0),(cvl,0,cne,1),(ctf,0,ctf2,0),(ctf2,1,cne,0),(cne,0,cgo,1),(ctf2,0,cgo,0),(cgo,0,csl,0)]: p.con(*c)
-ts=p.add("#X obj 560 380 text get ockm-presets-scale;"); lsp=p.add("#X obj 560 410 list split 1;"); asx=p.add(f"#X obj 560 440 array set {D}0-s;")
-p.con(regen,4,store[3],0); p.con(store[3],0,ts,0); p.con(ts,0,lsp,0); p.con(lsp,1,asx,0)
-tn=p.add("#X obj 360 380 text get ockm-presets-notes;"); ln=p.add("#X obj 360 410 list split 1;"); tl=p.add("#X obj 360 440 t l l;")
-ll=p.add("#X obj 420 470 list length;"); an=p.add(f"#X obj 360 500 array set {D}0-n;")
-# v1.02 riff (ockm-<track>-riff, the bass): one of the bass's own riffs; -1 (an older loop) uses the notes setting as before
-rrf=p.add(f"#X obj 1850 170 r ockm-{D}1-riff;"); trf=p.add("#X obj 1850 195 t b f;"); frf=p.add("#X obj 1850 290 f -1;")
-tnr=p.add("#X obj 300 350 t b b;"); mrf=p.add("#X obj 1850 320 moses 0;"); tbn=p.add("#X obj 1900 350 text get ockm-presets-bassnotes;")
-# v1.06 the lead: repeat (ockm-<track>-repeat 1 loose) swaps motif and question for their loose versions; tune 19 answers
-# the bass, playing the bass's own riff (two octaves up, where the lead lives)
-rrp=p.add(f"#X obj 2000 170 r ockm-{D}1-repeat;"); trp=p.add("#X obj 2000 195 t b f;")
-nmap=p.add(f"#X obj 300 375 expr if({D}f2>0 && int({D}f1)==15 \\, 20 \\, if({D}f2>0 && int({D}f1)==16 \\, 21 \\, {D}f1));")
-s19=p.add("#X obj 300 395 sel 19;"); rbr=p.add("#X obj 2150 170 r ockm-bass-riff;"); fbr=p.add("#X obj 2150 300 f 0;"); mx0=p.add("#X obj 2150 325 max 0;")
-for c in [(rrp,0,trp,0),(trp,1,nmap,1),(trp,0,exg,0),(rbr,0,fbr,1),(s19,0,fbr,0),(fbr,0,mx0,0),(mx0,0,tbn,0)]: p.con(*c)
-nrf=p.add("#X obj 1850 350 < 0;"); spn=p.add("#X obj 360 360 spigot 1;")
-for c in [(rrf,0,trf,0),(trf,1,frf,1),(trf,0,exg,0),(regen,3,tnr,0),(tnr,1,frf,0),(frf,0,nrf,0),(nrf,0,spn,1),(frf,0,mrf,0),(mrf,1,tbn,0),(tbn,0,ln,0),
-          (tnr,0,store[1],0),(store[1],0,spn,0),(spn,0,nmap,0),(nmap,0,s19,0),(s19,1,tn,0),(tn,0,ln,0),(ln,1,tl,0),(tl,1,ll,0),(tl,0,an,0)]: p.con(*c)
-tr=p.add(f"#X obj 170 380 text get ockm-presets-{D}1rhythm;"); lr=p.add("#X obj 170 410 list split 1;"); ar=p.add(f"#X obj 170 440 array set {D}0-r;")
-trl=p.add("#X obj 230 425 t l l;"); rll=p.add("#X obj 270 455 list length;")
-p.con(regen,2,store[0],0); p.con(store[0],0,tr,0); p.con(tr,0,lr,0); p.con(lr,1,trl,0); p.con(trl,1,rll,0); p.con(trl,0,ar,0)
-rx=p.add(f"#X obj 20 410 expr if(36+{D}f1>40 \\, 24+{D}f1 \\, 36+{D}f1) + 12*{D}f2;"); ro=p.add(f"#X obj 20 440 + {D}2;")
-p.con(regen,1,store[2],0); p.con(store[2],0,rx,0); p.con(rx,0,ro,0)
-# v1.02 octave (ockm-<track>-octave): the same riff an octave up (or down), a sub or a mid bass
-roc=p.add(f"#X obj 1700 170 r ockm-{D}1-octave;"); toc=p.add("#X obj 1700 195 t b f;")
-for c in [(roc,0,toc,0),(toc,1,rx,1),(toc,0,exg,0)]: p.con(*c)
-lp=p.add("#X obj 20 560 t b b;"); p.con(regen,0,lp,0)
-z1=p.add("#X msg 120 590 0;"); nl=p.add("#X obj 20 590 f 128;"); rlg=p.add(f"#X obj 80 560 r ockm-{D}1-len;"); un=p.add("#X obj 20 620 until;")
-fi=p.add("#X obj 20 650 f;"); pi=p.add("#X obj 70 650 + 1;"); fh=p.add("#X obj 400 760 f;"); ph=p.add("#X obj 450 760 + 1;")
-for c in [(rlg,0,nl,1),(lp,1,z1,0),(z1,0,fi,1),(z1,0,fh,1),(lp,0,nl,0),(nl,0,un,0),(un,0,fi,0),(fi,0,pi,0),(pi,0,fi,1)]: p.con(*c)
-ti=p.add("#X obj 20 680 t f f f;"); p.con(fi,0,ti,0)
-rcd=p.add("#X obj 860 700 tabread ockm-pat-chord-deg;")
-fold=p.add(f"#X obj 860 730 expr if(int({D}f1)>=4 \\, int({D}f1)-7 \\, int({D}f1)) * {D}f2;")   # V, VI, VII sit below the root
-p.con(ti,1,rcd,0); p.con(rcd,0,fold,0); p.con(nsy,0,fold,1)
-tws={}
-for j,nm in enumerate(["note","on","acc","slide"]):
-    tws[nm]=p.add(f"#X obj {200+j*170} 900 tabwrite ockm-pat-{D}1-{nm};"); p.con(ti,2,tws[nm],1)
-m16=p.add(f"#X obj 20 700 expr if(int({D}f2)==48 \\, if({D}f4>0 && int({D}f1)>=int({D}f3)-16 \\, 16*(1+((int({D}f4)-1)%2)) + int({D}f1)%16 \\, int({D}f1)%16) \\, int({D}f1) % int(max({D}f2\\,1)));")
-rd=p.add(f"#X obj 20 720 tabread {D}0-r;")
-kick=p.add("#X obj 1000 700 tabread ockm-pat-d1;")
-tkb=p.add("#X obj 1000 680 t f f;"); bon=p.add("#X obj 1100 700 tabread ockm-pat-bass-on;")
-ans=p.add(f"#X obj 1000 725 expr if({D}f3>0 \\, {D}f2 \\, {D}f1);"); a19=p.add("#X obj 1200 650 == 19;")
-lov=p.add(f"#X obj 1100 760 expr if({D}f2>0 \\, 2 \\, {D}f1);"); lkf=p.add("#X obj 1150 735 f 0;"); ta19=p.add("#X obj 1200 675 t b f;")
-lockx=p.add(f"#X obj 160 720 expr if({D}f3==1 \\, if({D}f2>0 \\, if({D}f1==2 || {D}f1==4 || {D}f2>=2 \\, 2 \\, 1) \\, 0) \\, if({D}f3==2 \\, if({D}f2>0 \\, 0 \\, {D}f1) \\, {D}f1));")
-H=f"(abs(sin({D}f4*12.9898+{D}f3*78.233+1.7)*43758.5453)-floor(abs(sin({D}f4*12.9898+{D}f3*78.233+1.7)*43758.5453)))"
-dens0=p.add(f"#X obj 160 735 expr if({D}f1>0 && {D}f1<5 && {D}f2<1 && {D}f1!=2 && {D}f1!=4 && {H}>{D}f2 \\, 0 \\, if({D}f1==0 && {D}f2>1 && {H}<({D}f2-1)*0.5 \\, 1 \\, {D}f1));")
-# v0.86: mutate touches the rhythm (a variation, seed above 0, adds a note on about one 8th-note rest in five and drops about
-# one plain note in seven; accents and held notes stay), and the bass's last bar of a loop of 2 bars or more gets a pickup into the
-# start (a note on its last 8th if it was resting). Same seed, same result, so a variation repeats steadily
-H2=f"(abs(sin({D}f2*12.9898+{D}f3*78.233+7.7)*43758.5453)-floor(abs(sin({D}f2*12.9898+{D}f3*78.233+7.7)*43758.5453)))"
-dens=p.add(f"#X obj 160 760 expr if({D}f3>0 && {D}f1==0 && int({D}f2)%2==0 && {H2}<0.2 \\, 1 \\, if({D}f3>0 && {D}f1==1 && {H2}>0.85 \\, 0 \\, if({D}f5==0 && {D}f4>=32 && int({D}f2)>={D}f4-16 && int({D}f2)%16==14 && {D}f1==0 \\, 1 \\, {D}f1)));")
-p.con(dens0,0,dens,0)
-cx=p.add(f"#X obj 20 745 expr {D}f1>0 \\; {D}f1==2 || {D}f1==4 \\; {D}f1>=3 && {D}f1!=6 \\; {D}f1>0 && {D}f1<5 \\; {D}f1>=5;")
-# v1.02 slide amount (ockm-<track>-slideamt 0-1): on top of the rhythm's own slides, about this share of the notes slide into
-# the next (decided by the step and the mutate seed, so it repeats)
-rst=p.add(f"#X obj 160 775 expr if({D}f1>0 && {D}f1<5 && {D}f3>0 && (abs(sin({D}f2*1.731+{D}f4*5.21+floor({D}f2/16)*3.3+0.37)*6151.7)-floor(abs(sin({D}f2*1.731+{D}f4*5.21+floor({D}f2/16)*3.3+0.37)*6151.7)))<{D}f3*0.5 \\, 0 \\, {D}f1);")
-rre=p.add(f"#X obj 1700 230 r ockm-{D}1-rests;"); tre=p.add("#X obj 1700 255 t b f;")
-for c in [(rre,0,tre,0),(tre,1,rst,2),(tre,0,exg,0)]: p.con(*c)
-slx=p.add(f"#X obj 250 760 expr ({D}f1>=3 && {D}f1!=6) || ({D}f1>0 && {D}f4>0 && (abs(sin({D}f2*3.917+{D}f3*11.3+2.9)*7919.3)-floor(abs(sin({D}f2*3.917+{D}f3*11.3+2.9)*7919.3)))<{D}f4*0.7);")
-rsa=p.add(f"#X obj 1550 230 r ockm-{D}1-slideamt;"); tsa=p.add("#X obj 1550 255 t b f;")
-for c in [(rsa,0,tsa,0),(tsa,1,slx,3),(tsa,0,exg,0)]: p.con(*c)
-p.con(rll,0,m16,1)   # a four-bar rhythm repeats every 64 steps; 48 is a bar and its two siblings (v1.05)
-p.con(rlg,0,m16,2); p.con(var["seed"],1,m16,3)
-for c in [(ti,0,m16,0),(m16,0,rd,0),(rd,0,lockx,0),(lockx,0,dens0,0),(dens,0,rst,0),(rst,0,cx,0),(rst,0,slx,0),(ti,1,rst,1),(var["seed"],1,rst,3),(ti,1,slx,1),(var["seed"],1,slx,2),(slx,0,tws["slide"],0),(cx,1,tws["acc"],0),
-          (ti,1,tkb,0),(tkb,1,bon,0),(tkb,0,kick,0),(bon,0,ans,1),(kick,0,ans,0),(ans,0,lockx,1),
-          (store[1],0,a19,0),(a19,0,ta19,0),(ta19,1,ans,2),(ta19,1,lov,1),(ta19,0,lkf,0),(var["lock"],1,lkf,1),(var["lock"],1,lov,0),(lkf,0,lov,0),(lov,0,lockx,2),(var["density"],1,dens0,1),(one_d,0,dens0,1),(var["seed"],1,dens0,2),(ti,1,dens0,3),
-          (ti,1,dens,1),(var["seed"],1,dens,2),(rlg,0,dens,3)]: p.con(*c)
-to=p.add("#X obj 20 780 t f f;"); s1=p.add("#X obj 20 810 sel 1;"); th=p.add("#X obj 400 790 t f f;")
-# v1.06 phrase-aware: a four-bar tune over a longer part plays A then A' (the next of its eight versions), not A A
-ix=p.add(f"#X obj 400 820 expr if(int({D}f2)==512 \\, ((int({D}f3)+int({D}f4/64))%8)*64 + int({D}f4)%64 \\, int({D}f1+{D}f3) % int({D}f2));"); rn=p.add(f"#X obj 400 845 tabread {D}0-n;"); td=p.add("#X obj 400 870 t f f;")
-sx=p.add(f"#X obj 560 870 expr ((int({D}f1)%7)+7)%7;"); rs=p.add(f"#X obj 560 895 tabread {D}0-s;")
-addc=p.add("#X obj 400 857 + 0;")
-ojump=p.add(f"#X obj 400 850 expr {D}f1 + 7*({D}f4!=512 && {D}f2>0 && (abs(sin({D}f3*7.13+{D}f2*3.7+0.3)*9137.21)-floor(abs(sin({D}f3*7.13+{D}f2*3.7+0.3)*9137.21)))<0.2);")
-p.con(var["seed"],1,ix,2); p.con(var["seed"],1,ojump,1); p.con(ti,1,ojump,2); p.con(ti,1,ix,3); p.con(ll,0,ojump,3)
-# the lead (arg 7): on the beat, a note that isn't in the chord moves to the nearest one that is
-_R=f"((int({D}f1)%7+7)%7)"
-# inside to outside (ockm-<track>-outside 0-1, the lead; v0.81). Degrees here are counted from the chord's root, so 0 2 4 are
-# chord notes. Below 0.25 every note moves onto the chord. From 0.25 only the notes on the beat do, and more and more notes
-# between the beats step to a neighbour (passing notes). From 0.5 some notes on the beat become the chord's 7th or 9th
-# (colour). From 0.75 some leap up an octave, and (after the note is worked out, below) some off-beat notes slip a semitone
-# down (chromatic). Which notes is decided by the step and the mutate seed, so each variation decorates differently but repeats.
-def _h(k): return f"(abs(sin({D}f2*12.9898+{D}f5*78.233+{k})*43758.5453)-floor(abs(sin({D}f2*12.9898+{D}f5*78.233+{k})*43758.5453)))"
-_SN=f"({D}f1 - ({_R}==1 || {_R}==3 || {_R}==5) + ({_R}==6))"
-_ST=f"(int({D}f2)%4==0)"
-_IN=f"if({_ST} \\, if({D}f4>=0.5 && {_h(1.1)}<({D}f4-0.5) \\, {D}f1-{_R}+6+2*({_h(2.3)}<0.5) \\, {_SN}) \\, if({_h(3.7)}<({D}f4-0.25)*1.2 \\, {D}f1+1-2*({_h(4.1)}<0.5) \\, {D}f1))"
-_LP=f"7*({D}f4>=0.75 && {_h(5.3)}<({D}f4-0.75)*1.2)"
-snap=p.add(f"#X obj 400 860 expr if({D}f3>0 \\, if({D}f4<0.25 \\, {_SN} \\, {_IN} + {_LP}) \\, {D}f1);")
-fsn=p.add(f"#X obj 560 820 f {D}7;"); p.con(lbm,0,fsn,0); p.con(fsn,0,snap,2); p.con(ti,1,snap,1)
-p.con(fsn,0,dens,4)   # the pickup is the bass's: the lead's phrases already land where they mean to
-p.con(var["outside"],1,snap,3); fr1=p.add("#X msg 640 820 0.35;"); p.con(lbm,0,fr1,0); p.con(fr1,0,snap,3)
-p.con(var["seed"],1,snap,4)
-nx=p.add(f"#X obj 400 930 expr {D}f2 + 12*floor({D}f1/7) + {D}f3;")
-# a hold writes the note before it again (the same pitch, sliding on), without moving on through the note list
-hsel=p.add("#X obj 700 780 sel 1;"); hlast=p.add("#X obj 700 805 f;")
-_HC=f"(abs(sin({D}f2*12.9898+{D}f4*78.233+6.7)*43758.5453)-floor(abs(sin({D}f2*12.9898+{D}f4*78.233+6.7)*43758.5453)))"
-chrom=p.add(f"#X obj 400 945 expr {D}f1 - ({D}f5>0 && {D}f3>=0.75 && int({D}f2)%4!=0 && {_HC}<({D}f3-0.75)*1.6);")
-p.con(ti,1,chrom,1); p.con(var["outside"],1,chrom,2); p.con(fr1,0,chrom,2); p.con(var["seed"],1,chrom,3); p.con(fsn,0,chrom,4)
-for c in [(cx,4,hsel,0),(hsel,0,hlast,0),(hlast,0,tws["note"],0),(chrom,0,hlast,1)]: p.con(*c)
-for c in [(cx,0,tws["on"],0),(cx,3,s1,0),(s1,0,fh,0),(fh,0,th,0),(th,1,ph,0),(ph,0,fh,1),(th,0,ix,0),(ll,0,ix,1),(ix,0,rn,0),(rn,0,ojump,0),(ojump,0,snap,0),(snap,0,addc,0),(fold,0,addc,1),(addc,0,td,0),
-          (td,1,sx,0),(sx,0,rs,0),(rs,0,nx,2),(td,0,nx,0),(ro,0,nx,1),(nx,0,chrom,0),(chrom,0,tws["note"],0)]: p.con(*c)
-p.add("#X text 20 980 hooks: ockm-<track>-rhythm 0-7 \\, ockm-<track>-notes 0-11 \\, ockm-<track>-gen (rebuild) \\, ockm-<track>-mode (0 auto \\, 1 manual) \\, ockm-<track>-sync (follow the chords) \\, ockm-<track>-lock (0 own rhythm \\, 1 lock to kick \\, 2 fill the gaps) \\, ockm-<track>-density (0-2 \\, 1 = the preset) \\, ockm-<track>-seed (mutate: 0 = the original) \\, and the shared ockm-root 0-11 and ockm-scale 0-5. Args: track \\, octave \\, rhythm \\, notes \\, default mode \\, default sync.;")
-p.save("seq/ockm-monogen.pd","#N canvas 120 120 1100 1020 12;")
+# v1.13: in Lua, seq/ockm-linemaker.pd_lua (hand-written). Its preset tables are filled in from PRE here; the chord
+# generator's section (further down) defines _inject_lua. The old Pd version (seq/ockm-monogen.pd) is removed if present
+def _linemaker_presets():
+    nums=lambda v: [float(x) if "." in x else int(x) for x in v.split()]
+    lt=lambda l: "{ "+", ".join(str(x) for x in l)+" }"
+    rows=lambda key: "\n".join("  "+lt(nums(v))+",   -- "+n for n,v in PRE[key])
+    return ("local RHYTHMS = {\n bass = {\n"+rows("bassrhythm")+"\n },\n lead = {\n"+rows("leadrhythm")+"\n } }\n"
+            "local NOTES = {\n"+rows("notes")+"\n}\n"
+            "local BASS_RIFFS = {\n"+rows("bassnotes")+"\n}\n"
+            "local SCALES = {\n"+rows("scale")+"\n}\n")
+if os.path.exists(os.path.join(R,"seq","ockm-monogen.pd")): os.remove(os.path.join(R,"seq","ockm-monogen.pd"))
 
 # ================= LFO (one per synth) =================
 # Sits between a synth's four knobs and the synth: ockm-<part>-k1..k4 (your settings) in, ockm-<part>-k1-m..k4-m out.
@@ -2138,6 +2007,7 @@ _inject_lua(_cm,"local CHORD_RHYTHMS = {   -- "+", ".join(n for n,_ in PRE["chor
             "local PROGRESSIONS = {   -- at half a bar, a bar and two bars a chord; in each, "+", ".join(n for n,_,_ in PROGS)+"\n"
             +",\n".join("  { "+", ".join(_lt(st) for st in rr)+" }" for rr in _rates)+" }\n")
 if os.path.exists(os.path.join(R,"seq","ockm-chordgen.pd")): os.remove(os.path.join(R,"seq","ockm-chordgen.pd"))
+_inject_lua(os.path.join("seq","ockm-linemaker.pd_lua"), _linemaker_presets())
 
 # ================= drum grooves =================
 p=P()

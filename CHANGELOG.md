@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.13 (20 October 2026)
+
+- **The bass and lead generator is Lua** (`seq/ockm-linemaker.pd_lua`, replacing `seq/ockm-monogen.pd`): rhythms and siblings, riffs and tunes, answer the bass, lock to the kick, density, mutate, rests, slides, octave, repeat, and the lead's inside-to-outside decorations, in one readable file. The random choices still work in 32-bit floats as Pd's did. Checked against the old one on 664 mixes of every setting, bass and lead: 654 note for note the same; the other 10 each differ by one coin flip at one step, where the old version's 32-bit sine landed exactly on a threshold (Pd's sine also differs slightly between the Mac and the Pi, so the Lua version is the steadier of the two). Saved loops keep their notes, so nothing saved changes
+- More plain-Lua tests (`tests/lua/test_linemaker.lua`)
+
 ## v1.12 (20 October 2026)
 
 Under the hood: the musical logic moves out of Pd and into Lua, one generator at a time. Pd keeps making the sound.

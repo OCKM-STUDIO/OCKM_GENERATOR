@@ -772,8 +772,8 @@
 #X msg 400 105 off;
 #X msg 460 105 \; ockm-rise-now 0;
 #X obj 110 850 ockm-presets;
-#X obj 230 850 ockm-monogen bass 0 0 0 0 1 0;
-#X obj 400 850 ockm-monogen lead 24 0 0 0 1 1;
+#X obj 230 850 ockm-linemaker bass 0 0 0 0 1 0;
+#X obj 400 850 ockm-linemaker lead 24 0 0 0 1 1;
 #X obj 530 850 ockm-chordmaker chord;
 #X obj 700 850 ockm-grooves;
 #X obj 830 850 ockm-lfo-bass;
