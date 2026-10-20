@@ -1646,7 +1646,7 @@ def touchscreen_makes_and_opens_projects(work):
     h = Harness(); h.show("ockm-project-name", "ockm-project-new", "ockm-project-open")
     tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
     tap(150, 919, 36); tap(151, 830, 95)   # menu, project
-    tap(200, 667, 178)                   # new blank project
+    tap(200, 808, 100)                   # new blank project
     f = os.path.join(work, "t_touchproj.pd"); h.finish(400, f)
     out = run(work, f)
     errs = [l for l in out.splitlines() if "error" in l.lower() and "current.txt" not in l]
@@ -1664,7 +1664,7 @@ def touchscreen_save_makes_variations(work):
     h = Harness(); h.show("ockm-project-saveas")
     tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
     tap(150, 919, 36); tap(151, 830, 95)   # menu, project
-    tap(200, 667, 178)                     # new blank project
+    tap(200, 808, 100)                     # new blank project
     tap(250, 407, 36)                              # mixer
     tap(300, 54, 300); tap(320, 865, 36)           # kick fader, then the first save: plain
     tap(400, 54, 340); tap(420, 865, 36)           # v2
@@ -1688,31 +1688,58 @@ def touchscreen_save_makes_variations(work):
 
 @test
 def touchscreen_variation_browser_keeps_and_tidies(work):
-    """v1.11: the variation browser. Five saves make v1 to v5; keep v2, then tidy up: the newest three, the kept one and
-    the open one stay, the rest go to the trash folder. Every save is stamped with its time."""
+    """v1.26: the project page's variations. Seven saves make v1 to v7; pick v2 and keep it, then tidy up (under more):
+    the newest five, the kept one and the open one stay, the rest go to the trash folder. Every save is stamped with its time."""
     if not PDLUA:
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness()
     tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
     tap(150, 919, 36); tap(151, 830, 95)   # menu, project
-    tap(200, 667, 178)                     # new blank project
+    tap(200, 808, 100)                     # new blank project
     tap(250, 407, 36)                      # mixer
-    for i in range(5):                     # five saves: the project, then v2 to v5
-        tap(300 + i * 100, 54, 280 + i * 20); tap(320 + i * 100, 865, 36)
-    tap(900, 919, 36); tap(901, 830, 95)   # back to the project screen
-    tap(950, 870, 475)                     # browse all
-    tap(1000, 709, 338)                    # keep v2 (rows newest first: v5 v4 v3 v2 v1)
-    tap(1050, 224, 560); tap(1100, 224, 560)   # tidy up, tap again
-    f = os.path.join(work, "t_browser.pd"); h.finish(1300, f)
+    for i in range(7):                     # seven saves: the project, then v2 to v7
+        tap(300 + i * 100, 54, 280 + i * 14); tap(320 + i * 100, 865, 36)
+    tap(1100, 919, 36); tap(1101, 830, 95)   # back to the project page (the open project is picked)
+    tap(1150, 740, 376)                    # v2 (newest first: v7 v6 v5 v4 / v3 v2 v1)
+    tap(1200, 830, 269)                    # keep it
+    tap(1250, 876, 230)                    # more
+    tap(1300, 480, 248); tap(1350, 480, 248)   # tidy up, tap again
+    f = os.path.join(work, "t_browser.pd"); h.finish(1500, f)
     out = run(work, f)
     P = os.path.join(work, "projects")
     left = sorted(d for d in os.listdir(P) if re.match(r"\d{4}-\d\d-\d\d-", d))
-    base = min(left, key=len) if left else "?"
     trash = os.listdir(os.path.join(work, "trash")) if os.path.exists(os.path.join(work, "trash")) else []
-    assert len(left) == 4 and all(re.search(r"-v[2345]$", d) for d in left), f"v2 (kept) to v5 should stay: {left} trash {trash}"
+    assert len(left) == 6 and all(re.search(r"-v[234567]$", d) for d in left), f"v2 (kept) to v7 should stay: {left} trash {trash}"
     assert any(not re.search(r"-v\d+$", d) for d in trash), f"v1 should be in the trash: {trash}"
     meta = open(os.path.join(P, [d for d in left if d.endswith("-v2")][0], "variation.txt")).read()
     assert "keep = true" in meta and "saved = " in meta, meta
+
+@test
+def project_page_plays_a_variation_and_comes_back(work):
+    """v1.26: ▶ on the project page plays a saved variation without leaving the page: what was open (with its unsaved
+    changes) is set aside, and comes back exactly when you stop."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness(); h.show("ockm-project-name", "ockm-d1-level", "ockm-playing", "ockm-saved", "ockm-stash", "ockm-unstash", "ockm-project-open")
+    tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
+    tap(150, 919, 36); tap(151, 830, 95)   # menu, project
+    tap(200, 808, 100)                     # new blank project
+    tap(700, 407, 36)                      # mixer (after the new project's own first save, 300 ms on)
+    tap(750, 54, 300); tap(770, 865, 36)   # the kick's fader, saved
+    tap(850, 54, 380)                      # moved again, not saved
+    tap(900, 919, 36); tap(901, 830, 95)   # the project page
+    tap(950, 628, 318)                     # v1's play button
+    h.at(1250, "ockm-play 0")              # stop
+    f = os.path.join(work, "t_preview.pd"); h.finish(1450, f)
+    out = run(work, f)
+    names = [v.split()[-1] for v in printed(out, "ockm-project-name")]
+    lv = [round(float(v.split()[-1]), 3) for v in printed(out, "ockm-d1-level")]
+    assert "1" in [v.split()[-1] for v in printed(out, "ockm-playing")], "it played"
+    saved, moved = lv[1], lv[2]            # the fader's two moves (before them: the new project's own value)
+    assert saved != moved and saved in lv[3:-1], f"the saved level played: {lv}"
+    assert lv[-1] == moved, f"stopped: the unsaved level is back: {lv}"
+    assert len(set(names)) == 1, f"the same project is open at the end: {names}"
+    assert open(os.path.join(work, "projects", "current.txt")).read().strip() == names[-1] + ";"
 
 @test
 def lua_generators_plain_tests(work):
@@ -2328,7 +2355,7 @@ def touchscreen_exports_audio_stems_and_midi(work):
     h = Harness()
     h.at(100, "ockm-bass-gen bang ; ockm-chord-gen bang ; ockm-bpm 160")
     h.at(300, "ockm-ui-test tap 919 36 ; ockm-ui-test tap 830 95")      # project
-    h.at(400, "ockm-ui-test tap 854 178")     # export...
+    h.at(400, "ockm-ui-test tap 902 100")     # export...
     h.at(600, "ockm-ui-test tap 224 162")     # the loop plays once
     h.at(700, "ockm-ui-test tap 510 222")     # stems on
     h.at(800, "ockm-ui-test tap 736 222")     # MIDI on
@@ -2362,10 +2389,10 @@ def touchscreen_exports_the_loop_and_records_live(work):
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness()
     h.at(100, "ockm-bass-gen bang ; ockm-bpm 160")
-    h.at(300, "ockm-ui-test tap 919 36 ; ockm-ui-test tap 830 95"); h.at(400, "ockm-ui-test tap 854 178")   # project, export...
+    h.at(300, "ockm-ui-test tap 919 36 ; ockm-ui-test tap 830 95"); h.at(400, "ockm-ui-test tap 902 100")   # project, export...
     h.at(500, "ockm-ui-test tap 224 162")     # the loop plays once
     h.at(600, "ockm-ui-test tap 644 544")     # export (stereo mix)
-    h.at(8000, "ockm-ui-test tap 919 36 ; ockm-ui-test tap 830 95"); h.at(8100, "ockm-ui-test tap 854 178")
+    h.at(8000, "ockm-ui-test tap 919 36 ; ockm-ui-test tap 830 95"); h.at(8100, "ockm-ui-test tap 902 100")
     h.at(8200, "ockm-ui-test tap 154 544")    # record what I play
     h.at(8300, "ockm-play 1")
     h.at(9800, "ockm-ui-test tap 803 36")     # stop recording

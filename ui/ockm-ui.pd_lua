@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v1.25"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v1.26"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -516,6 +516,8 @@ function ui:postinitialize()
   listen("ockm-usb-list-end", function(o) o.usb = o.usb_in or {}; o.usb_in = nil; o:dirty() end)
   listen("ockm-playing", function(o, sel, a)
     if o.exporting and o.exporting.song and (tonumber(a[1]) or 0) == 0 and not o.exporting.tail then o:export_end() end
+    -- v1.26: stopped while a variation plays from the project page: back to yours
+    if o.pv and not o.pv.busy and not o.pv.export and (tonumber(a[1]) or 0) == 0 then o:preview_end() end
   end)
   listen("ockm-project-name", function(o) if o.new_pending then o.new_pending = nil; if o.newclock then o.newclock:delay(300) end end end)
   for _, n in ipairs({ "ockm-saved", "ockm-revert", "ockm-project-name" }) do listen(n, function(o) o.unsaved = false; o:dirty() end) end
@@ -856,6 +858,7 @@ function ui:layout()
   if self.sheet == "variations" then self:layout_variations(add) end
   if self.sheet == "slotpick" then self:layout_slotpick(add) end
   if self.sheet == "fxset" then self:layout_fxset(add) end
+  if self.sheet == "pmore" then self:layout_pmore(add) end
   -- messages on screens that have no message line of their own
   if self.msg and (self.screen == "perform" or self.screen == "live" or self.screen == "fx" or self.screen == "compose" or self.screen == "mixer" or self.screen == "arrange" or self.screen == "setup" or self.screen == "drums"
                    or (self.msg_undo and self.undo_label)) then
@@ -2033,10 +2036,11 @@ end
 
 function ui:open(screen)
   if screen == "perform" then screen = "live" end   -- v0.87: Perform A is gone; its drum grid is the drums tab's all drums view
+  if screen ~= "project" and self.pv and not self.pv.export then self:preview_end() end   -- v1.26: leaving puts yours back
   self.msg = nil
   self.screen = screen
   self.pick, self.confirm, self.sheet = nil, nil, nil
-  if screen == "project" then psend("ockm-project-list", "bang", {}) end
+  if screen == "project" then psend("ockm-project-list", "bang", {}); self.pg_home = nil end
   if screen == "drums" then psend("ockm-samples-scan", "bang", {}) end   -- pick up files added since
   self.sel_step = 0
   self:set_page(self:play_block())
@@ -3329,7 +3333,7 @@ function ui:export()
   if e.mix > 0 or e.stems > 0 then
     jobs[#jobs + 1] = function() self:export_audio(dir) end
   else
-    jobs[#jobs + 1] = function() self:say("exported MIDI to " .. where) end
+    jobs[#jobs + 1] = function() self:say("exported MIDI to " .. where); self:export_back() end
   end
   self.jobs = jobs; self.jobclock:delay(10)
 end
@@ -3357,12 +3361,14 @@ function ui:export_end()
   psend("ockm-rec-stop", "bang", {})
   self.exporting = nil
   self:say("exported " .. x.base .. " to " .. (self.exp_where or "the exports folder"))
+  self:export_back()
 end
 function ui:export_cancel()
   if self.exporting then
     psend("ockm-play", "float", { 0 }); psend("ockm-rec-stop", "bang", {})
     self.exporting = nil; self:say("export stopped. The part already written is in the file")
   end
+  self:export_back()
 end
 
 -- everything MIDI needs from the pattern that's open
@@ -3520,7 +3526,7 @@ function ui:layout_export(add)
   local by = y + h - 64
   add{ kind="btn", x=lx, y=by, w=220, h=48, label="record what I play", tap=function()
          self.sheet = nil; self:record_live() end }
-  add{ kind="btn", x=x + w - 20 - 160, y=by, w=160, h=48, label="cancel", quiet=true, tap=function() self.sheet = nil end }
+  add{ kind="btn", x=x + w - 20 - 160, y=by, w=160, h=48, label="cancel", quiet=true, tap=function() self.sheet = nil; self:export_back() end }
   add{ kind="btn", x=x + w - 20 - 160 - 12 - 200, y=by, w=200, h=48, accent=any, disabled=not any, label="export",
        tap=function() if any then self.sheet = nil; self:export() end end }
 end
@@ -3579,95 +3585,219 @@ function ui:new_name()
   return date .. "-" .. os.date("%H%M%S")
 end
 
-function ui:layout_project(add)
-  local cur = self.project or "default"
-  add{ kind="text", x=16, y=80, w=300, h=12, label="open now", size=10 }
-  add{ kind="text", x=16, y=96, w=W - 32, h=24, label=ockm_pretty(cur), size=22, col="txt" }
-  add{ kind="text", x=16, y=130, w=W - 32, h=14, label=self.msg or "the loop, plus the drum kit, tempo and effects", size=11, col=self.msg and "acc" or nil }
-  local bw = (W - 32 - 4 * 8) / 5
-  local acts = {
-    { "save a variation", function() self:save_variation() end },
-    { "back to last save", function() psend("ockm-revert", "bang", {}); self:say("back to the last save of " .. ockm_pretty(cur)) end },
-    { "save as a copy", function()
-        local n = self:new_name(); psend("ockm-project-saveas", "symbol", { n }); psend("ockm-project-list", "bang", {})
-        self:say("saved a copy as " .. ockm_pretty(n) .. ". You're now working in the copy") end },
-    { "new blank project", function()
-        local n = self:new_name(); self.exists = 1; self.new_pending = true; self.fresh = n; psend("ockm-project-new", "symbol", { n }); psend("ockm-project-list", "bang", {})
-        self.pick = nil; self:say("new project: " .. ockm_pretty(n) .. ". The last one stays as you last saved it") end },
-    { "export...", function() psend("ockm-usb-scan", "bang", {}); psend("ockm-exports-ask", "bang", {}); self.sheet = "export" end },
-  }
-  for i, a in ipairs(acts) do
-    add{ kind="btn", x=16 + (i - 1) * (bw + 8), y=152, w=bw, h=52, label=a[1], accent=(i == 4 or i == 5), tap=a[2] }
-  end
-  -- every project, newest first, one tile each: its variations are in the row under the tiles
-  local list = self.projects or {}
+-- v1.26 the project page: a grid of projects (scroll it with a finger), and beside it the one you picked, with its
+-- variations in a grid of their own. ▶ plays a project's latest variation, or one variation, without leaving the page:
+-- what you had open is set aside (stash/, not saved over) and comes back when you stop or leave
+function ui:proj_groups()
   local groups, order = {}, {}
-  for _, n in ipairs(list) do
+  for _, n in ipairs(self.projects or {}) do
     local b = ockm_base(n)
     if not groups[b] then groups[b] = {}; order[#order + 1] = b end
     table.insert(groups[b], n)
   end
-  for _, g in pairs(groups) do table.sort(g, function(a, b) return ockm_ver(a) < ockm_ver(b) end) end
-  local cur_base = ockm_base(cur)
-  local shown = self.pgroup or cur_base
-  add{ kind="text", x=16, y=222, w=300, h=12, label="your projects (" .. #order .. ")", size=10 }
-  local cols, rows = 4, 4
-  local per = cols * rows
-  local pages = math.max(1, math.ceil(#order / per))
-  self.ppage = clamp(self.ppage or 0, 0, pages - 1)
-  local cw = (W - 32 - (cols - 1) * 8) / cols
-  for k = 1, per do
-    local b = order[self.ppage * per + k]
+  for _, g in pairs(groups) do table.sort(g, function(a, b) return ockm_ver(a) > ockm_ver(b) end) end   -- newest first
+  return groups, order
+end
+function ui:home() return (self.pv and self.pv.home) or self.project or "default" end
+function ui:preview_play(n)
+  if self.pv and self.pv.n == n and self.playing ~= 0 then self:preview_end(); return end
+  if not self.pv then
+    -- the music you're playing comes first: stop it to hear something from the library
+    if self.playing ~= 0 then self:say("stop the music to hear it (it plays here, then yours comes back)"); return end
+    self.pv = { home = self.project or "default", unsaved = self.unsaved, fresh = self.fresh }
+    psend("ockm-stash", "bang", {})
+  end
+  self.pv.n = n; self.pv.busy = true
+  psend("ockm-project-open", "symbol", { n })
+  if self.playing == 0 then psend("ockm-play", "float", { 1 }) end
+  self.pv.busy = false
+  self:dirty()
+end
+function ui:preview_end()
+  local p = self.pv
+  if not p then return end
+  self.pv = nil
+  if self.playing ~= 0 then psend("ockm-play", "float", { 0 }) end
+  psend("ockm-unstash", "symbol", { p.home })
+  self.unsaved, self.fresh = p.unsaved, p.fresh
+  self:dirty()
+end
+-- export a variation the same way: set aside what's open, open it, export, come back
+function ui:var_export(n)
+  if n ~= (self.project or "default") or self.pv then
+    if not self.pv then
+      self.pv = { home = self.project or "default", unsaved = self.unsaved, fresh = self.fresh }
+      psend("ockm-stash", "bang", {})
+    end
+    if self.playing ~= 0 then psend("ockm-play", "float", { 0 }) end
+    self.pv.n = n; self.pv.export = true
+    psend("ockm-project-open", "symbol", { n })
+  end
+  psend("ockm-usb-scan", "bang", {}); psend("ockm-exports-ask", "bang", {}); self.sheet = "export"
+end
+function ui:export_back() if self.pv and self.pv.export then self:preview_end() end end
+-- a copy of a variation as a new project of its own
+function ui:var_duplicate(n)
+  local was = self.pv
+  if not was then
+    self.pv = { home = self.project or "default", unsaved = self.unsaved, fresh = self.fresh }
+    psend("ockm-stash", "bang", {})
+  end
+  local nn = self:new_name()
+  psend("ockm-project-open", "symbol", { n }); psend("ockm-project-saveas", "symbol", { nn }); self:var_stamp(nn)
+  self:preview_end(); psend("ockm-project-list", "bang", {})
+  self.pgroup = nn; self.vsel = nil
+  self:say("copied " .. ockm_pretty(n) .. " as " .. ockm_pretty(nn))
+end
+function ui:proj_act(fn) return function() self:preview_end(); fn() end end
+local PT_COLS, PT_ROWS, PT_H = 4, 5, 68
+local VT_COLS, VT_ROWS, VT_H = 4, 5, 52
+function ui:layout_project(add)
+  local home = self:home()
+  -- what's open now, and what you can do with it
+  add{ kind="text", x=16, y=76, w=300, h=12, label="open now", size=9 }
+  add{ kind="text", x=16, y=88, w=390, h=24, label=ockm_pretty(home), size=20, col="txt" }
+  local note = self.pv and ((self.pv.export and "exporting " or "playing ") .. ockm_pretty(self.pv.n) .. (self.pv.export and ": yours comes back after" or ": stop to go back")) or (self.unsaved and "unsaved changes" or "")
+  add{ kind="text", x=16, y=116, w=420, h=12, label=self.msg or note, size=10, col=(self.msg or self.pv or self.unsaved) and "acc" or nil }
+  local acts = {
+    { "save", 70, function() self:save_variation() end },
+    { "back to last save", 128, function() psend("ockm-revert", "bang", {}); self:say("back to the last save of " .. ockm_pretty(home)) end },
+    { "save as copy", 104, function()
+        local n = self:new_name(); psend("ockm-project-saveas", "symbol", { n }); psend("ockm-project-list", "bang", {})
+        self:say("saved a copy as " .. ockm_pretty(n) .. ". You're now working in the copy") end },
+    { "new blank", 92, function()
+        local n = self:new_name(); self.exists = 1; self.new_pending = true; self.fresh = n; psend("ockm-project-new", "symbol", { n }); psend("ockm-project-list", "bang", {})
+        self:say("new project: " .. ockm_pretty(n) .. ". The last one stays as you last saved it") end },
+    { "export...", 84, function() psend("ockm-usb-scan", "bang", {}); psend("ockm-exports-ask", "bang", {}); self.sheet = "export" end },
+  }
+  local x = W - 16
+  for i = #acts, 1, -1 do
+    local a = acts[i]
+    x = x - a[2]
+    add{ kind="btn", x=x, y=80, w=a[2], h=40, small=true, label=a[1], accent=(i >= 4), tap=self:proj_act(a[3]) }
+    x = x - 6
+  end
+  -- the projects: newest first, a tile each, scrolled a row at a time
+  local groups, order = self:proj_groups()
+  -- the open project is picked when the page opens or what's open changes
+  if self.pg_home ~= home then self.pg_home = home; self.pgroup = ockm_base(home); self.vsel = nil; self.vscroll = 0 end
+  if not (self.pgroup and groups[self.pgroup]) then self.pgroup = groups[ockm_base(home)] and ockm_base(home) or order[1] end
+  add{ kind="text", x=16, y=134, w=300, h=12, label="your projects (" .. #order .. ")", size=10 }
+  add{ kind="card", x=16, y=150, w=572, h=H - 150 - 10 }
+  local tw = (572 - 16 - (PT_COLS - 1) * 6) / PT_COLS
+  local rows = math.ceil(#order / PT_COLS)
+  self.pscroll = clamp(self.pscroll or 0, 0, math.max(0, rows - PT_ROWS))
+  local pvs = { row = PT_H + 6, get = function() return self.pscroll end, set = function(v) self.pscroll = clamp(v, 0, math.max(0, rows - PT_ROWS)) end }
+  for k = 1, PT_COLS * PT_ROWS do
+    local b = order[self.pscroll * PT_COLS + k]
     if not b then break end
     local g = groups[b]
-    local col, row = (k - 1) % cols, math.floor((k - 1) / cols)
-    local is_cur = (b == cur_base)
-    local latest = g[#g]
-    local lbl = ockm_pretty(b) .. (#g > 1 and ("  v" .. ockm_ver(latest)) or "") .. (is_cur and "  (open)" or "")
-    add{ kind="choice", x=16 + col * (cw + 8), y=238 + row * 52, w=cw, h=46, small=true,
-         label=lbl, sel=(b == shown),
-         tap=function()
-           self.confirm = nil; self.pgroup = b
-           local want = is_cur and cur or latest
-           self.pick = (want ~= cur) and want or nil
-         end }
+    local col, row = (k - 1) % PT_COLS, math.floor((k - 1) / PT_COLS)
+    local tx, ty = 24 + col * (tw + 6), 158 + row * (PT_H + 6)
+    local info = self:var_info(g[1])
+    add{ kind="ptile", x=tx, y=ty, w=tw, h=PT_H, label=ockm_pretty(b):match("^[^·]+"):gsub("%s+$", ""), style=info.style or "",
+         sub=((ockm_pretty(b):match("· (.+)$") and (ockm_pretty(b):match("· (.+)$") .. " · ")) or "") .. #g .. (#g == 1 and " variation" or " variations"),
+         sel=(b == self.pgroup), open=(b == ockm_base(home)), vs=pvs,
+         tap=function() self.pgroup = b; self.vsel = nil; self.vscroll = 0; self.confirm = nil end }
+    add{ kind="pbtn", x=tx + tw - 36, y=ty + PT_H - 36, w=30, h=30, on=(self.pv and self.playing ~= 0 and ockm_base(self.pv.n) == b), vs=pvs,
+         tap=function() self.pgroup = b; self.vsel = nil; self:preview_play(g[1]) end }
   end
-  -- the variations of the project picked (or open), oldest to newest: the last 12
-  local g = groups[shown]
-  if g and #g > 1 then
-    add{ kind="text", x=16, y=444, w=W - 32, h=12, label="variations of " .. ockm_pretty(shown):match("^[^·]+"):gsub("%s+$", "") .. ": each save keeps the one before", size=10 }
-    add{ kind="btn", x=W - 16 - 150, y=460, w=150, h=30, small=true, accent=true, label="browse all " .. #g,
-         tap=function() self.vbase = shown; self.vpage = 0; self.vcache = {}; self.vconfirm = nil; self.sheet = "variations" end }
-    local first = math.max(1, #g - 9)
-    local vw = (W - 32 - 156 - 9 * 6) / 10
-    for i = first, #g do
-      local n = g[i]
-      add{ kind="choice", x=16 + (i - first) * (vw + 6), y=460, w=vw, h=30, small=true,
-           label="v" .. ockm_ver(n) .. (n == cur and " open" or ""), sel=(self.pick == n) or (self.pick == nil and n == cur),
-           tap=function() self.confirm = nil; self.pick = (n ~= cur) and n or nil end }
-    end
+  if rows > PT_ROWS then add{ kind="vbar", x=582, y=158, w=4, h=PT_ROWS * (PT_H + 6) - 6, pos=self.pscroll / rows, frac=PT_ROWS / rows } end
+  -- the project picked: its variations
+  local g = self.pgroup and groups[self.pgroup]
+  local px = 596
+  local pw = W - 16 - px
+  add{ kind="card", x=px, y=150, w=pw, h=H - 150 - 10 }
+  if not g then
+    add{ kind="text", x=px + 14, y=170, w=pw - 28, h=12, label="no projects yet: save one and it shows here", size=11 }
+    return
   end
-  if pages > 1 then
-    add{ kind="arrow", x=W - 112, y=216, w=44, h=20, dir=-1, on=self.ppage > 0, tap=function() self.ppage = self.ppage - 1 end }
-    add{ kind="arrow", x=W - 60, y=216, w=44, h=20, dir=1, on=self.ppage < pages - 1, tap=function() self.ppage = self.ppage + 1 end }
+  if self.vsel and ockm_base(self.vsel) ~= self.pgroup then self.vsel = nil end
+  local sel = self.vsel or g[1]
+  local info = self:var_info(sel)
+  add{ kind="text", x=px + 14, y=160, w=pw - 28, h=20, label=ockm_pretty(self.pgroup):match("^[^·]+"):gsub("%s+$", ""), size=17, col="txt" }
+  add{ kind="text", x=px + 14, y=184, w=pw - 28, h=12, label=info.summary or "", size=9 }
+  local bw = (pw - 28 - 12) / 3
+  local is_open = (sel == (self.project or "default")) and not self.pv
+  add{ kind="btn", x=px + 14, y=212, w=bw, h=36, small=true, accent=not is_open, off=is_open, label=is_open and "open now" or "open",
+       tap=function() if is_open then return end; local n = sel; self:preview_end(); self:var_open(n) end }
+  add{ kind="btn", x=px + 14 + (bw + 6), y=212, w=bw, h=36, small=true, label="export...", tap=function() self:var_export(sel) end }
+  add{ kind="btn", x=px + 14 + 2 * (bw + 6), y=212, w=bw, h=36, small=true, label="more ...", tap=function() self.sheet = "pmore" end }
+  -- the variation picked: when, keep, delete
+  local vtxt = "v" .. ockm_ver(sel) .. (info.saved and ("  ·  " .. os.date("%d %b %H:%M", info.saved)) or "")
+  add{ kind="text", x=px + 14, y=262, w=150, h=12, label=vtxt, size=11, col="txt" }
+  add{ kind="btn", x=px + pw - 14 - 130, y=256, w=62, h=26, small=true, label=info.keep and "kept" or "keep", accent=info.keep and true or false,
+       tap=function() local m = self:var_meta(sel); m.keep = not m.keep; self:var_write(sel, m); self.vcache[sel] = nil end }
+  local armed = (self.confirm == sel)
+  add{ kind="btn", x=px + pw - 14 - 62, y=256, w=62, h=26, small=true, quiet=not armed, off=is_open, label=armed and "sure?" or "delete",
+       tap=function()
+         if sel == (self.project or "default") and not self.pv then self:say("that's the one you're in: open another first"); return end
+         if armed then
+           if self.pv and self.pv.n == sel then self:preview_end() end
+           self:var_delete(sel); self.confirm = nil; self.vsel = nil; self:say(ockm_pretty(sel) .. " moved to the trash folder")
+         else self.confirm = sel end
+       end }
+  local vw = (pw - 28 - (VT_COLS - 1) * 6) / VT_COLS
+  local vrows = math.ceil(#g / VT_COLS)
+  self.vscroll = clamp(self.vscroll or 0, 0, math.max(0, vrows - VT_ROWS))
+  local vvs = { row = VT_H + 6, get = function() return self.vscroll end, set = function(v) self.vscroll = clamp(v, 0, math.max(0, vrows - VT_ROWS)) end }
+  for k = 1, VT_COLS * VT_ROWS do
+    local n = g[self.vscroll * VT_COLS + k]
+    if not n then break end
+    local col, row = (k - 1) % VT_COLS, math.floor((k - 1) / VT_COLS)
+    local vx, vy = px + 14 + col * (vw + 6), 292 + row * (VT_H + 6)
+    local vi = self:var_info(n)
+    local when = (n == (self.project or "default") and not self.pv) and "open now" or (vi.keep and "kept" or (vi.saved and os.date("%d %b", vi.saved) or ""))
+    add{ kind="vtile", x=vx, y=vy, w=vw, h=VT_H, label="v" .. ockm_ver(n), sub=when, keep=vi.keep, sel=(n == sel), vs=vvs,
+         tap=function() self.vsel = n; self.confirm = nil end }
+    add{ kind="pbtn", x=vx + 4, y=vy + (VT_H - 28) / 2, w=28, h=28, on=(self.pv and self.pv.n == n and self.playing ~= 0), vs=vvs,
+         tap=function() self.vsel = n; self:preview_play(n) end }
   end
-  -- what to do with the one you picked
-  local p = self.pick
-  if p then
-    local y = H - 64
-    add{ kind="text", x=16, y=y - 18, w=W - 32, h=12, label=ockm_pretty(p) .. ": open it, or delete it. Opening swaps out " .. ockm_pretty(cur), size=10 }
-    local w3 = (W - 32 - 16) / 3
-    add{ kind="btn", x=16, y=y, w=w3, h=52, label="save a variation, then open", accent=true, tap=function()
-      self:save_variation(); psend("ockm-project-open", "symbol", { p }); self.pick = nil; self:say("opened " .. ockm_pretty(p)) end }
-    add{ kind="btn", x=16 + w3 + 8, y=y, w=w3, h=52, label="open without saving", tap=function()
-      psend("ockm-project-open", "symbol", { p }); self.pick = nil; self:say("opened " .. ockm_pretty(p)) end }
-    add{ kind="btn", x=16 + 2 * (w3 + 8), y=y, w=w3, h=52, label=(self.confirm == p) and "tap again to delete" or "delete", quiet=(self.confirm ~= p), tap=function()
-      if self.confirm == p then
-        psend("ockm-project-delete", "symbol", { p }); self.pick, self.confirm = nil, nil
-        self:say(ockm_pretty(p) .. " moved to the trash folder")
-      else self.confirm = p end
-    end }
+  if vrows > VT_ROWS then add{ kind="vbar", x=px + pw - 8, y=292, w=4, h=VT_ROWS * (VT_H + 6) - 6, pos=self.vscroll / vrows, frac=VT_ROWS / vrows } end
+end
+-- more: the project as a whole
+function ui:layout_pmore(add)
+  local groups = self:proj_groups()
+  local g = groups[self.pgroup or ""] or {}
+  local sel = self.vsel or g[1]
+  local cur = self.project or "default"
+  add{ kind="scrim", x=0, y=0, w=W, h=H, tap=function() self.sheet = nil; self.confirm = nil end }
+  local x0, y0, w0 = W / 2 - 220, 130, 440
+  add{ kind="sheet", x=x0, y=y0, w=w0, h=290 }
+  add{ kind="text", x=x0 + 16, y=y0 + 16, w=w0 - 32, h=14, label=ockm_pretty(self.pgroup or ""):match("^[^·]+") or "", size=14, col="txt" }
+  local bw = w0 - 32
+  if sel then
+    add{ kind="btn", x=x0 + 16, y=y0 + 46, w=bw, h=44, small=true, label="copy v" .. ockm_ver(sel) .. " as a new project",
+         tap=function() self.sheet = nil; self:var_duplicate(sel) end }
   end
+  -- tidy up: everything except the kept ones, the newest 5 and the open one goes to the trash folder
+  local gone = {}
+  for i, n in ipairs(g) do if i > 5 and n ~= cur and not self:var_info(n).keep then gone[#gone + 1] = n end end
+  local ta = (self.confirm == "tidy")
+  add{ kind="btn", x=x0 + 16, y=y0 + 96, w=bw, h=44, small=true, off=(#gone == 0), quiet=not ta,
+       label=(#gone == 0) and "tidy up: nothing to clear" or (ta and string.format("tap again: %d to the trash", #gone) or string.format("tidy up: keep the kept and the newest 5 (%d go)", #gone)),
+       tap=function()
+         if #gone == 0 then return end
+         if ta then
+           if self.pv then self:preview_end() end
+           for _, n in ipairs(gone) do self:var_delete(n) end
+           self.confirm = nil; self.vsel = nil; self.sheet = nil; self:say(string.format("%d variations moved to the trash folder", #gone))
+         else self.confirm = "tidy" end
+       end }
+  local has_open = false
+  for _, n in ipairs(g) do if n == cur and not self.pv then has_open = true end end
+  local da = (self.confirm == "delproj")
+  add{ kind="btn", x=x0 + 16, y=y0 + 146, w=bw, h=44, small=true, quiet=not da, off=has_open,
+       label=has_open and "delete project: it's open, open another first" or (da and string.format("tap again: all %d variations to the trash", #g) or "delete the whole project"),
+       tap=function()
+         if has_open then return end
+         if da then
+           if self.pv then self:preview_end() end
+           for _, n in ipairs(g) do self:var_delete(n) end
+           self.confirm = nil; self.pgroup = nil; self.vsel = nil; self.sheet = nil; self:say("moved to the trash folder")
+         else self.confirm = "delproj" end
+       end }
+  add{ kind="btn", x=x0 + w0 - 116, y=y0 + 228, w=100, h=44, small=true, label="close", tap=function() self.sheet = nil; self.confirm = nil end }
 end
 
 -- ------------------------------------------------------------------ variation browser (v1.11)
@@ -3711,6 +3841,7 @@ function ui:var_info(n)
   local bits = {}
   local st = kv["ockm-style"]
   if st and st >= 0 and STYLES[st + 1] then bits[#bits + 1] = STYLES[st + 1][1] end
+  local style = (st and st >= 0 and STYLES[st + 1]) and STYLES[st + 1][1] or nil
   if kv["ockm-bpm"] then bits[#bits + 1] = string.format("%d bpm", math.floor(kv["ockm-bpm"] + 0.5)) end
   if kv["ockm-root"] then bits[#bits + 1] = (NOTES[math.floor(kv["ockm-root"]) % 12 + 1] or "") .. " " .. (SCALE_NAMES[math.floor(kv["ockm-scale"] or 0) + 1] or "") end
   local pg = kv["ockm-chord-prog"]
@@ -3721,7 +3852,7 @@ function ui:var_info(n)
   end
   bits[#bits + 1] = table.concat(parts, " + ")
   local m = self:var_meta(n)
-  local info = { summary = table.concat(bits, " · "), saved = m.saved, keep = m.keep }
+  local info = { summary = table.concat(bits, " · "), saved = m.saved, keep = m.keep, style = style }
   self.vcache[n] = info
   return info
 end
@@ -4168,6 +4299,9 @@ function ui:move(x, y)
   if t.mode == "xy" then t.w.drag(self:xy_at(t.w, x, y)); return end
   if t.mode == "vlane" then self:lane_set(t.w, x, y); return end
   if t.mode == nil and t.w.kind == "bpm" and math.abs(dy) > 8 then t.mode = "bpm" end
+  -- v1.26: a grid that scrolls a row at a time: drag up or down anywhere on it
+  if t.mode == nil and t.w.vs and math.abs(dy) > 14 and math.abs(dy) > math.abs(dx) then t.mode = "vscroll"; t.vs0 = t.w.vs.get() end
+  if t.mode == "vscroll" then t.w.vs.set(t.vs0 - math.floor(dy / t.w.vs.row + 0.5)); return end
   if t.mode == "bpm" then
     self:send("ockm-bpm", clamp(math.floor(t.v0 - dy / 3 + 0.5), 40, 200)); return
   end
@@ -4505,6 +4639,29 @@ function ui:draw(g, w)
   elseif k == "strip" then
     self:col(g, "card"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
     self:ctext(g, w.label, { x=w.x, y=w.y + 6, w=w.w, h=16 }, 11, w.silent and "mute" or "txt")
+  elseif k == "ptile" or k == "vtile" then
+    -- v1.26 the project page's tiles: a project (name, style, date and variations) or a variation (its number, when)
+    self:col(g, w.sel and "on" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
+    if w.keep or w.open then self:col(g, "acc"); g:stroke_rounded_rect(w.x + 1, w.y + 1, w.w - 2, w.h - 2, 6, 2) end
+    local c, mc = w.sel and "bg" or "txt", w.sel and "bg" or "mute"
+    if k == "ptile" then
+      self:text(g, w.label, w.x + 10, w.y + 7, 12, c, w.w - 16)
+      self:text(g, w.style, w.x + 10, w.y + 27, 9, mc, w.w - 50)
+      self:text(g, w.sub, w.x + 10, w.y + 44, 9, mc, w.w - 50)
+    else
+      self:text(g, w.label, w.x + 38, w.y + 8, 12, c, w.w - 40)
+      self:text(g, w.sub, w.x + 38, w.y + 30, 8, (w.keep and not w.sel) and "acc" or mc, w.w - 40)
+    end
+  elseif k == "pbtn" then
+    -- ▶ or, while it plays, ❚❚
+    self:col(g, w.on and "acc" or "dim"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, w.w / 2)
+    self:col(g, w.on and "#ffffff" or "txt")
+    local cx, cy, r = w.x + w.w / 2, w.y + w.h / 2, w.w * 0.22
+    if w.on then g:fill_rect(cx - r, cy - r, r * 0.7, 2 * r); g:fill_rect(cx + r * 0.3, cy - r, r * 0.7, 2 * r)
+    else local p = Path(cx - r * 0.7, cy - r); p:line_to(cx + r, cy); p:line_to(cx - r * 0.7, cy + r); p:close(); g:fill_path(p) end
+  elseif k == "vbar" then
+    self:col(g, "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 2)
+    self:col(g, "mute"); g:fill_rounded_rect(w.x, w.y + w.h * w.pos, w.w, math.max(10, w.h * w.frac), 2)
   elseif k == "xy" then
     -- v1.23 the bus effects' pad: quarter lines, the centre line for the filter, where it is (filled while it's in)
     self:col(g, "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 8)

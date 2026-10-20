@@ -117,11 +117,11 @@ SHOTS = [
                       "test tap 539 36", "test tap 145 282", "send ockm-drum-loop float 32"]),
     ("drums-groove", ["test tap 539 36", "test tap 660 445"]),                         # drums tab, tap a groove
     ("project", ["test tap 919 36", "test tap 830 95", "test tap 600 261"]),                              # project screen, pick an older project
-    ("project-variations", ["test tap 919 36", "test tap 830 95", "test tap 360 261", "test tap 64 475"]),   # a project with variations, pick v1
-    ("project-browser", ["test tap 919 36", "test tap 830 95", "test tap 360 261", "test tap 870 475"]),   # browse its variations
+    ("project-variations", ["test tap 919 36", "test tap 830 95", "test tap 200 180", "test tap 720 318"]),   # v1.26: neon otter picked, its v2 picked
+    ("project-browser", ["test tap 876 230"]),                                                             # more: copy, tidy up, delete the project
     ("setup", ["test tap 150 36"]),
     ("arrange", ["test tap 795 36"]),                                                     # arrange tab (being rebuilt)
-    ("export", ["test tap 919 36", "test tap 830 95", "test tap 854 178"]),                                    # project screen, export...
+    ("export", ["test tap 919 36", "test tap 830 95", "test tap 902 100"]),                                    # project screen, export...
     ("bass-manual", ["test tap 601 36", "test tap 900 283", "test tap 89 158"]),      # switch to manual, then edit step 2
     ("bass-sidechain", ["test tap 836 544", "send ockm-bass-sidechain float 0.7", "test tap 601 36"]),   # the sidechain shapes, pump picked
     ("song-style", ["test tap 477 36", "test tap 584 174"]),   # peak time (last: it changes the tempo and groove)

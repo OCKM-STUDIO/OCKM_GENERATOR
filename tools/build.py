@@ -2785,6 +2785,30 @@ tu2=undo_dir(tud2,2,2050,YU+50); q.con(tu2,0,sender("dir",2050,YU+150),0)
 q.con(tud2,1,sender("readall",1800,YU+175),0)
 tz2=q.add(f"#X obj 1700 {YU+200} t b b;"); q.con(tud2,0,tz2,0); q.con(tz2,1,keep2,0); q.con(keep2,0,sender("dir",1700,YU+275),0)
 q.con(tz2,0,fc4,0)   # reload the pattern on screen from its restored buffer (as revert does)
+# v1.26 previewing a variation from the project page. ockm-stash: everything open now (the loop, the project, and which
+# pattern is on) is written to stash/ beside projects/, without counting as a save. ockm-unstash <name>: read it all back
+# as the project <name> (the one that was open), and its pattern again. In between, ockm-project-open plays other folders
+YS=YU+320
+rst_=q.add(f"#X obj 1100 {YS} r ockm-stash;"); tst_=q.add(f"#X obj 1100 {YS+25} t b b b b b b b;"); q.con(rst_,0,tst_,0)
+fpc=q.add(f"#X obj 2300 {YS+50} f;"); q.con(tl,5,fpc,1); fps=q.add(f"#X obj 2300 {YS+75} f;"); q.con(tst_,6,fpc,0); q.con(fpc,0,fps,1)   # the pattern that's on
+keep3=q.add(f"#X obj 1100 {YS+250} symbol;"); dk3=holder("dir",1300,YS+50); q.con(tst_,5,dk3,0); q.con(dk3,0,keep3,1)
+def stash_dir(src,outlet,x,y):
+    bu=holder("base",x,y); q.con(src,outlet,bu,0); ud=joined(bu,0,"../stash",x,y+25)
+    t=q.add(f"#X obj {x} {y+75} t s s;"); q.con(ud,0,t,0); q.con(t,1,q.add(f"#X obj {x+150} {y+100} file mkdir;"),0); return t
+ts3=stash_dir(tst_,4,1450,YS+50); q.con(ts3,0,sender("dir",1450,YS+150),0)
+m03=q.add(f"#X msg 1250 {YS+100} 0;"); q.con(tst_,3,m03,0); q.con(m03,0,sender("announce",1250,YS+125),0)
+q.con(tst_,2,scap,0); q.con(tst_,1,sender("writeall",1200,YS+175),0)
+tz3=q.add(f"#X obj 1100 {YS+200} t b b;"); q.con(tst_,0,tz3,0); m13=q.add(f"#X msg 1250 {YS+225} 1;")
+q.con(tz3,1,m13,0); q.con(m13,0,sender("announce",1250,YS+250),0); q.con(tz3,0,keep3,0); q.con(keep3,0,sender("dir",1100,YS+275),0)
+run_=q.add(f"#X obj 1700 {YS} r ockm-unstash;"); tun=q.add(f"#X obj 1700 {YS+25} t b b b s;"); q.con(run_,0,tun,0)
+tsu=stash_dir(tun,2,2050,YS+50); q.con(tsu,0,sender("dir",2050,YS+150),0)                 # 1. point at stash/
+q.con(tun,1,sender("readall",1800,YS+175),0)                                             # 2. read it all
+q.con(tun,3,q.add(f"#X obj 1900 {YS+60} symbol;"),0)
+nm3=q.add(f"#X obj 1700 {YS+200} symbol;"); q.con(tun,3,nm3,1)
+tz4=q.add(f"#X obj 1700 {YS+225} t b b b;"); q.con(tun,0,tz4,0)
+q.con(tz4,2,nm3,0); q.con(nm3,0,sender("setname",1700,YS+250),0)                         # 3. back to its own folder and name
+q.con(tz4,1,fps,0); q.con(fps,0,sender("loadpat",1850,YS+250),0)                          # 4. its pattern again
+q.con(tz4,0,sender("remember",1700,YS+275),0)                                             # 5. remembered, and the screens told
 # ockm-project-new <name>: a blank project (every pattern empty, default kit, tempo and sounds)
 Y5=Y4+250
 rn=q.add(f"#X obj 20 {Y5} r ockm-project-new;"); tn=q.add(f"#X obj 20 {Y5+25} t b b b b b s s;")

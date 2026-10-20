@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.26 (20 October 2026)
+
+- **The project page, redesigned:** your projects in a grid (four across, scroll with a finger), and beside it the one you picked, with its variations in a grid of their own, newest first. Kept variations are outlined in orange, and so is the open project
+- **▶ plays without leaving the page:** on a project, its latest variation; on a variation, that one. Whatever you had open, unsaved changes and all, is set aside (in stash/, not saved over) and comes back exactly when you stop or leave the page. Stop your music first: it says so if you haven't
+- **Pick a variation** and the panel acts on it: **open**, **export...** (it exports that variation and then puts back what you had open), **keep** and **delete**. **More...** has copy as a new project, tidy up (keeps the kept ones and the newest five) and delete the whole project
+- Along the top: save, back to last save, save as copy, new blank and export... (what's open now)
+- The old variation browser sheet is gone: it's all on the page
+
 ## v1.25 (20 October 2026)
 
 - **The pad springs back:** not latched, lifting your finger sends the effect back to the centre of the pad as it goes out (a filter sweeps back open, like the old DJ filter strip), and the crosshair returns to the middle. Latched, it stays where you left it
