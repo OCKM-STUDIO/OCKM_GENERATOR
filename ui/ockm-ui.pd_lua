@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v1.10"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v1.11"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -772,6 +772,7 @@ function ui:layout()
   else self:layout_synth(add) end
   if self.sheet == "export" then self:layout_export(add) end
   if self.sheet == "eq" then self:layout_eq(add) end
+  if self.sheet == "variations" then self:layout_variations(add) end
   if self.sheet == "slotpick" then self:layout_slotpick(add) end
   -- messages on screens that have no message line of their own
   if self.msg and (self.screen == "perform" or self.screen == "live" or self.screen == "compose" or self.screen == "mixer" or self.screen == "arrange" or self.screen == "setup" or self.screen == "drums"
@@ -3195,7 +3196,8 @@ function ui:save_variation()
   local cur = self.project or "default"
   if not self.unsaved then self:say("nothing new to save in " .. ockm_pretty(cur)); return end
   if cur == self.fresh then
-    self.fresh = nil; psend("ockm-save", "bang", {}); self:say("saved " .. ockm_pretty(cur) .. ": the loop and the kit"); return
+    self.fresh = nil; psend("ockm-save", "bang", {}); self:var_stamp(cur)
+    self:say("saved " .. ockm_pretty(cur) .. ": the loop and the kit"); return
   end
   local n
   if cur == "default" then n = self:new_name()
@@ -3208,7 +3210,7 @@ function ui:save_variation()
     end
     repeat top = top + 1; n = base .. "-v" .. top until not taken[n]
   end
-  psend("ockm-project-saveas", "symbol", { n }); psend("ockm-project-list", "bang", {})
+  psend("ockm-project-saveas", "symbol", { n }); psend("ockm-project-list", "bang", {}); self:var_stamp(n)
   self:say("saved as " .. ockm_pretty(n) .. ". " .. ockm_pretty(cur):match("^[^·]+"):gsub("%s+$", "") .. " stays as it was")
 end
 function ui:new_name()
@@ -3279,8 +3281,10 @@ function ui:layout_project(add)
   local g = groups[shown]
   if g and #g > 1 then
     add{ kind="text", x=16, y=444, w=W - 32, h=12, label="variations of " .. ockm_pretty(shown):match("^[^·]+"):gsub("%s+$", "") .. ": each save keeps the one before", size=10 }
-    local first = math.max(1, #g - 11)
-    local vw = (W - 32 - 11 * 6) / 12
+    add{ kind="btn", x=W - 16 - 150, y=460, w=150, h=30, small=true, accent=true, label="browse all " .. #g,
+         tap=function() self.vbase = shown; self.vpage = 0; self.vcache = {}; self.vconfirm = nil; self.sheet = "variations" end }
+    local first = math.max(1, #g - 9)
+    local vw = (W - 32 - 156 - 9 * 6) / 10
     for i = first, #g do
       local n = g[i]
       add{ kind="choice", x=16 + (i - first) * (vw + 6), y=460, w=vw, h=30, small=true,
@@ -3309,6 +3313,144 @@ function ui:layout_project(add)
       else self.confirm = p end
     end }
   end
+end
+
+-- ------------------------------------------------------------------ variation browser (v1.11)
+-- Each variation folder can hold variation.txt (when it was saved, and whether to keep it through a tidy-up). The browser
+-- reads each one's loop and project files for a one-line summary, and opens, keeps, exports or deletes it
+function ui:proj_dir(n)
+  if not self._loadpath or self._loadpath == "" then return nil end
+  return self._loadpath .. "../projects/" .. n .. "/"
+end
+function ui:var_meta(n)
+  local d = self:proj_dir(n); local f = d and io.open(d .. "variation.txt", "r")
+  if not f then return {} end
+  local src = f:read("a"); f:close()
+  local fn = load(src, "variation", "t", {}); local ok, t = pcall(fn or function() end)
+  return (ok and type(t) == "table") and t or {}
+end
+function ui:var_write(n, t)
+  local d = self:proj_dir(n); local f = d and io.open(d .. "variation.txt", "w")
+  if not f then return end
+  f:write(string.format("return { saved = %d, keep = %s }\n", math.floor(t.saved or 0), t.keep and "true" or "false")); f:close()
+end
+function ui:var_stamp(n)
+  local m = self:var_meta(n); m.saved = os.time(); self:var_write(n, m)
+  if self.vcache then self.vcache[n] = nil end
+end
+local function read_kv(path, into)
+  local f = path and io.open(path, "r")
+  if not f then return into end
+  for line in f:read("a"):gmatch("[^;]+") do
+    local k, v = line:match("^%s*(ockm%-[%w%-]+)%s+([%-%d%.]+)")
+    if k and into[k] == nil then into[k] = tonumber(v) end
+  end
+  f:close(); return into
+end
+function ui:var_info(n)
+  self.vcache = self.vcache or {}
+  if self.vcache[n] then return self.vcache[n] end
+  local d = self:proj_dir(n)
+  local kv = {}
+  if d then read_kv(d .. "loop.txt", kv); read_kv(d .. "project.txt", kv) end
+  local bits = {}
+  local st = kv["ockm-style"]
+  if st and st >= 0 and STYLES[st + 1] then bits[#bits + 1] = STYLES[st + 1][1] end
+  if kv["ockm-bpm"] then bits[#bits + 1] = string.format("%d bpm", math.floor(kv["ockm-bpm"] + 0.5)) end
+  if kv["ockm-root"] then bits[#bits + 1] = (NOTES[math.floor(kv["ockm-root"]) % 12 + 1] or "") .. " " .. (SCALE_NAMES[math.floor(kv["ockm-scale"] or 0) + 1] or "") end
+  local pg = kv["ockm-chord-prog"]
+  if pg and PROGS[math.floor(pg) + 1] then bits[#bits + 1] = PROGS[math.floor(pg) + 1][1] end
+  local parts = {}
+  for _, pr in ipairs({ { "ockm-drums-on", "drums" }, { "ockm-bass-on", "bass" }, { "ockm-chord-on", "chords" }, { "ockm-lead-on", "lead" } }) do
+    if (kv[pr[1]] or 1) > 0 then parts[#parts + 1] = pr[2] end
+  end
+  bits[#bits + 1] = table.concat(parts, " + ")
+  local m = self:var_meta(n)
+  local info = { summary = table.concat(bits, " · "), saved = m.saved, keep = m.keep }
+  self.vcache[n] = info
+  return info
+end
+function ui:var_group(base)
+  local g = {}
+  for _, q in ipairs(self.projects or {}) do if ockm_base(q) == base then g[#g + 1] = q end end
+  table.sort(g, function(a, b) return ockm_ver(a) > ockm_ver(b) end)   -- newest first
+  return g
+end
+function ui:var_open(n, then_export)
+  local cur = self.project or "default"
+  if n ~= cur then
+    if self.unsaved then self:save_variation() end
+    psend("ockm-project-open", "symbol", { n })
+  end
+  self.pick = nil; self.vconfirm = nil
+  if then_export then psend("ockm-usb-scan", "bang", {}); psend("ockm-exports-ask", "bang", {}); self.sheet = "export"
+  else self.sheet = nil end
+  self:say("opened " .. ockm_pretty(n))
+end
+function ui:var_delete(n)
+  psend("ockm-project-delete", "symbol", { n }); psend("ockm-project-list", "bang", {})
+  if self.vcache then self.vcache[n] = nil end
+end
+function ui:layout_variations(add)
+  local base = self.vbase or ockm_base(self.project or "default")
+  local cur = self.project or "default"
+  local g = self:var_group(base)
+  add{ kind="zone", x=0, y=0, w=W, h=H, tap=function() end }
+  local x, y, w, h = 24, 64, W - 48, H - 72
+  add{ kind="sheet", x=x, y=y, w=w, h=h }
+  add{ kind="text", x=x + 20, y=y + 16, w=w - 200, h=22, label="variations of " .. ockm_pretty(base):match("^[^·]+"):gsub("%s+$", "") .. " (" .. #g .. ")", size=18, col="txt" }
+  add{ kind="btn", x=x + w - 120, y=y + 10, w=100, h=36, label="close", tap=function() self.sheet = nil; self.vconfirm = nil end }
+  local per = 6
+  local pages = math.max(1, math.ceil(#g / per))
+  self.vpage = clamp(self.vpage or 0, 0, pages - 1)
+  local rh, ry = 58, y + 56
+  local bw = 78
+  for k = 1, per do
+    local n = g[self.vpage * per + k]
+    if not n then break end
+    local info = self:var_info(n)
+    local yy = ry + (k - 1) * (rh + 6)
+    local is_cur = (n == cur)
+    add{ kind="text", x=x + 20, y=yy + 6, w=110, h=22, label="v" .. ockm_ver(n), size=20, col=is_cur and "acc" or "txt" }
+    add{ kind="text", x=x + 20, y=yy + 34, w=110, h=12, size=10,
+         label=is_cur and "open now" or (info.saved and os.date("%d %b %H:%M", info.saved) or "") }
+    add{ kind="text", x=x + 110, y=yy + 8, w=w - 110 - 4 * (bw + 6) - 30, h=14, size=12, col="txt", label=info.summary }
+    add{ kind="text", x=x + 110, y=yy + 30, w=w - 110 - 4 * (bw + 6) - 30, h=12, size=10,
+         label=(is_cur and info.saved) and ("saved " .. os.date("%d %b %H:%M", info.saved)) or "" }
+    local bx = x + w - 20 - 4 * bw - 3 * 6
+    add{ kind="btn", x=bx, y=yy, w=bw, h=rh - 6, small=true, label="open", accent=not is_cur, off=is_cur,
+         tap=function() if not is_cur then self:var_open(n) end end }
+    add{ kind="btn", x=bx + (bw + 6), y=yy, w=bw, h=rh - 6, small=true, label=info.keep and "kept" or "keep", accent=info.keep and true or false,
+         tap=function() local m = self:var_meta(n); m.keep = not m.keep; self:var_write(n, m); self.vcache[n] = nil end }
+    add{ kind="btn", x=bx + 2 * (bw + 6), y=yy, w=bw, h=rh - 6, small=true, label="export", tap=function() self:var_open(n, true) end }
+    local armed = (self.vconfirm == n)
+    add{ kind="btn", x=bx + 3 * (bw + 6), y=yy, w=bw, h=rh - 6, small=true, quiet=not armed, off=is_cur,
+         label=armed and "sure?" or "delete",
+         tap=function()
+           if is_cur then self:say("that's the one you're in: open another first"); return end
+           if armed then self:var_delete(n); self.vconfirm = nil; self:say(ockm_pretty(n) .. " moved to the trash folder")
+           else self.vconfirm = n end
+         end }
+  end
+  if pages > 1 then
+    add{ kind="arrow", x=x + w - 112, y=y + h - 50, w=44, h=36, dir=-1, on=self.vpage > 0, tap=function() self.vpage = self.vpage - 1 end }
+    add{ kind="arrow", x=x + w - 60, y=y + h - 50, w=44, h=36, dir=1, on=self.vpage < pages - 1, tap=function() self.vpage = self.vpage + 1 end }
+  end
+  -- tidy up: everything except the kept ones, the newest 3 and the open one goes to the trash folder
+  local gone = {}
+  for i, n in ipairs(g) do
+    if i > 3 and n ~= cur and not self:var_info(n).keep then gone[#gone + 1] = n end
+  end
+  local armed = (self.vconfirm == "tidy")
+  add{ kind="btn", x=x + 20, y=y + h - 54, w=360, h=44, small=true, off=(#gone == 0), quiet=not armed,
+       label=(#gone == 0) and "tidy up: nothing to clear" or (armed and string.format("tap again: %d to the trash", #gone) or string.format("tidy up: keep the kept and the newest 3 (%d go)", #gone)),
+       tap=function()
+         if #gone == 0 then return end
+         if armed then
+           for _, n in ipairs(gone) do self:var_delete(n) end
+           self.vconfirm = nil; self:say(string.format("%d variations moved to the trash folder", #gone))
+         else self.vconfirm = "tidy" end
+       end }
 end
 
 -- ------------------------------------------------------------------ mute, solo, mixer

@@ -115,6 +115,7 @@ SHOTS = [
     ("drums-groove", ["test tap 539 36", "test tap 660 445"]),                         # drums tab, tap a groove
     ("project", ["test tap 919 36", "test tap 830 95", "test tap 600 261"]),                              # project screen, pick an older project
     ("project-variations", ["test tap 919 36", "test tap 830 95", "test tap 360 261", "test tap 64 475"]),   # a project with variations, pick v1
+    ("project-browser", ["test tap 919 36", "test tap 830 95", "test tap 360 261", "test tap 870 475"]),   # browse its variations
     ("setup", ["test tap 150 36"]),
     ("arrange", ["test tap 795 36"]),                                                     # arrange tab (being rebuilt)
     ("export", ["test tap 919 36", "test tap 830 95", "test tap 854 178"]),                                    # project screen, export...

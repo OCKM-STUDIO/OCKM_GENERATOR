@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.11 (20 October 2026)
+
+- **Variation browser:** on the project screen, pick a project and tap **browse all** to see every variation, newest first, each with its style, tempo, key, progression, which parts are in, and when it was saved. Each one can be opened, **kept**, exported (it opens, then the export sheet comes up) or deleted (tap twice). The one you're in can't be deleted
+- **Tidy up** (in the browser): clears everything except the kept ones, the newest three and the one you're in, to the trash folder. Tap twice
+- Each save now writes `variation.txt` in its folder: when it was saved, and whether it's kept
+
 ## v1.10 (20 October 2026)
 
 - **Every save is a variation:** save keeps the version you had exactly as it was and carries on in a new one (velvet heron, then velvet heron v2, v3...). Nothing is ever overwritten. A brand-new project's first save just saves it, and save with nothing changed makes nothing

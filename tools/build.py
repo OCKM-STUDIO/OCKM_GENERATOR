@@ -2629,7 +2629,7 @@ mkdir_of(tsa,4,700,Y6)
 for c in [(rsa,0,tsa,0),(tsa,3,sender("setname",300,Y6+50),0),(tsa,2,scap,0),(tsa,1,sender("writeall",200,Y6+75),0),(tsa,0,sender("remember",20,Y6+100),0)]: q.con(*c)
 # ockm-project-delete <name>: its files move to trash/<name> (next to projects/), then the empty folder goes
 Y7=Y6+150
-DEL_FILES=["project.txt",LOOP_FILE,"song.txt"]+[f"p{n+1}.txt" for n in range(8)]+[".DS_Store"]
+DEL_FILES=["project.txt",LOOP_FILE,"song.txt","variation.txt"]+[f"p{n+1}.txt" for n in range(8)]+[".DS_Store"]   # v1.11: variation.txt (saved time, keep)
 rdl=q.add(f"#X obj 20 {Y7} r ockm-project-delete;"); tdl=q.add(f"#X obj 20 {Y7+25} t b s;"); q.con(rdl,0,tdl,0)
 nmd=q.add(f"#X obj 100 {Y7+50} symbol;"); q.con(tdl,1,nmd,1)
 nf=len(DEL_FILES)

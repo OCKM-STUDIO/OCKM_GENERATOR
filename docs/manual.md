@@ -18,7 +18,7 @@ The window is the instrument: three touch screens, drawn in Lua (plugdata has Lu
 
 Tap a track's name on the mixer, or in the drums tab's all drums view, to jump straight to it.
 
-**Saving** (v1.10): every save is a variation. Save keeps the version you had and carries on in a new one (v2, v3 and so on), so nothing is ever overwritten. On the project screen each project shows once, with its variations in a row underneath when you pick it.
+**Saving** (v1.10): every save is a variation. Save keeps the version you had and carries on in a new one (v2, v3 and so on), so nothing is ever overwritten. On the project screen each project shows once, with its variations in a row underneath when you pick it. **Browse all** (v1.11) opens the variation browser: every variation with a one-line summary (style, tempo, key, progression, parts) and when it was saved, to open, keep, export or delete. **Tidy up** clears all but the kept ones, the newest three and the one you're in, to the trash folder.
 
 **Perform** (home: no steps, just mutes and effects, big enough for thumbs. Until v0.87 this was Perform B; Perform A's drum grid is now the drums tab's **all drums** view)
 - **Play** and **tempo** top left. Drag the tempo number up or down. One loop per project: everything you play live works on it. **Save** (the disc) keeps the loop and the kit, and turns orange when there's something unsaved

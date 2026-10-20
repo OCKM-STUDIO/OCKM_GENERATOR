@@ -918,7 +918,7 @@ def touchscreen_screens_draw(work):
         raise Skip("Pillow not installed")
     p = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_preview.py"), os.path.join(work, "preview")], capture_output=True, text=True)
     assert p.returncode == 0, p.stderr[-800:]
-    assert len(os.listdir(os.path.join(work, "preview"))) == 32, "expected thirty-two screen pictures"
+    assert len(os.listdir(os.path.join(work, "preview"))) == 33, "expected thirty-three screen pictures"
 
 @test
 def mute_solo_and_levels(work):
@@ -1682,6 +1682,34 @@ def touchscreen_save_makes_variations(work):
     levels = [lev(base), lev(base + "-v2"), lev(base + "-v3")]
     assert len(set(levels)) == 3, f"each variation keeps its own save: {levels}"
     assert open(os.path.join(P, "current.txt")).read().strip() == base + "-v3;"
+
+@test
+def touchscreen_variation_browser_keeps_and_tidies(work):
+    """v1.11: the variation browser. Five saves make v1 to v5; keep v2, then tidy up: the newest three, the kept one and
+    the open one stay, the rest go to the trash folder. Every save is stamped with its time."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness()
+    tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
+    tap(150, 919, 36); tap(151, 830, 95)   # menu, project
+    tap(200, 667, 178)                     # new blank project
+    tap(250, 407, 36)                      # mixer
+    for i in range(5):                     # five saves: the project, then v2 to v5
+        tap(300 + i * 100, 54, 280 + i * 20); tap(320 + i * 100, 865, 36)
+    tap(900, 919, 36); tap(901, 830, 95)   # back to the project screen
+    tap(950, 870, 475)                     # browse all
+    tap(1000, 709, 338)                    # keep v2 (rows newest first: v5 v4 v3 v2 v1)
+    tap(1050, 224, 560); tap(1100, 224, 560)   # tidy up, tap again
+    f = os.path.join(work, "t_browser.pd"); h.finish(1300, f)
+    out = run(work, f)
+    P = os.path.join(work, "projects")
+    left = sorted(d for d in os.listdir(P) if re.match(r"\d{4}-\d\d-\d\d-", d))
+    base = min(left, key=len) if left else "?"
+    trash = os.listdir(os.path.join(work, "trash")) if os.path.exists(os.path.join(work, "trash")) else []
+    assert len(left) == 4 and all(re.search(r"-v[2345]$", d) for d in left), f"v2 (kept) to v5 should stay: {left} trash {trash}"
+    assert any(not re.search(r"-v\d+$", d) for d in trash), f"v1 should be in the trash: {trash}"
+    meta = open(os.path.join(P, [d for d in left if d.endswith("-v2")][0], "variation.txt")).read()
+    assert "keep = true" in meta and "saved = " in meta, meta
 
 @test
 def drum_grooves_fill_every_slot(work):
