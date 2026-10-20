@@ -1855,6 +1855,19 @@ def rewind_and_beat_repeat(work):
     assert sim(1.0, 1.6) < 0.7, f"before it, the drums don't repeat every eighth: {sim(1.0, 1.6):.2f}"
 
 @test
+def eight_bar_lift_pushes_late(work):
+    """v1.18: slot A is the 8 bar lift: drums out, and the high-pass goes half way (0.225) over 6 bars, then on to 0.45."""
+    sys.path.insert(0, os.path.join(ROOT, "tests"))
+    import ui_preview
+    if not ui_preview.LUA:
+        raise Skip("no lua to run the screen")
+    L = ui_preview.run(["send ockm-playing float 1", "test tap 566 500"])
+    gl = [l for l in L if l.startswith("sent ockm-filter-glide ")]
+    assert gl and abs(float(gl[0].split()[3]) - 0.225) < 1e-6, f"first half way: {gl}"
+    ms = float(gl[0].split()[4]); assert 10500 < ms < 12500, f"over six bars at 124 bpm (about 11.6 s): {ms}"
+    assert any(l.startswith("sent ockm-d1-mute-q ") and l.endswith(" 1") for l in L), "the drums go"
+
+@test
 def drum_grooves_fill_every_slot(work):
     """A groove lands on each slot by the sound it plays, makes the drums 1 bar (a groove's natural length) and sets the swing."""
     h = Harness(); h.show("ockm-drum-len")

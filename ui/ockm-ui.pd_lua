@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v1.18"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v1.19"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -485,6 +485,7 @@ function ui:postinitialize()
   self.tickclock = pd.Clock:new():register(self, "tick")
   self.demudclock = pd.Clock:new():register(self, "demud_finish")
   self.rampclock = pd.Clock:new():register(self, "ramp_tick")
+  self.lateclock = pd.Clock:new():register(self, "macro_late")
   self.newclock = pd.Clock:new():register(self, "apply_new_defaults")
   self.initclock = pd.Clock:new():register(self, "init_sends")
   self:load_settings()
@@ -632,6 +633,7 @@ end
 function ui:finalize()
   for _, r in ipairs(self.recv or {}) do r:destruct() end
   if self.clock then self.clock:destruct() end
+  if self.lateclock then self.lateclock:destruct() end
   if self.msgclock then self.msgclock:destruct() end
   if self.audclock then self.audclock:destruct() end
   if self.flashclock then self.flashclock:destruct() end
@@ -1209,23 +1211,25 @@ local TARGETS = {
   { id = "mutes",    choices = { "kick + bass", "drums only", "no drums", "no kick" } },
 }
 local TARGET = {}; for _, t in ipairs(TARGETS) do TARGET[t.id] = t end
-local HOW = { { "jump", 0 }, { "1 beat", 4 }, { "1 bar", 16 }, { "2 bars", 32 }, { "4 bars", 64 } }   -- in steps
+local HOW = { { "jump", 0 }, { "1 beat", 4 }, { "1 bar", 16 }, { "2 bars", 32 }, { "4 bars", 64 }, { "8 bars", 128 } }   -- in steps (8 bars: v1.18)
 local BACK = { "snap back", "glide back", "stay" }
 -- v0.93: a recipe can run for a length: a tap plays it for that many bars, then everything comes back on the 1
 local RUN_BARS = { 0, 1, 2, 4, 8 }
-local MACRO_NAMES = { "build", "wash", "breakdown", "strip", "sink", "dub out", "lift", "blur", "freeze", "smash", "swell", "haze",
+local MACRO_NAMES = { "8 bar lift", "4 bar lift", "build", "wash", "breakdown", "strip", "sink", "dub out", "lift", "blur", "freeze", "smash", "swell", "haze",
                       "tunnel", "pressure", "drop out", "air", "grit" }
 local function default_settings()
   return {
     sounds = {},     -- your saved drum sounds: { name, type, and the slot settings in SOUND_KEYS }
     macros = {
-      { name = "build", moves = { { t = "filter", v = 0.6, how = 4, back = 1 }, { t = "reverb", v = 0.65, how = 1, back = 2 },
-                                  { t = "delay", v = 0.45, how = 1, back = 1 }, { t = "pump", v = 1, how = 1, back = 1 } } },
+      -- v1.18: the 8 bar lift (in build's place): the 4 bar lift over twice as long, its high-pass going further, most of it
+      -- late (late: half way over the first six bars, the rest in the last two), so it opens up as it lands
+      { name = "8 bar lift", bars = 8, moves = { { t = "mutes", v = 3, how = 1, back = 1 }, { t = "filter", v = 0.45, how = 6, back = 1, late = true },
+                                                { t = "reverb", v = 0.4, how = 2, back = 1 }, { t = "delay", v = 0.3, how = 2, back = 1 } } },
       { name = "wash", moves = { { t = "delay", v = 0.85, how = 1, back = 1 }, { t = "feedback", v = 0.78, how = 1, back = 1 },
                                  { t = "reverb", v = 0.9, how = 1, back = 1 }, { t = "filter", v = -0.5, how = 2, back = 1 } } },
       -- v0.94: the breakdown's high-pass twin: drums out, the high-pass climbs slowly over the 4 bars (halfway up), a touch of
       -- reverb and delay, then it all slams back on the 1
-      { name = "lift", bars = 4, moves = { { t = "mutes", v = 3, how = 1, back = 1 }, { t = "filter", v = 0.3, how = 5, back = 1 },
+      { name = "4 bar lift", bars = 4, moves = { { t = "mutes", v = 3, how = 1, back = 1 }, { t = "filter", v = 0.3, how = 5, back = 1 },
                                           { t = "reverb", v = 0.4, how = 2, back = 1 }, { t = "delay", v = 0.3, how = 2, back = 1 } } },   -- gentle
       { name = "sink", moves = { { t = "filter", v = -0.85, how = 3, back = 1 }, { t = "drive", v = 0.7, how = 3, back = 1 } } },
       { name = "dub out", moves = { { t = "throw", v = 1, how = 1, back = 1 }, { t = "feedback", v = 0.85, how = 1, back = 3 },
@@ -1273,11 +1277,20 @@ function ui:load_settings()
     end
   end
   self.me = d
+  -- v1.18: lift is the 4 bar lift; build (as it came, with pump) becomes the 8 bar lift
+  for i, r in ipairs(d.macros) do
+    if r.name == "lift" and r.bars then r.name = "4 bar lift" end
+    if r.name == "build" then
+      local pumped = false
+      for _, m in ipairs(r.moves or {}) do if m.t == "pump" then pumped = true end end
+      if pumped then d.macros[i] = default_settings().macros[1] end
+    end
+  end
   local has, hp = false, false
-  for _, r in ipairs(d.macros) do if r.name == "breakdown" then has = true end; if r.name == "lift" and r.bars then hp = true end end
+  for _, r in ipairs(d.macros) do if r.name == "breakdown" then has = true end; if (r.name == "lift" or r.name == "4 bar lift") and r.bars then hp = true end end
   -- v0.95: lift's high-pass goes half as far, over the 4 bars (it went to 0.6 in a bar)
   for _, r in ipairs(d.macros) do
-    if r.name == "lift" and r.bars then
+    if (r.name == "lift" or r.name == "4 bar lift") and r.bars then
       for _, m in ipairs(r.moves) do if m.t == "filter" and m.v == 0.6 and m.how == 3 then m.v = 0.3; m.how = 5 end end
     end
   end
@@ -1378,6 +1391,10 @@ function ui:macro_down(slot)
         local want = keep(tr) and 0 or 1
         if want ~= saved.mutes[tr] then self:qmute(tr, want) end
       end
+    elseif t and t.id == "filter" and m.late and ms > 0 then
+      -- late: half way over the first three quarters of the time, the rest in the last quarter
+      pd.send("ockm-filter-glide", "list", { m.v * 0.5, math.max(30, ms * 0.75) }); self.v["ockm-filter"] = m.v
+      self.late = { v = m.v, ms = ms * 0.25 }; self.lateclock:delay(ms * 0.75)
     elseif t and t.id == "filter" then
       pd.send("ockm-filter-glide", "list", { m.v, math.max(30, ms) }); self.v["ockm-filter"] = m.v
     elseif t then
@@ -1389,7 +1406,12 @@ function ui:macro_down(slot)
 end
 -- put moves back: on letting go, all but the ones that stay; when finishing, everything (force: a recipe with a length,
 -- where every move comes back together whatever it says)
+function ui:macro_late()
+  if self.late and self.macro then pd.send("ockm-filter-glide", "list", { self.late.v, math.max(30, self.late.ms) }) end
+  self.late = nil
+end
 function ui:macro_restore(all, force)
+  if self.lateclock then self.lateclock:unset() end; self.late = nil
   local mc = self.macro
   local r, saved = mc.recipe, mc.saved
   local stays = false

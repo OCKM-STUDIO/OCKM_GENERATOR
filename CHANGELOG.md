@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.19 (20 October 2026)
+
+- **8 bar lift** (macro slot A, in build's place): the 4 bar lift over twice as long, its high-pass going further (0.45), most of it in the last two bars: half way over the first six, the rest as it lands
+- **Lift is now called 4 bar lift.** Saved settings move over: build (as it came, with pump) becomes the 8 bar lift; a build you've changed stays
+- Macro moves can run over 8 bars, and a filter move can be **late** (half way over three quarters of the time, the rest in the last quarter)
+
 ## v1.18 (20 October 2026)
 
 - **Rewind is twice as fast:** up to 6 times speed backwards within 100 ms, half a second in all, then the loop drops back in from the top
