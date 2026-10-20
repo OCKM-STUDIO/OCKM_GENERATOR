@@ -579,8 +579,11 @@ _sum=p.add("#X obj 1250 560 array sum ockm-solos;"); _ss=p.add("#X obj 1250 585 
 p.con(_sum,0,_ss,0)
 for _i,_t in enumerate([n for n,_ in SLOTS]+["bass","lead","chord"]):
     _r=p.add(f"#X obj {1250+(_i%6)*110} {480+(_i//6)*40} r ockm-{_t}-solo;"); _ne=p.add(f"#X obj {1250+(_i%6)*110} {500+(_i//6)*40} != 0;")
-    _tw=p.add(f"#X obj {1250+(_i%6)*110} {520+(_i//6)*40} tabwrite ockm-solos {_i};"); _tb=p.add(f"#X obj {1300+(_i%6)*110} {520+(_i//6)*40} t b f;")
-    p.con(_r,0,_ne,0); p.con(_ne,0,_tb,0); p.con(_tb,1,_tw,0); p.con(_tb,0,_sum,0)
+    # v1.15 fix: tabwrite takes its index on the right inlet (an argument doesn't set it), so every solo used to land in
+    # slot 0 and the count only knew about the last one pressed
+    _tw=p.add(f"#X obj {1250+(_i%6)*110} {520+(_i//6)*40} tabwrite ockm-solos;"); _tb=p.add(f"#X obj {1300+(_i%6)*110} {520+(_i//6)*40} t b f b;")
+    _ix=p.add(f"#X msg {1350+(_i%6)*110} {500+(_i//6)*40} {_i};")
+    p.con(_r,0,_ne,0); p.con(_ne,0,_tb,0); p.con(_tb,2,_ix,0); p.con(_ix,0,_tw,1); p.con(_tb,1,_tw,0); p.con(_tb,0,_sum,0)
 p.add(f"#X text 1100 395 settings and patterns: {PROJ_DIR} (project.txt and p1 to p8);")
 # drums
 # v1.08: the mix bus is 6 dB lower than it was, so a track pushed up on its fader has room before the limiter; the master

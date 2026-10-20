@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.16 (20 October 2026)
+
+- **Perform's scenes are switches:** drums only, no drums and kick + bass light up when on; tap again and exactly what was muted and soloed before comes back. Change a mute by hand while one is on and it lets go. All in stays a one-shot (everything in, solos cleared)
+- **M and S on every instrument page,** beside the on/off switch: bass, lead and chords each have their own; on the drums tab they mute or solo all eight drums together (lit when every drum is)
+
 ## v1.15 (20 October 2026)
 
 First ear test of the knobs, sound by sound.

@@ -1807,6 +1807,25 @@ def several_solos_count_together(work):
     assert [v.split()[0] for v in printed(out, "ockm-soloing")] == ["1", "2", "1", "0"], printed(out, "ockm-soloing")
 
 @test
+def touchscreen_scene_switches_on_and_off(work):
+    """v1.15: drums only is a switch: on mutes the synths, off puts back exactly what was muted before (here the bass)."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness(); h.show("ockm-bass-mute", "ockm-lead-mute", "ockm-d1-mute")
+    tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
+    tap(100, 299, 36)                       # perform
+    h.at(150, "ockm-bass-mute 1")           # the bass muted by hand
+    tap(200, 74, 556)                       # drums only: on
+    tap(300, 74, 556)                       # and off again
+    f = os.path.join(work, "t_scene.pd"); h.finish(400, f)
+    out = run(work, f)
+    last = lambda n: (printed(out, n) or ["?"])[-1].split()[0]
+    lead = [v.split()[0] for v in printed(out, "ockm-lead-mute")]
+    assert "1" in lead and last("ockm-lead-mute") == "0", f"drums only should mute the lead, then let it back: {lead}"
+    assert last("ockm-bass-mute") == "1", f"switching off should leave the bass muted, as it was: {printed(out, 'ockm-bass-mute')}"
+    assert last("ockm-d1-mute") in ("0", "?"), "the kick plays throughout"
+
+@test
 def drum_grooves_fill_every_slot(work):
     """A groove lands on each slot by the sound it plays, makes the drums 1 bar (a groove's natural length) and sets the swing."""
     h = Harness(); h.show("ockm-drum-len")
@@ -2106,7 +2125,7 @@ def refit_my_line_when_the_harmony_moves(work):
                             "array ockm-pat-chord-deg " + " ".join("0" for _ in range(64)), "send ockm-lead-mode float 1",
                             "test tap 663 36", "test tap 5 595",                     # lead tab: remembers the harmony it was written over
                             "array ockm-pat-chord-deg " + " ".join("4" for _ in range(64)), "send ockm-chord-prog float 5",
-                            "test tap 663 36", "test tap 479 283"])                  # the harmony moved: refit my line
+                            "test tap 663 36", "test tap 395 283"])                  # the harmony moved: refit my line
     edits = [l.split()[3:] for l in lines if l.startswith("sent ockm-lead-edit")]
     assert len(edits) == 16, f"every note on the beat should be refitted: {len(edits)} {edits[:2]}"
     assert all(int(float(e[1])) == 55 for e in edits), f"A moves to G, the nearest note of E minor: {edits[:3]}"

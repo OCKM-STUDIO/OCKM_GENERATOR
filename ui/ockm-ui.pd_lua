@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v1.15"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v1.16"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -1065,6 +1065,34 @@ end
 -- where a mute is heading: what it will be once anything waiting has landed
 function ui:mute_target(t) local p = self:pending(t); if p ~= nil then return p end; return self.v["ockm-"..t.."-mute"] or 0 end
 
+-- does what's playing (with anything waiting to land) match this scene?
+function ui:scene_matches(keep)
+  for _, t in ipairs(TRACKS) do
+    if (self.v["ockm-"..t.."-solo"] or 0) > 0 then return false end
+    if self:mute_target(t) ~= (keep(t) and 0 or 1) then return false end
+  end
+  return true
+end
+-- a scene switch: on applies it (remembering what was muted and soloed), off puts that back; oneshot: all in
+function ui:scene_switch(i, keep, oneshot)
+  if oneshot then self.scene_on, self.scene_saved = nil, nil; self:scene(keep); return end
+  if self.scene_on == i and self.scene_saved then
+    local sv = self.scene_saved
+    self.scene_on, self.scene_saved = nil, nil
+    for _, t in ipairs(TRACKS) do
+      if self:mute_target(t) ~= sv.mutes[t] then self:qmute(t, sv.mutes[t]) end
+      if (self.v["ockm-"..t.."-solo"] or 0) ~= sv.solos[t] then self:send("ockm-"..t.."-solo", sv.solos[t]) end
+    end
+    return
+  end
+  if not self.scene_on then
+    local sv = { mutes = {}, solos = {} }
+    for _, t in ipairs(TRACKS) do sv.mutes[t] = self:mute_target(t); sv.solos[t] = self.v["ockm-"..t.."-solo"] or 0 end
+    self.scene_saved = sv
+  end
+  self.scene_on = i
+  self:scene(keep)
+end
 -- scenes: which tracks play. Everything else is muted; solos are cleared so the scene is what you hear
 function ui:scene(keep)
   for _, t in ipairs(TRACKS) do
@@ -1119,9 +1147,14 @@ function ui:layout_live(add)
                { "kick + bass", function(t) return kicks[t] or t == "bass" end },
                { "all in", function() return true end } }
   local sw = (436 - 18) / 4
+  -- v1.15: drums only, no drums and kick + bass are switches: on (orange) applies the scene, off puts back exactly what
+  -- was muted and soloed before. Change a mute by hand while one is on and it lets go (what you hear is yours again).
+  -- All in is a one-shot: everything in, solos cleared
+  if self.scene_on and not self:scene_matches(SC[self.scene_on][2]) then self.scene_on, self.scene_saved = nil, nil end
   for i, sc in ipairs(SC) do
-    add{ kind="btn", x=22 + (i - 1) * (sw + 6), y=530, w=sw, h=52, small=true, label=sc[1], edge=true, flash="scene" .. i,
-         tap=function() self:scene(sc[2]); self:flash_btn("scene" .. i) end }
+    local lit = (self.scene_on == i)
+    add{ kind="btn", x=22 + (i - 1) * (sw + 6), y=530, w=sw, h=52, small=true, label=sc[1], edge=not lit, accent=lit, flash="scene" .. i,
+         tap=function() self:scene_switch(i, sc[2], i == #SC); self:flash_btn("scene" .. i) end }
   end
   -- master effects, big
   local mx, iw = rx + 6, half_w - 12
@@ -1504,6 +1537,7 @@ function ui:pad_action(i, down)
   elseif b == 7 then
     if down ~= false then self:send("ockm-rise", 1) end
   elseif down ~= false then
+    self.scene_on, self.scene_saved = nil, nil
     self:scene(function() return true end)
   end
 end
@@ -1758,6 +1792,12 @@ function ui:layout_drums(add)
     end }
   end
   add{ kind="hbar", x=196, y=270, w=190, h=24, hook="ockm-swing", lo=50, hi=75, label="swing" }
+  -- v1.15: M and S for all eight drums together (lit when every drum is muted or soloed)
+  local function all_drums(k) for _, nm in ipairs(SLOTS) do if (self.v["ockm-"..nm.."-"..k] or 0) <= 0 then return false end end return true end
+  for j, ms in ipairs({ { "M", "mute" }, { "S", "solo" } }) do
+    add{ kind="ms", x=W - 16 - 110 - 6 - 84 + (j - 1) * 44, y=267, w=40, h=30, label=ms[1], lit=all_drums(ms[2]),
+         tap=function() local to = all_drums(ms[2]) and 0 or 1; for _, nm in ipairs(SLOTS) do self:send("ockm-"..nm.."-"..ms[2], to) end end }
+  end
   -- the drums in or out of this pattern (the same as their tile on the builder)
   add{ kind="onoff", x=W - 16 - 110, y=267, w=110, h=30, on=(self.v["ockm-drums-on"] or 1) > 0,
        tap=function() self:send("ockm-drums-on", ((self.v["ockm-drums-on"] or 1) > 0) and 0 or 1) end }
@@ -1911,7 +1951,8 @@ function ui:layout_synth(add)
   end
   -- yours or made for you; when the harmony has moved under your line, offer to refit it; on/off top right (as on the builder)
   local yours = self:part_yours(part)
-  local HTX = W - 16 - 110 - 6 - 86 - 6 - 100   -- the half-time switch; slide and on/off sit to its right
+  local MSX = W - 16 - 110 - 6 - 84               -- v1.15: M and S, left of on/off
+  local HTX = MSX - 6 - 86 - 6 - 100              -- the half-time switch; slide, M and S, and on/off sit to its right
   local hk = "ockm-"..part.."-half"
   local ht = (self.v[hk] or 0) > 0
   add{ kind="choice", x=HTX, y=266, w=100, h=34, small=true, accent=true, sel=ht, label="half-time",
@@ -1929,11 +1970,13 @@ function ui:layout_synth(add)
     if not self.msg and not yours then info = self:evo_status(part) or info end
     add{ kind="text", x=16, y=276, w=HTX - 32, h=12, label=info, size=11, col=self.msg and "acc" or nil }
     if mono then
-      add{ kind="choice", x=W - 16 - 110 - 6 - 86, y=266, w=86, h=34, label="slide", accent=true, small=true, sel=self:mono_get(self.sel_step, "slide") > 0,
+      add{ kind="choice", x=MSX - 6 - 86, y=266, w=86, h=34, label="slide", accent=true, small=true, sel=self:mono_get(self.sel_step, "slide") > 0,
            tap=function() self:mono_toggle_slide() end }
     end
   end
   local onk = "ockm-"..part.."-on"
+  add{ kind="ms", x=MSX, y=268, w=40, h=30, label="M", hook="ockm-"..part.."-mute" }
+  add{ kind="ms", x=MSX + 44, y=268, w=40, h=30, label="S", hook="ockm-"..part.."-solo" }
   add{ kind="onoff", x=W - 16 - 110, y=268, w=110, h=30, on=(self.v[onk] or 1) > 0, tap=function() self:send(onk, ((self.v[onk] or 1) > 0) and 0 or 1) end }
   self:layout_synth_sound(add, part, mono)
 end
@@ -3768,7 +3811,7 @@ function ui:press(x, y)
   elseif w.kind == "dstep" or w.kind == "pcell" or w.kind == "ms" then
     -- drum steps, mute and solo act the moment a finger lands, like the pads on a drum machine
     if w.kind == "ms" then
-      self:send(w.hook, ((self.v[w.hook] or 0) > 0) and 0 or 1)
+      if w.tap then w.tap() else self:send(w.hook, ((self.v[w.hook] or 0) > 0) and 0 or 1) end
     else
       local slot, step = w.slot, w.step
       if w.kind == "dstep" then slot, step = self.slot, self:dabs(w.i) end
@@ -3863,7 +3906,7 @@ function ui:release(x, y)
       self:say(SYNTHS[self.part] .. " " .. self:follows_what(SYNTHS[self.part]) .. ": set the mode to manual on compose to edit it")
     elseif w.kind == "mstep" then self:mono_tap(w.i)
     elseif w.kind == "cstep" then self:chord_tap(w.i)
-    elseif w.kind == "ms" then self:send(w.hook, ((self.v[w.hook] or 0) > 0) and 0 or 1)
+    elseif w.kind == "ms" then if w.tap then w.tap() else self:send(w.hook, ((self.v[w.hook] or 0) > 0) and 0 or 1) end
     elseif w.tap then w.tap() end
   end
   self:dirty()
@@ -4138,7 +4181,7 @@ function ui:draw(g, w)
       if w.sub then self:ctext(g, w.sub, { x=w.x, y=top + 32, w=w.w, h=12 }, 9, sc) end
     end
   elseif k == "ms" then
-    local on = (self.v[w.hook] or 0) > 0
+    local on = (w.lit ~= nil) and w.lit or ((self.v[w.hook or ""] or 0) > 0)
     local solo = w.label == "S"
     self:col(g, on and (solo and "acc" or "on") or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 4)
     self:ctext(g, w.label, w, (w.h > 30) and 15 or 11, on and (solo and "#ffffff" or "bg") or "mute")
