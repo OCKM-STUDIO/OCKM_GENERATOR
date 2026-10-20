@@ -561,6 +561,15 @@ Audio is recorded as it plays, so you hear the export; the effects get 2.5 secon
 | 10 | soul | ii V I (held two bars) | 4 |
 | 11 | piano house | I V vi IV (written for a major key) | 4 |
 | 12 | anthem | vi IV I V (written for a major key) | 4 |
+| 13 | seven | i VII | 2 |
+| 14 | six | i VI | 2 |
+| 15 | five | i v | 2 |
+| 16 | two five | ii v | 2 |
+| 17 | lift | i VII VI VII | 4 |
+| 18 | seven four | i VII iv (iv held two bars) | 4 |
+| 19 | gospel | I vi ii V (written for a major key) | 4 |
+
+The stepper shows them by chord count (one, two, four, then soul); garage (5) and trip hop (9) are off it since v1.04 but still play in loops saved on them. **Second half** (`ockm-turn-to`): the turnaround bar goes to V (4) or climbs to VII (6), every `ockm-turn-every` bars.
 
 The presets live in `tools/build.py` (`PRE` and `PROGS`). The build writes their names and shapes into the touchscreen too, so they always match.
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.04 (19 October 2026)
+
+Step 8 of the harmony and generator proposal: more progressions, and how the phrase ends.
+
+- **Seven new progressions:** seven (i VII, the house and techno two-chord), six (i VI), five (i v), two five (ii v, the Rhodes loop that never resolves), lift (i VII VI VII), seven four (i VII iv; in mixolydian I bVII IV) and gospel (I vi ii V). With rate and the scales, that's a lot of ground
+- **The stepper reads by chord count:** one, two, four, then soul. Garage and trip hop are off the list (they were rates, not progressions: half-bar and two-bar changes do them now); loops saved on them still play
+- **Second half** (builder, where the turnaround switch was): the last bar of each phrase stays (**end: same**), turns to V (**turnaround**, as before) or climbs to VII (**climb**, the key's own 7th). Tap to step through. Styles set it: classic house and progressive sometimes climb, Italo piano and deep house sometimes turn round
+- Styles now roll the new two-chord moves: seven for Chicago, tech house and Detroit, six for deep house, five for peak time, two five for deep house and nu disco, lift and gospel for classic house and Italo piano
+
 ## v1.03 (19 October 2026)
 
 Step 7 of the harmony and generator proposal: the tab controls trimmed to the ones you hear.

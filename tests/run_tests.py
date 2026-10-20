@@ -1298,6 +1298,19 @@ def turnaround_goes_to_five_major(work):
     assert chords[:5] == [am, am, am, e, am], f"bars 1-5 should be Am Am Am E Am: {chords[:5]}"
 
 @test
+def second_half_climbs_to_seven(work):
+    """v1.04 second half, climb: turnaround every 4 bars to VII (ockm-turn-to 6). One chord in A minor: bars 1-3 Am, bar 4 G
+    (the key's own G, not raised), bar 5 Am again."""
+    h = Harness(); h.show("ockm-chord-notes-out")
+    h.at(100, "ockm-bpm 200 ; ockm-root 9 ; ockm-scale 0 ; ockm-length 16 ; ockm-chord-len 16 ; ockm-chord-prog 0 ; ockm-chord-rhythm 0 ; ockm-chord-type 0 ; ockm-turn-to 6 ; ockm-turn-every 4")
+    h.at(300, "ockm-play 1"); h.at(300 + int(5.2 * 16 * 75), "ockm-play 0")
+    f = os.path.join(work, "t_climb.pd"); h.finish(300 + int(5.4 * 16 * 75), f)
+    out = run(work, f)
+    chords = [sorted({int(float(n)) % 12 for n in v.split()[:4] if float(n) > 0}) for v in printed(out, "ockm-chord-notes-out")]
+    am, g = [0, 4, 9], [2, 7, 11]
+    assert chords[:5] == [am, am, am, g, am], f"bars 1-5 should be Am Am Am G Am: {chords[:5]}"
+
+@test
 def bass_turnaround_and_walk(work):
     """A following bass moves to V on the turnaround bar (one chord, A minor: A, then E on bar 4). With walk on, over
     i then iv (Am, Dm) the last offbeat of bar 1 steps a semitone below D (C#) instead of playing A."""
@@ -1677,7 +1690,7 @@ def song_styles_set_the_lot(work):
     seen = set()
     for sh in chunks:   # the tap, then four shuffles: every one a fresh take
         assert sh["ockm-style"] == 0 and sh["ockm-bpm"] == 122, "shuffle stays in deep house"
-        assert sh["ockm-drum-groove"] in (2, 16, 17, 21) and sh["ockm-root"] in (5, 2, 7, 0) and sh["ockm-chord-prog"] in (3, 1, 9, 6), sh
+        assert sh["ockm-drum-groove"] in (2, 16, 17, 21) and sh["ockm-root"] in (5, 2, 7, 0) and sh["ockm-chord-prog"] in (13, 1, 3, 15, 6), sh
         assert sh["ockm-bass-seed"] >= 1, "a shuffled riff is a variation"
         seen.add((sh["ockm-root"], sh["ockm-chord-prog"], sh["ockm-drum-groove"], sh["ockm-bass-seed"]))
     assert len(chunks) == 5, f"four shuffles: {len(chunks)}"

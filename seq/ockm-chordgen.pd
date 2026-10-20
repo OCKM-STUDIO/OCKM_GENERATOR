@@ -40,7 +40,7 @@
 #X obj 500 360 list split 1;
 #X obj 500 420 f 16;
 #X obj 620 390 array set \$0-p;
-#X obj 500 275 expr \$f1 + max(0\, min(2\, int(\$f2)))*12;
+#X obj 500 275 expr \$f1 + max(0\, min(2\, int(\$f2)))*19;
 #X obj 400 250 t b b b;
 #X obj 100 300 text get ockm-presets-chordrhythm;
 #X obj 100 330 list split 1;

@@ -438,9 +438,9 @@ gstep=p.add("#X obj 30 50 t f f;")
 def _semi(d): return f"({D}s4[((({d})%7)+7)%7] + 12*floor(({d})/7.0))"
 _IC=f"(int({D}f2) % max(ockm_chordlen\\,1))"; _IN=f"((int({D}f2) - int({D}f2)%16 + 16) % max(ockm_chordlen\\,1))"
 _C=f"int({D}s3[{_IC}])"; _N=f"int({D}s3[{_IN}])"
-_SH=f"({_semi('4')} - {_semi(_C)})"; _SH2=f"({_SH} - 12*({_SH}>6) + 12*({_SH}<-6))"
+_SH=f"({_semi('ockm_turn_deg')} - {_semi(_C)})"; _SH2=f"({_SH} - 12*({_SH}>6) + 12*({_SH}<-6))"
 _T=f"({D}f1 + {D}f7*{_SH2})"
-_R7=f"({_T} + ((((int({_T}) - int(ockm_root))%12)+12)%12==10))"
+_R7=f"({_T} + (ockm_turn_deg==4 && (((int({_T}) - int(ockm_root))%12)+12)%12==10))"
 _TP=f"(ockm_root + {_semi(_N)} - 1)"; _TG=f"({_TP} + 12*floor(({D}f1 - {_TP})/12.0 + 0.5))"
 xf=p.add(f"#X obj 30 330 expr if({D}f1<=0 \\, {D}f1 \\, if(ockm_turn_on && {D}f5>0 \\, {_R7} \\, if({D}f6>0 && {D}f5>0 && int({D}f2)%16>=14 && {_N}!={_C} \\, {_TG} \\, {D}f1)));")
 xlb=p.add("#X obj 1100 40 loadbang;"); xs3=p.add("#X obj 1100 70 symbol ockm-pat-chord-deg;"); xs4=p.add(f"#X obj 1260 70 symbol {D}0-sc;")
@@ -501,7 +501,7 @@ LFO_DEF={"lfo-shape":0,"lfo-rate":4,"lfo-depth":0,"lfo-target":1,"chorus":0}   #
 SYNTH_DEFAULTS={"bass":dict(engine=5,mode=0,sync=1,walk=0,riff=-1,slideamt=0,octave=0,sidechain=0,scshape=1,half=0,lock=0,density=1,seed=0,level=0.85,k1=0.42,k2=0.25,k3=0.45,k4=0.45,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
                 "lead":dict(engine=4,mode=0,sync=1,octave=0,sidechain=0,scshape=1,half=0,lock=0,density=1,seed=0,outside=0.35,level=0.7,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
                 "chord":dict(engine=0,mode=0,sidechain=0,scshape=1,half=0,level=0.65,rate=1,push=0,vary=0,drift=0,k1=0.45,k2=0.5,k3=0,k4=0.32,type=0,smooth=1,verb=0,delay=0,rhythm=0,prog=0,voicing=0,strum=0,**LFO_DEF)}
-PATTERN_KEYS=[("ockm-end",0,None),("ockm-impact",0,None),("ockm-pump",0,None),("ockm-bass-on",1,None),("ockm-lead-on",1,None),("ockm-chord-on",1,None),("ockm-rise",0,None),("ockm-drum-len",16,None),("ockm-bass-len",64,None),("ockm-lead-len",64,None),("ockm-chord-len",64,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None),("ockm-leader",0,None),("ockm-drum-groove",-1,None),("ockm-fill-every",0,None),("ockm-fill-style",0,None),("ockm-drums-on",1,None),("ockm-turn-every",0,None),("ockm-style",-1,None),
+PATTERN_KEYS=[("ockm-end",0,None),("ockm-impact",0,None),("ockm-pump",0,None),("ockm-bass-on",1,None),("ockm-lead-on",1,None),("ockm-chord-on",1,None),("ockm-rise",0,None),("ockm-drum-len",16,None),("ockm-bass-len",64,None),("ockm-lead-len",64,None),("ockm-chord-len",64,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None),("ockm-leader",0,None),("ockm-drum-groove",-1,None),("ockm-fill-every",0,None),("ockm-fill-style",0,None),("ockm-drums-on",1,None),("ockm-turn-every",0,None),("ockm-turn-to",4,None),("ockm-style",-1,None),
               ("ockm-evolve-every",0,None),("ockm-evolve-mode",1,None),("ockm-evolve-parts",15,None)]   # v1.00 evolve: phrase bars, 1 gentle 2 lively, which parts (1 drums 2 bass 4 lead 8 chords)
 for t,d in SYNTH_DEFAULTS.items():
     PATTERN_KEYS+=[(f"ockm-{t}-{k}",v,None) for k,v in d.items()]
@@ -1483,7 +1483,11 @@ PROGS=[("one-chord","i",[(0,1)]),("vamp","i iv",[(0,1),(3,1)]),("dub-techno","i 
        ("andalusian","i VII VI V",[(0,1),(6,1),(5,1),(4,1)]),("trip-hop","i VII VI v",[(0,2),(6,2),(5,2),(4,2)]),
        ("soul","ii V I",[(1,1),(4,1),(0,2)]),
        # v0.90, for Italian piano house (in a major key): the big four-chord turn, and the same starting on vi
-       ("piano-house","I V vi IV",[(0,1),(4,1),(5,1),(3,1)]),("anthem","vi IV I V",[(5,1),(3,1),(0,1),(4,1)])]
+       ("piano-house","I V vi IV",[(0,1),(4,1),(5,1),(3,1)]),("anthem","vi IV I V",[(5,1),(3,1),(0,1),(4,1)]),
+       # v1.04: the two-chord moves house and techno live on, and three four-chord ones (garage and trip hop leave the list:
+       # they were rates, not progressions; old loops on them still play)
+       ("seven","i VII",[(0,1),(6,1)]),("six","i VI",[(0,1),(5,1)]),("five","i v",[(0,1),(4,1)]),("two-five","ii v",[(1,1),(4,1)]),
+       ("lift","i VII VI VII",[(0,1),(6,1),(5,1),(6,1)]),("seven-four","i VII iv",[(0,1),(6,1),(3,2)]),("gospel","I vi ii V",[(0,1),(5,1),(1,1),(4,1)])]
 # drum grooves: one 16-step line per drum sound (x hit, X accent; v0.86: g a ghost note, about a third, o soft, about two thirds). Swing 0 = leave it as it is.
 # sounds: kick snare clap perc1 hat open-hat tom perc2. A groove lands on whichever slot plays that sound.
 GROOVES=[
@@ -2003,8 +2007,8 @@ for i,(srcs,sel) in enumerate([([lsc],"scale"),([rty,d0b],"type"),([rro,d9],"roo
     p.con(pp,0,tr,0); p.con(tr,0,cn,0)
 cmod=p.add("#X obj 30 65 mod 256;"); p.con(p.add(f"#X obj 100 40 r ockm-{D}1-len;"),0,cmod,1)
 ts=p.add("#X obj 30 80 t f f;"); rdeg0=p.add(f"#X obj 200 95 tabread ockm-pat-{D}1-deg;"); ron=p.add(f"#X obj 30 110 tabread ockm-pat-{D}1-on;")
-rdeg=p.add(f"#X obj 200 115 expr if(ockm_turn_on \\, 4 \\, {D}f1);"); p.con(rdeg0,0,rdeg,0)
-tdeg=p.add("#X obj 200 140 t f f;"); trn=p.add(f"#X obj 300 170 expr ockm_turn_on+0*{D}f1;")
+rdeg=p.add(f"#X obj 200 115 expr if(ockm_turn_on \\, ockm_turn_deg \\, {D}f1);"); p.con(rdeg0,0,rdeg,0)
+tdeg=p.add("#X obj 200 140 t f f;"); trn=p.add(f"#X obj 300 170 expr ockm_turn_on*(ockm_turn_deg==4)+0*{D}f1;")   # climb (VII) keeps the key's own 7th
 son=p.add("#X obj 30 140 sel 0;"); vx=p.add(f"#X obj 70 170 expr if({D}f1>1 \\, 1 \\, 0.75);")
 hp=p.add("#X obj 70 230 pack f f f f;"); hpp=p.add("#X obj 70 260 list prepend hit;"); hpt=p.add("#X obj 70 285 list trim;")
 sno=p.add(f"#X obj 200 700 s ockm-{D}1-notes-out;")
@@ -2108,6 +2112,9 @@ sfo=p.add("#X obj 600 385 s ockm-fill-now;")
 for c in [(rb,0,tbb,0),(tbb,1,fev,0),(fev,0,on,1),(tbb,0,cnt,0),(cnt,0,inc,0),(inc,0,cnt,1),(cnt,0,on,0),(on,0,von,0),(on,0,sfo,0)]: p.con(*c)
 # turnaround: on the last bar of every 4, 8 or 16 bars the harmony goes to V (major) and leads back to the start
 rtv=p.add("#X obj 820 140 r ockm-turn-every;"); ftv=p.add("#X obj 820 165 f 0;"); p.con(rtv,0,ftv,1)
+# v1.04 second half: where the turnaround bar goes, 4 (V, major) or 6 (VII, the climb)
+rtt=p.add("#X obj 1000 140 r ockm-turn-to;"); vtt=p.add("#X obj 1000 165 v ockm_turn_deg;"); p.con(rtt,0,vtt,0)
+ltt=p.add("#X obj 1100 115 loadbang;"); m4=p.add("#X msg 1100 140 4;"); p.con(ltt,0,m4,0); p.con(m4,0,vtt,0)
 tbt=p.add("#X obj 820 285 t f b;"); ton=p.add(f"#X obj 820 360 expr if({D}f2>0 \\, ({D}f1 % {D}f2) == {D}f2-1 \\, 0);"); vton=p.add("#X obj 820 385 v ockm_turn_on;")
 for c in [(cnt,0,tbt,0),(tbt,1,ftv,0),(ftv,0,ton,1),(tbt,0,ton,0),(ton,0,vton,0)]: p.con(*c)   # the setting first, then the bar
 # play starts the count again; stop ends any fill
