@@ -643,6 +643,33 @@ def bass_rhythm_siblings_on_the_last_bar(work):
     assert 31 not in b and [x for x in b if x >= 16] != [x for x in a if x >= 16], f"variation 2: sibling B, no pickup: {b}"
 
 @test
+def lead_answers_the_bass_and_rests(work):
+    """v1.06. Tune 19, answer the bass: the lead plays the bass's riff (fifth: A and E) only in the gaps of the bass (8ths on
+    the even steps, so the lead lands on odd steps). Rests at 1 skip some of the lead's notes, differently from bar to bar."""
+    def take(cmds):
+        h = Harness()
+        h.at(100, "ockm-resync bang ; ockm-root 9 ; ockm-scale 0 ; ockm-chord-prog 0 ; ockm-bass-len 32 ; ockm-lead-len 32 ; ockm-bass-riff 2 ; ockm-bass-rhythm 1 ; "
+                  "ockm-bass-seed 0 ; ockm-lead-seed 0 ; ockm-lead-outside 0 ; ockm-lead-rests 0 ; ockm-lead-rhythm 1 ; ockm-lead-notes 19")
+        h.at(150, cmds)
+        g = h.add("#X obj 10 300 r test-get;"); t = h.add("#X obj 10 330 t b b b;")
+        outs = []
+        for i, nm in enumerate(["bass-on", "lead-on", "lead-note"]):
+            a = h.add(f"#X obj {10 + i * 190} 360 array get ockm-pat-{nm} 0 32;"); l = h.add(f"#X obj {10 + i * 190} 390 list prepend {nm};")
+            tr = h.add(f"#X obj {10 + i * 190} 420 list trim;"); pr = h.add(f"#X obj {10 + i * 190} 450 print GOT;")
+            h.con(t, a, 2 - i); h.con(a, l); h.con(l, tr); h.con(tr, pr)
+        h.con(g, t); h.at(300, "test-get bang")
+        f = os.path.join(work, f"t_ans{abs(hash(cmds)) % 1000}.pd"); h.finish(400, f)
+        got = {v.split()[0]: [int(float(x)) for x in v.split()[1:]] for v in printed(run(work, f), "GOT")}
+        return got
+    g = take("ockm-lead-gen bang")
+    lead = [i for i, v in enumerate(g["lead-on"]) if v > 0]
+    assert lead and all(g["bass-on"][i] == 0 for i in lead), f"the lead only in the bass's gaps: lead {lead}, bass {[i for i, v in enumerate(g['bass-on']) if v]}"
+    assert {g["lead-note"][i] % 12 for i in lead} <= {9, 4}, f"the bass's riff (A, E): {[g['lead-note'][i] for i in lead]}"
+    r = take("ockm-lead-rests 1")
+    lead_r = [i for i, v in enumerate(r["lead-on"]) if v > 0]
+    assert len(lead_r) < len(lead), f"rests: fewer notes: {len(lead_r)} vs {len(lead)}"
+
+@test
 def chord_engines_sound(work):
     for eng, name, k3 in [(0, "poly", 0.0), (1, "organ", 0.2), (0, "poly-pad", 0.6)]:   # v0.98: poly's k3 is attack
         h = Harness(dut="ockm-chord zz")

@@ -499,7 +499,7 @@ for _t in [n for n,_ in SLOTS]+["bass","lead","chord"]:
     PROJECT_KEYS+=[(f"ockm-{_t}-{k}",v,None) for k,v in EQ_DEF.items()]
 LFO_DEF={"lfo-shape":0,"lfo-rate":4,"lfo-depth":0,"lfo-target":1,"chorus":0}   # sine, one bar, off, the first knob; chorus off
 SYNTH_DEFAULTS={"bass":dict(engine=5,mode=0,sync=1,walk=0,riff=-1,slideamt=0,octave=0,sidechain=0,scshape=1,half=0,lock=0,density=1,seed=0,level=0.85,k1=0.42,k2=0.25,k3=0.45,k4=0.45,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
-                "lead":dict(engine=4,mode=0,sync=1,octave=0,sidechain=0,scshape=1,half=0,lock=0,density=1,seed=0,outside=0.35,level=0.7,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
+                "lead":dict(engine=4,mode=0,sync=1,octave=0,repeat=0,rests=0,sidechain=0,scshape=1,half=0,lock=0,density=1,seed=0,outside=0.35,level=0.7,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
                 "chord":dict(engine=0,mode=0,sidechain=0,scshape=1,half=0,level=0.65,rate=1,push=0,vary=0,drift=0,k1=0.45,k2=0.5,k3=0,k4=0.32,type=0,smooth=1,verb=0,delay=0,rhythm=0,prog=0,voicing=0,strum=0,**LFO_DEF)}
 PATTERN_KEYS=[("ockm-end",0,None),("ockm-impact",0,None),("ockm-pump",0,None),("ockm-bass-on",1,None),("ockm-lead-on",1,None),("ockm-chord-on",1,None),("ockm-rise",0,None),("ockm-drum-len",16,None),("ockm-bass-len",64,None),("ockm-lead-len",64,None),("ockm-chord-len",64,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None),("ockm-leader",0,None),("ockm-drum-groove",-1,None),("ockm-fill-every",0,None),("ockm-fill-style",0,None),("ockm-drums-on",1,None),("ockm-turn-every",0,None),("ockm-turn-to",4,None),("ockm-style",-1,None),
               ("ockm-evolve-every",0,None),("ockm-evolve-mode",1,None),("ockm-evolve-parts",15,None)]   # v1.00 evolve: phrase bars, 1 gentle 2 lively, which parts (1 drums 2 bass 4 lead 8 chords)
@@ -1386,15 +1386,17 @@ def _cadence(beats, target, rnd):
     """keep the start of the idea, then step home to target (0 the root: an answer; 4 the fifth: a question)"""
     mid=_ct_move(target, rnd.choice([1,-1]))
     return [beats[0], mid, target, target]   # home by beat 3 and stay there, so a phrase that ends early still lands
-def _melody4(seed, kind, lift):
+def _melody4(seed, kind, lift, loose=False):
+    """v1.06 repeat: tight, bar 3 is bar 1 with its last beat moved (a hook); loose, bar 3 changes (a solo)"""
     rnd=_random.Random(seed)
     A=_motif_beats(rnd)
+    B=[_ct_move(x,1) for x in A] if rnd.random()<0.5 else [_ct_move(A[0],0)]+[_ct_move(A[0], -( _CT.index(_ct_move(x,0)) - _CT.index(_ct_move(A[0],0)) )) for x in A[1:]]
+    T=A[:]; T[3]=_ct_move(T[3], 1)
     if kind=="motif":                 # sing-along: say it, say it again, change it, come home
-        B=[_ct_move(x,1) for x in A] if rnd.random()<0.5 else [_ct_move(A[0],0)]+[_ct_move(A[0], -( _CT.index(_ct_move(x,0)) - _CT.index(_ct_move(A[0],0)) )) for x in A[1:]]
-        bars=[A, A, B, _cadence(A, 0, rnd)]
+        bars=[A, A, B if loose else T, _cadence(A, 0, rnd)]
     else:                             # question and answer: up in the air on the fifth, then home to the root
         A2=A[:]; A2[3]=_ct_move(A2[3], rnd.choice([1,-1]))
-        bars=[A, _cadence(A2, 4, rnd), A, _cadence(A, 0, rnd)]
+        bars=[A, _cadence(A2, 4, rnd), B if loose else A, _cadence(A, 0, rnd)]
     out, made = [], {}
     for b in bars:                    # the same idea comes back note for note
         if tuple(b) not in made: made[tuple(b)] = _bar(b, rnd)
@@ -1440,13 +1442,16 @@ def _rhy4(*bars):
     assert len(bars)==4 and all(len(b)==16 for b in bars)
     return " ".join(str({".":0,"x":1,"X":2,"s":3,"S":4}[c]) for b in bars for c in b)
 PRE={"leadrhythm":[("offbeat",_sib("0 0 2 0 0 0 1 0 0 0 2 0 0 0 1 0")),("rolling",_sib("0 2 1 1 0 2 1 1 0 2 1 1 0 2 1 1")),("gallop","0 0 2 1 0 1 2 0 0 0 2 1 0 1 2 0"),
-               ("acid-classic",_sib("2 1 0 1 3 4 1 0 2 1 3 1 0 2 1 3")),("sparse-dub","2 0 0 0 0 0 0 1 0 0 1 0 0 0 0 0"),("tech-bounce","0 0 2 0 0 1 0 0 0 0 2 0 0 1 0 1"),
+               ("acid",_sib("2 1 0 1 3 4 1 0 2 1 3 1 0 2 1 3")),("sparse-dub","2 0 0 0 0 0 0 1 0 0 1 0 0 0 0 0"),("tech-bounce","0 0 2 0 0 1 0 0 0 0 2 0 0 1 0 1"),
                ("acid-16ths","2 1 3 1 2 1 1 3 2 1 3 1 2 3 1 1"),("trip-hop","2 0 0 0 0 0 3 1 0 0 0 0 0 0 1 0"),("hook",_sib("2 0 0 1 0 0 1 0 0 0 1 0 1 0 0 0")),("sparse-melody",_sib("2 0 0 0 0 0 1 0 0 3 0 0 1 0 0 0")),
                # four bars long (v0.52): phrases that breathe
                ("phrase",_rhy4("X.x.x.x.X...x.x.","X.x.x.x.X...x...","X.x.x.x.X.x.x.x.","X...x...X.......")),
                ("question-answer",_rhy4("X.x.x..xX.x.....","x.......X.......","X.x.x..xX.x.....","x...x...X.......")),
                ("pickup",_rhy4("X.....x.....x.x.","X.......x...x.x.","X.....x.....x.x.","X...x...X.......")),
-               ("arp-gate",_rhy4("XxxxXxx.XxxxXxx.","XxxxXxx.XxxxXxx.","XxxxXxxxXxxxXxxx","Xxx.Xxx.X.x.X..."))],
+               ("arp-gate",_rhy4("XxxxXxx.XxxxXxx.","XxxxXxx.XxxxXxx.","XxxxXxxxXxxxXxxx","Xxx.Xxx.X.x.X...")),
+               # v1.06: long, the Detroit string line; stab, the rave riff (peak time, hard techno)
+               ("long",_rhy4("X.......X.......","X.......X.......","X.......X.......","X...............")),
+               ("stab",_rhy4("X..X..X.........","X..X..X.........","X..X..X.X.X.....","................"))],
      # the bass has its own list: the classic dance bass rhythms first, then the older ones
      # v1.05: eleven bass rhythms named by feel, each one-bar rhythm with two siblings (other last bars of the phrase,
      # picked by mutate and evolve). Retired ones (7 8 10 11 13 15 16 17) stay, hidden on the screen, so saved loops play on
@@ -1474,7 +1479,10 @@ PRE={"leadrhythm":[("offbeat",_sib("0 0 2 0 0 0 1 0 0 0 2 0 0 0 1 0")),("rolling
               ("dub","0 0 -3 -2"),("pedal","0 0 0 1"),("arp-up","0 2 4 7"),("arp-updown","0 2 4 7 4 2"),("call","4 4 2 0 2 4 5 4"),("descend","7 6 4 2"),
               ("melody",_tune(1,False,0)),("melody-steps",_tune(2,True,0)),("melody-high",_tune(3,False,7)),
               ("motif",_bank(lambda k:_melody4(100+k,"motif",0))),("motif-call",_bank(lambda k:_melody4(200+k,"call",0))),
-              ("motif-high",_bank(lambda k:_melody4(300+k,"motif",7))),("arp-evolve",_bank(lambda k:_arp4(400+k)))],
+              ("motif-high",_bank(lambda k:_melody4(300+k,"motif",7))),("arp-evolve",_bank(lambda k:_arp4(400+k))),
+              # v1.06: 19 answer the bass (the generator plays the bass's riff in the gaps of the bass); 20 and 21 are motif and
+              # question loose (repeat), picked by the generator, not on the screen
+              ("answer-the-bass","0"),("motif-loose",_bank(lambda k:_melody4(100+k,"motif",0,True))),("call-loose",_bank(lambda k:_melody4(200+k,"call",0,True)))],
      "scale":[("minor","0 2 3 5 7 8 10"),("major","0 2 4 5 7 9 11"),("dorian","0 2 3 5 7 9 10"),("phrygian","0 1 3 5 7 8 10"),
               ("mixolydian","0 2 4 5 7 9 10"),("harmonic-minor","0 2 3 5 7 8 11")],
      # chord rhythms (v1.01: named by feel; 6 and 7, syncopated and garage skip, are retired and stay as placeholders so saved
@@ -1851,9 +1859,15 @@ ll=p.add("#X obj 420 470 list length;"); an=p.add(f"#X obj 360 500 array set {D}
 # v1.02 riff (ockm-<track>-riff, the bass): one of the bass's own riffs; -1 (an older loop) uses the notes setting as before
 rrf=p.add(f"#X obj 1850 170 r ockm-{D}1-riff;"); trf=p.add("#X obj 1850 195 t b f;"); frf=p.add("#X obj 1850 290 f -1;")
 tnr=p.add("#X obj 300 350 t b b;"); mrf=p.add("#X obj 1850 320 moses 0;"); tbn=p.add("#X obj 1900 350 text get ockm-presets-bassnotes;")
+# v1.06 the lead: repeat (ockm-<track>-repeat 1 loose) swaps motif and question for their loose versions; tune 19 answers
+# the bass, playing the bass's own riff (two octaves up, where the lead lives)
+rrp=p.add(f"#X obj 2000 170 r ockm-{D}1-repeat;"); trp=p.add("#X obj 2000 195 t b f;")
+nmap=p.add(f"#X obj 300 375 expr if({D}f2>0 && int({D}f1)==15 \\, 20 \\, if({D}f2>0 && int({D}f1)==16 \\, 21 \\, {D}f1));")
+s19=p.add("#X obj 300 395 sel 19;"); rbr=p.add("#X obj 2150 170 r ockm-bass-riff;"); fbr=p.add("#X obj 2150 300 f 0;"); mx0=p.add("#X obj 2150 325 max 0;")
+for c in [(rrp,0,trp,0),(trp,1,nmap,1),(trp,0,exg,0),(rbr,0,fbr,1),(s19,0,fbr,0),(fbr,0,mx0,0),(mx0,0,tbn,0)]: p.con(*c)
 nrf=p.add("#X obj 1850 350 < 0;"); spn=p.add("#X obj 360 360 spigot 1;")
 for c in [(rrf,0,trf,0),(trf,1,frf,1),(trf,0,exg,0),(regen,3,tnr,0),(tnr,1,frf,0),(frf,0,nrf,0),(nrf,0,spn,1),(frf,0,mrf,0),(mrf,1,tbn,0),(tbn,0,ln,0),
-          (tnr,0,store[1],0),(store[1],0,spn,0),(spn,0,tn,0),(tn,0,ln,0),(ln,1,tl,0),(tl,1,ll,0),(tl,0,an,0)]: p.con(*c)
+          (tnr,0,store[1],0),(store[1],0,spn,0),(spn,0,nmap,0),(nmap,0,s19,0),(s19,1,tn,0),(tn,0,ln,0),(ln,1,tl,0),(tl,1,ll,0),(tl,0,an,0)]: p.con(*c)
 tr=p.add(f"#X obj 170 380 text get ockm-presets-{D}1rhythm;"); lr=p.add("#X obj 170 410 list split 1;"); ar=p.add(f"#X obj 170 440 array set {D}0-r;")
 trl=p.add("#X obj 230 425 t l l;"); rll=p.add("#X obj 270 455 list length;")
 p.con(regen,2,store[0],0); p.con(store[0],0,tr,0); p.con(tr,0,lr,0); p.con(lr,1,trl,0); p.con(trl,1,rll,0); p.con(trl,0,ar,0)
@@ -1876,6 +1890,9 @@ for j,nm in enumerate(["note","on","acc","slide"]):
 m16=p.add(f"#X obj 20 700 expr if(int({D}f2)==48 \\, if({D}f4>0 && int({D}f1)>=int({D}f3)-16 \\, 16*(1+((int({D}f4)-1)%2)) + int({D}f1)%16 \\, int({D}f1)%16) \\, int({D}f1) % int(max({D}f2\\,1)));")
 rd=p.add(f"#X obj 20 720 tabread {D}0-r;")
 kick=p.add("#X obj 1000 700 tabread ockm-pat-d1;")
+tkb=p.add("#X obj 1000 680 t f f;"); bon=p.add("#X obj 1100 700 tabread ockm-pat-bass-on;")
+ans=p.add(f"#X obj 1000 725 expr if({D}f3>0 \\, {D}f2 \\, {D}f1);"); a19=p.add("#X obj 1200 650 == 19;")
+lov=p.add(f"#X obj 1100 760 expr if({D}f2>0 \\, 2 \\, {D}f1);"); lkf=p.add("#X obj 1150 735 f 0;"); ta19=p.add("#X obj 1200 675 t b f;")
 lockx=p.add(f"#X obj 160 720 expr if({D}f3==1 \\, if({D}f2>0 \\, if({D}f1==2 || {D}f1==4 || {D}f2>=2 \\, 2 \\, 1) \\, 0) \\, if({D}f3==2 \\, if({D}f2>0 \\, 0 \\, {D}f1) \\, {D}f1));")
 H=f"(abs(sin({D}f4*12.9898+{D}f3*78.233+1.7)*43758.5453)-floor(abs(sin({D}f4*12.9898+{D}f3*78.233+1.7)*43758.5453)))"
 dens0=p.add(f"#X obj 160 735 expr if({D}f1>0 && {D}f1<5 && {D}f2<1 && {D}f1!=2 && {D}f1!=4 && {H}>{D}f2 \\, 0 \\, if({D}f1==0 && {D}f2>1 && {H}<({D}f2-1)*0.5 \\, 1 \\, {D}f1));")
@@ -1888,16 +1905,21 @@ p.con(dens0,0,dens,0)
 cx=p.add(f"#X obj 20 745 expr {D}f1>0 \\; {D}f1==2 || {D}f1==4 \\; {D}f1>=3 && {D}f1!=6 \\; {D}f1>0 && {D}f1<5 \\; {D}f1>=5;")
 # v1.02 slide amount (ockm-<track>-slideamt 0-1): on top of the rhythm's own slides, about this share of the notes slide into
 # the next (decided by the step and the mutate seed, so it repeats)
+rst=p.add(f"#X obj 160 775 expr if({D}f1>0 && {D}f1<5 && {D}f3>0 && (abs(sin({D}f2*1.731+{D}f4*5.21+floor({D}f2/16)*3.3+0.37)*6151.7)-floor(abs(sin({D}f2*1.731+{D}f4*5.21+floor({D}f2/16)*3.3+0.37)*6151.7)))<{D}f3*0.5 \\, 0 \\, {D}f1);")
+rre=p.add(f"#X obj 1700 230 r ockm-{D}1-rests;"); tre=p.add("#X obj 1700 255 t b f;")
+for c in [(rre,0,tre,0),(tre,1,rst,2),(tre,0,exg,0)]: p.con(*c)
 slx=p.add(f"#X obj 250 760 expr ({D}f1>=3 && {D}f1!=6) || ({D}f1>0 && {D}f4>0 && (abs(sin({D}f2*3.917+{D}f3*11.3+2.9)*7919.3)-floor(abs(sin({D}f2*3.917+{D}f3*11.3+2.9)*7919.3)))<{D}f4*0.7);")
 rsa=p.add(f"#X obj 1550 230 r ockm-{D}1-slideamt;"); tsa=p.add("#X obj 1550 255 t b f;")
 for c in [(rsa,0,tsa,0),(tsa,1,slx,3),(tsa,0,exg,0)]: p.con(*c)
 p.con(rll,0,m16,1)   # a four-bar rhythm repeats every 64 steps; 48 is a bar and its two siblings (v1.05)
 p.con(rlg,0,m16,2); p.con(var["seed"],1,m16,3)
-for c in [(ti,0,m16,0),(m16,0,rd,0),(rd,0,lockx,0),(lockx,0,dens0,0),(dens,0,cx,0),(dens,0,slx,0),(ti,1,slx,1),(var["seed"],1,slx,2),(slx,0,tws["slide"],0),(cx,1,tws["acc"],0),
-          (ti,1,kick,0),(kick,0,lockx,1),(var["lock"],1,lockx,2),(var["density"],1,dens0,1),(one_d,0,dens0,1),(var["seed"],1,dens0,2),(ti,1,dens0,3),
+for c in [(ti,0,m16,0),(m16,0,rd,0),(rd,0,lockx,0),(lockx,0,dens0,0),(dens,0,rst,0),(rst,0,cx,0),(rst,0,slx,0),(ti,1,rst,1),(var["seed"],1,rst,3),(ti,1,slx,1),(var["seed"],1,slx,2),(slx,0,tws["slide"],0),(cx,1,tws["acc"],0),
+          (ti,1,tkb,0),(tkb,1,bon,0),(tkb,0,kick,0),(bon,0,ans,1),(kick,0,ans,0),(ans,0,lockx,1),
+          (store[1],0,a19,0),(a19,0,ta19,0),(ta19,1,ans,2),(ta19,1,lov,1),(ta19,0,lkf,0),(var["lock"],1,lkf,1),(var["lock"],1,lov,0),(lkf,0,lov,0),(lov,0,lockx,2),(var["density"],1,dens0,1),(one_d,0,dens0,1),(var["seed"],1,dens0,2),(ti,1,dens0,3),
           (ti,1,dens,1),(var["seed"],1,dens,2),(rlg,0,dens,3)]: p.con(*c)
 to=p.add("#X obj 20 780 t f f;"); s1=p.add("#X obj 20 810 sel 1;"); th=p.add("#X obj 400 790 t f f;")
-ix=p.add(f"#X obj 400 820 expr if(int({D}f2)==512 \\, (int({D}f3)%8)*64 + int({D}f4)%64 \\, int({D}f1+{D}f3) % int({D}f2));"); rn=p.add(f"#X obj 400 845 tabread {D}0-n;"); td=p.add("#X obj 400 870 t f f;")
+# v1.06 phrase-aware: a four-bar tune over a longer part plays A then A' (the next of its eight versions), not A A
+ix=p.add(f"#X obj 400 820 expr if(int({D}f2)==512 \\, ((int({D}f3)+int({D}f4/64))%8)*64 + int({D}f4)%64 \\, int({D}f1+{D}f3) % int({D}f2));"); rn=p.add(f"#X obj 400 845 tabread {D}0-n;"); td=p.add("#X obj 400 870 t f f;")
 sx=p.add(f"#X obj 560 870 expr ((int({D}f1)%7)+7)%7;"); rs=p.add(f"#X obj 560 895 tabread {D}0-s;")
 addc=p.add("#X obj 400 857 + 0;")
 ojump=p.add(f"#X obj 400 850 expr {D}f1 + 7*({D}f4!=512 && {D}f2>0 && (abs(sin({D}f3*7.13+{D}f2*3.7+0.3)*9137.21)-floor(abs(sin({D}f3*7.13+{D}f2*3.7+0.3)*9137.21)))<0.2);")

@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.06 (19 October 2026)
+
+Step 10 of the harmony and generator proposal: the lead.
+
+- **Eleven lead rhythms:** phrase, question answer, pickup, arp gate, hook, sparse melody, offbeat, rolling, acid, and two new four-bar ones: **long** (the Detroit string line) and **stab** (the rave riff: peak time and hard techno now use it). Gallop, tech bounce, sparse dub, trip hop and acid 16ths are off the list
+- **Eight tunes:** one note, octaves, arp up, arp up-down, arp evolve, motif, question (was motif call) and the new **answer the bass**: the bass's riff, two octaves up, played only in the gaps of the bass rhythm. Call and response between the two parts. The melodies, motif high and the bass-shaped fragments are off the list
+- **Register** (low, mid, high): where the tune lives, for every tune (replaces motif high)
+- **Repeat** (tight, loose): how much bar 3 changes from bar 1 in the motifs. Tight is a hook (bar 3 is bar 1 with its last beat moved), loose a solo
+- **Rests** (0 to 1): a share of the notes rest, different in every bar. Density thins the rhythm the same way every bar
+- **A then A':** a four-bar tune over a longer lead plays its next version in the second half, not the same four bars again
+- New projects start the lead on motif and phrase; the setting for it in Settings is gone (styles set the lead)
+- Detroit's lead plays long with arp evolve on the dx
+
 ## v1.05 (19 October 2026)
 
 Step 9 of the harmony and generator proposal: rhythms with siblings, and the bass rhythm list cut to house and techno.

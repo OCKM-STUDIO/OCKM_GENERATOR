@@ -535,6 +535,8 @@ Audio is recorded as it plays, so you hear the export; the effects get 2.5 secon
 
 **Chord rhythms**, simplest first: 1 bar pads, 2 two beat, 3 offbeat, 4 dub stabs, 5 house organ, 6 tresillo (3-3-2), 7 syncopated, 8 garage skip (2 bars), 9 call and answer (2 bars), 10 eighths
 
+**The lead** (v1.06): rhythms phrase, question answer, pickup, arp gate, hook, sparse melody, offbeat, rolling, acid, long, stab; tunes one note, octaves, arp up, arp up-down, arp evolve, motif, question, answer the bass (tune 19: the bass's riff in the gaps of the bass). **Register** (`ockm-lead-octave` -1, 0, 1), **repeat** (`ockm-lead-repeat` 0 tight, 1 loose) and **rests** (`ockm-lead-rests` 0-1). A four-bar tune over a longer lead plays A then A'.
+
 **Rhythm siblings** (v1.05): one-bar bass rhythms and the one-bar lead rhythms are written as three bars: the rhythm and two siblings (other last bars). The original plays the first bar throughout; a variation (seed above 0) plays the last bar of the part as sibling A (odd seeds) or B (even). Bass rhythms on the stepper: offbeat, 8ths, 16ths, dotted, octave, held, on the beat, cluster, bounce, acid, house pickup.
 
 **Synth tab controls** (v1.03): four knobs, drive (bass and lead), reverb and delay sends, chorus on/off, movement (a sine on the first knob, every bar, 2 or 4 bars, with depth), sidechain and half-time. Level is on the mixer only. Half-time for all three synths is also on the builder's phrase row.
