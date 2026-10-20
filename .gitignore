@@ -18,3 +18,4 @@ sketches/
 projects/*
 !projects/default/
 !projects/current.txt
+stash/
