@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.20 (20 October 2026)
+
+- **Two-handed chords** on the piano, organ and Rhodes: the left hand plays the chord's root between G2 and F#3 (an octave over the bass), in one of five patterns: **anchor** (root and octave when the chord changes, and each bar), **pulse** (every beat), **synco** (1, the and of 2, 4), **broken** (root on the beats, fifth and octave on the ands) and **answer** (the beats the right hand leaves empty)
+- With the left hand playing, the right hand moves up out of its way: nothing below G3, and four-note chords drop their root
+- On the chord tab: **two hands** and the left hand's pattern, next to strum. Voicing is now one button (close, open, wide)
+- Deep house (Rhodes), classic house, filter house and Italo piano play with two hands, their chords' low cut at 90 Hz instead of 150 so the left hand comes through
+- MIDI export writes the left hand on the chords track
+- The left hand is a second, two-voice copy of the engine (voices/ockm-chord-<engine>-lh.pd), switched off unless two hands is on
+
 ## v1.19 (20 October 2026)
 
 - **8 bar lift** (macro slot A, in build's place): the 4 bar lift over twice as long, its high-pass going further (0.45), most of it in the last two bars: half way over the first six, the rest as it lands

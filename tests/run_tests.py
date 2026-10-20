@@ -919,7 +919,7 @@ def touchscreen_screens_draw(work):
         raise Skip("Pillow not installed")
     p = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_preview.py"), os.path.join(work, "preview")], capture_output=True, text=True)
     assert p.returncode == 0, p.stderr[-800:]
-    assert len(os.listdir(os.path.join(work, "preview"))) == 33, "expected thirty-three screen pictures"
+    assert len(os.listdir(os.path.join(work, "preview"))) == 34, "expected thirty-four screen pictures"
 
 @test
 def mute_solo_and_levels(work):
@@ -1853,6 +1853,33 @@ def rewind_and_beat_repeat(work):
     sim = lambda a, b: float(np.corrcoef(x[int(a * sr):int(b * sr)], x[int(a * sr) - L:int(b * sr) - L])[0, 1])
     assert sim(2.3, 2.9) > 0.8, f"held, each eighth should repeat the one before: {sim(2.3, 2.9):.2f}"
     assert sim(1.0, 1.6) < 0.7, f"before it, the drums don't repeat every eighth: {sim(1.0, 1.6):.2f}"
+
+@test
+def two_handed_chords(work):
+    """v1.20: with two hands on the piano, a left hand plays the root low down (G2 to F#3), so the 80-200 Hz band fills;
+    on one hand, or on the poly (which has no left hand), it stays empty."""
+    try:
+        import numpy as np
+    except ImportError:
+        raise Skip("numpy not installed")
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    def low(name, eng, hands):
+        h = Harness(); h.record(os.path.join(work, name + ".wav"))
+        h.at(100, f"ockm-bpm 124 ; ockm-drums-on 0 ; ockm-bass-on 0 ; ockm-lead-on 0 ; ockm-chord-on 1 ; ockm-chord-prog 10 ; ockm-chord-rhythm 2 ; "
+                  f"ockm-chord-lowcut 90 ; ockm-chord-delay 0 ; ockm-chord-engine {eng} ; ockm-chord-hands {hands} ; ockm-play 1")
+        h.at(4000, "ockm-play 0"); f = os.path.join(work, name + ".pd"); h.finish(4100, f)
+        subprocess.run([PD, "-nogui", "-nosound", "-nomidi", "-batch", "-path", PDLUA, "-lib", "pdlua", "-open", "OCKM_GENERATOR.pd", "-open", f],
+                       cwd=work, capture_output=True, text=True, timeout=300)
+        wv = wave.open(os.path.join(work, name + ".wav")); sr = wv.getframerate()
+        x = np.frombuffer(wv.readframes(wv.getnframes()), np.int16).astype(float)[::wv.getnchannels()] / 32768
+        x = x[int(0.3 * sr):]
+        X = np.abs(np.fft.rfft(x)) ** 2; fr = np.fft.rfftfreq(len(x), 1 / sr)
+        return float(X[(fr > 80) & (fr < 200)].sum() / max(1e-12, X[fr > 20].sum()))
+    one, two, poly = low("h_one", 3, 0), low("h_two", 3, 2), low("h_poly", 0, 2)
+    assert two > 0.03, f"two hands: the left hand should fill 80-200 Hz ({two:.3f})"
+    assert one < two / 4, f"one hand: no left hand ({one:.3f} against {two:.3f})"
+    assert poly < two / 4, f"the poly has no left hand ({poly:.3f})"
 
 @test
 def eight_bar_lift_pushes_late(work):

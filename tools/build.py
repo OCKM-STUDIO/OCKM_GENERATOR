@@ -512,7 +512,7 @@ for _t in [n for n,_ in SLOTS]+["bass","lead","chord"]:
 LFO_DEF={"lfo-shape":0,"lfo-rate":4,"lfo-depth":0,"lfo-target":1,"chorus":0}   # sine, one bar, off, the first knob; chorus off
 SYNTH_DEFAULTS={"bass":dict(engine=5,mode=0,sync=1,walk=0,riff=-1,slideamt=0,octave=0,sidechain=0,scshape=1,half=0,lock=0,density=1,seed=0,level=0.85,k1=0.42,k2=0.25,k3=0.45,k4=0.45,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
                 "lead":dict(engine=4,mode=0,sync=1,octave=0,repeat=0,rests=0,sidechain=0,scshape=1,half=0,lock=0,density=1,seed=0,outside=0.35,level=0.7,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
-                "chord":dict(engine=0,mode=0,sidechain=0,scshape=1,half=0,level=0.65,rate=1,push=0,vary=0,drift=0,k1=0.45,k2=0.5,k3=0,k4=0.32,type=0,smooth=1,verb=0,delay=0,rhythm=0,prog=0,voicing=0,strum=0,**LFO_DEF)}
+                "chord":dict(engine=0,mode=0,sidechain=0,scshape=1,half=0,level=0.65,rate=1,push=0,vary=0,drift=0,k1=0.45,k2=0.5,k3=0,k4=0.32,type=0,smooth=1,verb=0,delay=0,rhythm=0,prog=0,voicing=0,strum=0,hands=0,**LFO_DEF)}   # v1.20 hands: 0 one, 1-5 the left hand's pattern
 PATTERN_KEYS=[("ockm-end",0,None),("ockm-impact",0,None),("ockm-pump",0,None),("ockm-bass-on",1,None),("ockm-lead-on",1,None),("ockm-chord-on",1,None),("ockm-rise",0,None),("ockm-drum-len",16,None),("ockm-bass-len",64,None),("ockm-lead-len",64,None),("ockm-chord-len",64,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None),("ockm-leader",0,None),("ockm-drum-groove",-1,None),("ockm-fill-every",0,None),("ockm-fill-style",0,None),("ockm-drums-on",1,None),("ockm-turn-every",0,None),("ockm-turn-to",4,None),("ockm-style",-1,None),
               ("ockm-evolve-every",0,None),("ockm-evolve-mode",1,None),("ockm-evolve-parts",15,None)]   # v1.00 evolve: phrase bars, 1 gentle 2 lively, which parts (1 drums 2 bass 4 lead 8 chords)
 for t,d in SYNTH_DEFAULTS.items():
@@ -766,10 +766,14 @@ for r,(nm,seqo,voi) in enumerate(SYN):
     ds=p.add(f"#X obj 990 {y} *~ 0;"); dt_=p.add(f"#X obj 1060 {y} throw~ ockm-dlybus;"); dr_=p.add(f"#X obj 990 {y-18} r ockm-{nm}-delay;")
     p.con(gt,0,ds,0); p.con(ds,0,dt_,0); p.con(dr_,0,ds,1)
     synth_voice[nm]=vo
+    if nm=="chord":   # v1.20: the left hand, through the same chorus, gate and EQ
+        vlh=p.add(f"#X obj 560 {y+34} ockm-chord-lh chord;")
+        for c in [(sq,1,vlh,0),(vlh,0,cho,0),(ofn,0,vlh,0)]: p.con(*c)
+        synth_voice["chord-lh"]=vlh
 s0b=p.add("#X obj 400 80 sel 0;"); offm=p.add("#X msg 400 105 off;")
 p.con(ttg,1,s0b,0); p.con(s0b,0,offm,0)
 p.con(s0b,0,p.add("#X msg 460 105 \\; ockm-rise-now 0;"),0)
-for nm in ("bass","lead","chord"): p.con(offm,0,synth_voice[nm],0); p.con(gof,0,synth_voice[nm],0)
+for nm in ("bass","lead","chord","chord-lh"): p.con(offm,0,synth_voice[nm],0); p.con(gof,0,synth_voice[nm],0)
 # generators and shared presets
 gy=by+3*40+20
 p.add(f"#X obj 110 {gy} ockm-presets;")
@@ -1836,18 +1840,86 @@ local function chord_voicing(deg, ctype, sc, root, smooth, voicing, turn, lift)
   end
   return n, ty
 end
+-- v1.20 two hands (piano, organ, Rhodes). The left hand on step i: pat 1 anchor (root and octave when the chord changes,
+-- and each bar), 2 pulse (on every beat), 3 syncopated (1, the and of 2, 4), 4 broken (root on the beats, fifth and
+-- octave on the ands), 5 answer (on the beats the right hand leaves empty). on: the right hand's hit here (0 none),
+-- changed: the chord changed here. Returns a shape ("both" root and octave, "root", "fifth", "oct") and a strength, or nil
+local function left_hand(pat, i, on, changed)
+  local b = i % 16
+  local top = (b == 0) and 0.9 or 0.75
+  if pat == 1 then
+    if changed or b == 0 then return "both", 0.9 end
+  elseif pat == 2 then
+    if i % 4 == 0 then return "both", top end
+    if changed then return "both", 0.8 end
+  elseif pat == 3 then
+    if b == 0 or b == 6 or b == 12 then return "both", top end
+    if changed then return "both", 0.8 end
+  elseif pat == 4 then
+    if i % 4 == 0 then return "root", top end
+    if changed then return "root", 0.8 end
+    if i % 8 == 2 then return "fifth", 0.6 end
+    if i % 8 == 6 then return "oct", 0.6 end
+  elseif pat == 5 then
+    if (i % 4 == 0 or changed) and on == 0 then return "both", top end
+  end
+  return nil
+end
+-- the left hand's notes: the chord's root between G2 and F#3 (an octave over the bass), with its octave or fifth
+local LH_LOW = 43
+local function left_notes(shape, deg, sc, root)
+  local d = math.floor(deg)
+  local pc = (root + sc[d % 7 + 1]) % 12
+  local low = LH_LOW + (pc - LH_LOW) % 12
+  if shape == "root" then return { low } end
+  if shape == "oct" then return { low + 12 } end
+  if shape == "fifth" then return { low + (sc[(d + 4) % 7 + 1] - sc[d % 7 + 1]) % 12 } end
+  return { low, low + 12 }
+end
+-- the right hand with the left playing: four-note chords drop their root (the left hand has it), and nothing sits
+-- below G3, so the hands don't crowd each other
+local function right_hand(n, deg, sc, root)
+  local pc = (root + sc[math.floor(deg) % 7 + 1]) % 12
+  local o = {}
+  if #n >= 4 then for _, x in ipairs(n) do if x % 12 ~= pc then o[#o + 1] = x end end end
+  if #o < 3 then o = {}; for _, x in ipairs(n) do o[#o + 1] = x end end
+  local seen, r = {}, {}
+  for _, x in ipairs(o) do
+    while x < 55 do x = x + 12 end
+    if not seen[x] then seen[x] = true; r[#r + 1] = x end
+  end
+  table.sort(r)
+  return r
+end
+local TWO_HANDS = { [1] = true, [3] = true, [4] = true }   -- the chord engines that play with two hands: organ, piano, Rhodes
 """
 os.makedirs(os.path.join(R,"seq"),exist_ok=True)
 open(os.path.join(R,"seq","ockm-chordnotes.pd_lua"),"w").write("""-- The chord sequencer's notes: a chord type, key, scale and voicing turned into up to four MIDI notes.
 -- Written by tools/build.py: change it there. In: scale <7 semitones>, type <n>, root <0-11>, smooth <0/1>,
--- voicing <0-2>, drift <0/1>, hit <strength> <scale step> <turnaround 0/1> <step>. Out: four notes (0 for none) and the strength.
+-- voicing <0-2>, drift <0/1>, hands <0-5>, engine <n>, hit <strength> <scale step> <turnaround 0/1> <step>,
+-- lh <step> <scale step> <turnaround 0/1> <right hand's hit>. Out: four notes (0 for none) and the strength; right: the left hand's.
 local cn = pd.Class:new():register("ockm-chordnotes")
 """+CHORD_LUA+"""
 function cn:initialize(sel, atoms)
-  self.inlets, self.outlets = 1, 1
+  self.inlets, self.outlets = 1, 2
   self.sc, self.ty, self.root, self.smooth, self.voicing = { 0, 2, 3, 5, 7, 8, 10 }, 0, 9, true, 0
   self.drift, self.pass, self.last = false, 0, -1
+  self.hands, self.engine = 0, 0
   return true
+end
+function cn:two() return self.hands > 0 and TWO_HANDS[self.engine] end
+function cn:in_1_hands(a) self.hands = math.floor(a[1] or 0) end
+function cn:in_1_engine(a) self.engine = math.floor(a[1] or 0) end
+-- every step: lh <step> <chord root> <turnaround 0/1> <right hand's hit>. Out (right): the left hand's notes and strength
+function cn:in_1_lh(a)
+  local d = a[2] or 0
+  local changed = (d ~= self.lhdeg)
+  self.lhdeg = d
+  if not self:two() then return end
+  local shape, s = left_hand(self.hands, math.floor(a[1] or 0), a[4] or 0, changed)
+  if not shape then return end
+  local n = left_notes(shape, d, self.sc, self.root)
+  self:outlet(2, "list", { n[1] or 0, n[2] or 0, 0, 0, math.min(1, s * (0.92 + 0.16 * math.random())) })
 end
 function cn:in_1_scale(a) if #a >= 7 then self.sc = a end end
 function cn:in_1_type(a) self.ty = math.max(0, math.floor(a[1] or 0)) end
@@ -1860,6 +1932,7 @@ function cn:in_1_hit(a)
   if st < self.last then self.pass = self.pass + 1 end   -- the pattern came round again
   self.last = st
   local n = chord_voicing(a[2] or 0, self.ty, self.sc, self.root, self.smooth, self.voicing, (a[3] or 0) > 0, self.drift and self.pass % 2 == 1)
+  if self:two() then n = right_hand(n, a[2] or 0, self.sc, self.root) end
   local out = {}
   for k = 1, 4 do out[k] = n[k] or 0 end
   out[5] = math.min(1, (a[1] or 0.75) * (0.92 + 0.16 * math.random()))   -- played, not programmed: no two hits quite the same
@@ -2055,7 +2128,7 @@ p.add("#X text 20 10 Chord pattern. Each step has on/accent and a chord root (sc
 inl=p.add("#X obj 30 50 inlet;"); out=p.add("#X obj 30 700 outlet;")
 p.add(f"#X obj 30 760 table ockm-pat-{D}1-on {STEPS};"); p.add(f"#X obj 230 760 table ockm-pat-{D}1-deg {STEPS};")
 # v0.90: the notes are worked out in Lua (seq/ockm-chordnotes.pd_lua, written above), shared with the screen
-cn=p.add("#X obj 30 600 ockm-chordnotes;")
+cn=p.add("#X obj 30 600 ockm-chordnotes;"); out2=p.add("#X obj 400 700 outlet;"); p.con(cn,1,out2,0)   # v1.20: the left hand
 lb=p.add("#X obj 700 40 loadbang;"); lbt=p.add("#X obj 700 65 t b b b;")
 d0a=p.add("#X msg 700 90 0;"); d0b=p.add("#X msg 760 90 0;"); d9=p.add("#X msg 820 90 9;")
 rsc=p.add("#X obj 700 120 r ockm-scale;"); tsc=p.add("#X obj 700 150 text get ockm-presets-scale;"); lsc=p.add("#X obj 700 175 list split 1;")
@@ -2065,7 +2138,8 @@ rsm=p.add(f"#X obj 1250 120 r ockm-{D}1-smooth;"); one_sm=p.add("#X msg 1250 90 
 rro=p.add("#X obj 1100 120 r ockm-root;")
 for c in [(lb,0,lbt,0),(lbt,2,d0a,0),(lbt,1,d0b,0),(lbt,0,d9,0),(d0a,0,tsc,0),(rsc,0,tsc,0),(tsc,0,lsc,0)]: p.con(*c)
 rdr=p.add(f"#X obj 1550 120 r ockm-{D}1-drift;")
-for i,(srcs,sel) in enumerate([([lsc],"scale"),([rty,d0b],"type"),([rro,d9],"root"),([rsm,one_sm],"smooth"),([rvo],"voicing"),([rdr],"drift")]):
+rha=p.add(f"#X obj 1700 120 r ockm-{D}1-hands;"); ren=p.add(f"#X obj 1850 120 r ockm-{D}1-engine;")
+for i,(srcs,sel) in enumerate([([lsc],"scale"),([rty,d0b],"type"),([rro,d9],"root"),([rsm,one_sm],"smooth"),([rvo],"voicing"),([rdr],"drift"),([rha],"hands"),([ren],"engine")]):
     pp=p.add(f"#X obj {700+i*150} 230 list prepend {sel};"); tr=p.add(f"#X obj {700+i*150} 255 list trim;")
     for sr in srcs: p.con(sr,1 if sr is lsc else 0,pp,0)
     p.con(pp,0,tr,0); p.con(tr,0,cn,0)
@@ -2079,6 +2153,13 @@ sno=p.add(f"#X obj 200 700 s ockm-{D}1-notes-out;")
 p.con(cmod,0,hp,3)   # the step, so the Lua can count passes (drift)
 for c in [(inl,0,cmod,0),(cmod,0,ts,0),(ts,1,rdeg0,0),(rdeg,0,tdeg,0),(tdeg,1,trn,0),(trn,0,hp,2),(tdeg,0,hp,1),(ts,0,ron,0),(ron,0,son,0),
           (son,1,vx,0),(vx,0,hp,0),(hp,0,hpp,0),(hpp,0,hpt,0),(hpt,0,cn,0),(cn,0,out,0),(cn,0,sno,0)]: p.con(*c)
+# v1.20 the left hand: every step tells the Lua the step, the chord (with the turnaround) and the right hand's hit
+tl=p.add("#X obj 400 80 t f f f;"); lon=p.add(f"#X obj 560 110 tabread ockm-pat-{D}1-on;"); ldg0=p.add(f"#X obj 480 110 tabread ockm-pat-{D}1-deg;")
+ldg=p.add(f"#X obj 480 135 expr if(ockm_turn_on \\, ockm_turn_deg \\, {D}f1);"); ltd=p.add("#X obj 480 160 t f f;")
+ltr=p.add(f"#X obj 560 185 expr ockm_turn_on*(ockm_turn_deg==4)+0*{D}f1;")
+lpk=p.add("#X obj 400 220 pack f f f f;"); lpp=p.add("#X obj 400 245 list prepend lh;"); lpt=p.add("#X obj 400 270 list trim;")
+for c in [(cmod,0,tl,0),(tl,2,lon,0),(lon,0,lpk,3),(tl,1,ldg0,0),(ldg0,0,ldg,0),(ldg,0,ltd,0),(ltd,1,ltr,0),(ltr,0,lpk,2),(ltd,0,lpk,1),
+          (tl,0,lpk,0),(lpk,0,lpp,0),(lpp,0,lpt,0),(lpt,0,cn,0)]: p.con(*c)
 # store / load / edit / extend
 re=p.add(f"#X obj 1300 600 r ockm-{D}1-edit;"); tl=p.add("#X obj 1300 630 t l l;"); ls=p.add("#X obj 1480 660 list split 1;"); up=p.add("#X obj 1300 690 unpack f f f;")
 p.con(re,0,tl,0); p.con(tl,1,ls,0); p.con(tl,0,up,0)
@@ -2365,18 +2446,29 @@ CHORD_ENGINES=[(0,"stab","Poly: two detuned saws through a filter. Attack 0 is t
                (3,"piano","House piano: a struck string. Ten stretched partials \\, a second string beating \\, a hammer knock. Classic house and Italo piano"),
                (4,"rhodes","Rhodes: a warm body with the tine ringing on the attack \\, barks when hit hard \\, tremolo. Deep house"),
                (6,"hard","Hard stab: three wide saws and a square through a resonant filter that snaps shut \\, driven. Techno and tech house")]
+# v1.20 two hands: organ, piano and Rhodes also come as a two-voice left hand (ockm-chord-<kind>-lh), which runs only
+# while its engine is picked and ockm-<track>-hands is above 0
+TWO_HAND_KINDS=("organ","piano","rhodes")
+LH_GAIN=1.0
 for idx,kind,title in CHORD_ENGINES:
-    q=P(); q.add(f"#X text 20 10 Chord engine {idx}. {title}. k1-k4 0 to 1.;")
+  for lh in ((False,True) if kind in TWO_HAND_KINDS else (False,)):
+    nv=2 if lh else 4
+    q=P(); q.add(f"#X text 20 10 Chord engine {idx}{' (left hand)' if lh else ''}. {title}. k1-k4 0 to 1.;")
     inl=q.add("#X obj 30 50 inlet;"); sp_=q.add("#X obj 30 80 spigot 1;"); ro=q.add("#X obj 30 110 route off;")
     so=q.add(f"#X obj 30 140 s {D}0-off;"); up=q.add("#X obj 120 140 unpack f f f f f;")
     rsx=q.add(f"#X obj 500 50 r ockm-{D}1-strum;")
-    strum={v: q.add(f"#X obj {500+v*60} 80 * {round(25*v,1)};") for v in (1,2,3)}
-    for v in (1,2,3): q.con(rsx,0,strum[v],0)
+    strum={v: q.add(f"#X obj {500+v*60} 80 * {round(25*v,1)};") for v in range(1,nv)}
+    for v in range(1,nv): q.con(rsx,0,strum[v],0)
     re=q.add(f"#X obj 700 50 r ockm-{D}1-engine;"); eq=q.add(f"#X obj 700 80 == {idx};"); tf=q.add("#X obj 700 110 t f f;")
     sw=q.add("#X obj 700 170 switch~;"); s0=q.add("#X obj 760 140 sel 0;"); bo=q.add(f"#X obj 760 170 s {D}0-off;")
-    for c in [(inl,0,sp_,0),(sp_,0,ro,0),(ro,0,so,0),(ro,1,up,0),(re,0,eq,0),(eq,0,tf,0),(tf,1,sw,0),(tf,0,s0,0),(s0,0,bo,0),(tf,0,sp_,1)]: q.con(*c)
+    for c in [(inl,0,sp_,0),(sp_,0,ro,0),(ro,0,so,0),(ro,1,up,0),(re,0,eq,0),(tf,1,sw,0),(tf,0,s0,0),(s0,0,bo,0),(tf,0,sp_,1)]: q.con(*c)
+    if lh:
+        # on only with this engine and two hands
+        en=q.add(f"#X obj 700 95 expr {D}f1*({D}f2>0);"); hs=q.add(f"#X obj 850 50 r ockm-{D}1-hands;"); htb=q.add("#X obj 850 70 t b f;"); fe=q.add("#X obj 820 95 f;")
+        for c in [(eq,0,en,0),(eq,0,fe,1),(hs,0,htb,0),(htb,1,en,1),(htb,0,fe,0),(fe,0,en,0),(en,0,tf,0)]: q.con(*c)
+    else: q.con(eq,0,tf,0)
     vs=[]
-    for v in range(4):
+    for v in range(nv):
         sp=P(); chord_voice(sp,kind)
         q.L.append(sp.text(f"#N canvas 0 0 980 460 v{v} 0;").rstrip("\n"))
         o=q.add(f"#X restore {120+v*90} 200 pd v{v};"); vs.append(o)
@@ -2385,30 +2477,21 @@ for idx,kind,title in CHORD_ENGINES:
         else:
             pp=q.add(f"#X obj {120+v*90} 170 pipe 0;"); q.con(up,v,pp,0); q.con(pp,0,o,0)
             q.con(strum[v],0,pp,1)
-    s1=q.add("#X obj 120 260 +~;"); s2=q.add("#X obj 120 280 +~;"); s3=q.add("#X obj 120 300 +~;"); g=q.add(f"#X obj 120 330 *~ {CHORD_GAIN[kind]};"); out=q.add("#X obj 120 370 outlet~;")
-    hp=q.add("#X obj 120 315 hip~ 20;")   # FM at a 1:1 ratio puts a sideband at 0 Hz (an offset): keep it out of the mix
-    for c in [(vs[0],0,s1,0),(vs[1],0,s1,1),(s1,0,s2,0),(vs[2],0,s2,1),(s2,0,s3,0),(vs[3],0,s3,1),(s3,0,hp,0),(hp,0,g,0),(g,0,out,0)]: q.con(*c)
-    if kind=="strings":
-        # ensemble: three delay taps swept by slow sines a third of a cycle apart (k2 sets the depth)
-        q.C=[c for c in q.C if c!=(g,0,out,0)]
-        dw=q.add(f"#X obj 300 330 delwrite~ {D}0-ens 40;"); dry=q.add("#X obj 120 400 *~ 0.5;"); mix=q.add("#X obj 120 450 +~;")
-        lb=q.add("#X obj 500 250 loadbang;"); kd=q.add(f"#X obj 700 250 r ockm-{D}1-k2-m;"); kx=q.add(f"#X obj 700 275 expr 0.5+{D}f1*3;")
-        for c in [(g,0,dw,0),(g,0,dry,0),(dry,0,mix,0),(mix,0,out,0),(kd,0,kx,0)]: q.con(*c)
-        for j in range(3):
-            lo=q.add(f"#X obj {300+j*130} 360 osc~ 0.6;"); ph=q.add(f"#X msg {380+j*130} 335 {round(j/3,3)};"); dp=q.add(f"#X obj {300+j*130} 385 *~ 2;")
-            off=q.add(f"#X obj {300+j*130} 410 +~ 8;"); vd=q.add(f"#X obj {300+j*130} 435 vd~ {D}0-ens;"); vg=q.add(f"#X obj {300+j*130} 460 *~ 0.35;")
-            for c in [(lb,0,ph,0),(ph,0,lo,1),(lo,0,dp,0),(kx,0,dp,1),(dp,0,off,0),(off,0,vd,0),(vd,0,vg,0),(vg,0,mix,0)]: q.con(*c)
-    q.save(f"voices/ockm-chord-{kind}.pd","#N canvas 160 160 900 420 12;")
-q=P()
-q.add("#X text 20 10 Chord synth: four engines \\, one plays at a time (ockm-<track>-engine 0 poly \\, 1 organ \\, 3 piano \\, 4 rhodes: 2 and 5 were pad and strings \\, retired in v0.98). Input: up to 4 MIDI notes plus a hit strength \\, or off.;")
-inl=q.add("#X obj 30 50 inlet;")
-eng=[q.add(f"#X obj {30+i*170} 100 ockm-chord-{k} {D}1;") for i,(_,k,_) in enumerate(CHORD_ENGINES)]
-s1=q.add("#X obj 30 160 +~;"); s2=q.add("#X obj 30 185 +~;"); out=q.add("#X obj 30 220 outlet~;")
-for e in eng: q.con(inl,0,e,0)
-sm=q.add("#X obj 30 160 +~;"); q.C=[]
-for e in eng: q.con(inl,0,e,0); q.con(e,0,sm,0)   # an outlet~ into one inlet sums
-q.con(sm,0,out,0)
-q.save("voices/ockm-chord.pd","#N canvas 140 140 700 260 12;")
+    sm=q.add("#X obj 120 280 +~;"); g=q.add(f"#X obj 120 330 *~ {round(CHORD_GAIN[kind]*(LH_GAIN if lh else 1),4)};"); out=q.add("#X obj 120 370 outlet~;")
+    hp=q.add("#X obj 120 305 hip~ 20;")   # FM at a 1:1 ratio puts a sideband at 0 Hz (an offset): keep it out of the mix
+    for o in vs: q.con(o,0,sm,0)   # outlet~s into one inlet sum
+    for c in [(sm,0,hp,0),(hp,0,g,0),(g,0,out,0)]: q.con(*c)
+    q.save(f"voices/ockm-chord-{kind}{'-lh' if lh else ''}.pd","#N canvas 160 160 900 420 12;")
+for lh in (False,True):
+    q=P()
+    if lh: q.add("#X text 20 10 Chord synth's left hand (v1.20): organ \\, piano and Rhodes with two voices \\, running only while ockm-<track>-hands is above 0. Input: up to 2 MIDI notes plus a hit strength \\, or off.;")
+    else: q.add("#X text 20 10 Chord synth: five engines \\, one plays at a time (ockm-<track>-engine 0 poly \\, 1 organ \\, 3 piano \\, 4 rhodes \\, 6 hard stab: 2 and 5 were pad and strings \\, retired in v0.98). Input: up to 4 MIDI notes plus a hit strength \\, or off.;")
+    inl=q.add("#X obj 30 50 inlet;")
+    eng=[q.add(f"#X obj {30+i*170} 100 ockm-chord-{k}{'-lh' if lh else ''} {D}1;") for i,(_,k,_) in enumerate([e for e in CHORD_ENGINES if not lh or e[1] in TWO_HAND_KINDS])]
+    sm=q.add("#X obj 30 160 +~;"); out=q.add("#X obj 30 220 outlet~;")
+    for e in eng: q.con(inl,0,e,0); q.con(e,0,sm,0)   # an outlet~ into one inlet sums
+    q.con(sm,0,out,0)
+    q.save(f"voices/ockm-chord{'-lh' if lh else ''}.pd","#N canvas 140 140 700 260 12;")
 
 # ================= settings store =================
 # Holds every setting, the 8 patterns (in memory) and the project, and saves them as text files.

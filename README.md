@@ -6,16 +6,16 @@ Tap a style and it builds a whole loop in that style: tempo, groove, key, chords
 
 ![Perform screen](docs/img/perform.png)
 
-**Status:** v1.09, a personal project that works and gets played, moving fast. I'm looking for collaborators (see [below](#looking-for-collaborators)).
+**Status:** v1.20, a personal project that works and gets played, moving fast. I'm looking for collaborators (see [below](#looking-for-collaborators)).
 
 ## What's in it
 
 - **Drums:** 8 slots, each a synthesised drum (kick, snare, clap, hats, toms, rim, conga, shaker, all built from scratch in Pd) or your own samples. Per-step accents, velocity, timing, swing, and a closed hat that chokes the open one. Two banks of grooves (house and techno) fill all 8 slots in one tap. A separate drum lab designs kits and renders them to samples
 - **Bass and lead:** mono synths with their own engines: analogue, acid, sub 808, FM, reese, donk and an MS-20 style raw engine for the bass; analogue, DX, sync, supersaw and raw for the lead. Rhythms and riffs are generated to follow the harmony, with mutate, density, rests and "answer the bass"
-- **Chords:** poly, hard stab, organ, house piano and Rhodes engines, with progressions, voicings, strum, push and drift
+- **Chords:** poly, hard stab, organ, house piano and Rhodes engines, with progressions, voicings, strum, push and drift. Piano, organ and Rhodes can play with two hands: a left hand on the root in five patterns
 - **The builder:** key, scale and progression shared by every part, phrase length, turnarounds, and an evolve setting that changes one part every phrase and brings it back
 - **Fifteen styles,** from deep house and Chicago through Italo piano, filter house and trance to peak time and hard techno. Every tap is a fresh take inside the style
-- **Perform:** mutes that land on the beat or bar, solos, a DJ filter, drive, rise, drop, a DJ rewind, beat repeat, and macros (build, lift, breakdown) that combine mutes and effects over 4 bars
+- **Perform:** mutes that land on the beat or bar, solos, a DJ filter, drive, rise, drop, a DJ rewind, beat repeat, and macros (8 bar lift, 4 bar lift, breakdown) that combine mutes and effects over 4 bars
 - **Mixer:** dB faders, sends, mute and solo, and a 4-band EQ per track
 - **Arrange and export:** turn the loop into a track; export the mix, stems and MIDI
 - **MIDI:** USB controllers (pads mute and fire macros, knobs move the effects and the synth you're on), and MIDI clock in and out

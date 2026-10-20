@@ -101,6 +101,7 @@ SHOTS = [
     ("bass", ["test tap 601 36", "test tap 89 158"]),                 # bass tab; tapping a step on auto just explains the lock
     ("lead", ["test tap 663 36"]),
     ("chord", ["test tap 725 36"]),
+    ("chord-hands", ["send ockm-chord-engine float 3", "send ockm-chord-hands float 2"]),   # v1.20: piano, two hands, pulse
     ("compose", ["test tap 477 36"]),
     ("perform-mutes", ["test tap 262 36", "test tap 74 186", "test tap 103 503"]),   # mute the kick, solo the bass
     ("mixer", ["test tap 407 36"]),

@@ -1,0 +1,15 @@
+#N canvas 140 140 700 260 12;
+#X text 20 10 Chord synth's left hand (v1.20): organ \, piano and Rhodes with two voices \, running only while ockm-<track>-hands is above 0. Input: up to 2 MIDI notes plus a hit strength \, or off.;
+#X obj 30 50 inlet;
+#X obj 30 100 ockm-chord-organ-lh \$1;
+#X obj 200 100 ockm-chord-piano-lh \$1;
+#X obj 370 100 ockm-chord-rhodes-lh \$1;
+#X obj 30 160 +~;
+#X obj 30 220 outlet~;
+#X connect 1 0 2 0;
+#X connect 2 0 5 0;
+#X connect 1 0 3 0;
+#X connect 3 0 5 0;
+#X connect 1 0 4 0;
+#X connect 4 0 5 0;
+#X connect 5 0 6 0;

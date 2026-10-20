@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v1.19"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v1.20"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -64,6 +64,8 @@ local LEAD_TUNE_ORDER = { 0, 1, 8, 9, 18, 15, 16, 19 }
 local LEAD_TUNE_NAME = { [0] = "one note", [16] = "question", [19] = "answer the bass" }
 local PROG_ORDER = { 0, 1, 12, 13, 14, 15, 3, 16, 17, 5, 6, 7, 2, 10, 11, 18, 9 }   -- v1.01: retired (syncopated, garage skip); old loops move to tresillo
 -- names shown on screen, where they differ from the engine's own
+local VOICINGS = { "close", "open", "wide" }
+local LH_PATTERNS = { "anchor", "pulse", "synco", "broken", "answer" }   -- v1.20 the left hand (ockm-chord-hands 1-5)
 local ENG_LABEL = { reese = "wide", mini = "analogue", stab = "poly", hard = "hard stab" }
 local function eng_label(nm) return ENG_LABEL[nm] or nm end
 -- each engine's sweet spot (k1-k4), loaded when it's picked, so it sounds right straight away
@@ -187,6 +189,58 @@ local function chord_voicing(deg, ctype, sc, root, smooth, voicing, turn, lift)
   end
   return n, ty
 end
+-- v1.20 two hands (piano, organ, Rhodes). The left hand on step i: pat 1 anchor (root and octave when the chord changes,
+-- and each bar), 2 pulse (on every beat), 3 syncopated (1, the and of 2, 4), 4 broken (root on the beats, fifth and
+-- octave on the ands), 5 answer (on the beats the right hand leaves empty). on: the right hand's hit here (0 none),
+-- changed: the chord changed here. Returns a shape ("both" root and octave, "root", "fifth", "oct") and a strength, or nil
+local function left_hand(pat, i, on, changed)
+  local b = i % 16
+  local top = (b == 0) and 0.9 or 0.75
+  if pat == 1 then
+    if changed or b == 0 then return "both", 0.9 end
+  elseif pat == 2 then
+    if i % 4 == 0 then return "both", top end
+    if changed then return "both", 0.8 end
+  elseif pat == 3 then
+    if b == 0 or b == 6 or b == 12 then return "both", top end
+    if changed then return "both", 0.8 end
+  elseif pat == 4 then
+    if i % 4 == 0 then return "root", top end
+    if changed then return "root", 0.8 end
+    if i % 8 == 2 then return "fifth", 0.6 end
+    if i % 8 == 6 then return "oct", 0.6 end
+  elseif pat == 5 then
+    if (i % 4 == 0 or changed) and on == 0 then return "both", top end
+  end
+  return nil
+end
+-- the left hand's notes: the chord's root between G2 and F#3 (an octave over the bass), with its octave or fifth
+local LH_LOW = 43
+local function left_notes(shape, deg, sc, root)
+  local d = math.floor(deg)
+  local pc = (root + sc[d % 7 + 1]) % 12
+  local low = LH_LOW + (pc - LH_LOW) % 12
+  if shape == "root" then return { low } end
+  if shape == "oct" then return { low + 12 } end
+  if shape == "fifth" then return { low + (sc[(d + 4) % 7 + 1] - sc[d % 7 + 1]) % 12 } end
+  return { low, low + 12 }
+end
+-- the right hand with the left playing: four-note chords drop their root (the left hand has it), and nothing sits
+-- below G3, so the hands don't crowd each other
+local function right_hand(n, deg, sc, root)
+  local pc = (root + sc[math.floor(deg) % 7 + 1]) % 12
+  local o = {}
+  if #n >= 4 then for _, x in ipairs(n) do if x % 12 ~= pc then o[#o + 1] = x end end end
+  if #o < 3 then o = {}; for _, x in ipairs(n) do o[#o + 1] = x end end
+  local seen, r = {}, {}
+  for _, x in ipairs(o) do
+    while x < 55 do x = x + 12 end
+    if not seen[x] then seen[x] = true; r[#r + 1] = x end
+  end
+  table.sort(r)
+  return r
+end
+local TWO_HANDS = { [1] = true, [3] = true, [4] = true }   -- the chord engines that play with two hands: organ, piano, Rhodes
 local PROG_SHAPES = { { { 0, 16 } }, { { 0, 16 }, { 3, 16 } }, { { 0, 48 }, { 6, 16 } }, { { 0, 16 }, { 3, 16 }, { 5, 16 }, { 4, 16 } }, { { 0, 8 }, { 5, 8 }, { 3, 8 }, { 4, 8 } }, { { 0, 16 }, { 5, 16 }, { 2, 16 }, { 6, 16 } }, { { 5, 16 }, { 6, 16 }, { 0, 32 } }, { { 0, 16 }, { 6, 16 }, { 5, 16 }, { 4, 16 } }, { { 0, 32 }, { 6, 32 }, { 5, 32 }, { 4, 32 } }, { { 1, 16 }, { 4, 16 }, { 0, 32 } }, { { 0, 16 }, { 4, 16 }, { 5, 16 }, { 3, 16 } }, { { 5, 16 }, { 3, 16 }, { 0, 16 }, { 4, 16 } }, { { 0, 16 }, { 6, 16 } }, { { 0, 16 }, { 5, 16 } }, { { 0, 16 }, { 4, 16 } }, { { 1, 16 }, { 4, 16 } }, { { 0, 16 }, { 6, 16 }, { 5, 16 }, { 6, 16 } }, { { 0, 16 }, { 6, 16 }, { 3, 32 } }, { { 0, 16 }, { 5, 16 }, { 1, 16 }, { 4, 16 } } }
 -- END PRESETS
 -- the rhythm list for a part (the bass has its own, the classic dance bass rhythms)
@@ -289,7 +343,7 @@ function ui:defaults()
   v["ockm-bass-scshape"] = 1; v["ockm-lead-scshape"] = 1; v["ockm-chord-scshape"] = 1
   v["ockm-bass-riff"] = -1; v["ockm-bass-slideamt"] = 0; v["ockm-bass-octave"] = 0; v["ockm-lead-octave"] = 0
   v["ockm-lead-repeat"] = 0; v["ockm-lead-rests"] = 0
-  v["ockm-chord-rate"] = 1; v["ockm-chord-push"] = 0; v["ockm-chord-vary"] = 0; v["ockm-chord-drift"] = 0   -- analogue, analogue, poly (as the engine starts)
+  v["ockm-chord-rate"] = 1; v["ockm-chord-push"] = 0; v["ockm-chord-vary"] = 0; v["ockm-chord-drift"] = 0; v["ockm-chord-hands"] = 0   -- analogue, analogue, poly (as the engine starts)
   v["ockm-drum-punch"] = 0.5
   v["ockm-style"] = -1; v["ockm-bass-half"] = 0; v["ockm-lead-half"] = 0; v["ockm-chord-half"] = 0
   v["ockm-bass-mode"] = 0; v["ockm-lead-mode"] = 0; v["ockm-chord-mode"] = 0   -- 0 auto, 1 manual
@@ -328,7 +382,7 @@ function ui:hooks()
     for _, k in ipairs({"engine","k1","k2","k3","k4","drive","verb","delay","rhythm","notes","octave"}) do h[#h+1] = "ockm-"..t.."-"..k end
   end
   h[#h+1] = "ockm-bass-riff"; h[#h+1] = "ockm-bass-slideamt"; h[#h+1] = "ockm-lead-repeat"; h[#h+1] = "ockm-lead-rests"
-  for _, k in ipairs({"engine","k1","k2","k3","k4","type","smooth","verb","delay","rhythm","prog","voicing","strum","rate","push","vary","drift"}) do h[#h+1] = "ockm-chord-"..k end
+  for _, k in ipairs({"engine","k1","k2","k3","k4","type","smooth","verb","delay","rhythm","prog","voicing","strum","rate","push","vary","drift","hands"}) do h[#h+1] = "ockm-chord-"..k end
   for _, t in ipairs(SYNTHS) do for _, k in ipairs({ "lfo-shape", "lfo-rate", "lfo-depth", "lfo-target", "chorus" }) do h[#h+1] = "ockm-"..t.."-"..k end end
   for _, t in ipairs(TRACKS) do h[#h+1] = "ockm-"..t.."-mute"; h[#h+1] = "ockm-"..t.."-solo" end
   for _, t in ipairs(SYNTHS) do h[#h+1] = "ockm-"..t.."-level"; h[#h+1] = "ockm-"..t.."-mode" end
@@ -2071,18 +2125,26 @@ function ui:layout_synth_sound(add, part, mono)
   if part == "chord" then
     local vo = math.floor(self.v["ockm-chord-voicing"] or 0)
     local cw = (rw - 30) / 6
-    for i, nm in ipairs({ "close", "open", "wide" }) do
-      add{ kind="choice", x=rx + (i - 1) * (cw + 6), y=558, w=cw, h=34, label=nm, small=true, sel=(vo == i - 1), tap=function() self:send("ockm-chord-voicing", i - 1) end }
-    end
+    -- v1.20: voicing is one button (close, open, wide, round again), to make room for the hands
+    add{ kind="btn", x=rx, y=558, w=cw, h=34, small=true, label=VOICINGS[vo + 1] or "close", tap=function() self:send("ockm-chord-voicing", (vo + 1) % 3) end }
     -- smooth: every chord at about the same height (moved here from the left in v0.90)
-    add{ kind="choice", x=rx + 3 * (cw + 6), y=558, w=cw, h=34, label="smooth", accent=true, small=true, sel=(self.v["ockm-chord-smooth"] or 1) > 0,
+    add{ kind="choice", x=rx + (cw + 6), y=558, w=cw, h=34, label="smooth", accent=true, small=true, sel=(self.v["ockm-chord-smooth"] or 1) > 0,
          tap=function() self:send("ockm-chord-smooth", ((self.v["ockm-chord-smooth"] or 1) > 0) and 0 or 1) end }
     -- drift (v1.01): every second time round, chords built from the key sit an inversion higher
     local dr = (self.v["ockm-chord-drift"] or 0) > 0
-    add{ kind="choice", x=rx + 4 * (cw + 6), y=558, w=cw, h=34, label="drift", accent=true, small=true, sel=dr,
+    add{ kind="choice", x=rx + 2 * (cw + 6), y=558, w=cw, h=34, label="drift", accent=true, small=true, sel=dr,
          tap=function() self:send("ockm-chord-drift", dr and 0 or 1) end }
     local ce = math.floor(self.v["ockm-chord-engine"] or 0)
-    add{ kind="hbar", x=rx + 5 * (cw + 6), y=558, w=cw, h=34, hook="ockm-chord-strum", lo=0, hi=(ce == 3 or ce == 4) and 1 or 0.5, label="strum", bold=true }
+    add{ kind="hbar", x=rx + 3 * (cw + 6), y=558, w=cw, h=34, hook="ockm-chord-strum", lo=0, hi=(ce == 3 or ce == 4) and 1 or 0.5, label="strum", bold=true }
+    -- v1.20 two hands (organ, piano, Rhodes): the left hand plays the root low down in one of five patterns
+    if TWO_HANDS[ce] then
+      local hd = math.floor(self.v["ockm-chord-hands"] or 0)
+      local last = (hd > 0) and hd or (self.lh_last or 1)
+      add{ kind="choice", x=rx + 4 * (cw + 6), y=558, w=cw, h=34, label="two hands", accent=true, small=true, sel=(hd > 0),
+           tap=function() if hd > 0 then self.lh_last = hd; self:send("ockm-chord-hands", 0) else self:send("ockm-chord-hands", last) end end }
+      add{ kind="btn", x=rx + 5 * (cw + 6), y=558, w=cw, h=34, small=true, label=(LH_PATTERNS[last] or "anchor"), quiet=(hd == 0),
+           tap=function() self:send("ockm-chord-hands", last % #LH_PATTERNS + 1) end }
+    end
   end
 end
 
@@ -2237,7 +2299,7 @@ local STYLES = {
   { "deep house", second={ 0, 1 }, vary={ 1, 2 }, drift=1, evolve=1, rate={ 1, 1, 2 }, kit="909-long", punch=0.4, bpm=122, swing=58, groove={ 2, 16, 17, 21 }, root={ 5, 2, 7, 0 }, scale={ 2, 0 }, prog={ 13, 1, 3, 15, 6 }, type={ 8, 6, 9 },
     drums={ kick={ -1, 110, 0.1, 0 }, clap={ 0, 100, 0, 0.1 } },
     bass={ engine={ 5, 1 }, rhythm={ 9, 3, 1 }, notes={ 2, 0, 6 }, move=1, k={ 0.35, 0.2, 0.4, 0.45 } },
-    chord={ engine={ 4, 3 }, rhythm={ 3, 0, 8, 11 }, verb=0.25, delay=0.12, chorus=2, strum=0.12 },
+    chord={ engine={ 4, 3 }, rhythm={ 3, 0, 8, 11 }, verb=0.25, delay=0.12, chorus=2, strum=0.12, hands={ 1, 5 } },
     lead=false },
   { "chicago", vary=2, rate={ 1, 0 }, push=1, kit="909", punch=0.6, bpm=125, swing=62, groove={ 13, 14, 22, 1 }, root={ 7, 0, 9, 2 }, scale={ 0, 2 }, prog={ 12, 1, 0, 3 }, type={ 10, 8 },
     drums={ kick={ 0, 90, 0.2, 0.3 }, clap={ 0, 100, 0, 0.2 } },
@@ -2247,7 +2309,7 @@ local STYLES = {
   { "classic house", second={ 2, 0 }, vary={ 2, 1 }, rate={ 1, 0 }, push=1, kit="909", punch=0.5, bpm=124, swing=56, groove={ 1, 0, 21, 16 }, root={ 0, 7, 2, 5 }, scale={ 1, 4, 0 }, prog={ 16, 5, 3, 18, 10 }, type={ 6, 1 },
     drums={ kick={ 0, 100, 0.1, 0.2 }, clap={ 0, 100, 0, 0 } },
     bass={ engine={ 5, 2 }, rhythm={ 0, 1, 18, 9, 4 }, notes={ 2, 1, 0 }, move=1, sidechain=0.2 },
-    chord={ engine={ 3, 1 }, rhythm={ 0, 2, 5, 10 }, verb=0.15, delay=0.1, strum=0.1 },
+    chord={ engine={ 3, 1 }, rhythm={ 0, 2, 5, 10 }, verb=0.15, delay=0.1, strum=0.1, hands={ 4, 1, 2 } },
     lead={ engine={ 4, 2 }, rhythm={ 10, 11, 8 }, notes={ 15, 16, 8 }, outside=0.4, verb=0.15, delay=0.2, chorus=2 } },
   -- v1.07: filter house (French house): the house groove, two chords changing every half bar, 8ths chords pumping hard
   -- under the kick, the bass on octaves ringing out, no lead
@@ -2255,14 +2317,14 @@ local STYLES = {
     type={ 1, 10 }, vary=2,
     drums={ kick={ 0, 100, 0.2, 0.3 }, clap={ 0, 90, 0, 0 } },
     bass={ engine={ 5, 2 }, rhythm={ 4, 1 }, notes=1, move=1, k={ 0.45, 0.3, 0.5, 0.7 }, sidechain=0.3 },
-    chord={ engine={ 3, 1 }, rhythm=9, sidechain=0.75, verb=0.15, delay=0.08 },
+    chord={ engine={ 3, 1 }, rhythm=9, sidechain=0.75, verb=0.15, delay=0.08, hands=1 },
     lead=false },
   -- v0.90: Italian piano house (Black Box, Cappella, late 80s Italy): an M1-style piano playing open triads in a major key
   -- on the big four-chord turn, a riff that pushes ahead of the beat, the M1 organ bass bouncing on the offbeats
   { "italo piano", second={ 1, 0 }, vary=1, push=1, kit="909", punch=0.5, bpm=124, swing=55, groove={ 1, 21, 0, 16 }, root={ 0, 7, 5, 2 }, scale={ 1, 4 }, prog={ 10, 11, 18, 16 }, type={ 0, 1 },
     drums={ kick={ 0, 100, 0.1, 0.2 }, clap={ 0, 100, 0, 0.1 } },
     bass={ engine={ 6, 5 }, rhythm={ 0, 4, 1 }, notes={ 0, 1 }, move=1 },
-    chord={ engine=3, rhythm={ 10, 5, 0 }, verb=0.2, delay=0.08, voicing=1, strum=0.04 },
+    chord={ engine=3, rhythm={ 10, 5, 0 }, verb=0.2, delay=0.08, voicing=1, strum=0.04, hands={ 2, 3 } },
     lead=false },
   { "nu disco", vary=2, evolve=1, push=1, kit="808", punch=0.4, bpm=118, swing=54, groove={ 23, 15, 21 }, root={ 2, 9, 4 }, scale={ 2, 4, 0 }, prog={ 15, 12, 1, 5 }, type={ 12, 6 },
     drums={ kick={ 0, 90, 0, 0.1 }, clap={ 0, 90, 0, 0.2 } },
@@ -2697,7 +2759,9 @@ function ui:apply_style(i, classic)
       else self:send("ockm-"..part.."-lfo-depth", 0) end
       if part == "chord" then   -- v0.90: every chord kept at the same height, voiced and rolled the style's way
         self:send("ockm-chord-smooth", 1); self:send("ockm-chord-voicing", ps.voicing or 0); self:send("ockm-chord-strum", ps.strum or 0)
-        self:send("ockm-chord-lowcut", ps.lowcut or 150)   -- the low end is the kick's and the bass's
+        local hd = spick(ps.hands or 0, shuf)   -- v1.20: two hands on piano, organ and Rhodes
+        self:send("ockm-chord-hands", hd)
+        self:send("ockm-chord-lowcut", ps.lowcut or ((hd > 0) and 90 or 150))   -- the low end is the kick's and the bass's (the left hand's G2 needs a little)
       end
       if part ~= "chord" then
         self:send("ockm-"..part.."-seed", shuf and math.random(1, 60) or 0)   -- shuffle: a variation of the riff too
@@ -3099,6 +3163,7 @@ function ui:collect_pattern()
   local d = { len = self:loop_len(), root = math.floor(self.v["ockm-root"] or 9), scale = self:scale(),
               ctype = math.floor(self.v["ockm-chord-type"] or 0), smooth = (self.v["ockm-chord-smooth"] or 1) > 0,
               voicing = math.floor(self.v["ockm-chord-voicing"] or 0),
+              hands = TWO_HANDS[math.floor(self.v["ockm-chord-engine"] or 0)] and math.floor(self.v["ockm-chord-hands"] or 0) or 0,
               loop = 0, on = {}, drums = {}, mono = {}, chord = {} }
   -- every step of the loop, each part repeating inside it at its own length
   local dl, bl, ll, cl = self:plen("drum"), self:plen("bass"), self:plen("lead"), self:plen("chord")
@@ -3122,7 +3187,9 @@ function ui:collect_pattern()
 end
 -- a chord's notes, worked out the way the chord sequencer does it (the same Lua: chord_voicing, in the presets block)
 local function chord_notes(d, deg)
-  return (chord_voicing(deg, d.ctype, d.scale, d.root, d.smooth, d.voicing or 0, false))
+  local n = chord_voicing(deg, d.ctype, d.scale, d.root, d.smooth, d.voicing or 0, false)
+  if (d.hands or 0) > 0 then n = right_hand(n, deg, d.scale, d.root) end
+  return n
 end
 local function vlq(n)
   local b = { n % 128 }
@@ -3180,6 +3247,20 @@ function ui:write_midi(path, chain)
             local nx = st + 1
             while nx < d.len and nx - st < 16 and d.chord[nx].on <= 0 do nx = nx + 1 end
             for _, n in ipairs(chord_notes(d, c.deg)) do note(tr.chord, 2, t0 + st * Q, clamp(n, 0, 127), (c.on > 1) and 120 or 95, (nx - st) * Q - 2) end
+          end
+        end
+        -- v1.20: the left hand, on the same track, each note held until its next one
+        if (d.hands or 0) > 0 then
+          local hits, last = {}, nil
+          for st = 0, d.len - 1 do
+            local c = d.chord[st]
+            local shape, sv = left_hand(d.hands, st, c.on, c.deg ~= last)
+            last = c.deg
+            if shape then hits[#hits + 1] = { st, left_notes(shape, c.deg, d.scale, d.root), sv } end
+          end
+          for k, h in ipairs(hits) do
+            local nx = hits[k + 1] and hits[k + 1][1] or d.len
+            for _, n in ipairs(h[2]) do note(tr.chord, 2, t0 + h[1] * Q, clamp(n, 0, 127), math.floor(h[3] * 127), math.min(16, nx - h[1]) * Q - 2) end
           end
         end
       end
