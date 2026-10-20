@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.21 (20 October 2026)
+
+- **The 8 bar lift's filter goes further and gets there sooner:** the high-pass climbs to 0.65 (was 0.45), 60% of the way over the first four bars and all the way by the end of bar 7, then holds for the last bar. A saved 8 bar lift still on the old setting moves over
+
 ## v1.20 (20 October 2026)
 
 - **Two-handed chords** on the piano, organ and Rhodes: the left hand plays the chord's root between G2 and F#3 (an octave over the bass), in one of five patterns: **anchor** (root and octave when the chord changes, and each bar), **pulse** (every beat), **synco** (1, the and of 2, 4), **broken** (root on the beats, fifth and octave on the ands) and **answer** (the beats the right hand leaves empty)

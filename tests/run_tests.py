@@ -1883,15 +1883,16 @@ def two_handed_chords(work):
 
 @test
 def eight_bar_lift_pushes_late(work):
-    """v1.18: slot A is the 8 bar lift: drums out, and the high-pass goes half way (0.225) over 6 bars, then on to 0.45."""
+    """v1.21: slot A is the 8 bar lift: drums out, and the high-pass goes 60% of the way (0.39) over 4 bars, then on to 0.65
+    by the end of bar 7."""
     sys.path.insert(0, os.path.join(ROOT, "tests"))
     import ui_preview
     if not ui_preview.LUA:
         raise Skip("no lua to run the screen")
     L = ui_preview.run(["send ockm-playing float 1", "test tap 566 500"])
     gl = [l for l in L if l.startswith("sent ockm-filter-glide ")]
-    assert gl and abs(float(gl[0].split()[3]) - 0.225) < 1e-6, f"first half way: {gl}"
-    ms = float(gl[0].split()[4]); assert 10500 < ms < 12500, f"over six bars at 124 bpm (about 11.6 s): {ms}"
+    assert gl and abs(float(gl[0].split()[3]) - 0.39) < 1e-6, f"first 60% of the way: {gl}"
+    ms = float(gl[0].split()[4]); assert 7000 < ms < 8500, f"over four bars at 124 bpm (about 7.7 s): {ms}"
     assert any(l.startswith("sent ockm-d1-mute-q ") and l.endswith(" 1") for l in L), "the drums go"
 
 @test

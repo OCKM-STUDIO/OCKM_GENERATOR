@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v1.20"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v1.21"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -1276,8 +1276,8 @@ local function default_settings()
     sounds = {},     -- your saved drum sounds: { name, type, and the slot settings in SOUND_KEYS }
     macros = {
       -- v1.18: the 8 bar lift (in build's place): the 4 bar lift over twice as long, its high-pass going further, most of it
-      -- late (late: half way over the first six bars, the rest in the last two), so it opens up as it lands
-      { name = "8 bar lift", bars = 8, moves = { { t = "mutes", v = 3, how = 1, back = 1 }, { t = "filter", v = 0.45, how = 6, back = 1, late = true },
+      -- late (v1.21 late: 60% of the way over the first four bars, all the way by the end of bar 7, held for the last bar)
+      { name = "8 bar lift", bars = 8, moves = { { t = "mutes", v = 3, how = 1, back = 1 }, { t = "filter", v = 0.65, how = 6, back = 1, late = true },
                                                 { t = "reverb", v = 0.4, how = 2, back = 1 }, { t = "delay", v = 0.3, how = 2, back = 1 } } },
       { name = "wash", moves = { { t = "delay", v = 0.85, how = 1, back = 1 }, { t = "feedback", v = 0.78, how = 1, back = 1 },
                                  { t = "reverb", v = 0.9, how = 1, back = 1 }, { t = "filter", v = -0.5, how = 2, back = 1 } } },
@@ -1338,6 +1338,12 @@ function ui:load_settings()
       local pumped = false
       for _, m in ipairs(r.moves or {}) do if m.t == "pump" then pumped = true end end
       if pumped then d.macros[i] = default_settings().macros[1] end
+    end
+  end
+  -- v1.21: the 8 bar lift's high-pass goes further (0.45 was the v1.19 setting)
+  for _, r in ipairs(d.macros) do
+    if r.name == "8 bar lift" then
+      for _, m in ipairs(r.moves or {}) do if m.t == "filter" and m.late and m.v == 0.45 then m.v = 0.65 end end
     end
   end
   local has, hp = false, false
@@ -1446,9 +1452,9 @@ function ui:macro_down(slot)
         if want ~= saved.mutes[tr] then self:qmute(tr, want) end
       end
     elseif t and t.id == "filter" and m.late and ms > 0 then
-      -- late: half way over the first three quarters of the time, the rest in the last quarter
-      pd.send("ockm-filter-glide", "list", { m.v * 0.5, math.max(30, ms * 0.75) }); self.v["ockm-filter"] = m.v
-      self.late = { v = m.v, ms = ms * 0.25 }; self.lateclock:delay(ms * 0.75)
+      -- late (v1.21): 60% of the way over the first half of the time, the rest by seven eighths, then held
+      pd.send("ockm-filter-glide", "list", { m.v * 0.6, math.max(30, ms * 0.5) }); self.v["ockm-filter"] = m.v
+      self.late = { v = m.v, ms = ms * 0.375 }; self.lateclock:delay(ms * 0.5)
     elseif t and t.id == "filter" then
       pd.send("ockm-filter-glide", "list", { m.v, math.max(30, ms) }); self.v["ockm-filter"] = m.v
     elseif t then
