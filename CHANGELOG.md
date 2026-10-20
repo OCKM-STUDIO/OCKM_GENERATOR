@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.15 (20 October 2026)
+
+First ear test of the knobs, sound by sound.
+
+- **Analogue lead:** cutoff opens right out (the top 15% of the knob fades in the unfiltered sound; the filter itself stops at 9 kHz, where it behaves), emphasis reaches the edge of self-oscillation, contour is a much bigger, snappier opening on each note (up to 16 times the cutoff, on a cubed curve, so it falls away and leaves the cutoff in charge)
+- **Drive (bass and lead):** a real overdrive: up to 60 times the gain into tanh plus its square (even harmonics), the level kept where it was. It was heard as a little compression
+- **DX detune is a stack:** at 0 one clean voice; turning up fades in two more, sharp and flat, spreading to 60 cents apart
+- **Fix: solo with more than one track.** Soloing two tracks and then unsoloing one brought everything back: the count of soloed tracks only remembered the last one pressed. A new test checks it
+
 ## v1.14 (20 October 2026)
 
 Every synth knob now makes a clear difference, from the first quarter turn, without the loudness jumping. Each one was measured (rendered at 0, a quarter, half and full, and the change in tone, length, movement and level compared), fixed where it was weak, and measured again. A new test fails the build if a knob stops making a difference.

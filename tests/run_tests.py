@@ -1798,6 +1798,15 @@ def every_synth_knob_makes_a_difference(work):
     assert not loud, "knobs that change the loudness more than the sound: " + ", ".join(loud)
 
 @test
+def several_solos_count_together(work):
+    """v1.15: solo two tracks, then unsolo one: the other stays soloed (the count used to hold only the last solo pressed)."""
+    h = Harness(); h.show("ockm-soloing")
+    h.at(100, "ockm-lead-solo 1"); h.at(150, "ockm-chord-solo 1"); h.at(200, "ockm-chord-solo 0"); h.at(250, "ockm-lead-solo 0")
+    f = os.path.join(work, "t_solos.pd"); h.finish(300, f)
+    out = run(work, f)
+    assert [v.split()[0] for v in printed(out, "ockm-soloing")] == ["1", "2", "1", "0"], printed(out, "ockm-soloing")
+
+@test
 def drum_grooves_fill_every_slot(work):
     """A groove lands on each slot by the sound it plays, makes the drums 1 bar (a groove's natural length) and sets the swing."""
     h = Harness(); h.show("ockm-drum-len")

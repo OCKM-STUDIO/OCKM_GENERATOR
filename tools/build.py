@@ -1106,10 +1106,15 @@ for i,e in enumerate(eng):
     q.con(inl,0,e,0)
     for j,k in enumerate(ks): q.con(k,0,e,j+1)
     q.con(e,0,sm,0)
-rd=q.add(f"#X obj 400 200 r ockm-{D}1-drive;"); dx=q.add(f"#X obj 400 230 expr 1+{D}f1*9;")
-th=q.add(f"#X obj 30 260 expr~ if({D}f2>1.001 \\, tanh({D}v1*{D}f2)/sqrt({D}f2) \\, {D}v1);"); out=q.add("#X obj 30 300 outlet~;")   # drive 0 is clean
+# v1.14 drive: a real overdrive. Up to 60 times the gain into tanh, plus its square (even harmonics: warm and gritty,
+# not just squashed); the level is scaled so a typical note (about 0.25) comes out as loud as it went in, and the offset
+# the square makes is filtered out.
+# It was tanh at up to 10x on a quiet signal: heard as a little compression, not as drive
+rd=q.add(f"#X obj 400 200 r ockm-{D}1-drive;"); dx=q.add(f"#X obj 400 230 expr 1+60*pow({D}f1\\, 1.5);")
+th=q.add(f"#X obj 30 260 expr~ if({D}f2>1.001 \\, (tanh({D}f2*{D}v1)+0.25*tanh({D}f2*{D}v1)*tanh({D}f2*{D}v1))*0.25/tanh(0.25*{D}f2) \\, {D}v1);")
+thh=q.add("#X obj 30 280 hip~ 20;"); out=q.add("#X obj 30 300 outlet~;")   # drive 0 is clean
 q.add("#X text 400 260 drive: 0 clean \\, 1 heavy;")
-for c in [(rd,0,dx,0),(dx,0,th,1),(sm,0,th,0),(th,0,out,0)]: q.con(*c)
+for c in [(rd,0,dx,0),(dx,0,th,1),(sm,0,th,0),(th,0,thh,0),(thh,0,out,0)]: q.con(*c)
 q.save("voices/ockm-mono.pd","#N canvas 140 140 900 340 12;")
 
 # ================= lead engines =================
@@ -1121,13 +1126,16 @@ LEAD_ENGINES=[("dx",2),("sync",3),("mini",4),("supersaw",5),("raw",6)]
 def lead_engine(name,idx,title,build): engine(f"voices/ockm-lead-{name}.pd",idx,title,build,core_name="ockm-lead-core",hook="voice",
                                                decay="60*pow(33\\,"+D+"f1)")   # v1.14: 60 ms to 2 s, so a quarter turn already rings past the step
 
-def filt_env_mul(q,core,ks,lo,span,amt,kidx=2,x=450,y=200,cmin=30,cmax=12000):
+def filt_env_mul(q,core,ks,lo,span,amt,kidx=2,x=450,y=200,cmin=30,cmax=12000,curve=1):
     """v1.14: cutoff = base * (1 + amount * envelope). k1 sets the base (lo..lo*2^span, so every bit of the knob moves it);
     the envelope opens it by a multiple, so it never swamps the knob. kidx: the knob for the amount (0..amt), or None (amt)."""
     em=q.add(f"#X obj {x} {y} *~ {amt};"); ad=q.add(f"#X obj {x} {y+30} +~ 1;"); mb=q.add(f"#X obj {x} {y+60} *~ 1000;")
     cl=q.add(f"#X obj {x} {y+90} clip~ {cmin} {cmax};")
     k1=q.add(f"#X obj 200 140 expr {lo}*pow(2\\,{span}*{D}f1);")
-    for c in [(core,1,em,0),(em,0,ad,0),(ad,0,mb,0),(mb,0,cl,0),(ks[0],0,k1,0),(k1,0,mb,1)]: q.con(*c)
+    if curve==1: q.con(core,1,em,0)
+    else:
+        cv=q.add(f"#X obj {x-120} {y} expr~ pow(max(0\\, {D}v1)\\, {curve});"); q.con(core,1,cv,0); q.con(cv,0,em,0)
+    for c in [(em,0,ad,0),(ad,0,mb,0),(mb,0,cl,0),(ks[0],0,k1,0),(k1,0,mb,1)]: q.con(*c)
     if kidx is not None:
         k3=q.add(f"#X obj 420 140 * {amt};"); q.con(ks[kidx],0,k3,0); q.con(k3,0,em,1)
     return cl
@@ -1158,13 +1166,18 @@ def lead_mini(q,core,ks,out):
     d3=q.add("#X obj 250 200 *~ 0.5;"); o3=q.add("#X obj 250 230 ockm-blsquare;"); g3=q.add("#X obj 250 260 *~ 0.6;")
     m1=q.add("#X obj 30 270 +~;"); m2=q.add("#X obj 30 295 +~;")
     pre=q.add(f"#X obj 30 320 expr~ tanh({D}v1*0.7);")
-    cut=filt_env_mul(q,core,ks,60,7.5,10)   # v1.14: cutoff 60 Hz to 11 kHz, contour opens it up to 10 times
-    bob=q.add("#X obj 30 360 bob~;"); k2=q.add(f"#X obj 310 140 expr 0.2+3.6*pow({D}f1\\, 0.6);")
+    # v1.14: cutoff 60 Hz to 9 kHz, then the top 15% of the knob fades in the unfiltered sound (fully open); contour
+    # opens the filter up to 16 times the cutoff, on a snappy curve (cubed: a quick "pew" that falls away and leaves the
+    # cutoff in charge). bob~ misbehaves above about 9 kHz, so it stops there
+    cut=filt_env_mul(q,core,ks,60,7.2,16,cmax=9000,curve=3)
+    bob=q.add("#X obj 30 360 bob~;"); k2=q.add(f"#X obj 310 140 expr 0.2+3.8*pow({D}f1\\, 0.7);")
     am=q.add("#X obj 30 400 *~;"); g=q.add("#X obj 30 430 *~ 0.95;")
-    emc=q.add("#X obj 30 380 *~ 1;"); emk=q.add(f"#X obj 420 170 expr 1+1.8*{D}f1;")   # emphasis thins the sound: make the level back up
+    emc=q.add("#X obj 30 380 *~ 1;"); emk=q.add(f"#X obj 420 170 expr 1+1.2*{D}f1;")   # emphasis thins the sound: make the level back up
+    opn=q.add(f"#X obj 30 390 expr~ {D}v1*(1-{D}f3) + {D}v2*0.5*{D}f3;"); opk=q.add(f"#X obj 200 170 expr min(1\\, max(0\\, ({D}f1-0.85)/0.15));")
     for c in [(core,0,mt,0),(mt,0,o1,0),(mt,0,d2,0),(d2,0,o2,0),(mt,0,d3,0),(d3,0,o3,0),(o3,0,g3,0),
               (o1,0,m1,0),(o2,0,m1,1),(m1,0,m2,0),(g3,0,m2,1),(m2,0,pre,0),(pre,0,bob,0),(cut,0,bob,1),(ks[1],0,k2,0),(k2,0,bob,2),
-              (bob,0,emc,0),(emc,0,am,0),(ks[1],0,emk,0),(emk,0,emc,1),(core,2,am,1),(am,0,g,0),(g,0,out,0)]: q.con(*c)
+              (bob,0,emc,0),(emc,0,opn,0),(pre,0,opn,1),(ks[0],0,opk,0),(opk,0,opn,2),(opn,0,am,0),(ks[1],0,emk,0),(emk,0,emc,1),(core,2,am,1),(am,0,g,0),(g,0,out,0)]: q.con(*c)
+
     q.add("#X text 200 110 k1 cutoff / k2 emphasis / k3 contour (filter envelope);")
 
 def lead_juno(q,core,ks,out):
@@ -1201,16 +1214,20 @@ def lead_dx(q,core,ks,out):
     bi=q.add(f"#X obj 200 170 expr 0.3+4*{D}f1;"); ix=q.add("#X obj 300 260 *~ 1;")
     i1=q.add("#X obj 160 300 *~;"); i2=q.add("#X obj 160 330 *~;")
     ad=q.add("#X obj 30 360 +~;"); car=q.add("#X obj 30 390 osc~;")
-    # v1.14: detune up to 35 cents (it was 10)
-    dt=q.add(f"#X obj 600 140 expr 1+0.02*pow({D}f1\\, 1.5);"); mt2=q.add("#X obj 30 250 *~ 1;"); ad2=q.add("#X obj 130 360 +~;"); car2=q.add("#X obj 130 390 osc~;")
-    sm=q.add("#X obj 30 420 +~;"); sc=q.add("#X obj 30 445 *~ 0.5;"); dtg=q.add(f"#X obj 600 170 expr 0.5*(1+0.7*{D}f1);")
+    # v1.15 detune is a stack: at 0 one clean voice; turning up fades in two more, one sharp and one flat, spreading to
+    # 60 cents apart: a thick, beating DX. The level holds as the voices come in (they add up in loudness, not in phase)
+    dt=q.add(f"#X obj 600 140 expr 1+0.035*pow({D}f1\\, 1.2) \\; 1/(1+0.035*pow({D}f1\\, 1.2)) \\; pow({D}f1\\, 0.6);")
+    mt2=q.add("#X obj 30 250 *~ 1;"); ad2=q.add("#X obj 130 360 +~;"); car2=q.add("#X obj 130 390 osc~;")
+    mt3=q.add("#X obj 230 250 *~ 1;"); ad3=q.add("#X obj 230 360 +~;"); car3=q.add("#X obj 230 390 osc~;")
+    sc=q.add(f"#X obj 30 445 expr~ ({D}v1 + {D}f4*({D}v2+{D}v3))/sqrt(1+2*{D}f4*{D}f4);")
     dxh=q.add("#X obj 30 458 hip~ 20;")   # v1.14: FM at 1:1 puts a sideband at 0 Hz (a DC offset, a slow wobble once detuned): keep it out
     am=q.add("#X obj 30 470 *~;"); am2=q.add("#X obj 30 495 *~;"); g=q.add("#X obj 30 520 *~ 0.65;")
     for c in [(core,0,mt,0),(core,1,ec,0),(ec,0,amp,0),(ks[1],0,rt,0),(rt,0,rm,1),(mt,0,rm,0),(rm,0,mo,0),
               (ks[0],0,bi,0),(bi,0,ix,1),(ec,0,ix,0),(mo,0,i1,0),(ix,0,i1,1),(i1,0,i2,0),(rm,0,i2,1),
-              (mt,0,ad,0),(i2,0,ad,1),(ad,0,car,0),(ks[2],0,dt,0),(dt,0,mt2,1),(mt,0,mt2,0),(mt2,0,ad2,0),(i2,0,ad2,1),(ad2,0,car2,0),
-              (car,0,sm,0),(car2,0,sm,1),(sm,0,sc,0),(ks[2],0,dtg,0),(dtg,0,sc,1),(sc,0,dxh,0),(dxh,0,am,0),(amp,0,am,1),(am,0,am2,0),(core,2,am2,1),(am2,0,g,0),(g,0,out,0)]: q.con(*c)
-    q.add("#X text 200 110 k1 brightness / k2 character: tine \\, reed \\, bell \\, glass / k3 detune (a second voice beside it);")
+              (mt,0,ad,0),(i2,0,ad,1),(ad,0,car,0),(ks[2],0,dt,0),(dt,0,mt2,1),(dt,1,mt3,1),(dt,2,sc,3),
+              (mt,0,mt2,0),(mt2,0,ad2,0),(i2,0,ad2,1),(ad2,0,car2,0),(mt,0,mt3,0),(mt3,0,ad3,0),(i2,0,ad3,1),(ad3,0,car3,0),
+              (car,0,sc,0),(car2,0,sc,1),(car3,0,sc,2),(sc,0,dxh,0),(dxh,0,am,0),(amp,0,am,1),(am,0,am2,0),(core,2,am2,1),(am2,0,g,0),(g,0,out,0)]: q.con(*c)
+    q.add("#X text 200 110 k1 brightness / k2 character: tine \\, reed \\, bell \\, glass / k3 detune (a stack: two more voices \\, sharp and flat);")
 
 def lead_sync(q,core,ks,out):
     # hard sync: a second saw restarts every cycle of the first, so its pitch shows up as a sweeping tone. The envelope sweeps it
@@ -1303,9 +1320,14 @@ for i,e in enumerate(eng):
 # engine number -> the engines (anything past the last engine plays the last one)
 rv=q.add(f"#X obj 800 50 r ockm-{D}1-engine;"); mn=q.add(f"#X obj 800 80 min {max(i for _,i in LEAD_ENGINES)};"); sv=q.add(f"#X obj 800 110 s ockm-{D}1-voice;")
 q.con(rv,0,mn,0); q.con(mn,0,sv,0)
-rd=q.add(f"#X obj 400 200 r ockm-{D}1-drive;"); dx=q.add(f"#X obj 400 230 expr 1+{D}f1*9;")
-th=q.add(f"#X obj 30 260 expr~ if({D}f2>1.001 \\, tanh({D}v1*{D}f2)/sqrt({D}f2) \\, {D}v1);"); out=q.add("#X obj 30 300 outlet~;")
-for c in [(rd,0,dx,0),(dx,0,th,1),(sm,0,th,0),(th,0,out,0)]: q.con(*c)
+# v1.14 drive: a real overdrive. Up to 60 times the gain into tanh, plus its square (even harmonics: warm and gritty,
+# not just squashed); the level is scaled so a typical note (about 0.25) comes out as loud as it went in, and the offset
+# the square makes is filtered out.
+# It was tanh at up to 10x on a quiet signal: heard as a little compression, not as drive
+rd=q.add(f"#X obj 400 200 r ockm-{D}1-drive;"); dx=q.add(f"#X obj 400 230 expr 1+60*pow({D}f1\\, 1.5);")
+th=q.add(f"#X obj 30 260 expr~ if({D}f2>1.001 \\, (tanh({D}f2*{D}v1)+0.25*tanh({D}f2*{D}v1)*tanh({D}f2*{D}v1))*0.25/tanh(0.25*{D}f2) \\, {D}v1);")
+thh=q.add("#X obj 30 280 hip~ 20;"); out=q.add("#X obj 30 300 outlet~;")
+for c in [(rd,0,dx,0),(dx,0,th,1),(sm,0,th,0),(th,0,thh,0),(thh,0,out,0)]: q.con(*c)
 q.save("voices/ockm-lead.pd","#N canvas 140 140 900 340 12;")
 
 # ================= master effects =================

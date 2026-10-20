@@ -14,8 +14,9 @@
 #X obj 810 130 ockm-mono-raw \$1;
 #X obj 30 200 +~;
 #X obj 400 200 r ockm-\$1-drive;
-#X obj 400 230 expr 1+\$f1*9;
-#X obj 30 260 expr~ if(\$f2>1.001 \, tanh(\$v1*\$f2)/sqrt(\$f2) \, \$v1);
+#X obj 400 230 expr 1+60*pow(\$f1\, 1.5);
+#X obj 30 260 expr~ if(\$f2>1.001 \, (tanh(\$f2*\$v1)+0.25*tanh(\$f2*\$v1)*tanh(\$f2*\$v1))*0.25/tanh(0.25*\$f2) \, \$v1);
+#X obj 30 280 hip~ 20;
 #X obj 30 300 outlet~;
 #X text 400 260 drive: 0 clean \, 1 heavy;
 #X connect 1 0 6 0;
@@ -64,3 +65,4 @@
 #X connect 15 0 16 1;
 #X connect 13 0 16 0;
 #X connect 16 0 17 0;
+#X connect 17 0 18 0;
