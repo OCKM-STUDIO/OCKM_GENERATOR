@@ -35,7 +35,8 @@ Tap a track's name on the mixer, or in the drums tab's all drums view, to jump s
 - **Shaker:** band-passed noise with an attack (the swell) and a decay, low cut and grit
 - **Two macro sliders per sound** (the peach ones), each moving several settings at once:
   - **Character:** a named slider with its own recipe (clap **room**, snare **crack**, hats **metal**, kick **punch**, toms **boom**, congas **slap**, rim **wood**, shaker **shake**). Centre is your sound; right is more, left is the opposite
-  - **Morph:** at zero, your sound; push it up to travel a smooth path through nearby sounds (further along, further away). Pitch and tuning move a little, colour more, level never. **New path** picks a different route
+  - **Hat choke** (v1.09): a slot playing the closed hat cuts any slot playing the open hat, as on an 808 or 909
+- **Morph:** at zero, your sound; push it up to travel a smooth path through nearby sounds (further along, further away). Pitch and tuning move a little, colour more, level never. **New path** picks a different route
   - **Keep** makes what you hear the new starting point and puts both sliders back to zero. Moving any other slider by hand does the same, so nothing jumps
 - Where renders go: kick to `samples/kick`, toms to `samples/tom`, congas, rim and shaker to `samples/perc`. Sets share a name, ending in low, mid, high (or closed, open)
 - The loop (at 120): kicks on the beat (your lab kick if its loop is on), clap or snare on 2 and 4, hats on the offbeats, shaker on every half beat, rim and congas off the beat, and a tom run at the end of the bar. Turn on as many loops as you like
@@ -485,7 +486,7 @@ Every hit varies a little in strength, and accents hit harder. On the poly engin
 
 | Engine | k1 | k2 | k3 | k4 | Character |
 |---|---|---|---|---|---|
-| 0 poly (was stab) | brightness | detune | attack (the bottom third is a stab; up from there a pad) | length (up to about 3 s) | Two detuned saws through a filter. The dub techno stab at attack 0, a pad further up, and a string machine with the chorus on. Replaces pad and strings (v0.98). Detune is gentle up to half way and wide at the top (v1.08) |
+| 0 poly (was stab) | brightness | detune | attack (the bottom third is a stab; up from there a pad) | length (up to about 3 s) | Two detuned saws through a filter. The dub techno stab at attack 0, a pad further up, and a string machine with the chorus on. Replaces pad and strings (v0.98). Four saws since v1.09: detune spreads them round the note, gentle up to half way and wide at the top |
 | 6 hard stab | cutoff | resonance | drive | length | v1.08: three wide saws and a square through a resonant filter that snaps shut, then driven. The bark for techno and tech house (tech house, peak time, hard techno) |
 | 1 organ | upper drawbars | percussion click | sub drawbar | length | House organ |
 | 3 piano | brightness | octave (the even partials) | snap (how fast the first bright hit drops away) | length | House piano (v0.92): a struck string. Ten slightly stretched partials, the first four doubled by a second string that beats against them, the upper ones dying first, a hammer knock. Brighter the harder you hit. Classic house and Italo piano |

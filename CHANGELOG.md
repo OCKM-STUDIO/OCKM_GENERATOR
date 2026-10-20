@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.09 (20 October 2026)
+
+- **Hard stab, more punch:** each hit starts with a spike that drops to the body in 35 ms, the pitch knocks down onto the note from 3 semitones up over the first 15 ms, and the saws spread wider
+- **Poly detune you can hear:** four saws spread round the note (it was two), up to about three quarters of a semitone at the top. Width, not a slow wobble
+- **Hat choke:** a closed hat cuts the open hat in 8 ms, as on an 808 or 909. It goes by the sound a slot plays (closed hat, open hat), samples included. Both on the same step still opens
+- **Less fizz on the analogue and raw basses:** the drive's top harmonics are rolled off after it, and the raw's saw is band-limited (the plain one aliased). The raw lead keeps more top, so it can still scream
+- **Fix:** v1.08 started the master 6 dB too quiet (the start-up level skipped the make-up gain)
+
 ## v1.08 (20 October 2026)
 
 First listen on the Pi: harder sounds for techno, trance, and a mixer with room to push.

@@ -639,7 +639,7 @@ for k,(msg,post,name) in enumerate([(f"{D}1 3 \\, 0 {D}2 {D}3","sqrt(max($v1\\,0
     if post:
         ex_=p.add(f"#X obj {900+k*200} 1135 expr~ {post.replace('$',D)};"); p.con(vl_,0,ex_,0); p.con(ex_,0,sd_,0)
     else: p.con(vl_,0,sd_,0)
-lbv=p.add("#X obj 820 1000 loadbang;"); onev=p.add("#X msg 820 1020 1;"); p.con(lbv,0,onev,0); p.con(onev,0,pvol,0)
+lbv=p.add("#X obj 820 1000 loadbang;"); onev=p.add("#X msg 820 1020 1;"); p.con(lbv,0,onev,0); p.con(onev,0,x2v,0)
 # the drums in or out of this pattern (ockm-drums-on): out stops every drum row
 dgo=p.add("#X obj 250 360 spigot 1;"); p.con(gsp,0,dgo,0); p.con(p.add("#X obj 320 340 r ockm-drums-on;"),0,dgo,1)
 for r,(nm,snd) in enumerate(SLOTS):
@@ -2219,8 +2219,12 @@ def chord_voice(sp,kind):
     am=sp.add("#X obj 20 330 *~;"); av=sp.add("#X obj 200 300 vline~;")
     for c in [(ni,0,mo,0),(mo,1,tb,0),(tb,1,mt,0),(roff,0,moff,0),(moff,0,av,0),(av,0,am,1),(am,0,out,0)]: sp.con(*c)
     if kind=="stab":
-        tf=sp.add("#X obj 80 140 t f f;"); dt=sp.add("#X obj 160 170 * 1.007;"); p1=sp.add("#X obj 80 200 phasor~;"); p2=sp.add("#X obj 160 200 phasor~;")
-        sm=sp.add("#X obj 80 230 +~;"); ce=sp.add("#X obj 80 255 -~ 1;")
+        # v1.08: four saws spread round the note (outer pair at the detune, inner pair at 40% of it), so detune is width,
+        # not a slow wobble between two
+        tf=sp.add("#X obj 80 140 t f f f f;")
+        dm=[sp.add(f"#X obj {80+j*80} 170 * 1;") for j in range(4)]
+        po=[sp.add(f"#X obj {80+j*80} 200 phasor~;") for j in range(4)]
+        ce=sp.add(f"#X obj 80 255 expr~ ({D}v1+{D}v2+{D}v3+{D}v4)*0.5-1;")
         fe=sp.add("#X obj 400 200 vline~;"); fa=sp.add("#X obj 400 225 *~ 2200;"); fb=sp.add("#X obj 400 250 +~ 600;"); fc=sp.add("#X obj 400 275 clip~ 40 15000;")
         l1=sp.add("#X obj 80 290 lop~;"); l2=sp.add("#X obj 80 310 lop~;")
         dk=sp.add("#X obj 300 130 f 280;"); tbb=sp.add("#X obj 20 140 t b b;")
@@ -2230,17 +2234,22 @@ def chord_voice(sp,kind):
         for c in [(dk,0,tdk,0),(tdk,1,mpk,1),(tdk,0,fv2,0),(fv2,0,vcv,0),(vcv,0,mpk,0)]: sp.con(*c)
         pa=sp.add("#X obj 200 200 pack f 280 2;"); ma=sp.add(f"#X msg 200 230 {D}1 {D}3 \\, 0 {D}2 {D}3;"); mf=sp.add(f"#X msg 400 170 {D}1 {D}3 \\, 0 {D}2 {D}3;")
         # k3 attack (v0.98): the bottom third is all stab, so old projects' snap settings stay stabs; up to about 0.9 s
-        x1=sp.add(f"#X obj 600 140 expr 150*pow(2\\,6*{D}f1);"); x2=sp.add(f"#X obj 690 140 expr 1+0.012*{D}f1+0.05*{D}f1*{D}f1*{D}f1;"); x3=sp.add(f"#X obj 780 140 expr 2+1800*pow(max(0\\, {D}f1-0.3)\\, 2);"); x4=sp.add(f"#X obj 870 140 expr 40+3000*{D}f1*{D}f1;")
-        for c in [(mt,0,tf,0),(tf,1,dt,0),(dt,0,p2,0),(tf,0,p1,0),(p1,0,sm,0),(p2,0,sm,1),(sm,0,ce,0),(ce,0,l1,0),(l1,0,l2,0),(l2,0,am,0),
+        x1=sp.add(f"#X obj 600 140 expr 150*pow(2\\,6*{D}f1);"); x2=sp.add(f"#X obj 690 140 expr 1-(0.008*{D}f1+0.035*{D}f1*{D}f1*{D}f1) \\; 1-0.4*(0.008*{D}f1+0.035*{D}f1*{D}f1*{D}f1) \\; 1+0.4*(0.008*{D}f1+0.035*{D}f1*{D}f1*{D}f1) \\; 1+(0.008*{D}f1+0.035*{D}f1*{D}f1*{D}f1);"); x3=sp.add(f"#X obj 780 140 expr 2+1800*pow(max(0\\, {D}f1-0.3)\\, 2);"); x4=sp.add(f"#X obj 870 140 expr 40+3000*{D}f1*{D}f1;")
+        for j in range(4): sp.con(tf,3-j,dm[j],0); sp.con(dm[j],0,po[j],0); sp.con(po[j],0,ce,j); sp.con(x2,j,dm[j],1)
+        for c in [(mt,0,tf,0),(ce,0,l1,0),(l1,0,l2,0),(l2,0,am,0),
                   (fe,0,fa,0),(fa,0,fb,0),(fb,0,fc,0),(fc,0,l1,1),(fc,0,l2,1),
                   (tb,0,tbb,0),(tbb,1,fv,0),(fv,0,pa,0),(pa,0,ma,0),(ma,0,av,0),(tbb,0,dk,0),(mpk,0,mf,0),(mf,0,fe,0),
-                  (k[0],0,x1,0),(x1,0,fb,1),(k[1],0,x2,0),(x2,0,dt,1),(k[2],0,x3,0),(x3,0,pa,2),(x3,0,mpk,2),(k[3],0,x4,0),(x4,0,dk,1),(x4,0,pa,1)]: sp.con(*c)
+                  (k[0],0,x1,0),(x1,0,fb,1),(k[1],0,x2,0),(k[2],0,x3,0),(x3,0,pa,2),(x3,0,mpk,2),(k[3],0,x4,0),(x4,0,dk,1),(x4,0,pa,1)]: sp.con(*c)
     elif kind=="hard":
         # v1.08 hard stab (techno, tech house): three saws spread wide plus a square, through a resonant low-pass that
         # snaps shut, then driven. The filter's own envelope is short and fast, the amp holds a little longer, so each hit
         # is a bark with a body. k1 cutoff, k2 resonance, k3 drive, k4 length. The hit strength opens the filter further
-        tf=sp.add("#X obj 80 140 t f f f;"); d1=sp.add("#X obj 140 170 * 0.991;"); d2=sp.add("#X obj 200 170 * 1.009;")
-        o0=sp.add("#X obj 80 200 phasor~;"); o1=sp.add("#X obj 140 200 phasor~;"); o2=sp.add("#X obj 200 200 phasor~;"); o3=sp.add("#X obj 260 200 phasor~;")
+        # punch (v1.08): every hit starts with a spike that drops to the body in 35 ms, and the pitch knocks down onto the
+        # note from 3 semitones up over the first 15 ms. The saws spread wider (about 25 cents)
+        pe=sp.add("#X obj 300 170 vline~;"); pm=sp.add("#X msg 300 150 1 \\, 0 15;")
+        pf=sp.add(f"#X obj 80 175 expr~ {D}f2*(1+0.19*{D}v1*{D}v1);")
+        d1=sp.add("#X obj 140 190 *~ 0.986;"); d2=sp.add("#X obj 200 190 *~ 1.014;")
+        o0=sp.add("#X obj 80 210 phasor~;"); o1=sp.add("#X obj 140 210 phasor~;"); o2=sp.add("#X obj 200 210 phasor~;"); o3=sp.add("#X obj 260 210 phasor~;")
         mx=sp.add(f"#X obj 80 230 expr~ ({D}v1+{D}v2+{D}v3)*0.66-1 + 0.7*({D}v4>0.5) - 0.35;")
         hp=sp.add("#X obj 80 255 hip~ 30;")
         fe=sp.add("#X obj 400 200 vline~;")
@@ -2248,16 +2257,17 @@ def chord_voice(sp,kind):
         vf=sp.add("#X obj 80 285 vcf~ 4;")
         dr=sp.add(f"#X obj 80 310 expr~ tanh({D}f2*{D}v1)/tanh({D}f2);")
         tbb=sp.add("#X obj 20 140 t b b;"); dk=sp.add("#X obj 300 130 f 230;")
-        pa=sp.add("#X obj 200 260 pack f 230 2;"); ma=sp.add(f"#X msg 200 285 {D}1 {D}3 \\, 0 {D}2 {D}3;")
+        pa=sp.add("#X obj 200 260 pack f 230 0;"); ma=sp.add(f"#X msg 200 285 {D}1 2 \\, {D}3 35 2 \\, 0 {D}2 37;")
+        vt=sp.add("#X obj 200 240 t f f;"); vb=sp.add("#X obj 260 240 * 0.5;")
         # the filter: up in 1 ms, down over 60% of the length, opening up to 14 times the cutoff on a full hit
         fd=sp.add("#X obj 470 130 * 0.6;"); fdl=sp.add("#X obj 470 155 f 90;"); fm=sp.add("#X obj 400 170 t b;")
         mf=sp.add(f"#X msg 400 185 1 1 \\, 0 {D}1 1;")
         va=sp.add(f"#X obj 560 200 expr 3+11*{D}f1*{D}f1;")
         x1=sp.add(f"#X obj 600 140 expr 90*pow(2\\,5.5*{D}f1);"); x2=sp.add(f"#X obj 690 140 expr 1.5+12*{D}f1;"); x3=sp.add(f"#X obj 780 140 expr 1+7*{D}f1;"); x4=sp.add(f"#X obj 870 140 expr 50+1400*{D}f1*{D}f1;")
-        for c in [(mt,0,tf,0),(tf,2,o0,0),(tf,1,d1,0),(d1,0,o1,0),(tf,0,d2,0),(d2,0,o2,0),(tf,2,o3,0),
+        for c in [(mt,0,pf,1),(pe,0,pf,0),(pf,0,o0,0),(pf,0,d1,0),(d1,0,o1,0),(pf,0,d2,0),(d2,0,o2,0),(pf,0,o3,0),(tbb,0,pm,0),(pm,0,pe,0),
                   (o0,0,mx,0),(o1,0,mx,1),(o2,0,mx,2),(o3,0,mx,3),(mx,0,hp,0),(hp,0,vf,0),(vf,1,dr,0),(dr,0,am,0),
                   (fe,0,co,0),(co,0,vf,1),
-                  (tb,0,tbb,0),(tbb,1,fv,0),(fv,0,pa,0),(pa,0,ma,0),(ma,0,av,0),(fv,0,va,0),(va,0,co,2),
+                  (tb,0,tbb,0),(tbb,1,fv,0),(fv,0,vt,0),(vt,1,vb,0),(vb,0,pa,2),(vt,0,pa,0),(pa,0,ma,0),(ma,0,av,0),(fv,0,va,0),(va,0,co,2),
                   (tbb,0,dk,0),(dk,0,fd,0),(fd,0,fdl,0),(fdl,0,mf,0),(mf,0,fe,0),
                   (k[0],0,x1,0),(x1,0,co,1),(k[1],0,x2,0),(x2,0,vf,2),(k[2],0,x3,0),(x3,0,dr,1),(k[3],0,x4,0),(x4,0,dk,1),(x4,0,pa,1)]: sp.con(*c)
     elif kind=="organ":
@@ -2367,7 +2377,7 @@ def chord_voice(sp,kind):
                   (k[0],0,x1,0),(x1,0,l1,1),(x1,0,l2,1),(k[1],0,x2,0),(x2,0,du,1),(x2,1,dd,1),
                   (k[2],0,x3,0),(x3,0,fa3,0),(fa3,1,ad,1),(fa3,0,pa,1),(k[3],0,x4,0),(x4,0,ad,0),(ad,0,pa,2)]: sp.con(*c)
 
-CHORD_GAIN={"stab":0.42,"hard":0.4,"organ":0.135,"piano":0.4,"rhodes":0.13}   # measured: stab was a third as loud as the bass, organ a little loud
+CHORD_GAIN={"stab":0.42,"hard":0.42,"organ":0.135,"piano":0.4,"rhodes":0.13}   # measured: stab was a third as loud as the bass, organ a little loud
 # v0.98: four engines. Stab became poly (its k3 is attack: 0 the dub techno stab, 1 a pad, and a string machine with the
 # chorus on), so pad (2) and strings (5) are retired; the numbers stay so saved projects load, and the screen moves them on
 CHORD_ENGINES=[(0,"stab","Poly: two detuned saws through a filter. Attack 0 is the dub techno stab \\, up is a pad \\, with the chorus a string machine"),
