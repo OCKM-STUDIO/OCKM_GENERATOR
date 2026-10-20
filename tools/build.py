@@ -151,9 +151,10 @@ p=P(); header_text(p,"Transition sounds. ockm-riser-go <ms>: white noise sweepin
 out=p.add("#X obj 30 560 outlet~;")
 # riser: noise through a band-pass that sweeps up, fading in, then cut dead
 rr=p.add("#X obj 30 40 r ockm-riser-go;"); tr_=p.add("#X obj 30 65 t f f;")
-mf=p.add(f"#X msg 30 95 300 \\, 9000 {D}1;"); mg=p.add(f"#X msg 150 95 0 \\, 0.32 {D}1 \\, 0 5 {D}1;")
+# v1.17: subtler: 7 dB quieter, the sweep stops at 6 kHz (the top was most of the whoosh) and the band is narrower
+mf=p.add(f"#X msg 30 95 300 \\, 6000 {D}1;"); mg=p.add(f"#X msg 150 95 0 \\, 0.14 {D}1 \\, 0 5 {D}1;")
 fv=p.add("#X obj 30 125 vline~;"); gv=p.add("#X obj 150 125 vline~;")
-nz=p.add("#X obj 300 125 noise~;"); bp=p.add("#X obj 300 160 vcf~ 4;"); rg=p.add("#X obj 300 195 *~;")
+nz=p.add("#X obj 300 125 noise~;"); bp=p.add("#X obj 300 160 vcf~ 7;"); rg=p.add("#X obj 300 195 *~;")
 rs=p.add("#X obj 450 40 r ockm-riser-stop;"); ms_=p.add("#X msg 450 65 0 5;")
 for c in [(rr,0,tr_,0),(tr_,1,mf,0),(tr_,0,mg,0),(mf,0,fv,0),(mg,0,gv,0),(nz,0,bp,0),(fv,0,bp,1),(bp,0,rg,0),(gv,0,rg,1),(rg,0,out,0),(rs,0,ms_,0),(ms_,0,gv,0)]: p.con(*c)
 # impact: a crash (bright noise, long fade) plus a sub boom (a sine falling from 90 to 38 Hz)
@@ -592,7 +593,8 @@ mix=p.add("#X obj 560 1000 *~ 0.15;"); fx=p.add("#X obj 560 1030 ockm-fx;"); dac
 lim=p.add(f"#X obj 560 1056 expr~ if(abs({D}v1)<0.85 \\, {D}v1 \\, (0.85+0.15*tanh((abs({D}v1)-0.85)/0.15))*({D}v1/abs({D}v1)));")
 vol=p.add("#X obj 560 1048 *~;"); rvol=p.add("#X obj 700 1000 r ockm-volume;"); pvol=p.add("#X obj 700 1020 pack f 20;"); lvol=p.add("#X obj 700 1040 line~;")
 x2v=p.add("#X obj 780 1010 * 2;")   # the 6 dB the bus gave up, made back up here: the master's 0 dB is as loud as before
-p.con(mix,0,fx,0); p.con(fx,0,vol,0); p.con(rvol,0,x2v,0); p.con(x2v,0,pvol,0); p.con(pvol,0,lvol,0); p.con(lvol,0,vol,1)
+stut=p.add("#X obj 640 1040 ockm-stutter;")   # v1.17: rewind and beat repeat, on the whole mix after the effects
+p.con(mix,0,fx,0); p.con(fx,0,stut,0); p.con(stut,0,vol,0); p.con(rvol,0,x2v,0); p.con(x2v,0,pvol,0); p.con(pvol,0,lvol,0); p.con(lvol,0,vol,1)
 p.con(vol,0,lim,0); p.con(lim,0,dac,0); p.con(lim,0,dac,1); p.con(lim,0,smaster,0)
 # the gap before a drop: no new hits for a beat, the synths let go, the effects ring on
 gsp=p.add("#X obj 250 340 spigot 1;"); p.con(pipe,0,gsp,0)
@@ -1332,6 +1334,51 @@ th=q.add(f"#X obj 30 260 expr~ if({D}f2>1.001 \\, (tanh({D}f2*{D}v1)+0.25*tanh({
 thh=q.add("#X obj 30 280 hip~ 20;"); out=q.add("#X obj 30 300 outlet~;")
 for c in [(rd,0,dx,0),(dx,0,th,1),(sm,0,th,0),(th,0,thh,0),(thh,0,out,0)]: q.con(*c)
 q.save("voices/ockm-lead.pd","#N canvas 140 140 900 340 12;")
+
+# ================= rewind and beat repeat (v1.17) =================
+# The mix after the master effects runs into a 20-second recording (a delay line) all the time. The output is the live
+# mix, or the recording read back at a moving delay, crossfaded over 6 ms so nothing clicks.
+# ockm-rewind (bang, or 1): the recording plays backwards, speeding up like a hand dragging the record back, for 1.25 s;
+#   then the loop restarts from the top and the live mix drops straight back in.
+# ockm-repeat 1 (hold): from the next step, the slice you're on loops in time: a quarter (4 steps), halving every bar you
+#   hold (an eighth, a sixteenth, a 32nd): the classic build. ockm-repeat 0: the live mix carries on where it would have
+#   been, as if it never stopped. While a repeat holds, the delay jumps back one slice at the end of every slice.
+q=P()
+q.add("#X text 20 10 Rewind and beat repeat on the mix: ockm-rewind (tap) \\, ockm-repeat 1/0 (hold). See tools/build.py.;")
+inl=q.add("#X obj 30 50 inlet~;"); dw=q.add(f"#X obj 200 80 delwrite~ {D}0-ring 20000;"); vd=q.add(f"#X obj 120 160 vd~ {D}0-ring;")
+xf=q.add(f"#X obj 30 200 expr~ {D}v1*(1-{D}v3) + {D}v2*{D}v3;"); out=q.add("#X obj 30 240 outlet~;")
+dv=q.add("#X obj 120 130 vline~;"); mv=q.add("#X obj 300 160 vline~;")
+for c in [(inl,0,dw,0),(inl,0,xf,0),(dv,0,vd,0),(vd,0,xf,1),(mv,0,xf,2),(xf,0,out,0)]: q.con(*c)
+wet=q.add("#X msg 300 130 1 6;"); dry=q.add("#X msg 380 130 0 6;"); q.con(wet,0,mv,0); q.con(dry,0,mv,0)
+zd=q.add("#X msg 460 130 0;"); q.con(zd,0,dv,0)
+# --- rewind
+rrw=q.add("#X obj 30 300 r ockm-rewind;"); trw=q.add("#X obj 30 325 t b b b;")
+spin=q.add("#X msg 120 350 0 \\, 120 125 \\, 500 125 125 \\, 4500 1000 250;")   # the delay: speed 1 to -3 over 250 ms, then -3
+drw=q.add("#X obj 30 350 delay 1250;"); trs=q.add("#X obj 30 375 t b b b;")
+rst=q.add("#X msg 30 400 \; ockm-play 1;")   # restart the loop from the top (play while playing does that)
+rpl=q.add("#X obj 260 300 r ockm-playing;"); rspg=q.add("#X obj 30 312 spigot 0;")
+for c in [(rrw,0,rspg,0),(rpl,0,rspg,1),(rspg,0,trw,0),(trw,2,wet,0),(trw,1,spin,0),(spin,0,dv,0),(trw,0,drw,0),
+          (drw,0,trs,0),(trs,2,rst,0),(trs,1,dry,0),(trs,0,zd,0)]: q.con(*c)
+# --- beat repeat
+rrp=q.add("#X obj 30 460 r ockm-repeat;"); srp=q.add("#X obj 30 485 sel 1 0;")
+arm=q.add("#X obj 200 535 spigot 0;"); a1=q.add("#X msg 30 510 1;"); a0=q.add("#X msg 100 510 0;")
+rstep=q.add("#X obj 200 510 r ockm-step;"); tgo=q.add("#X obj 200 560 t b b b b;")
+ln=q.add("#X obj 400 560 f 4;"); l4=q.add("#X msg 400 535 4;")    # the slice, in steps
+dd=q.add("#X obj 520 560 f 0;")                                     # the delay now, in ms
+slc=q.add(f"#X obj 300 610 expr ockm_stepms*{D}f1;")                 # the slice in ms
+dsl=q.add("#X obj 300 640 delay;"); tsl=q.add("#X obj 300 665 t b b;")
+add_=q.add(f"#X obj 520 640 expr {D}f1 + ockm_stepms*{D}f2;"); stp=q.add("#X obj 520 665 t f f;")
+# every bar held, the slice halves (down to half a step)
+bar=q.add("#X obj 650 610 expr ockm_stepms*16;"); dbar=q.add("#X obj 650 640 delay;"); tbr=q.add("#X obj 650 665 t b b;")
+half=q.add(f"#X obj 400 690 expr max(0.5\\, {D}f1/2);"); lnm=q.add("#X obj 400 665 f 4;")   # lnm: the slice, read when a bar ends
+stopm=q.add("#X msg 300 720 stop;"); trl=q.add("#X obj 100 560 t b b b b;")
+for c in [(rrp,0,srp,0),(srp,0,a1,0),(a1,0,arm,1),(srp,1,trl,0),(trl,3,a0,0),(a0,0,arm,1),(trl,2,stopm,0),(stopm,0,dsl,0),(stopm,0,dbar,0),(trl,1,dry,0),
+          (rstep,0,arm,0),(arm,0,tgo,0),(tgo,3,a0,0),(tgo,2,l4,0),(l4,0,ln,0),(tgo,1,wet,0),(tgo,1,zd,0),(tgo,0,slc,0),(tgo,0,bar,0),
+          (ln,0,slc,0),(slc,0,dsl,0),(dsl,0,tsl,0),(tsl,1,dd,0),(dd,0,add_,0),(ln,0,add_,1),(add_,0,stp,0),(stp,1,dd,1),(stp,0,dv,0),(tsl,0,ln,0),
+          (bar,0,dbar,0),(dbar,0,tbr,0),(ln,0,lnm,1),(tbr,1,lnm,0),(lnm,0,half,0),(half,0,ln,1),(tbr,0,bar,0)]: q.con(*c)
+q.add("#X text 300 760 the delay returns to 0 when a repeat starts \\, and to the live mix (dry) when it ends;")
+zr=q.add("#X msg 520 535 0;"); q.con(tgo,1,zr,0); q.con(zr,0,dd,1)
+q.save("seq/ockm-stutter.pd","#N canvas 120 120 900 800 12;")
 
 # ================= master effects =================
 q=P()

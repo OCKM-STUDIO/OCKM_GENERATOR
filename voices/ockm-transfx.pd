@@ -3,12 +3,12 @@
 #X obj 30 560 outlet~;
 #X obj 30 40 r ockm-riser-go;
 #X obj 30 65 t f f;
-#X msg 30 95 300 \, 9000 \$1;
-#X msg 150 95 0 \, 0.32 \$1 \, 0 5 \$1;
+#X msg 30 95 300 \, 6000 \$1;
+#X msg 150 95 0 \, 0.14 \$1 \, 0 5 \$1;
 #X obj 30 125 vline~;
 #X obj 150 125 vline~;
 #X obj 300 125 noise~;
-#X obj 300 160 vcf~ 4;
+#X obj 300 160 vcf~ 7;
 #X obj 300 195 *~;
 #X obj 450 40 r ockm-riser-stop;
 #X msg 450 65 0 5;

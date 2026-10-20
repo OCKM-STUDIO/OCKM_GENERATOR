@@ -1233,21 +1233,22 @@ def drum_lab_character_and_morph(work):
 
 @test
 def touchscreen_filter_springs_and_throw(work):
-    """On perform: sweep the filter and let go, it glides back to 0. With hold on it stays. The throw pad sends 1 then 0."""
+    """On perform: sweep the filter and let go, it glides back to 0. With hold on it stays. The repeat pad (v1.17, where throw
+    was) sends 1 then 0."""
     if not PDLUA:
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
-    h = Harness(); h.show("ockm-filter-glide", "ockm-delay-throw", "ockm-filter-now")
+    h = Harness(); h.show("ockm-filter-glide", "ockm-repeat", "ockm-filter-now")
     h.at(100, "ockm-ui-test drag 716 215 636 215")          # sweep the filter left, let go
     h.at(500, "ockm-ui-test tap 902 163")                   # hold on
     h.at(550, "ockm-ui-test drag 716 215 636 215")          # sweep again, let go: it stays
-    h.at(900, "ockm-ui-test tap 886 106")                   # throw
+    h.at(900, "ockm-ui-test tap 886 106")                   # repeat
     f = os.path.join(work, "t_spring_ui.pd"); h.finish(1000, f)
     out = run(work, f)
     gl = printed(out, "ockm-filter-glide")
     assert len(gl) == 1 and gl[0].split()[-1] == "50", f"only the first sweep should spring back, quickly (50 ms): {gl}"
     now = [float(v.split()[-1]) for v in printed(out, "ockm-filter-now")]
     assert min(now) < -0.3 and abs(now[-1]) > 0.3, f"held filter should stay where it was left: last {now[-3:]}"
-    assert [int(float(v.split()[-1])) for v in printed(out, "ockm-delay-throw")] == [1, 0], printed(out, "ockm-delay-throw")
+    assert [int(float(v.split()[-1])) for v in printed(out, "ockm-repeat")] == [1, 0], printed(out, "ockm-repeat")
 
 @test
 def melody_uses_chord_tones(work):
@@ -1826,6 +1827,33 @@ def touchscreen_scene_switches_on_and_off(work):
     assert last("ockm-d1-mute") in ("0", "?"), "the kick plays throughout"
 
 @test
+def rewind_and_beat_repeat(work):
+    """v1.17: rewind spins the mix back and restarts the loop; while repeat is held the mix repeats itself every slice."""
+    try:
+        import numpy as np
+    except ImportError:
+        raise Skip("numpy not installed")
+    def rec(name, msgs, end):
+        h = Harness(); h.record(os.path.join(work, name + ".wav")); h.show("ockm-play")
+        h.at(100, "ockm-bpm 124 ; ockm-drum-groove 3 ; ockm-bass-on 1 ; ockm-lead-on 1 ; ockm-chord-on 1 ; ockm-play 1")
+        for ms, m in msgs: h.at(ms, m)
+        h.at(end, "ockm-play 0"); f = os.path.join(work, name + ".pd"); h.finish(end + 100, f)
+        p = subprocess.run([PD, "-nogui", "-nosound", "-nomidi", "-batch"] + (["-path", PDLUA, "-lib", "pdlua"] if PDLUA else []) +
+                           ["-open", "OCKM_GENERATOR.pd", "-open", f], cwd=work, capture_output=True, text=True, timeout=300)
+        wv = wave.open(os.path.join(work, name + ".wav")); sr = wv.getframerate()
+        x = np.frombuffer(wv.readframes(wv.getnframes()), np.int16).astype(float)[::wv.getnchannels()] / 32768
+        return x, sr, p.stdout + p.stderr
+    x, sr, o = rec("rw", [(3000, "ockm-rewind bang")], 6000)
+    during = np.sqrt((x[int(3.0 * sr):int(4.1 * sr)] ** 2).mean())
+    assert during > 0.01, f"rewind should play the mix backwards, not go quiet: {during:.4f}"
+    assert [l for l in o.splitlines() if l.startswith("ockm-play")][:2] == ["ockm-play: 1", "ockm-play: 1"], "rewind should restart the loop"
+    x, sr, o = rec("rp", [(2000, "ockm-repeat 1"), (4000, "ockm-repeat 0")], 5000)
+    L = int(4 * 60000 / 124 / 4 / 1000 * sr)
+    sim = lambda a, b: float(np.corrcoef(x[int(a * sr):int(b * sr)], x[int(a * sr) - L:int(b * sr) - L])[0, 1])
+    assert sim(2.6, 3.2) > 0.8, f"held, each quarter should repeat the one before: {sim(2.6, 3.2):.2f}"
+    assert sim(1.0, 1.6) < 0.5, "before it, the mix doesn't repeat every quarter"
+
+@test
 def drum_grooves_fill_every_slot(work):
     """A groove lands on each slot by the sound it plays, makes the drums 1 bar (a groove's natural length) and sets the swing."""
     h = Harness(); h.show("ockm-drum-len")
@@ -1975,15 +2003,16 @@ def drums_tab_swipes_to_all_drums(work):
     assert any(e[:2] == ["d1", "0"] for e in edits[1:]), f"back on one drum: the kick's step 1: {edits}"
 
 @test
-def perform_pump_is_held(work):
-    """Perform's pump is a move you hold, like drop and throw: 1 while held, back to 0 on release."""
+def perform_rewind_taps_and_repeat_holds(work):
+    """v1.17: Perform's rewind (where pump was) is a tap; repeat (where throw was) is held: 1 while held, 0 on release."""
     sys.path.insert(0, os.path.join(ROOT, "tests"))
     import ui_preview
     if not ui_preview.LUA:
         raise Skip("no lua to run the screen")
-    L = ui_preview.run(["test press 660 106", "test release 660 106"])
-    pump = [float(l.split()[3]) for l in L if l.startswith("sent ockm-pump ")]
-    assert pump == [1, 0], f"held then let go: {pump}"
+    L = ui_preview.run(["test press 660 106", "test release 660 106", "test press 886 106", "test release 886 106"])
+    assert len([l for l in L if l.startswith("sent ockm-rewind")]) == 1, f"one tap, one rewind: {[l for l in L if 'rewind' in l]}"
+    rp = [float(l.split()[3]) for l in L if l.startswith("sent ockm-repeat ")]
+    assert rp == [1, 0], f"repeat held then let go: {rp}"
 
 @test
 def breakdown_recipe_runs_for_bars_or_while_held(work):
@@ -2036,8 +2065,8 @@ def midi_pads_and_knobs(work):
     assert kick[:2] == ["1", "0"], f"the top-left pad toggles the kick: {kick}"
     held = L.index("mark held")
     assert any(l.startswith("sent ockm-filter-glide ") for l in L[:held]), "slot B (lift) moves the filter while held"
-    pump = [l.split()[3] for l in L[:L.index("mark keys")] if l.startswith("sent ockm-pump ")]
-    assert pump == ["1", "0"], f"the pump pad is held: {pump}"
+    rw = [l for l in L[:L.index("mark keys")] if l.startswith("sent ockm-rewind")]
+    assert len(rw) == 1, f"the top-right pad of bank B rewinds (v1.17, where pump was): {rw}"
     fl = [float(l.split()[3]) for l in L if l.startswith("sent ockm-filter ")]
     assert fl[:3] == [-1, 0, 1], f"knob 1 is the filter, off in the middle: {fl}"
     assert [float(l.split()[3]) for l in L if l.startswith("sent ockm-lead-k1 ")][-1:] == [1], "knob 5 is k1 of the synth on screen (the lead tab)"
@@ -2045,7 +2074,7 @@ def midi_pads_and_knobs(work):
     pg = L[L.index("mark pgm"):]
     assert any(l.startswith("sent ockm-d1-mute-q ") and l.endswith(" 1") for l in pg), "program 4 (top left) toggles the kick"
     assert any(l.startswith("sent ockm-filter-glide ") for l in pg[:pg.index("mark tapped")]), "program 13 taps lift"
-    assert [l.split()[3] for l in pg if l.startswith("sent ockm-pump ")] == ["1", "0"], "program 15 toggles pump on, then off"
+    assert len([l for l in pg if l.startswith("sent ockm-rewind")]) == 2, "program 15 rewinds, each time"
 
 @test
 def retired_engines_move_on_and_engines_load_their_sweet_spot(work):

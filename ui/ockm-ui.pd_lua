@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v1.16"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v1.17"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -1002,14 +1002,13 @@ function ui:layout_perform(add)
     self:send("ockm-rise", rise and 0 or 1)
     self:say(rise and "rise off: no drop" or "rise: building to the next loop start (2 bars or more), then the drop")
   end }
-  local plab = (pump <= 0) and "pump" or ((pump < 0.75) and "pump ·" or "pump ··")
-  add{ kind="choice", x=mx + (mw + 6), y=PART_Y, w=mw, h=PART_H, label=plab, sel=(pump > 0), accent=true, tap=function()
-    local nx = (pump <= 0) and 0.5 or ((pump < 0.75) and 1 or 0)
-    self:send("ockm-pump", nx)
-    self:say((nx == 0) and "pump off" or ((nx < 0.75) and "pump: the kick ducks the synths, lightly" or "pump: deep, house-style"))
+  -- v1.17: rewind (a tap) and beat repeat (hold) in place of pump and throw (the macros still use those)
+  add{ kind="btn", x=mx + (mw + 6), y=PART_Y, w=mw, h=PART_H, label="rewind", edge=true, flash="rewind", tap=function()
+    psend("ockm-rewind", "bang", {}); self:flash_btn("rewind")
+    self:say("rewind: back it spins, then the loop drops in again from the top")
   end }
   add{ kind="pad", x=mx + 2 * (mw + 6), y=PART_Y, w=mw, h=PART_H, hook="ockm-drop", label="drop" }
-  add{ kind="pad", x=mx + 3 * (mw + 6), y=PART_Y, w=mw, h=PART_H, hook="ockm-delay-throw", label="throw" }
+  add{ kind="pad", x=mx + 3 * (mw + 6), y=PART_Y, w=mw, h=PART_H, hook="ockm-repeat", label="repeat" }
   -- the filter: springs back to off when you let go, unless held. Drive beside it
   local fw = math.floor((iw - 6) * 2 / 3)
   local hold = self.filter_hold
@@ -1162,11 +1161,12 @@ function ui:layout_live(add)
   local rise = (self.v["ockm-rise"] or 0) > 0
   local pump = self.v["ockm-pump"] or 0
   add{ kind="choice", x=mx, y=80, w=mw, h=52, label="rise", sel=rise, accent=true, tap=function() self:send("ockm-rise", rise and 0 or 1) end }
-  -- v0.88: pump is a move you hold, like drop and throw: everything dips on each kick, deep, until you let go. How each
-  -- part pumps the rest of the time is its own sidechain, on its tab
-  add{ kind="pad", x=mx + (mw + 6), y=80, w=mw, h=52, hook="ockm-pump", label="pump", sub="hold" }
+  -- v1.17: rewind (tap: it spins back, then the loop restarts from the top) and beat repeat (hold: the slice you're on
+  -- loops in time, halving every bar you hold). They replace pump and throw; the macros still use those
+  add{ kind="btn", x=mx + (mw + 6), y=80, w=mw, h=52, label="rewind", edge=true, flash="rewind", tap=function()
+    psend("ockm-rewind", "bang", {}); self:flash_btn("rewind") end }
   add{ kind="pad", x=mx + 2 * (mw + 6), y=80, w=mw, h=52, hook="ockm-drop", label="drop", sub="hold" }
-  add{ kind="pad", x=mx + 3 * (mw + 6), y=80, w=mw, h=52, hook="ockm-delay-throw", label="throw", sub="hold" }
+  add{ kind="pad", x=mx + 3 * (mw + 6), y=80, w=mw, h=52, hook="ockm-repeat", label="repeat", sub="hold" }
   local hold = self.filter_hold
   add{ kind="hbar", x=mx, y=140, w=iw, h=150, hook="ockm-filter", lo=-1, hi=1, label=hold and "filter (held)" or "filter", bold=true, spring=not hold }
   add{ kind="choice", x=mx + iw - 64, y=148, w=56, h=30, label="hold", small=true, onbar=true, sel=hold, tap=function()
@@ -1518,7 +1518,7 @@ function ui:pad_action(i, down)
     return
   end
   local b = i - 8
-  local MOVES = { [4] = "ockm-pump", [5] = "ockm-drop", [6] = "ockm-delay-throw" }
+  local MOVES = { [5] = "ockm-drop", [6] = "ockm-repeat" }   -- v1.17: rewind (pad 4) and repeat in place of pump and throw
   if b <= 3 then
     if down == nil then
       -- a tap with no let go: a recipe with a length runs its bars; any other macro stays on until the next tap
@@ -1529,6 +1529,8 @@ function ui:pad_action(i, down)
         if now.run then self:macro_up(b) else now.latched = true end
       end
     elseif down then self:macro_down(b) else self:macro_up(b) end
+  elseif b == 4 then
+    if down ~= false then psend("ockm-rewind", "bang", {}); self:flash_btn("rewind") end
   elseif MOVES[b] then
     local h = MOVES[b]
     local on = down

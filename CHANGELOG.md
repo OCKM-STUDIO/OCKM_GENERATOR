@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.17 (20 October 2026)
+
+- **Rewind** (Perform, in place of pump): tap and the last few seconds of the mix spin backwards, speeding up like a hand dragging the record, then the loop restarts from the top and drops straight back in
+- **Repeat** (Perform, in place of throw): hold and the slice you're on loops in time from the next step, a quarter to start, halving every bar you hold (an eighth, a sixteenth, a 32nd). Let go and the mix carries on as if it never stopped
+- **Rise is subtler:** its noise riser is 7 dB quieter, sweeps to 6 kHz (not 9) and is narrower: a lift, not a whoosh. The filter build and the drop are as before
+- Both act on the whole mix, after the effects (seq/ockm-stutter.pd: a 20-second recording of the mix, read back at a moving delay). Pump and throw stay for the macros (dub out, build). On the MIDI pads, bank B: rewind where pump was, repeat where throw was
+
 ## v1.16 (20 October 2026)
 
 - **Perform's scenes are switches:** drums only, no drums and kick + bass light up when on; tap again and exactly what was muted and soloed before comes back. Change a mute by hand while one is on and it lets go. All in stays a one-shot (everything in, solos cleared)
