@@ -1828,7 +1828,8 @@ def touchscreen_scene_switches_on_and_off(work):
 
 @test
 def rewind_and_beat_repeat(work):
-    """v1.17: rewind spins the mix back and restarts the loop; while repeat is held the mix repeats itself every slice."""
+    """v1.17: rewind spins the mix back (half a second) and restarts the loop; while repeat is held the drums repeat
+    themselves every slice (an eighth to start; the synths are off here so the drums can be measured)."""
     try:
         import numpy as np
     except ImportError:
@@ -1844,14 +1845,14 @@ def rewind_and_beat_repeat(work):
         x = np.frombuffer(wv.readframes(wv.getnframes()), np.int16).astype(float)[::wv.getnchannels()] / 32768
         return x, sr, p.stdout + p.stderr
     x, sr, o = rec("rw", [(3000, "ockm-rewind bang")], 6000)
-    during = np.sqrt((x[int(3.0 * sr):int(4.1 * sr)] ** 2).mean())
+    during = np.sqrt((x[int(3.05 * sr):int(3.45 * sr)] ** 2).mean())
     assert during > 0.01, f"rewind should play the mix backwards, not go quiet: {during:.4f}"
     assert [l for l in o.splitlines() if l.startswith("ockm-play")][:2] == ["ockm-play: 1", "ockm-play: 1"], "rewind should restart the loop"
-    x, sr, o = rec("rp", [(2000, "ockm-repeat 1"), (4000, "ockm-repeat 0")], 5000)
-    L = int(4 * 60000 / 124 / 4 / 1000 * sr)
+    x, sr, o = rec("rp", [(150, "ockm-bass-on 0 ; ockm-lead-on 0 ; ockm-chord-on 0"), (2000, "ockm-repeat 1"), (4000, "ockm-repeat 0")], 5000)
+    L = int(2 * 60000 / 124 / 4 / 1000 * sr)
     sim = lambda a, b: float(np.corrcoef(x[int(a * sr):int(b * sr)], x[int(a * sr) - L:int(b * sr) - L])[0, 1])
-    assert sim(2.6, 3.2) > 0.8, f"held, each quarter should repeat the one before: {sim(2.6, 3.2):.2f}"
-    assert sim(1.0, 1.6) < 0.5, "before it, the mix doesn't repeat every quarter"
+    assert sim(2.3, 2.9) > 0.8, f"held, each eighth should repeat the one before: {sim(2.3, 2.9):.2f}"
+    assert sim(1.0, 1.6) < 0.7, f"before it, the drums don't repeat every eighth: {sim(1.0, 1.6):.2f}"
 
 @test
 def drum_grooves_fill_every_slot(work):

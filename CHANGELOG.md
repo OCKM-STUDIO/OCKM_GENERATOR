@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.18 (20 October 2026)
+
+- **Rewind is twice as fast:** up to 6 times speed backwards within 100 ms, half a second in all, then the loop drops back in from the top
+- **Repeat is on the drums only,** with the bass, chords and lead carrying on under it (much clearer than repeating the whole loop, which already repeats). It starts on an eighth and halves every half bar you hold it (a sixteenth, then a 32nd)
+
 ## v1.17 (20 October 2026)
 
 - **Rewind** (Perform, in place of pump): tap and the last few seconds of the mix spin backwards, speeding up like a hand dragging the record, then the loop restarts from the top and drops straight back in

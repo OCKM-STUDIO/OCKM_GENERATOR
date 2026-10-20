@@ -593,7 +593,7 @@ mix=p.add("#X obj 560 1000 *~ 0.15;"); fx=p.add("#X obj 560 1030 ockm-fx;"); dac
 lim=p.add(f"#X obj 560 1056 expr~ if(abs({D}v1)<0.85 \\, {D}v1 \\, (0.85+0.15*tanh((abs({D}v1)-0.85)/0.15))*({D}v1/abs({D}v1)));")
 vol=p.add("#X obj 560 1048 *~;"); rvol=p.add("#X obj 700 1000 r ockm-volume;"); pvol=p.add("#X obj 700 1020 pack f 20;"); lvol=p.add("#X obj 700 1040 line~;")
 x2v=p.add("#X obj 780 1010 * 2;")   # the 6 dB the bus gave up, made back up here: the master's 0 dB is as loud as before
-stut=p.add("#X obj 640 1040 ockm-stutter;")   # v1.17: rewind and beat repeat, on the whole mix after the effects
+stut=p.add("#X obj 640 1040 ockm-stutter 1 0;")   # v1.17: rewind, on the whole mix after the effects (repeat is on the drums)
 p.con(mix,0,fx,0); p.con(fx,0,stut,0); p.con(stut,0,vol,0); p.con(rvol,0,x2v,0); p.con(x2v,0,pvol,0); p.con(pvol,0,lvol,0); p.con(lvol,0,vol,1)
 p.con(vol,0,lim,0); p.con(lim,0,dac,0); p.con(lim,0,dac,1); p.con(lim,0,smaster,0)
 # the gap before a drop: no new hits for a beat, the synths let go, the effects ring on
@@ -672,7 +672,8 @@ for r,(nm,snd) in enumerate(SLOTS):
     ds=p.add(f"#X obj 990 {y+2} *~ 0;"); dt_=p.add(f"#X obj 1060 {y+2} throw~ ockm-dlybus;"); dr_=p.add(f"#X obj 990 {y-18} r ockm-{nm}-delay;")
     p.con(v,0,ds,0); p.con(ds,0,dt_,0); p.con(dr_,0,ds,1)
 # the drum bus: the eight drums together, then into the mix
-cdb=p.add("#X obj 400 960 catch~ ockm-drumbus;"); dbus=p.add("#X obj 400 980 ockm-drumbus;"); p.con(cdb,0,dbus,0); p.con(dbus,0,mix,0)
+cdb=p.add("#X obj 400 960 catch~ ockm-drumbus;"); dbus=p.add("#X obj 400 980 ockm-drumbus;"); p.con(cdb,0,dbus,0)
+dstut=p.add("#X obj 400 990 ockm-stutter 0 1;"); p.con(dbus,0,dstut,0); p.con(dstut,0,mix,0)   # v1.17: beat repeat on the drums only
 rsm=p.add("#X obj 1600 380 r ockm-stepms;"); vsm=p.add("#X obj 1600 405 v ockm_stepms;"); p.con(rsm,0,vsm,0)
 # build and drop (v0.83). ockm-rise 1 starts a build that ends on a loop start at least 2 bars away: the high-pass climbs
 # (slowly at first), a noise riser comes in over the last bar's first 3 beats, the last beat drops out (ockm-gap), and on
@@ -1338,13 +1339,14 @@ q.save("voices/ockm-lead.pd","#N canvas 140 140 900 340 12;")
 # ================= rewind and beat repeat (v1.17) =================
 # The mix after the master effects runs into a 20-second recording (a delay line) all the time. The output is the live
 # mix, or the recording read back at a moving delay, crossfaded over 6 ms so nothing clicks.
-# ockm-rewind (bang, or 1): the recording plays backwards, speeding up like a hand dragging the record back, for 1.25 s;
+# ockm-rewind (bang, or 1): the recording plays backwards, speeding up like a hand dragging the record back (to 6 times
+#   speed in 100 ms), for half a second;
 #   then the loop restarts from the top and the live mix drops straight back in.
-# ockm-repeat 1 (hold): from the next step, the slice you're on loops in time: a quarter (4 steps), halving every bar you
-#   hold (an eighth, a sixteenth, a 32nd): the classic build. ockm-repeat 0: the live mix carries on where it would have
+# ockm-repeat 1 (hold), on the drums only (the music carries on under it): from the next step, the slice you're on loops
+#   in time: an eighth (2 steps), halving every half bar you hold (a sixteenth, a 32nd): the classic build. ockm-repeat 0: the live mix carries on where it would have
 #   been, as if it never stopped. While a repeat holds, the delay jumps back one slice at the end of every slice.
 q=P()
-q.add("#X text 20 10 Rewind and beat repeat on the mix: ockm-rewind (tap) \\, ockm-repeat 1/0 (hold). See tools/build.py.;")
+q.add("#X text 20 10 Rewind and beat repeat: ockm-rewind (tap) \\, ockm-repeat 1/0 (hold). Args: rewind on \\, repeat on (the master does rewind \\, the drum bus repeat). See tools/build.py.;")
 inl=q.add("#X obj 30 50 inlet~;"); dw=q.add(f"#X obj 200 80 delwrite~ {D}0-ring 20000;"); vd=q.add(f"#X obj 120 160 vd~ {D}0-ring;")
 xf=q.add(f"#X obj 30 200 expr~ {D}v1*(1-{D}v3) + {D}v2*{D}v3;"); out=q.add("#X obj 30 240 outlet~;")
 dv=q.add("#X obj 120 130 vline~;"); mv=q.add("#X obj 300 160 vline~;")
@@ -1353,26 +1355,30 @@ wet=q.add("#X msg 300 130 1 6;"); dry=q.add("#X msg 380 130 0 6;"); q.con(wet,0,
 zd=q.add("#X msg 460 130 0;"); q.con(zd,0,dv,0)
 # --- rewind
 rrw=q.add("#X obj 30 300 r ockm-rewind;"); trw=q.add("#X obj 30 325 t b b b;")
-spin=q.add("#X msg 120 350 0 \\, 120 125 \\, 500 125 125 \\, 4500 1000 250;")   # the delay: speed 1 to -3 over 250 ms, then -3
-drw=q.add("#X obj 30 350 delay 1250;"); trs=q.add("#X obj 30 375 t b b b;")
+# v1.17b: twice as fast: speed 1 to -6 over 100 ms, then -6, half a second in all
+spin=q.add("#X msg 120 350 0 \\, 80 50 \\, 350 50 50 \\, 3150 400 100;")
+drw=q.add("#X obj 30 350 delay 500;"); trs=q.add("#X obj 30 375 t b b b;")
 rst=q.add("#X msg 30 400 \; ockm-play 1;")   # restart the loop from the top (play while playing does that)
 rpl=q.add("#X obj 260 300 r ockm-playing;"); rspg=q.add("#X obj 30 312 spigot 0;")
-for c in [(rrw,0,rspg,0),(rpl,0,rspg,1),(rspg,0,trw,0),(trw,2,wet,0),(trw,1,spin,0),(spin,0,dv,0),(trw,0,drw,0),
+ron=q.add(f"#X obj 30 290 spigot {D}1;"); q.con(rrw,0,ron,0)
+for c in [(ron,0,rspg,0),(rpl,0,rspg,1),(rspg,0,trw,0),(trw,2,wet,0),(trw,1,spin,0),(spin,0,dv,0),(trw,0,drw,0),
           (drw,0,trs,0),(trs,2,rst,0),(trs,1,dry,0),(trs,0,zd,0)]: q.con(*c)
 # --- beat repeat
 rrp=q.add("#X obj 30 460 r ockm-repeat;"); srp=q.add("#X obj 30 485 sel 1 0;")
 arm=q.add("#X obj 200 535 spigot 0;"); a1=q.add("#X msg 30 510 1;"); a0=q.add("#X msg 100 510 0;")
 rstep=q.add("#X obj 200 510 r ockm-step;"); tgo=q.add("#X obj 200 560 t b b b b;")
-ln=q.add("#X obj 400 560 f 4;"); l4=q.add("#X msg 400 535 4;")    # the slice, in steps
+ln=q.add("#X obj 400 560 f 2;"); l4=q.add("#X msg 400 535 2;")    # the slice, in steps: an eighth to start (v1.17b)
 dd=q.add("#X obj 520 560 f 0;")                                     # the delay now, in ms
 slc=q.add(f"#X obj 300 610 expr ockm_stepms*{D}f1;")                 # the slice in ms
 dsl=q.add("#X obj 300 640 delay;"); tsl=q.add("#X obj 300 665 t b b;")
 add_=q.add(f"#X obj 520 640 expr {D}f1 + ockm_stepms*{D}f2;"); stp=q.add("#X obj 520 665 t f f;")
 # every bar held, the slice halves (down to half a step)
-bar=q.add("#X obj 650 610 expr ockm_stepms*16;"); dbar=q.add("#X obj 650 640 delay;"); tbr=q.add("#X obj 650 665 t b b;")
-half=q.add(f"#X obj 400 690 expr max(0.5\\, {D}f1/2);"); lnm=q.add("#X obj 400 665 f 4;")   # lnm: the slice, read when a bar ends
+# v1.17b: it halves every half bar
+bar=q.add("#X obj 650 610 expr ockm_stepms*8;"); dbar=q.add("#X obj 650 640 delay;"); tbr=q.add("#X obj 650 665 t b b;")
+half=q.add(f"#X obj 400 690 expr max(0.5\\, {D}f1/2);"); lnm=q.add("#X obj 400 665 f 2;")   # lnm: the slice, read when a bar ends
 stopm=q.add("#X msg 300 720 stop;"); trl=q.add("#X obj 100 560 t b b b b;")
-for c in [(rrp,0,srp,0),(srp,0,a1,0),(a1,0,arm,1),(srp,1,trl,0),(trl,3,a0,0),(a0,0,arm,1),(trl,2,stopm,0),(stopm,0,dsl,0),(stopm,0,dbar,0),(trl,1,dry,0),
+pon=q.add(f"#X obj 30 472 spigot {D}2;"); q.con(rrp,0,pon,0)
+for c in [(pon,0,srp,0),(srp,0,a1,0),(a1,0,arm,1),(srp,1,trl,0),(trl,3,a0,0),(a0,0,arm,1),(trl,2,stopm,0),(stopm,0,dsl,0),(stopm,0,dbar,0),(trl,1,dry,0),
           (rstep,0,arm,0),(arm,0,tgo,0),(tgo,3,a0,0),(tgo,2,l4,0),(l4,0,ln,0),(tgo,1,wet,0),(tgo,1,zd,0),(tgo,0,slc,0),(tgo,0,bar,0),
           (ln,0,slc,0),(slc,0,dsl,0),(dsl,0,tsl,0),(tsl,1,dd,0),(dd,0,add_,0),(ln,0,add_,1),(add_,0,stp,0),(stp,1,dd,1),(stp,0,dv,0),(tsl,0,ln,0),
           (bar,0,dbar,0),(dbar,0,tbr,0),(ln,0,lnm,1),(tbr,1,lnm,0),(lnm,0,half,0),(half,0,ln,1),(tbr,0,bar,0)]: q.con(*c)
