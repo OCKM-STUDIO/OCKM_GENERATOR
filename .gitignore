@@ -10,3 +10,11 @@ samples/sources.csv
 exports/
 undo/
 .pi/
+.clipboard.txt
+my-settings.lua
+ui-preview/
+sketches/
+# your own projects stay yours: only the blank one (default) is shared
+projects/*
+!projects/default/
+!projects/current.txt
