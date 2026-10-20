@@ -299,7 +299,7 @@ def bass_generator(work):
         h.con(g, t)
         h.at(ms, f"test-{label} bang")
     h.at(100, "ockm-bass-notes 0 ; ockm-bass-rhythm 0"); grab(150, "a")
-    h.at(200, "ockm-bass-notes 3 ; ockm-bass-rhythm 12"); grab(250, "b")    # acid classic
+    h.at(200, "ockm-bass-notes 3 ; ockm-bass-rhythm 12"); grab(250, "b")    # acid (v1.05: acid classic and acid 16ths merged)
     h.at(300, "ockm-root 0 ; ockm-scale 3 ; ockm-bass-notes 6 ; ockm-bass-rhythm 10"); grab(350, "c")   # round the kick
     f = os.path.join(work, "t_gen.pd"); h.finish(450, f)
     out = run(work, f)
@@ -307,7 +307,7 @@ def bass_generator(work):
     def hits(label): return [n for n, o in zip(got[label + "-note"], got[label + "-on"]) if o]
     assert got["a-on"] == [0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0], "offbeat rhythm wrong"
     assert hits("a") == [33] * 4, "root notes in A minor should all be 33"
-    assert hits("b") == [33, 33, 45, 33, 36, 33, 43, 40, 33, 33, 45, 33, 36], f"acid riff wrong: {hits('b')}"
+    assert hits("b") == [33, 33, 45, 33, 36, 33, 43, 40, 33, 33, 45], f"acid riff wrong: {hits('b')}"   # v1.05: acid rhythm X.sxX.s.xsX.s.Sx
     assert hits("c") == [36, 36, 31, 32] * 3, f"dub pattern in C phrygian wrong: {hits('c')}"
 
 @test
@@ -621,6 +621,26 @@ def bass_riffs_slide_and_octave(work):
     assert [b - a for a, b in zip(n, n2)][0] == 12, f"octave up: {n[:4]} -> {n2[:4]}"
     _, sl2 = take("ockm-bass-riff 2 ; ockm-bass-slideamt 1")
     assert sum(sl) == 0 and sum(sl2) >= 4, f"slide: none on plain 8ths, most notes slide at 1: {sl} {sl2}"
+
+@test
+def bass_rhythm_siblings_on_the_last_bar(work):
+    """v1.05: a one-bar rhythm carries two siblings, other last bars of the phrase. Offbeat over 2 bars: the original plays
+    the plain bar twice; variation 1 (seed 1) ends with sibling A (a pickup 16th on step 31), variation 2 with sibling B
+    (no pickup)."""
+    def take(seed):
+        h = Harness()
+        h.at(100, f"ockm-resync bang ; ockm-chord-prog 0 ; ockm-bass-len 32 ; ockm-bass-riff 0 ; ockm-bass-seed {seed} ; ockm-bass-rhythm 0")
+        g = h.add("#X obj 10 300 r test-get;"); a = h.add("#X obj 10 360 array get ockm-pat-bass-on 0 32;"); pr = h.add("#X obj 10 390 print ON;")
+        h.con(g, a); h.con(a, pr); h.at(250, "test-get bang")
+        f = os.path.join(work, f"t_sib{seed}.pd"); h.finish(350, f)
+        on = [int(float(x)) for x in printed(run(work, f), "ON")[-1].split()]
+        return [i for i, v in enumerate(on) if v > 0]
+    base = [2, 6, 10, 14, 18, 22, 26, 30]
+    assert take(0) == base, f"original: {take(0)}"
+    a = take(1)
+    assert a[:4] == base[:4] and 31 in a, f"variation 1: sibling A on the last bar (a pickup on 31): {a}"
+    b = take(2)   # (a variation also moves a hit or two of its own, v0.86, so only the last 16th is checked here)
+    assert 31 not in b and [x for x in b if x >= 16] != [x for x in a if x >= 16], f"variation 2: sibling B, no pickup: {b}"
 
 @test
 def chord_engines_sound(work):
@@ -1677,7 +1697,7 @@ def song_styles_set_the_lot(work):
     assert t["ockm-bpm"] == 132 and t["ockm-swing"] == 50 and t["ockm-drum-groove"] == 5, t
     assert t["ockm-root"] == 5 and t["ockm-scale"] == 3, "F phrygian"
     assert t["ockm-d1-drive"] == 0.5 and t["ockm-d1-tune"] == -2, "the kick gets harder and lower"
-    assert t["ockm-lead-on"] == 1 and t["ockm-bass-rhythm"] == 10 and t["ockm-bass-sync"] == 0 and t["ockm-chord-on"] == 1, t
+    assert t["ockm-lead-on"] == 1 and t["ockm-bass-rhythm"] == 2 and t["ockm-bass-sync"] == 0 and t["ockm-chord-on"] == 1, t
     assert t["ockm-style"] == 11, t
     d = sent(ui_preview.run(["test tap 477 36", DEEP, CLASSIC]))
     assert d["ockm-bpm"] == 122 and d["ockm-scale"] == 2 and d["ockm-chord-engine"] == 4 and d["ockm-lead-on"] == 0, d

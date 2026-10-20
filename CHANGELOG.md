@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.05 (19 October 2026)
+
+Step 9 of the harmony and generator proposal: rhythms with siblings, and the bass rhythm list cut to house and techno.
+
+- **Siblings:** every one-bar bass rhythm, and the one-bar lead rhythms (offbeat, rolling, acid, hook, sparse melody), carries two alternative last bars. The original plays the plain bar throughout; a variation (mutate, or evolve) ends the part on one of the siblings: a pickup 16th, a dropped last note, a held last beat, a 16th run, depending on the rhythm. Fewer presets, more music
+- **Bass rhythms, eleven:** offbeat, 8ths, 16ths, dotted, octave, held, on the beat, cluster, bounce, acid (acid classic and acid 16ths merged) and the new **house pickup** (four bars of 8ths that walk into the next phrase). Dembow, two step, round the kick, gallop, sparse dub, trip hop and speed garage are off the list; loops saved on them still play
+
 ## v1.04 (19 October 2026)
 
 Step 8 of the harmony and generator proposal: more progressions, and how the phrase ends.

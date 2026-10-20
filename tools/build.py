@@ -1414,7 +1414,9 @@ def _bank(fn): return " ".join(str(v) for k in range(8) for v in fn(k))
 def _brh(*bars):
     """Bass rhythms, one or four bars of 16 steps: X accent, x note, s/S note (accent) that slides into the next,
     - holds the note before it (no new note: it carries on). A note or hold followed by a hold slides on into it."""
-    assert len(bars) in (1,4) and all(len(b)==16 for b in bars)
+    assert len(bars) in (1,3,4) and all(len(b)==16 for b in bars)
+    if len(bars)==3:   # v1.05: a one-bar rhythm and its two siblings (other last bars of the phrase), each read as its own bar
+        return " ".join(_brh(b) for b in bars)
     c="".join(bars); out=[]
     for i,ch in enumerate(c):
         nxt=c[(i+1)%len(c)]
@@ -1425,30 +1427,46 @@ def _brh(*bars):
             if nxt=="-" and v<3: v+=2                            # held on: slide into the hold
             out.append(v)
     return " ".join(str(v) for v in out)
+def _sib(r):
+    v=[int(x) for x in r.split()]; assert len(v)==16
+    a=v[:]
+    for i in range(15,8,-1):
+        if a[i]>0: a[i]=0; break
+    b=v[:]
+    if b[15]==0: b[15]=1
+    elif b[14]==0: b[14]=1
+    return " ".join(str(x) for x in v+a+b)
 def _rhy4(*bars):
     assert len(bars)==4 and all(len(b)==16 for b in bars)
     return " ".join(str({".":0,"x":1,"X":2,"s":3,"S":4}[c]) for b in bars for c in b)
-PRE={"leadrhythm":[("offbeat","0 0 2 0 0 0 1 0 0 0 2 0 0 0 1 0"),("rolling","0 2 1 1 0 2 1 1 0 2 1 1 0 2 1 1"),("gallop","0 0 2 1 0 1 2 0 0 0 2 1 0 1 2 0"),
-               ("acid-classic","2 1 0 1 3 4 1 0 2 1 3 1 0 2 1 3"),("sparse-dub","2 0 0 0 0 0 0 1 0 0 1 0 0 0 0 0"),("tech-bounce","0 0 2 0 0 1 0 0 0 0 2 0 0 1 0 1"),
-               ("acid-16ths","2 1 3 1 2 1 1 3 2 1 3 1 2 3 1 1"),("trip-hop","2 0 0 0 0 0 3 1 0 0 0 0 0 0 1 0"),("hook","2 0 0 1 0 0 1 0 0 0 1 0 1 0 0 0"),("sparse-melody","2 0 0 0 0 0 1 0 0 3 0 0 1 0 0 0"),
+PRE={"leadrhythm":[("offbeat",_sib("0 0 2 0 0 0 1 0 0 0 2 0 0 0 1 0")),("rolling",_sib("0 2 1 1 0 2 1 1 0 2 1 1 0 2 1 1")),("gallop","0 0 2 1 0 1 2 0 0 0 2 1 0 1 2 0"),
+               ("acid-classic",_sib("2 1 0 1 3 4 1 0 2 1 3 1 0 2 1 3")),("sparse-dub","2 0 0 0 0 0 0 1 0 0 1 0 0 0 0 0"),("tech-bounce","0 0 2 0 0 1 0 0 0 0 2 0 0 1 0 1"),
+               ("acid-16ths","2 1 3 1 2 1 1 3 2 1 3 1 2 3 1 1"),("trip-hop","2 0 0 0 0 0 3 1 0 0 0 0 0 0 1 0"),("hook",_sib("2 0 0 1 0 0 1 0 0 0 1 0 1 0 0 0")),("sparse-melody",_sib("2 0 0 0 0 0 1 0 0 3 0 0 1 0 0 0")),
                # four bars long (v0.52): phrases that breathe
                ("phrase",_rhy4("X.x.x.x.X...x.x.","X.x.x.x.X...x...","X.x.x.x.X.x.x.x.","X...x...X.......")),
                ("question-answer",_rhy4("X.x.x..xX.x.....","x.......X.......","X.x.x..xX.x.....","x...x...X.......")),
                ("pickup",_rhy4("X.....x.....x.x.","X.......x...x.x.","X.....x.....x.x.","X...x...X.......")),
                ("arp-gate",_rhy4("XxxxXxx.XxxxXxx.","XxxxXxx.XxxxXxx.","XxxxXxxxXxxxXxxx","Xxx.Xxx.X.x.X..."))],
      # the bass has its own list: the classic dance bass rhythms first, then the older ones
-     "bassrhythm":[("offbeat-donk",_brh("..X...x...X...x.")),("straight-8ths",_brh("X.x.x.x.X.x.x.x.")),
-                   ("rolling-16ths",_brh("xxXxxxXxxxXxxxXx")),("dotted-8ths",_brh("X..x..x..X..x..x")),
-                   ("octave-jump",_brh("x.X.x.X.x.X.x.X.")),("sustained",_brh("X---------------")),
-                   ("quarters",_brh("X...x...X...x...")),("dembow",_brh("X..x..x.X..x..x.")),
+     # v1.05: eleven bass rhythms named by feel, each one-bar rhythm with two siblings (other last bars of the phrase,
+     # picked by mutate and evolve). Retired ones (7 8 10 11 13 15 16 17) stay, hidden on the screen, so saved loops play on
+     "bassrhythm":[("offbeat",_brh("..X...x...X...x.","..X...x...X...xx","..X...x...X.....")),
+                   ("8ths",_brh("X.x.x.x.X.x.x.x.","X.x.x.x.X.x.x.xx","X.x.x.x.X.x.....")),
+                   ("16ths",_brh("xxXxxxXxxxXxxxXx","xXxxxXxxxXxxxXxx","xxXxxxXxxxXxx---")),
+                   ("dotted",_brh("X..x..x..X..x..x","X..x..x..X.x.x.x","X..x..x..X..x...")),
+                   ("octave",_brh("x.X.x.X.x.X.x.X.","x.X.x.X.x.X.x.x.","xXxXxXxXx.X.x.X.")),
+                   ("held",_brh("X---------------","X-------X-------","s---------------")),
+                   ("on-the-beat",_brh("X...x...X...x...","X...x...X..xx...","X...x...X...x.x.")),("dembow",_brh("X..x..x.X..x..x.")),
                    ("two-step",_brh("X.....x...X..x..","..x..x....X...x.","X.....x...X..x..","..x..x..X...x...")),
-                   ("3-2-3-cluster",_brh("Xxx.xx.Xxx..xx..")),
+                   ("cluster",_brh("Xxx.xx.Xxx..xx..","..xx.xxX.xx.xxX.","Xxx.xx.Xxx.xxxxx")),
                    ("round-the-kick","0 2 1 1 0 2 1 1 0 2 1 1 0 2 1 1"),("gallop","0 0 2 1 0 1 2 0 0 0 2 1 0 1 2 0"),
-                   ("acid-classic","2 1 0 1 3 4 1 0 2 1 3 1 0 2 1 3"),("acid-16ths","2 1 3 1 2 1 1 3 2 1 3 1 2 3 1 1"),
-                   ("tech-bounce","0 0 2 0 0 1 0 0 0 0 2 0 0 1 0 1"),("sparse-dub","2 0 0 0 0 0 0 1 0 0 1 0 0 0 0 0"),
+                   ("acid",_brh("X.sxX.s.xsX.s.Sx","X.sxX.s.xsX.ssSx","X.sxX.s.....s.Sx")),("acid-16ths","2 1 3 1 2 1 1 3 2 1 3 1 2 3 1 1"),
+                   ("bounce",_brh("..X..x....X..x.x","..X..x....X.xxxx","..X..x....X.....")),("sparse-dub","2 0 0 0 0 0 0 1 0 0 1 0 0 0 0 0"),
                    ("trip-hop","2 0 0 0 0 0 3 1 0 0 0 0 0 0 1 0"),
                    # v0.77: speed garage, held notes pushed off the kick, sliding at the end of the phrase
-                   ("speed-garage",_brh("X-.x..X-.x..x.x.","X-.x..X-..x.S-x.","X-.x..X-.x..x.x.","X-.x..X-.x.xS-.."))],
+                   ("speed-garage",_brh("X-.x..X-.x..x.x.","X-.x..X-..x.S-x.","X-.x..X-.x..x.x.","X-.x..X-.x.xS-..")),
+                   # new: a four-bar shape, 8ths that walk into the next phrase
+                   ("house-pickup",_brh("X.x.x.x.X.x.x.x.","X.x.x.x.X.x.x.x.","X.x.x.x.X.x.x.x.","X.x.x.x.X.x.xxxx"))],
      # v1.02: the bass's own riffs, scale steps from the chord root (it used to share the lead's tunes)
      "bassnotes":[("root","0"),("octaves","0 7"),("fifth","0 4"),("seventh-below","0 0 -1"),("dub","0 0 -3 -2"),("walk-up","0 1 2 4"),
                   ("acid","0 0 7 0 2 0 6 4"),("arp","0 2 4 7")],
@@ -1855,7 +1873,8 @@ p.con(ti,1,rcd,0); p.con(rcd,0,fold,0); p.con(nsy,0,fold,1)
 tws={}
 for j,nm in enumerate(["note","on","acc","slide"]):
     tws[nm]=p.add(f"#X obj {200+j*170} 900 tabwrite ockm-pat-{D}1-{nm};"); p.con(ti,2,tws[nm],1)
-m16=p.add("#X obj 20 700 mod 16;"); rd=p.add(f"#X obj 20 720 tabread {D}0-r;")
+m16=p.add(f"#X obj 20 700 expr if(int({D}f2)==48 \\, if({D}f4>0 && int({D}f1)>=int({D}f3)-16 \\, 16*(1+((int({D}f4)-1)%2)) + int({D}f1)%16 \\, int({D}f1)%16) \\, int({D}f1) % int(max({D}f2\\,1)));")
+rd=p.add(f"#X obj 20 720 tabread {D}0-r;")
 kick=p.add("#X obj 1000 700 tabread ockm-pat-d1;")
 lockx=p.add(f"#X obj 160 720 expr if({D}f3==1 \\, if({D}f2>0 \\, if({D}f1==2 || {D}f1==4 || {D}f2>=2 \\, 2 \\, 1) \\, 0) \\, if({D}f3==2 \\, if({D}f2>0 \\, 0 \\, {D}f1) \\, {D}f1));")
 H=f"(abs(sin({D}f4*12.9898+{D}f3*78.233+1.7)*43758.5453)-floor(abs(sin({D}f4*12.9898+{D}f3*78.233+1.7)*43758.5453)))"
@@ -1872,7 +1891,8 @@ cx=p.add(f"#X obj 20 745 expr {D}f1>0 \\; {D}f1==2 || {D}f1==4 \\; {D}f1>=3 && {
 slx=p.add(f"#X obj 250 760 expr ({D}f1>=3 && {D}f1!=6) || ({D}f1>0 && {D}f4>0 && (abs(sin({D}f2*3.917+{D}f3*11.3+2.9)*7919.3)-floor(abs(sin({D}f2*3.917+{D}f3*11.3+2.9)*7919.3)))<{D}f4*0.7);")
 rsa=p.add(f"#X obj 1550 230 r ockm-{D}1-slideamt;"); tsa=p.add("#X obj 1550 255 t b f;")
 for c in [(rsa,0,tsa,0),(tsa,1,slx,3),(tsa,0,exg,0)]: p.con(*c)
-p.con(rll,0,m16,1)   # a four-bar rhythm repeats every 64 steps
+p.con(rll,0,m16,1)   # a four-bar rhythm repeats every 64 steps; 48 is a bar and its two siblings (v1.05)
+p.con(rlg,0,m16,2); p.con(var["seed"],1,m16,3)
 for c in [(ti,0,m16,0),(m16,0,rd,0),(rd,0,lockx,0),(lockx,0,dens0,0),(dens,0,cx,0),(dens,0,slx,0),(ti,1,slx,1),(var["seed"],1,slx,2),(slx,0,tws["slide"],0),(cx,1,tws["acc"],0),
           (ti,1,kick,0),(kick,0,lockx,1),(var["lock"],1,lockx,2),(var["density"],1,dens0,1),(one_d,0,dens0,1),(var["seed"],1,dens0,2),(ti,1,dens0,3),
           (ti,1,dens,1),(var["seed"],1,dens,2),(rlg,0,dens,3)]: p.con(*c)

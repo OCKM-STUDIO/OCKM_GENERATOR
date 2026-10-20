@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v1.04"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v1.05"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -55,6 +55,8 @@ local CHORD_ENG = { "stab","organ","pad","piano","rhodes","strings" }
 local CHORD_ORDER = { 0, 1, 3, 4 }
 local HIDE_CHORD_RHY = { [6]=true, [7]=true }
 -- v1.04 progressions on the stepper, by how many chords: one, two, four, then soul (garage 4 and trip hop 8 are off the list)
+-- v1.05 bass rhythms on the stepper (the rest are retired: they still play in loops saved on them)
+local BASS_RHY_ORDER = { 0, 1, 2, 3, 4, 5, 6, 9, 14, 12, 18 }
 local PROG_ORDER = { 0, 1, 12, 13, 14, 15, 3, 16, 17, 5, 6, 7, 2, 10, 11, 18, 9 }   -- v1.01: retired (syncopated, garage skip); old loops move to tresillo
 -- names shown on screen, where they differ from the engine's own
 local ENG_LABEL = { reese = "wide", mini = "analogue", stab = "poly" }
@@ -95,7 +97,7 @@ local KNOBS = {
 }
 -- BEGIN PRESETS (written by tools/build.py from its preset lists: edit them there, not here)
 local RHYTHMS = { { "offbeat" }, { "rolling" }, { "gallop" }, { "acid classic" }, { "sparse dub" }, { "tech bounce" }, { "acid 16ths" }, { "trip hop" }, { "hook" }, { "sparse melody" }, { "phrase" }, { "question answer" }, { "pickup" }, { "arp gate" } }
-local BASS_RHYTHMS = { { "offbeat donk" }, { "straight 8ths" }, { "rolling 16ths" }, { "dotted 8ths" }, { "octave jump" }, { "sustained" }, { "quarters" }, { "dembow" }, { "two step" }, { "3 2 3 cluster" }, { "round the kick" }, { "gallop" }, { "acid classic" }, { "acid 16ths" }, { "tech bounce" }, { "sparse dub" }, { "trip hop" }, { "speed garage" } }
+local BASS_RHYTHMS = { { "offbeat" }, { "8ths" }, { "16ths" }, { "dotted" }, { "octave" }, { "held" }, { "on the beat" }, { "dembow" }, { "two step" }, { "cluster" }, { "round the kick" }, { "gallop" }, { "acid" }, { "acid 16ths" }, { "bounce" }, { "sparse dub" }, { "trip hop" }, { "speed garage" }, { "house pickup" } }
 local MONO_NOTES = { "root", "octaves", "root fifth", "acid riff", "walk up", "minor stab", "dub", "pedal", "arp up", "arp updown", "call", "descend", "melody", "melody steps", "melody high", "motif", "motif call", "motif high", "arp evolve" }
 local BASS_RIFFS = { { "root" }, { "octaves" }, { "fifth" }, { "seventh below" }, { "dub" }, { "walk up" }, { "acid" }, { "arp" } }
 local CHORD_RHY = { { "pads" }, { "halves" }, { "offbeat" }, { "skank" }, { "organ" }, { "tresillo" }, { " " }, { " " }, { "call answer" }, { "8ths" }, { "piano riff" }, { "sustained" } }
@@ -2154,7 +2156,7 @@ local STYLES = {
     lead=false },
   { "classic house", second={ 2, 0 }, vary={ 2, 1 }, rate={ 1, 0 }, push=1, kit="909", punch=0.5, bpm=124, swing=56, groove={ 1, 0, 21, 16 }, root={ 0, 7, 2, 5 }, scale={ 1, 4, 0 }, prog={ 16, 5, 3, 18, 10 }, type={ 6, 1 },
     drums={ kick={ 0, 100, 0.1, 0.2 }, clap={ 0, 100, 0, 0 } },
-    bass={ engine={ 5, 2 }, rhythm={ 0, 1, 9, 4 }, notes={ 2, 1, 0 }, move=1, sidechain=0.2 },
+    bass={ engine={ 5, 2 }, rhythm={ 0, 1, 18, 9, 4 }, notes={ 2, 1, 0 }, move=1, sidechain=0.2 },
     chord={ engine={ 3, 1 }, rhythm={ 0, 2, 5, 10 }, verb=0.15, delay=0.1, strum=0.1 },
     lead={ engine={ 4, 2 }, rhythm={ 10, 11, 8 }, notes={ 15, 16, 8 }, outside=0.4, verb=0.15, delay=0.2, chorus=2 } },
   -- v0.90: Italian piano house (Black Box, Cappella, late 80s Italy): an M1-style piano playing open triads in a major key
@@ -2176,7 +2178,7 @@ local STYLES = {
     lead=false },
   { "minimal", vary=1, evolve=1, kit="808", punch=0.5, bpm=125, swing=55, groove={ 4, 28, 26 }, root={ 4, 2, 9 }, scale={ 0, 3, 2 }, prog=0, type={ 11, 10 },
     drums={ kick={ 1, 70, 0.1, 0.3 }, clap={ 2, 60, 0, -0.6 } },
-    bass={ engine={ 1, 5 }, rhythm={ 15, 6, 14 }, notes={ 0, 6 }, move=0 },
+    bass={ engine={ 1, 5 }, rhythm={ 6, 14, 5 }, notes={ 0, 6 }, move=0 },
     chord={ engine=0, rhythm={ 3, 0, 2 }, delay=0.4 },
     lead={ engine={ 4, 2 }, rhythm={ 9, 12 }, notes={ 6, 10, 11 }, outside=0.3, verb=0.1, delay=0.35 } },
   { "progressive", second={ 2, 0 }, vary=1, drift=1, evolve=1, rate={ 2, 1 }, kit="909-long", punch=0.5, bpm=122, swing=50, groove={ 0, 2, 24 }, root={ 2, 9, 4, 7 }, scale={ 0, 5 }, prog={ 3, 13, 6, 7, 5 }, type={ 6, 7 },
@@ -2186,7 +2188,7 @@ local STYLES = {
     lead={ engine={ 5, 4, 2 }, rhythm={ 13, 10 }, notes={ 18, 8, 9 }, outside=0.3, verb=0.2, delay=0.3 } },
   { "dub techno", vary=0, evolve=1, kit="909-long", punch=0.4, bpm=120, swing=52, groove={ 6, 28, 4 }, root={ 5, 7, 9 }, scale={ 0, 2 }, prog={ 2, 0, 12 }, type={ 10, 8, 11 },
     drums={ kick={ -1, 130, 0.2, 0 }, clap={ 0, 100, 0, 0.3 } },
-    bass={ engine=1, rhythm={ 5, 15, 6 }, notes={ 0, 6 }, move=1 },
+    bass={ engine=1, rhythm={ 5, 6, 0 }, notes={ 0, 6 }, move=1 },
     chord={ engine=0, rhythm={ 3, 11, 2 }, verb=0.35, delay=0.55 },
     lead=false },
   { "detroit", vary=1, drift=1, kit="909", punch=0.6, bpm=128, swing=53, groove={ 25, 11, 26 }, root={ 0, 9, 5 }, scale={ 0, 2 }, prog={ 12, 1, 0 }, type={ 9, 8 },
@@ -2196,16 +2198,16 @@ local STYLES = {
     lead={ engine={ 2, 4 }, rhythm={ 10, 8 }, notes={ 15, 17 }, outside=0.4, delay=0.2 } },
   { "acid", kit="909", punch=0.7, bpm=130, swing=52, groove={ 29, 5, 14 }, root={ 9, 4, 7 }, scale={ 3, 0 }, prog=0, type=0,
     drums={ kick={ 0, 110, 0.4, 0.4 }, clap={ 0, 90, 0.1, -0.3 } },
-    bass={ engine=0, rhythm={ 13, 12, 2 }, notes={ 3, 4 }, move=0, delay=0.15, slide=0.3 },
+    bass={ engine=0, rhythm={ 12, 2, 3 }, notes={ 3, 4 }, move=0, delay=0.15, slide=0.3 },
     chord=false, lead=false },
   { "peak time", vary=1, kit="909", punch=0.8, bpm=132, swing=50, groove={ 5, 26, 24 }, root={ 5, 4, 2 }, scale={ 3, 0 }, prog={ 0, 14 }, type={ 11, 10 },
     drums={ kick={ -2, 150, 0.5, 0.5 }, clap={ 0, 70, 0.2, -0.6 } },
-    bass={ engine={ 5, 1 }, rhythm={ 10, 2, 1 }, notes={ 0, 1 }, move=0, sidechain=0.5, k={ 0.25, 0.2, 0.35, 0.3 } },
+    bass={ engine={ 5, 1 }, rhythm={ 2, 1, 4 }, notes={ 0, 1 }, move=0, sidechain=0.5, k={ 0.25, 0.2, 0.35, 0.3 } },
     chord={ engine=0, rhythm={ 3, 2, 9 }, delay=0.35 },
     lead={ engine={ 3, 5 }, rhythm={ 0, 1 }, notes={ 1, 7 }, outside=0.1, delay=0.2 } },
   { "hard techno", kit="909", punch=1.0, bpm=140, swing=50, groove={ 27, 26, 37 }, root={ 2, 6, 1 }, scale={ 3, 0 }, prog=0, type=0,
     drums={ kick={ -3, 170, 0.8, 0.8 }, clap={ 0, 90, 0.4, -0.3 } },
-    bass={ engine={ 1, 3 }, rhythm={ 10, 2, 1 }, notes={ 0, 1 }, move=0, sidechain=0.6, k={ 0.4, 0.8, 0.3, 0.4 } },
+    bass={ engine={ 1, 3 }, rhythm={ 2, 1, 3 }, notes={ 0, 1 }, move=0, sidechain=0.6, k={ 0.4, 0.8, 0.3, 0.4 } },
     chord=false,
     lead={ engine={ 4, 5 }, rhythm={ 12, 1 }, notes={ 11, 3 }, outside=0.8, delay=0.3 } },
 }
@@ -2719,8 +2721,8 @@ function ui:gen_controls(add, p, ix, cy, iw, k)
   add{ kind="text", x=ix + half + 8, y=318, w=half, h=12, label="rhythm", size=10 }
   self:stepper(add, ix + half + 8, 332, half, 44, rhythms_for(p), "ockm-"..p.."-rhythm", function(v)
     -- the octave jump is a rhythm and a note pattern together: it brings the octaves notes with it
-    if p == "bass" and (BASS_RHYTHMS[v + 1] or {})[1] == "octave jump" then self:send("ockm-bass-riff", 1) end
-  end, (p == "lead") and HIDE_LEAD_RHY or nil)
+    if p == "bass" and (BASS_RHYTHMS[v + 1] or {})[1] == "octave" then self:send("ockm-bass-riff", 1) end
+  end, (p == "lead") and HIDE_LEAD_RHY or nil, (p == "bass") and BASS_RHY_ORDER or nil)
   local w3 = (iw - 12) / 3
   if p == "bass" then
     add{ kind="text", x=ix, y=386, w=iw, h=12, label="movement: how the riff follows the chords", size=10 }
