@@ -1882,8 +1882,28 @@ def two_handed_chords(work):
     assert poly < two / 4, f"the poly has no left hand ({poly:.3f})"
 
 @test
+def gap_before_the_drop(work):
+    """v1.22: ockm-gap-arm 4 silences the whole mix (reverb and delay too) for the bar's last beat, then the drop comes back on the 1."""
+    try:
+        import numpy as np
+    except ImportError:
+        raise Skip("numpy not installed")
+    h = Harness(); h.record(os.path.join(work, "gap.wav"))
+    h.at(100, "ockm-bpm 124 ; ockm-drum-groove 3 ; ockm-verb-mix 0.6 ; ockm-delay-mix 0.5 ; ockm-play 1")
+    h.at(2150, "ockm-gap-arm 4")            # early in bar 2 (bar 2 starts about 2035 ms)
+    h.at(5000, "ockm-play 0"); f = os.path.join(work, "gap.pd"); h.finish(5100, f)
+    subprocess.run([PD, "-nogui", "-nosound", "-nomidi", "-batch"] + (["-path", PDLUA, "-lib", "pdlua"] if PDLUA else []) +
+                   ["-open", "OCKM_GENERATOR.pd", "-open", f], cwd=work, capture_output=True, text=True, timeout=300)
+    wv = wave.open(os.path.join(work, "gap.wav")); sr = wv.getframerate()
+    x = np.frombuffer(wv.readframes(wv.getnframes()), np.int16).astype(float)[::wv.getnchannels()] / 32768
+    rms = lambda a, b: float(np.sqrt((x[int(a * sr):int(b * sr)] ** 2).mean()))
+    before, gap, after = rms(2.6, 3.3), rms(3.55, 3.9), rms(4.1, 4.6)
+    assert before > 0.01 and after > 0.01, f"it plays either side of the gap: {before:.4f} {after:.4f}"
+    assert gap < before / 30, f"the last beat should be silent, effects and all: {gap:.5f} against {before:.4f}"
+
+@test
 def eight_bar_lift_pushes_late(work):
-    """v1.21: slot A is the 8 bar lift: drums out, and the high-pass goes 60% of the way (0.39) over 4 bars, then on to 0.65
+    """v1.22: slot A is the 8 bar lift: drums out, and the high-pass goes 60% of the way (0.36) over 4 bars, then on to 0.6
     by the end of bar 7."""
     sys.path.insert(0, os.path.join(ROOT, "tests"))
     import ui_preview
@@ -1891,7 +1911,7 @@ def eight_bar_lift_pushes_late(work):
         raise Skip("no lua to run the screen")
     L = ui_preview.run(["send ockm-playing float 1", "test tap 566 500"])
     gl = [l for l in L if l.startswith("sent ockm-filter-glide ")]
-    assert gl and abs(float(gl[0].split()[3]) - 0.39) < 1e-6, f"first 60% of the way: {gl}"
+    assert gl and abs(float(gl[0].split()[3]) - 0.36) < 1e-6, f"first 60% of the way: {gl}"
     ms = float(gl[0].split()[4]); assert 7000 < ms < 8500, f"over four bars at 124 bpm (about 7.7 s): {ms}"
     assert any(l.startswith("sent ockm-d1-mute-q ") and l.endswith(" 1") for l in L), "the drums go"
 

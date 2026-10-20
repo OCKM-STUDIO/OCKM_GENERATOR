@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v1.21"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v1.22"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -540,6 +540,7 @@ function ui:postinitialize()
   self.demudclock = pd.Clock:new():register(self, "demud_finish")
   self.rampclock = pd.Clock:new():register(self, "ramp_tick")
   self.lateclock = pd.Clock:new():register(self, "macro_late")
+  self.gapclock = pd.Clock:new():register(self, "gap_clear")   -- v1.22: a step after the drop, clear a gap that didn't happen
   self.newclock = pd.Clock:new():register(self, "apply_new_defaults")
   self.initclock = pd.Clock:new():register(self, "init_sends")
   self:load_settings()
@@ -688,6 +689,7 @@ function ui:finalize()
   for _, r in ipairs(self.recv or {}) do r:destruct() end
   if self.clock then self.clock:destruct() end
   if self.lateclock then self.lateclock:destruct() end
+  if self.gapclock then self.gapclock:destruct() end
   if self.msgclock then self.msgclock:destruct() end
   if self.audclock then self.audclock:destruct() end
   if self.flashclock then self.flashclock:destruct() end
@@ -1269,6 +1271,7 @@ local HOW = { { "jump", 0 }, { "1 beat", 4 }, { "1 bar", 16 }, { "2 bars", 32 },
 local BACK = { "snap back", "glide back", "stay" }
 -- v0.93: a recipe can run for a length: a tap plays it for that many bars, then everything comes back on the 1
 local RUN_BARS = { 0, 1, 2, 4, 8 }
+local GAPS = { { "no gap", 0 }, { "gap: half a beat", 2 }, { "gap: a beat", 4 } }   -- v1.22, in steps
 local MACRO_NAMES = { "8 bar lift", "4 bar lift", "build", "wash", "breakdown", "strip", "sink", "dub out", "lift", "blur", "freeze", "smash", "swell", "haze",
                       "tunnel", "pressure", "drop out", "air", "grit" }
 local function default_settings()
@@ -1276,14 +1279,15 @@ local function default_settings()
     sounds = {},     -- your saved drum sounds: { name, type, and the slot settings in SOUND_KEYS }
     macros = {
       -- v1.18: the 8 bar lift (in build's place): the 4 bar lift over twice as long, its high-pass going further, most of it
-      -- late (v1.21 late: 60% of the way over the first four bars, all the way by the end of bar 7, held for the last bar)
-      { name = "8 bar lift", bars = 8, moves = { { t = "mutes", v = 3, how = 1, back = 1 }, { t = "filter", v = 0.65, how = 6, back = 1, late = true },
+      -- late (v1.21 late: 60% of the way over the first four bars, all the way by the end of bar 7, held for the last bar).
+      -- v1.22: up to 0.6, and gap: the whole mix drops out for the last beat (4 steps) before the drop
+      { name = "8 bar lift", bars = 8, gap = 4, moves = { { t = "mutes", v = 3, how = 1, back = 1 }, { t = "filter", v = 0.6, how = 6, back = 1, late = true },
                                                 { t = "reverb", v = 0.4, how = 2, back = 1 }, { t = "delay", v = 0.3, how = 2, back = 1 } } },
       { name = "wash", moves = { { t = "delay", v = 0.85, how = 1, back = 1 }, { t = "feedback", v = 0.78, how = 1, back = 1 },
                                  { t = "reverb", v = 0.9, how = 1, back = 1 }, { t = "filter", v = -0.5, how = 2, back = 1 } } },
       -- v0.94: the breakdown's high-pass twin: drums out, the high-pass climbs slowly over the 4 bars (halfway up), a touch of
       -- reverb and delay, then it all slams back on the 1
-      { name = "4 bar lift", bars = 4, moves = { { t = "mutes", v = 3, how = 1, back = 1 }, { t = "filter", v = 0.3, how = 5, back = 1 },
+      { name = "4 bar lift", bars = 4, gap = 2, moves = { { t = "mutes", v = 3, how = 1, back = 1 }, { t = "filter", v = 0.5, how = 5, back = 1 },
                                           { t = "reverb", v = 0.4, how = 2, back = 1 }, { t = "delay", v = 0.3, how = 2, back = 1 } } },   -- gentle
       { name = "sink", moves = { { t = "filter", v = -0.85, how = 3, back = 1 }, { t = "drive", v = 0.7, how = 3, back = 1 } } },
       { name = "dub out", moves = { { t = "throw", v = 1, how = 1, back = 1 }, { t = "feedback", v = 0.85, how = 1, back = 3 },
@@ -1340,10 +1344,15 @@ function ui:load_settings()
       if pumped then d.macros[i] = default_settings().macros[1] end
     end
   end
-  -- v1.21: the 8 bar lift's high-pass goes further (0.45 was the v1.19 setting)
+  -- v1.22: the lifts' high-passes go further (8 bar 0.6, from 0.45 or 0.65; 4 bar 0.5, from 0.3), and both gain a gap
+  -- before the drop (a beat on the 8 bar, half a beat on the 4 bar). Ones you've changed keep your amounts
   for _, r in ipairs(d.macros) do
-    if r.name == "8 bar lift" then
-      for _, m in ipairs(r.moves or {}) do if m.t == "filter" and m.late and m.v == 0.45 then m.v = 0.65 end end
+    if r.name == "8 bar lift" and r.bars then
+      for _, m in ipairs(r.moves or {}) do if m.t == "filter" and m.late and (m.v == 0.45 or m.v == 0.65) then m.v = 0.6 end end
+      if r.gap == nil then r.gap = 4 end
+    elseif r.name == "4 bar lift" and r.bars then
+      for _, m in ipairs(r.moves or {}) do if m.t == "filter" and m.v == 0.3 and m.how == 5 then m.v = 0.5 end end
+      if r.gap == nil then r.gap = 2 end
     end
   end
   local has, hp = false, false
@@ -1397,6 +1406,7 @@ local function recipe_summary(r)
   if not r or #r.moves == 0 then return "empty: tap to make one" end
   local out = {}
   for _, m in ipairs(r.moves) do out[#out + 1] = move_label(m) end
+  if (r.gap or 0) > 0 and (r.bars or 0) > 0 then out[#out + 1] = "gap before the drop" end
   return table.concat(out, ", ")
 end
 
@@ -1466,6 +1476,7 @@ function ui:macro_down(slot)
 end
 -- put moves back: on letting go, all but the ones that stay; when finishing, everything (force: a recipe with a length,
 -- where every move comes back together whatever it says)
+function ui:gap_clear() pd.send("ockm-gap-arm", "float", { 0 }) end
 function ui:macro_late()
   if self.late and self.macro then pd.send("ockm-filter-glide", "list", { self.late.v, math.max(30, self.late.ms) }) end
   self.late = nil
@@ -1500,6 +1511,8 @@ function ui:set_mute_bar(on) self.mute_bar = on or nil; pd.send("ockm-mute-bar",
 function ui:macro_end()
   local mc = self.macro
   mc.ending = true
+  -- v1.22: the gap before the drop (the mix drops out for the bar's last steps; too late in the bar and it's skipped)
+  if (mc.recipe.gap or 0) > 0 and self.playing ~= 0 then pd.send("ockm-gap-arm", "float", { mc.recipe.gap }) end
   for tr, x in pairs(mc.saved.mutes) do if self:mute_target(tr) ~= x then self:qmute(tr, x) end end
 end
 function ui:on_bar()
@@ -1507,6 +1520,7 @@ function ui:on_bar()
   local mc = self.macro
   if not (mc and mc.run) then return end
   if mc.ending then
+    if (mc.recipe.gap or 0) > 0 and self.gapclock then self.gapclock:delay(steps_ms(self, 1)) end
     self:macro_restore(true, true); self.macro = nil
     self:set_mute_bar(false)
     self:dirty(); return
@@ -1527,6 +1541,7 @@ function ui:macro_up(slot)
 end
 function ui:macro_finish()
   if not self.macro then return end
+  pd.send("ockm-gap-arm", "float", { 0 })
   if self.macro.run then self:set_mute_bar(false); self:macro_restore(true, true); self.macro = nil; return end
   self:macro_restore(true)
   self.macro = nil
@@ -1787,6 +1802,12 @@ function ui:layout_set_macros(add)
        label=(rb > 0) and ("a tap plays it for " .. rb .. (rb == 1 and " bar" or " bars") .. ", then it all comes back on the 1 (mutes land on the bar). Or hold it") or "plays while held (moves that stay keep it lit)" }
   add{ kind="btn", x=ix + iw - 150, y=H - 104, w=150, h=24, small=true, label=(rb > 0) and ("runs " .. rb .. (rb == 1 and " bar" or " bars")) or "no length",
        tap=function() r.bars = RUN_BARS[ri % #RUN_BARS + 1]; if r.bars == 0 then r.bars = nil end; self:save_settings() end }
+  -- v1.22: a gap before the drop: everything out for the last half beat or beat, then the drop on the 1
+  if rb > 0 then
+    local gi = 1; for q, g in ipairs(GAPS) do if g[2] == (r.gap or 0) then gi = q end end
+    add{ kind="btn", x=ix + iw - 150 - 156, y=H - 104, w=150, h=24, small=true, label=GAPS[gi][1],
+         tap=function() r.gap = GAPS[gi % #GAPS + 1][2]; if r.gap == 0 then r.gap = nil end; self:save_settings() end }
+  end
   -- which slot on Perform B, and try it
   add{ kind="text", x=ix, y=H - 62, w=60, h=12, label="on slot", size=10 }
   for s = 1, 3 do

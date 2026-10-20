@@ -594,7 +594,23 @@ lim=p.add(f"#X obj 560 1056 expr~ if(abs({D}v1)<0.85 \\, {D}v1 \\, (0.85+0.15*ta
 vol=p.add("#X obj 560 1048 *~;"); rvol=p.add("#X obj 700 1000 r ockm-volume;"); pvol=p.add("#X obj 700 1020 pack f 20;"); lvol=p.add("#X obj 700 1040 line~;")
 x2v=p.add("#X obj 780 1010 * 2;")   # the 6 dB the bus gave up, made back up here: the master's 0 dB is as loud as before
 stut=p.add("#X obj 640 1040 ockm-stutter 1 0;")   # v1.17: rewind, on the whole mix after the effects (repeat is on the drums)
-p.con(mix,0,fx,0); p.con(fx,0,stut,0); p.con(stut,0,vol,0); p.con(rvol,0,x2v,0); p.con(x2v,0,pvol,0); p.con(pvol,0,lvol,0); p.con(lvol,0,vol,1)
+p.con(mix,0,fx,0); p.con(fx,0,stut,0);
+# v1.22 the gap before the drop: ockm-gap-arm <steps> (from a lift macro on its way out) silences the whole mix, effects and
+# all, for the last <steps> of the bar, and the drop comes back in on the 1. 0 lets go straight away (so does stopping)
+hsh=p.add("#X obj 600 1044 *~;"); hln=p.add("#X obj 700 1100 vline~;"); p.con(stut,0,hsh,0); p.con(hsh,0,vol,0); p.con(hln,0,hsh,1)
+hlb=p.add("#X msg 700 1075 1;"); p.con(lb,0,hlb,0); p.con(hlb,0,hln,0)
+rga=p.add("#X obj 900 1000 r ockm-gap-arm;"); tga=p.add("#X obj 900 1020 t f f;"); vga=p.add("#X obj 900 1045 v ockm_gaparm;"); sga0=p.add("#X obj 960 1045 sel 0;")
+hoff=p.add("#X msg 900 1100 1 3;"); vh0=p.add("#X msg 960 1100 0;"); vhd=p.add("#X obj 960 1125 v ockm_hushed;")
+rhs=p.add("#X obj 1080 1000 r ockm-step;"); xhs=p.add(f"#X obj 1080 1020 expr ockm_gaparm>0 && ({D}f1%16)==16-ockm_gaparm;"); shs=p.add("#X obj 1080 1045 sel 1;")
+hon=p.add("#X msg 1080 1070 0 4;"); vh1=p.add("#X msg 1140 1070 1;"); vhd1=p.add("#X obj 1140 1095 v ockm_hushed;")
+rhb=p.add("#X obj 1250 1000 r ockm-bar;"); xhb=p.add("#X obj 1250 1020 expr ockm_hushed;"); shb=p.add("#X obj 1250 1045 sel 1;"); thb=p.add("#X obj 1250 1065 t b b;")
+qhb=p.add("#X obj 1330 1085 expr max(0\\, ockm_stepms*0.25-3);"); dhb=p.add("#X obj 1250 1105 delay;"); ga0=p.add("#X msg 1250 1130 \\; ockm-gap-arm 0;")
+rhp=p.add("#X obj 1450 1000 r ockm-playing;"); shp=p.add("#X obj 1450 1020 sel 0;"); gp0=p.add("#X msg 1450 1045 \\; ockm-gap-arm 0;")
+for c in [(rga,0,tga,0),(tga,1,vga,0),(tga,0,sga0,0),(sga0,0,hoff,0),(sga0,0,vh0,0),(hoff,0,hln,0),(vh0,0,vhd,0),
+          (rhs,0,xhs,0),(xhs,0,shs,0),(shs,0,hon,0),(shs,0,vh1,0),(hon,0,hln,0),(vh1,0,vhd1,0),
+          (rhb,0,xhb,0),(xhb,0,shb,0),(shb,0,thb,0),(thb,1,qhb,0),(qhb,0,dhb,1),(thb,0,dhb,0),(dhb,0,ga0,0),
+          (rhp,0,shp,0),(shp,0,gp0,0)]: p.con(*c)
+p.con(rvol,0,x2v,0); p.con(x2v,0,pvol,0); p.con(pvol,0,lvol,0); p.con(lvol,0,vol,1)
 p.con(vol,0,lim,0); p.con(lim,0,dac,0); p.con(lim,0,dac,1); p.con(lim,0,smaster,0)
 # the gap before a drop: no new hits for a beat, the synths let go, the effects ring on
 gsp=p.add("#X obj 250 340 spigot 1;"); p.con(pipe,0,gsp,0)

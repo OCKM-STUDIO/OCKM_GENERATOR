@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.22 (20 October 2026)
+
+- **A gap before the drop:** the lifts now take the whole mix out, reverb and delay tails included, just before everything slams back on the 1. A beat on the 8 bar lift, half a beat on the 4 bar lift. Each recipe with a length has a gap button in the macro editor (no gap, half a beat, a beat). Hold a lift and let go late in the bar and the gap is skipped rather than cut short
+- **The lifts' filters:** the 8 bar lift's high-pass stops at 0.6, the 4 bar lift's goes to 0.5 (was 0.3). Saved lifts on the old amounts move over; ones you've changed keep yours
+
 ## v1.21 (20 October 2026)
 
 - **The 8 bar lift's filter goes further and gets there sooner:** the high-pass climbs to 0.65 (was 0.45), 60% of the way over the first four bars and all the way by the end of bar 7, then holds for the last bar. A saved 8 bar lift still on the old setting moves over
