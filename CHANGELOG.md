@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.12 (20 October 2026)
+
+Under the hood: the musical logic moves out of Pd and into Lua, one generator at a time. Pd keeps making the sound.
+
+- **The chord generator is Lua** (`seq/ockm-chordmaker.pd_lua`, replacing `seq/ockm-chordgen.pd`): rhythm, progression, rate, push and sustained, in about a hundred readable lines. Checked against the old one on every rhythm, progression, rate and push, at the progression's own length and after a length change: all 2,736 patterns identical. Nothing sounds different
+- **Plain-Lua tests:** `tests/lua/` runs the generators' logic without Pd (a small stand-in for pdlua, `pd_stub.lua`). The main test run includes them
+
 ## v1.11 (20 October 2026)
 
 - **Variation browser:** on the project screen, pick a project and tap **browse all** to see every variation, newest first, each with its style, tempo, key, progression, which parts are in, and when it was saved. Each one can be opened, **kept**, exported (it opens, then the export sheet comes up) or deleted (tap twice). The one you're in can't be deleted

@@ -14,6 +14,16 @@ Commit the builder and the rebuilt patches together. Some Lua is generated too: 
 
 Hand-written: `ui/ockm-ui.pd_lua` (all the screens; `tools/build.py` also writes its preset tables into it between markers), the scripts in `tools/` and `tools/pi/`, and the tests.
 
+## Musical logic lives in Lua
+
+Pd makes the sound and keeps time; the decisions about what to play are Lua. Generators are pdlua objects that write the pattern tables when a setting changes (never at step time), so timing stays with Pd:
+
+- `seq/ockm-chordmaker.pd_lua`: the chord generator (rhythm, progression, rate, push)
+- `seq/ockm-chordnotes.pd_lua`: chord voicing
+- the bass and lead generator is moving next
+
+Each keeps its logic in pure functions (no Pd calls), tested in plain Lua in `tests/lua/` with a small stand-in for pdlua. Preset lists still live in `tools/build.py`, which fills each file's `PRESETS` block. New musical logic goes in Lua, not in Pd `expr` chains.
+
 ## Before a pull request
 
 ```

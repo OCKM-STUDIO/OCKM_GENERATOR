@@ -1712,6 +1712,18 @@ def touchscreen_variation_browser_keeps_and_tidies(work):
     assert "keep = true" in meta and "saved = " in meta, meta
 
 @test
+def lua_generators_plain_tests(work):
+    """v1.12: the generators' musical logic is plain Lua: its own tests run without Pd (tests/lua/test_*.lua)."""
+    lua = shutil.which("lua5.4") or shutil.which("lua5.3") or shutil.which("lua")
+    if not lua:
+        raise Skip("no lua interpreter")
+    tdir = os.path.join(ROOT, "tests", "lua")
+    for fn in sorted(os.listdir(tdir)):
+        if fn.startswith("test_") and fn.endswith(".lua"):
+            p = subprocess.run([lua, os.path.join(tdir, fn), work], capture_output=True, text=True)
+            assert p.returncode == 0 and p.stdout.strip().endswith("ok"), f"{fn}: {p.stdout} {p.stderr}"
+
+@test
 def drum_grooves_fill_every_slot(work):
     """A groove lands on each slot by the sound it plays, makes the drums 1 bar (a groove's natural length) and sets the swing."""
     h = Harness(); h.show("ockm-drum-len")
