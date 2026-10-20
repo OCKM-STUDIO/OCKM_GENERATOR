@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v1.07"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v1.08"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -44,15 +44,15 @@ local TRACKS  = { "d1","d2","d3","d4","d5","d6","d7","d8","bass","lead","chord" 
 local NOTES   = { "C","C#","D","D#","E","F","F#","G","G#","A","A#","B" }
 local SCALES  = { {0,2,3,5,7,8,10}, {0,2,4,5,7,9,11}, {0,2,3,5,7,9,10}, {0,1,3,5,7,8,10}, {0,2,4,5,7,9,10}, {0,2,3,5,7,8,11} }
 local SCALE_NAMES = { "minor","major","dorian","phrygian","mixo","harm min" }
-local MONO_ENG  = { "acid","sub 808","fm","reese","pluck","analogue","donk" }
+local MONO_ENG  = { "acid","sub 808","fm","reese","pluck","analogue","donk","raw" }
 -- the order the engines are shown in (v0.98: six bass, four lead, four chord). Numbers match ockm-<part>-engine, which
 -- keep their old values so saved projects load; retired ones (bass pluck, lead acid and juno, chord pad and strings) are
 -- left off and moved on to their replacements (RETIRED, below)
-local MONO_ORDER = { 5, 0, 1, 3, 2, 6 }
-local LEAD_ENG  = { "acid","juno","dx","sync","mini","supersaw" }
-local LEAD_ORDER = { 4, 2, 3, 5 }
-local CHORD_ENG = { "stab","organ","pad","piano","rhodes","strings" }
-local CHORD_ORDER = { 0, 1, 3, 4 }
+local MONO_ORDER = { 5, 0, 1, 3, 2, 6, 7 }
+local LEAD_ENG  = { "acid","juno","dx","sync","mini","supersaw","raw" }
+local LEAD_ORDER = { 4, 2, 3, 5, 6 }
+local CHORD_ENG = { "stab","organ","pad","piano","rhodes","strings","hard" }
+local CHORD_ORDER = { 0, 6, 1, 3, 4 }
 local HIDE_CHORD_RHY = { [6]=true, [7]=true }
 -- v1.04 progressions on the stepper, by how many chords: one, two, four, then soul (garage 4 and trip hop 8 are off the list)
 -- v1.05 bass rhythms on the stepper (the rest are retired: they still play in loops saved on them)
@@ -64,14 +64,14 @@ local LEAD_TUNE_ORDER = { 0, 1, 8, 9, 18, 15, 16, 19 }
 local LEAD_TUNE_NAME = { [0] = "one note", [16] = "question", [19] = "answer the bass" }
 local PROG_ORDER = { 0, 1, 12, 13, 14, 15, 3, 16, 17, 5, 6, 7, 2, 10, 11, 18, 9 }   -- v1.01: retired (syncopated, garage skip); old loops move to tresillo
 -- names shown on screen, where they differ from the engine's own
-local ENG_LABEL = { reese = "wide", mini = "analogue", stab = "poly" }
+local ENG_LABEL = { reese = "wide", mini = "analogue", stab = "poly", hard = "hard stab" }
 local function eng_label(nm) return ENG_LABEL[nm] or nm end
 -- each engine's sweet spot (k1-k4), loaded when it's picked, so it sounds right straight away
 local ENGINE_K = {
   bass  = { [0] = { 0.35, 0.6, 0.55, 0.4 }, [1] = { 0.45, 0.3, 0.35, 0.55 }, [2] = { 0.4, 0.35, 0.45, 0.4 },
-            [3] = { 0.45, 0.5, 0.35, 0.5 }, [5] = { 0.42, 0.25, 0.45, 0.45 }, [6] = { 0.5, 0.5, 0.35, 0.45 } },
-  lead  = { [2] = { 0.45, 0.1, 0.25, 0.5 }, [3] = { 0.4, 0.55, 0.5, 0.45 }, [4] = { 0.55, 0.3, 0.4, 0.45 }, [5] = { 0.55, 0.55, 0.3, 0.5 } },
-  chord = { [0] = { 0.45, 0.5, 0.0, 0.32 }, [1] = { 0.5, 0.4, 0.3, 0.4 }, [3] = { 0.5, 0.3, 0.4, 0.4 }, [4] = { 0.5, 0.4, 0.3, 0.5 } },
+            [3] = { 0.45, 0.5, 0.35, 0.5 }, [5] = { 0.42, 0.25, 0.45, 0.45 }, [6] = { 0.5, 0.5, 0.35, 0.45 }, [7] = { 0.3, 0.75, 0.6, 0.35 } },
+  lead  = { [2] = { 0.45, 0.1, 0.25, 0.5 }, [3] = { 0.4, 0.55, 0.5, 0.45 }, [4] = { 0.55, 0.3, 0.4, 0.45 }, [5] = { 0.55, 0.55, 0.3, 0.5 }, [6] = { 0.35, 0.82, 0.7, 0.35 } },
+  chord = { [0] = { 0.45, 0.5, 0.0, 0.32 }, [1] = { 0.5, 0.4, 0.3, 0.4 }, [3] = { 0.5, 0.3, 0.4, 0.4 }, [4] = { 0.5, 0.4, 0.3, 0.5 }, [6] = { 0.45, 0.6, 0.6, 0.3 } },
 }
 -- retired engines: what a saved project's engine becomes, and the knobs that make it sound like the old one
 local RETIRED = {
@@ -89,6 +89,8 @@ local KNOBS = {
   analogue = {"cutoff","saw-square","envelope","decay"},
   donk  = {"brightness","bounce","hollow","decay"},
   stab  = {"brightness","detune","attack","length"},
+  hard  = {"cutoff","resonance","drive","length"},
+  raw   = {"cutoff","resonance","wave","decay"},
   supersaw = {"spread","cutoff","drift","decay"},
   organ = {"drawbars","click","sub","length"},
   pad   = {"brightness","detune","attack","length"},
@@ -257,6 +259,23 @@ end
 local MIX_DRUM = { [0] = 1.0, [1] = 0.75, [2] = 0.75, [3] = 0.6, [4] = 0.55, [5] = 0.5, [6] = 0.65, [7] = 0.6 }   -- by sound
 local MIX_SYNTH = { bass = 0.85, lead = 0.7, chord = 0.65 }
 local LEVEL_MAX = 1.5
+-- v1.08 faders work in dB, like a desk: unity at u (three quarters up for a track, half way for the master), +10 dB at
+-- the top, -40 dB near the bottom and off at the very bottom. The value stays a plain gain, so saved mixes don't move
+local function fader_db(f, u)
+  if f <= 0.01 then return nil end
+  if f >= u then return (f - u) / (1 - u) * 10 end
+  return (f - u) / u * 40
+end
+local function fader_gain(f, u)
+  local db = fader_db(f, u)
+  return db and 10 ^ (db / 20) or 0
+end
+local function fader_pos(g, u)
+  if not g or g <= 0 then return 0 end
+  local db = 20 * math.log(g, 10)
+  if db >= 0 then return math.min(1, u + db / 10 * (1 - u)) end
+  return math.max(0.02, u + db / 40 * u)
+end
 function ui:defaults()
   local v = self.v
   v["ockm-chord-smooth"] = 1
@@ -1123,7 +1142,7 @@ function ui:layout_live(add)
   end }
   local hw = (iw - 6) / 2
   add{ kind="hbar", x=mx, y=298, w=hw, h=56, hook="ockm-drive", lo=0, hi=1, label="drive", bold=true }
-  add{ kind="hbar", x=mx + hw + 6, y=298, w=hw, h=56, hook="ockm-volume", lo=0, hi=1, label="volume", bold=true }
+  add{ kind="hbar", x=mx + hw + 6, y=298, w=hw, h=56, hook="ockm-volume", lo=0, hi=1, label="volume", bold=true, db=0.5 }
   local ROW2 = { { "ockm-delay-mix", 0, 1, "delay" }, { "ockm-delay-fb", 0, 0.9, "feedback" }, { "ockm-delay-steps", 1, 8, "time" },
                  { "ockm-verb-mix", 0, 1, "reverb" }, { "ockm-verb-size", 0, 1, "size" } }
   self:fx_groups(add, ROW2, mx, 362, iw, 56)
@@ -2186,11 +2205,11 @@ local STYLES = {
   { "tech house", vary=1, kit="909", punch=0.7, bpm=126, swing=54, groove={ 3, 24, 21 }, root={ 9, 7, 2, 4 }, scale={ 0, 2 }, prog={ 0, 12, 1 }, type={ 10, 11 },
     drums={ kick={ 0, 90, 0.3, 0.4 }, clap={ 0, 80, 0, -0.5 } },
     bass={ engine={ 5, 2, 6 }, rhythm={ 14, 2, 9 }, notes={ 0, 3, 5 }, move=1, sidechain=0.3, k={ 0.35, 0.3, 0.5, 0.35 } },
-    chord={ engine={ 0, 1 }, rhythm={ 3, 2, 9 }, delay=0.25 },
-    lead=false },
+    chord={ engine={ 6, 0, 1 }, rhythm={ 5, 3, 8 }, delay=0.25 },
+    lead={ engine=6, rhythm={ 3, 15, 8 }, notes={ 0, 1, 16 }, octave=0, outside=0.2, delay=0.2, lfo={ { 6, 7 }, 0.3 } } },
   { "minimal", vary=1, evolve=1, kit="808", punch=0.5, bpm=125, swing=55, groove={ 4, 28, 26 }, root={ 4, 2, 9 }, scale={ 0, 3, 2 }, prog=0, type={ 11, 10 },
     drums={ kick={ 1, 70, 0.1, 0.3 }, clap={ 2, 60, 0, -0.6 } },
-    bass={ engine={ 1, 5 }, rhythm={ 6, 14, 5 }, notes={ 0, 6 }, move=0 },
+    bass={ engine={ 1, 5, 7 }, rhythm={ 6, 14, 5 }, notes={ 0, 6 }, move=0, lfo={ 7, 0.2 } },
     chord={ engine=0, rhythm={ 3, 0, 2 }, delay=0.4 },
     lead={ engine={ 4, 2 }, rhythm={ 9, 12 }, notes={ 0, 9, 1 }, rests=0.2, outside=0.3, verb=0.1, delay=0.35 } },
   { "progressive", second={ 2, 0 }, vary=1, drift=1, evolve=1, rate={ 2, 1 }, kit="909-long", punch=0.5, bpm=122, swing=50, groove={ 0, 2, 24 }, root={ 2, 9, 4, 7 }, scale={ 0, 5 }, prog={ 3, 13, 6, 7, 5 }, type={ 6, 7 },
@@ -2198,6 +2217,13 @@ local STYLES = {
     bass={ engine={ 5, 3 }, rhythm={ 2, 1, 4 }, notes={ 0, 2 }, move=1, sidechain=0.3 },
     chord={ engine=0, rhythm={ 0, 1, 9 }, verb=0.35, sidechain=0.4, chorus=2, k={ 0.45, 0.5, 0.8, 0.7 } },
     lead={ engine={ 5, 4, 2 }, rhythm={ 13, 10, 14 }, notes={ 18, 8, 9 }, rep={ 1, 0 }, outside=0.3, verb=0.2, delay=0.3 } },
+  -- v1.08: trance: 138, the four-floor kick and rolling offbeat bass, minor-key progressions over two bars a chord,
+  -- gated 8ths chords on the poly with the string chorus pumping under the kick, a supersaw arp on top
+  { "trance", second={ 0, 2 }, evolve=1, rate={ 2, 1 }, kit="909", punch=0.6, bpm=138, swing=50, groove={ 0, 24 }, root={ 9, 2, 5, 7 }, scale=0, prog={ 5, 6, 7 }, type={ 0, 1 },
+    drums={ kick={ -1, 120, 0.3, 0.3 }, clap={ 0, 90, 0.1, 0 } },
+    bass={ engine={ 5, 3 }, rhythm={ 0, 1 }, notes=0, move=1, sidechain=0.5, k={ 0.4, 0.3, 0.4, 0.3 } },
+    chord={ engine=0, rhythm={ 9, 0 }, verb=0.35, delay=0.25, sidechain=0.6, chorus=2, k={ 0.6, 0.7, 0.0, 0.3 } },
+    lead={ engine=5, rhythm={ 13, 10 }, notes={ 18, 8, 9 }, verb=0.3, delay=0.35 } },
   { "dub techno", vary=0, evolve=1, kit="909-long", punch=0.4, bpm=120, swing=52, groove={ 6, 28, 4 }, root={ 5, 7, 9 }, scale={ 0, 2 }, prog={ 2, 0, 12 }, type={ 10, 8, 11 },
     drums={ kick={ -1, 130, 0.2, 0 }, clap={ 0, 100, 0, 0.3 } },
     bass={ engine=1, rhythm={ 5, 6, 0 }, notes={ 0, 6 }, move=1 },
@@ -2215,13 +2241,13 @@ local STYLES = {
   { "peak time", vary=1, kit="909", punch=0.8, bpm=132, swing=50, groove={ 5, 26, 24 }, root={ 5, 4, 2 }, scale={ 3, 0 }, prog={ 0, 14 }, type={ 11, 10 },
     drums={ kick={ -2, 150, 0.5, 0.5 }, clap={ 0, 70, 0.2, -0.6 } },
     bass={ engine={ 5, 1 }, rhythm={ 2, 1, 4 }, notes={ 0, 1 }, move=0, sidechain=0.5, k={ 0.25, 0.2, 0.35, 0.3 } },
-    chord={ engine=0, rhythm={ 3, 2, 9 }, delay=0.35 },
-    lead={ engine={ 3, 5 }, rhythm={ 15, 0, 1 }, notes={ 0, 1 }, outside=0.1, delay=0.2 } },
+    chord={ engine=6, rhythm={ 8, 5 }, delay=0.35, sidechain=0.5, k={ 0.4, 0.65, 0.7, 0.25 } },
+    lead={ engine={ 6, 3, 5 }, lfo={ { 7, 6 }, 0.3 }, rhythm={ 15, 0, 1 }, notes={ 0, 1 }, outside=0.1, delay=0.2 } },
   { "hard techno", kit="909", punch=1.0, bpm=140, swing=50, groove={ 27, 26, 37 }, root={ 2, 6, 1 }, scale={ 3, 0 }, prog=0, type=0,
     drums={ kick={ -3, 170, 0.8, 0.8 }, clap={ 0, 90, 0.4, -0.3 } },
     bass={ engine={ 1, 3 }, rhythm={ 2, 1, 3 }, notes={ 0, 1 }, move=0, sidechain=0.6, k={ 0.4, 0.8, 0.3, 0.4 } },
-    chord=false,
-    lead={ engine={ 4, 5 }, rhythm={ 15, 1 }, notes={ 0, 1 }, outside=0.8, delay=0.3 } },
+    chord={ engine=6, rhythm={ 8, 5 }, delay=0.45, verb=0.15, sidechain=0.6, k={ 0.35, 0.75, 0.9, 0.2 } },
+    lead={ engine={ 6, 4, 5 }, lfo={ 7, 0.35 }, rhythm={ 15, 1 }, notes={ 0, 1 }, outside=0.8, delay=0.3 } },
 }
 -- ------------------------------------------------------------------ evolve (v1.00)
 -- An ongoing mutate. At the start of every phrase one ticked part steps to a variation, in turn: bass, lead, chords,
@@ -2597,6 +2623,11 @@ function ui:apply_style(i, classic)
       self:send("ockm-"..part.."-scshape", ps.shape or 1)
       self:send("ockm-"..part.."-verb", ps.verb or 0); self:send("ockm-"..part.."-delay", ps.delay or 0)
       self:send("ockm-"..part.."-chorus", ps.chorus or 0)
+      local lf = ps.lfo   -- v1.08: a slow sweep on the cutoff (k1), e.g. { 7, 0.3 }: over 8 bars, 0.3 deep
+      if lf then
+        self:send("ockm-"..part.."-lfo-target", 1); self:send("ockm-"..part.."-lfo-shape", 0)
+        self:send("ockm-"..part.."-lfo-rate", spick(lf[1], shuf)); self:send("ockm-"..part.."-lfo-depth", lf[2])
+      else self:send("ockm-"..part.."-lfo-depth", 0) end
       if part == "chord" then   -- v0.90: every chord kept at the same height, voiced and rolled the style's way
         self:send("ockm-chord-smooth", 1); self:send("ockm-chord-voicing", ps.voicing or 0); self:send("ockm-chord-strum", ps.strum or 0)
         self:send("ockm-chord-lowcut", ps.lowcut or 150)   -- the low end is the kick's and the bass's
@@ -3259,7 +3290,7 @@ function ui:layout_mixer(add)
       add{ kind="hbar", x=cx, y=top + 66, w=cw, h=26, hook="ockm-"..t.."-delay", lo=0, hi=1, label="dly" }
       add{ kind="choice", x=cx, y=top + 100, w=cw, h=32, small=true, label="EQ", sel=not self:eq_flat(t), accent=true,
            tap=function() self:eq_open(i) end }
-      add{ kind="vfader", x=cx, y=top + 140, w=cw, h=210, hook="ockm-"..t.."-level", lo=0, hi=LEVEL_MAX }
+      add{ kind="vfader", x=cx, y=top + 140, w=cw, h=210, hook="ockm-"..t.."-level", lo=0, hi=LEVEL_MAX, db=0.75 }
       add{ kind="ms", x=cx, y=top + 364, w=cw, h=50, label="M", hook="ockm-"..t.."-mute" }
       add{ kind="ms", x=cx, y=top + 420, w=cw, h=50, label="S", hook="ockm-"..t.."-solo" }
     else
@@ -3267,7 +3298,7 @@ function ui:layout_mixer(add)
       add{ kind="hbar", x=cx, y=top + 34, w=cw, h=26, hook="ockm-verb-mix", lo=0, hi=1, label="rev" }
       add{ kind="hbar", x=cx, y=top + 66, w=cw, h=26, hook="ockm-delay-mix", lo=0, hi=1, label="dly" }
       add{ kind="btn", x=cx, y=top + 100, w=cw, h=32, small=true, label="de-mud", tap=function() self:demud() end }
-      add{ kind="vfader", x=cx, y=top + 140, w=cw, h=210, hook="ockm-volume", lo=0, hi=1, master=true }
+      add{ kind="vfader", x=cx, y=top + 140, w=cw, h=210, hook="ockm-volume", lo=0, hi=1, master=true, db=0.5 }
       add{ kind="btn", x=cx, y=top + 364, w=cw, h=106, label="clear", quiet=true, tap=function()
         for _, t in ipairs(TRACKS) do
           if (self.v["ockm-"..t.."-mute"] or 0) > 0 then self:send("ockm-"..t.."-mute", 0) end
@@ -3564,6 +3595,11 @@ function ui:slide(w, x, y)
   elseif w.kind == "hbar" then f = clamp((x - w.x) / w.w, 0, 1)
   else f = clamp((x - (w.x + 110)) / (w.w - 180), 0, 1) end
   local v = w.lo + f * (w.hi - w.lo)
+  if w.db then
+    v = math.floor(fader_gain(f, w.db) * 1000 + 0.5) / 1000
+    local changed = (self.v[w.hook] ~= v)
+    self:send(w.hook, v); return
+  end
   if w.log then v = math.floor(w.lo * (w.hi / w.lo) ^ f + 0.5) end
   if w.hi - w.lo > 4 then v = math.floor(v + 0.5) else v = math.floor(v * 100 + 0.5) / 100 end
   if w.edit then self.v[w.hook] = v; w.edit(v); return end
@@ -3917,7 +3953,7 @@ function ui:draw(g, w)
     self:ctext(g, w.label, { x=w.x, y=w.y + 6, w=w.w, h=16 }, 11, w.silent and "mute" or "txt")
   elseif k == "hbar" then
     local v = self.v[w.hook] or 0
-    local f = clamp((v - w.lo) / (w.hi - w.lo), 0, 1)
+    local f = w.db and fader_pos(v, w.db) or clamp((v - w.lo) / (w.hi - w.lo), 0, 1)
     self:col(g, "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 4)
     if w.off then
       -- not in use: no value shown
@@ -3942,13 +3978,18 @@ function ui:draw(g, w)
     end
   elseif k == "vfader" then
     local v = self.v[w.hook] or 0
-    local f = clamp((v - w.lo) / (w.hi - w.lo), 0, 1)
+    local f = w.db and fader_pos(v, w.db) or clamp((v - w.lo) / (w.hi - w.lo), 0, 1)
     local tx = w.x + w.w / 2 - 4
     self:col(g, "off"); g:fill_rounded_rect(tx, w.y + 8, 8, w.h - 16, 4)
     local fy = w.y + 8 + (w.h - 16) * (1 - f)
     self:col(g, w.master and "on" or "acc"); g:fill_rounded_rect(tx, fy, 8, w.y + w.h - 8 - fy, 4)
     g:fill_rounded_rect(w.x + 4, fy - 7, w.w - 8, 14, 4)
-    self:ctext(g, string.format("%d", math.floor(v * 100 + 0.5)), { x=w.x, y=w.y + w.h - 2, w=w.w, h=12 }, 10, "mute")
+    local lbl = string.format("%d", math.floor(v * 100 + 0.5))
+    if w.db then
+      local d = (v > 0) and 20 * math.log(v, 10) or nil
+      lbl = (not d or d < -39.5) and "off" or (math.abs(d) < 0.5 and "0 dB" or string.format("%+d dB", math.floor(d + 0.5)))
+    end
+    self:ctext(g, lbl, { x=w.x, y=w.y + w.h - 2, w=w.w, h=12 }, 10, "mute")
   elseif k == "lanename" then
     self:text(g, w.label, w.x, w.y + math.max(4, (w.h - 15) / 2), 13, ((self.v["ockm-drums-on"] or 1) > 0) and "txt" or "mute", w.w)
   elseif k == "lane" then

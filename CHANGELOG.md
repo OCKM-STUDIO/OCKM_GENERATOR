@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.08 (20 October 2026)
+
+First listen on the Pi: harder sounds for techno, trance, and a mixer with room to push.
+
+- **Hard stab** (chord engine): three wide saws and a square through a resonant filter that snaps shut, then driven. Cutoff, resonance, drive, length. Tech house rolls it first (tresillo, skank or call answer); peak time and hard techno use it sparsely, one call a bar or tresillo, pumping under the kick. Hard techno has chords again
+- **Raw** (bass and lead engine, MS-20 style): a triangle or saw into a resonant filter that screams at the top of its resonance, driven hard after. Cutoff, resonance, wave, decay. Tech house now has a raw riff on top; peak time and hard techno roll it first for the lead; minimal sometimes uses it for the bass
+- **Styles can set the LFO:** a slow sweep on the cutoff over 4 or 8 bars, the hypnotic move. Styles that don't set it switch it off
+- **Trance** (new style, after progressive): 138, the rolling offbeat bass, minor-key progressions two bars a chord, gated 8ths chords on the poly with the string chorus pumping under the kick, a supersaw arp on top
+- **Poly detune** goes much further: gentle up to half way (as before), up to about a semitone at the top
+- **Mixer faders are in dB:** a track's 0 dB is three quarters up with +10 dB above, the master's 0 dB half way up. Each fader shows its dB. Saved mixes keep their levels. The mix runs 6 dB lower into the master effects and the master makes it back, so pushing a track is heard instead of squashed; a last soft limiter keeps a pushed master clean
+
 ## v1.07 (19 October 2026)
 
 Step 11 of the harmony and generator proposal: the grooves cut to house and techno, and a new style.

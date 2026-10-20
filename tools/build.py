@@ -572,10 +572,14 @@ for _i,_t in enumerate([n for n,_ in SLOTS]+["bass","lead","chord"]):
     p.con(_r,0,_ne,0); p.con(_ne,0,_tb,0); p.con(_tb,1,_tw,0); p.con(_tb,0,_sum,0)
 p.add(f"#X text 1100 395 settings and patterns: {PROJ_DIR} (project.txt and p1 to p8);")
 # drums
-mix=p.add("#X obj 560 1000 *~ 0.3;"); fx=p.add("#X obj 560 1030 ockm-fx;"); dac=p.add("#X obj 560 1065 dac~;"); smaster=p.add("#X obj 640 1065 s~ ockm-master;")
+# v1.08: the mix bus is 6 dB lower than it was, so a track pushed up on its fader has room before the limiter; the master
+# fader (unity half way up, +10 dB at the top) makes it back up after the effects, and a last soft limiter keeps a pushed master off the rails
+mix=p.add("#X obj 560 1000 *~ 0.15;"); fx=p.add("#X obj 560 1030 ockm-fx;"); dac=p.add("#X obj 560 1065 dac~;"); smaster=p.add("#X obj 640 1065 s~ ockm-master;")
+lim=p.add(f"#X obj 560 1056 expr~ if(abs({D}v1)<0.85 \\, {D}v1 \\, (0.85+0.15*tanh((abs({D}v1)-0.85)/0.15))*({D}v1/abs({D}v1)));")
 vol=p.add("#X obj 560 1048 *~;"); rvol=p.add("#X obj 700 1000 r ockm-volume;"); pvol=p.add("#X obj 700 1020 pack f 20;"); lvol=p.add("#X obj 700 1040 line~;")
-p.con(mix,0,fx,0); p.con(fx,0,vol,0); p.con(rvol,0,pvol,0); p.con(pvol,0,lvol,0); p.con(lvol,0,vol,1)
-p.con(vol,0,dac,0); p.con(vol,0,dac,1); p.con(vol,0,smaster,0)
+x2v=p.add("#X obj 780 1010 * 2;")   # the 6 dB the bus gave up, made back up here: the master's 0 dB is as loud as before
+p.con(mix,0,fx,0); p.con(fx,0,vol,0); p.con(rvol,0,x2v,0); p.con(x2v,0,pvol,0); p.con(pvol,0,lvol,0); p.con(lvol,0,vol,1)
+p.con(vol,0,lim,0); p.con(lim,0,dac,0); p.con(lim,0,dac,1); p.con(lim,0,smaster,0)
 # the gap before a drop: no new hits for a beat, the synths let go, the effects ring on
 gsp=p.add("#X obj 250 340 spigot 1;"); p.con(pipe,0,gsp,0)
 rgp=p.add("#X obj 400 340 r ockm-gap;"); ngp=p.add("#X obj 400 365 == 0;"); p.con(rgp,0,ngp,0); p.con(ngp,0,gsp,1)
@@ -1072,7 +1076,7 @@ q=P()
 q.add("#X text 20 10 Mono synth (bass or lead): six engines \\, one plays at a time (ockm-<track>-engine 0 to 5). Knobs k1-k4 and drive come in on hooks.;")
 inl=q.add("#X obj 30 50 inlet;")
 ks=[q.add(f"#X obj {200+i*130} 50 r ockm-{D}1-k{i+1}-m;") for i in range(4)]
-names=["acid","sub","fm","reese","analogue","donk"]   # each knows its own engine number (4, pluck, retired in v0.98)
+names=["acid","sub","fm","reese","analogue","donk","raw"]   # each knows its own engine number (4, pluck, retired in v0.98)
 eng=[q.add(f"#X obj {30+i*130} 130 ockm-mono-{n} {D}1;") for i,n in enumerate(names)]
 sm=q.add("#X obj 30 200 +~;")
 for i,e in enumerate(eng):
@@ -1090,7 +1094,7 @@ q.save("voices/ockm-mono.pd","#N canvas 140 140 900 340 12;")
 # FM becomes DX (2), and the old default pluck (4) becomes Mini.
 # v0.98: acid (0) and juno (1) are retired (analogue with emphasis, and analogue with the chorus, do them); supersaw is 5.
 # The numbers stay as they were, so saved projects keep their engine; the screen moves retired ones on
-LEAD_ENGINES=[("dx",2),("sync",3),("mini",4),("supersaw",5)]
+LEAD_ENGINES=[("dx",2),("sync",3),("mini",4),("supersaw",5),("raw",6)]
 def lead_engine(name,idx,title,build): engine(f"voices/ockm-lead-{name}.pd",idx,title,build,core_name="ockm-lead-core",hook="voice")
 
 def filt_env(q,core,ks,lo,span,x=450,y=200,kidx=2,cmin=30,cmax=14000,amt=3000):
@@ -1209,11 +1213,30 @@ def lead_supersaw(q,core,ks,out):
               (f2,0,am,0),(core,2,am,1),(am,0,g,0),(g,0,out,0)]: q.con(*c)
     q.add("#X text 200 110 k1 spread (one saw to seven) / k2 cutoff / k3 drift / k4 decay;")
 
+def raw(q,core,ks,out,hpf=80,gain=0.8):
+    # v1.08 raw (MS-20 style): a triangle or saw into a screaming resonant low-pass that self-oscillates at the top of
+    # its resonance, the high-pass taking the mud out first, and driven hard after, the way the MS-20's filter breaks up.
+    # For hypnotic techno sequences and big tech house riffs. Put the LFO on the cutoff (k1) over 4 or 8 bars for the sweep.
+    # k1 cutoff / k2 resonance (screams past about 0.85) / k3 wave (triangle to saw) / k4 decay
+    mt=q.add("#X obj 30 200 mtof~;"); ph=q.add("#X obj 30 230 phasor~;")
+    wv=q.add(f"#X obj 30 260 expr~ (1-{D}f2)*(4*abs({D}v1-0.5)-1) + {D}f2*(2*{D}v1-1);")
+    hp=q.add(f"#X obj 30 290 hip~ {hpf};"); pre=q.add(f"#X obj 30 315 expr~ tanh(1.6*{D}v1);")
+    cut=filt_env(q,core,ks,45,8,kidx=None,amt=4500,cmax=12000)
+    bob=q.add("#X obj 30 350 bob~;"); k2=q.add(f"#X obj 310 140 expr 0.3+4.1*pow({D}f1\\, 1.3);")
+    dr=q.add(f"#X obj 30 380 expr~ tanh(2.8*{D}v1)/tanh(2.8);")
+    am=q.add("#X obj 30 410 *~;"); g=q.add(f"#X obj 30 440 *~ {gain};")
+    for c in [(core,0,mt,0),(mt,0,ph,0),(ph,0,wv,0),(ks[2],0,wv,1),(wv,0,hp,0),(hp,0,pre,0),(pre,0,bob,0),(cut,0,bob,1),
+              (ks[1],0,k2,0),(k2,0,bob,2),(bob,0,dr,0),(dr,0,am,0),(core,2,am,1),(am,0,g,0),(g,0,out,0)]: q.con(*c)
+    q.add("#X text 200 110 k1 cutoff / k2 resonance (self-oscillates at the top) / k3 triangle to saw / k4 decay;")
+
+engine("voices/ockm-mono-raw.pd",7,"Raw engine (MS-20 style): triangle or saw into a screaming resonant filter \\, driven. Hypnotic techno and big tech house riffs",lambda q,c,k,o: raw(q,c,k,o,hpf=25,gain=1.1))
+
 for nm,fnb,title in [
         ("dx",lead_dx,"DX lead: two-operator FM. Electric piano \\, reed \\, bell or glass"),
         ("sync",lead_sync,"Sync lead: a hard-synced saw that sweeps with the envelope. Tech house and electro"),
         ("mini",lead_mini,"Analogue lead (was mini): three oscillators driven into a ladder filter. Big and warm"),
-        ("supersaw",lead_supersaw,"Supersaw lead: seven detuned saws. One saw to a trance stack \\, a hoover with a long decay")]:
+        ("supersaw",lead_supersaw,"Supersaw lead: seven detuned saws. One saw to a trance stack \\, a hoover with a long decay"),
+        ("raw",raw,"Raw lead (MS-20 style): triangle or saw into a screaming resonant filter \\, driven. Hypnotic techno sequences")]:
     lead_engine(nm,dict(LEAD_ENGINES)[nm],title,fnb)
 
 # ================= lead wrapper =================
@@ -2207,11 +2230,36 @@ def chord_voice(sp,kind):
         for c in [(dk,0,tdk,0),(tdk,1,mpk,1),(tdk,0,fv2,0),(fv2,0,vcv,0),(vcv,0,mpk,0)]: sp.con(*c)
         pa=sp.add("#X obj 200 200 pack f 280 2;"); ma=sp.add(f"#X msg 200 230 {D}1 {D}3 \\, 0 {D}2 {D}3;"); mf=sp.add(f"#X msg 400 170 {D}1 {D}3 \\, 0 {D}2 {D}3;")
         # k3 attack (v0.98): the bottom third is all stab, so old projects' snap settings stay stabs; up to about 0.9 s
-        x1=sp.add(f"#X obj 600 140 expr 150*pow(2\\,6*{D}f1);"); x2=sp.add(f"#X obj 690 140 expr 1+0.02*{D}f1;"); x3=sp.add(f"#X obj 780 140 expr 2+1800*pow(max(0\\, {D}f1-0.3)\\, 2);"); x4=sp.add(f"#X obj 870 140 expr 40+3000*{D}f1*{D}f1;")
+        x1=sp.add(f"#X obj 600 140 expr 150*pow(2\\,6*{D}f1);"); x2=sp.add(f"#X obj 690 140 expr 1+0.012*{D}f1+0.05*{D}f1*{D}f1*{D}f1;"); x3=sp.add(f"#X obj 780 140 expr 2+1800*pow(max(0\\, {D}f1-0.3)\\, 2);"); x4=sp.add(f"#X obj 870 140 expr 40+3000*{D}f1*{D}f1;")
         for c in [(mt,0,tf,0),(tf,1,dt,0),(dt,0,p2,0),(tf,0,p1,0),(p1,0,sm,0),(p2,0,sm,1),(sm,0,ce,0),(ce,0,l1,0),(l1,0,l2,0),(l2,0,am,0),
                   (fe,0,fa,0),(fa,0,fb,0),(fb,0,fc,0),(fc,0,l1,1),(fc,0,l2,1),
                   (tb,0,tbb,0),(tbb,1,fv,0),(fv,0,pa,0),(pa,0,ma,0),(ma,0,av,0),(tbb,0,dk,0),(mpk,0,mf,0),(mf,0,fe,0),
                   (k[0],0,x1,0),(x1,0,fb,1),(k[1],0,x2,0),(x2,0,dt,1),(k[2],0,x3,0),(x3,0,pa,2),(x3,0,mpk,2),(k[3],0,x4,0),(x4,0,dk,1),(x4,0,pa,1)]: sp.con(*c)
+    elif kind=="hard":
+        # v1.08 hard stab (techno, tech house): three saws spread wide plus a square, through a resonant low-pass that
+        # snaps shut, then driven. The filter's own envelope is short and fast, the amp holds a little longer, so each hit
+        # is a bark with a body. k1 cutoff, k2 resonance, k3 drive, k4 length. The hit strength opens the filter further
+        tf=sp.add("#X obj 80 140 t f f f;"); d1=sp.add("#X obj 140 170 * 0.991;"); d2=sp.add("#X obj 200 170 * 1.009;")
+        o0=sp.add("#X obj 80 200 phasor~;"); o1=sp.add("#X obj 140 200 phasor~;"); o2=sp.add("#X obj 200 200 phasor~;"); o3=sp.add("#X obj 260 200 phasor~;")
+        mx=sp.add(f"#X obj 80 230 expr~ ({D}v1+{D}v2+{D}v3)*0.66-1 + 0.7*({D}v4>0.5) - 0.35;")
+        hp=sp.add("#X obj 80 255 hip~ 30;")
+        fe=sp.add("#X obj 400 200 vline~;")
+        co=sp.add(f"#X obj 400 230 expr~ min(15000\\, {D}f2*(1+{D}f3*{D}v1*{D}v1));")
+        vf=sp.add("#X obj 80 285 vcf~ 4;")
+        dr=sp.add(f"#X obj 80 310 expr~ tanh({D}f2*{D}v1)/tanh({D}f2);")
+        tbb=sp.add("#X obj 20 140 t b b;"); dk=sp.add("#X obj 300 130 f 230;")
+        pa=sp.add("#X obj 200 260 pack f 230 2;"); ma=sp.add(f"#X msg 200 285 {D}1 {D}3 \\, 0 {D}2 {D}3;")
+        # the filter: up in 1 ms, down over 60% of the length, opening up to 14 times the cutoff on a full hit
+        fd=sp.add("#X obj 470 130 * 0.6;"); fdl=sp.add("#X obj 470 155 f 90;"); fm=sp.add("#X obj 400 170 t b;")
+        mf=sp.add(f"#X msg 400 185 1 1 \\, 0 {D}1 1;")
+        va=sp.add(f"#X obj 560 200 expr 3+11*{D}f1*{D}f1;")
+        x1=sp.add(f"#X obj 600 140 expr 90*pow(2\\,5.5*{D}f1);"); x2=sp.add(f"#X obj 690 140 expr 1.5+12*{D}f1;"); x3=sp.add(f"#X obj 780 140 expr 1+7*{D}f1;"); x4=sp.add(f"#X obj 870 140 expr 50+1400*{D}f1*{D}f1;")
+        for c in [(mt,0,tf,0),(tf,2,o0,0),(tf,1,d1,0),(d1,0,o1,0),(tf,0,d2,0),(d2,0,o2,0),(tf,2,o3,0),
+                  (o0,0,mx,0),(o1,0,mx,1),(o2,0,mx,2),(o3,0,mx,3),(mx,0,hp,0),(hp,0,vf,0),(vf,1,dr,0),(dr,0,am,0),
+                  (fe,0,co,0),(co,0,vf,1),
+                  (tb,0,tbb,0),(tbb,1,fv,0),(fv,0,pa,0),(pa,0,ma,0),(ma,0,av,0),(fv,0,va,0),(va,0,co,2),
+                  (tbb,0,dk,0),(dk,0,fd,0),(fd,0,fdl,0),(fdl,0,mf,0),(mf,0,fe,0),
+                  (k[0],0,x1,0),(x1,0,co,1),(k[1],0,x2,0),(x2,0,vf,2),(k[2],0,x3,0),(x3,0,dr,1),(k[3],0,x4,0),(x4,0,dk,1),(x4,0,pa,1)]: sp.con(*c)
     elif kind=="organ":
         tf=sp.add("#X obj 80 140 t f f f f;")
         o1=sp.add("#X obj 80 200 osc~;"); h2=sp.add("#X obj 150 170 * 2;"); o2=sp.add("#X obj 150 200 osc~;"); h3=sp.add("#X obj 220 170 * 3;"); o3=sp.add("#X obj 220 200 osc~;")
@@ -2319,13 +2367,14 @@ def chord_voice(sp,kind):
                   (k[0],0,x1,0),(x1,0,l1,1),(x1,0,l2,1),(k[1],0,x2,0),(x2,0,du,1),(x2,1,dd,1),
                   (k[2],0,x3,0),(x3,0,fa3,0),(fa3,1,ad,1),(fa3,0,pa,1),(k[3],0,x4,0),(x4,0,ad,0),(ad,0,pa,2)]: sp.con(*c)
 
-CHORD_GAIN={"stab":0.42,"organ":0.135,"piano":0.4,"rhodes":0.13}   # measured: stab was a third as loud as the bass, organ a little loud
+CHORD_GAIN={"stab":0.42,"hard":0.4,"organ":0.135,"piano":0.4,"rhodes":0.13}   # measured: stab was a third as loud as the bass, organ a little loud
 # v0.98: four engines. Stab became poly (its k3 is attack: 0 the dub techno stab, 1 a pad, and a string machine with the
 # chorus on), so pad (2) and strings (5) are retired; the numbers stay so saved projects load, and the screen moves them on
 CHORD_ENGINES=[(0,"stab","Poly: two detuned saws through a filter. Attack 0 is the dub techno stab \\, up is a pad \\, with the chorus a string machine"),
                (1,"organ","Organ: sine drawbars plus a percussive click. House organ stabs"),
                (3,"piano","House piano: a struck string. Ten stretched partials \\, a second string beating \\, a hammer knock. Classic house and Italo piano"),
-               (4,"rhodes","Rhodes: a warm body with the tine ringing on the attack \\, barks when hit hard \\, tremolo. Deep house")]
+               (4,"rhodes","Rhodes: a warm body with the tine ringing on the attack \\, barks when hit hard \\, tremolo. Deep house"),
+               (6,"hard","Hard stab: three wide saws and a square through a resonant filter that snaps shut \\, driven. Techno and tech house")]
 for idx,kind,title in CHORD_ENGINES:
     q=P(); q.add(f"#X text 20 10 Chord engine {idx}. {title}. k1-k4 0 to 1.;")
     inl=q.add("#X obj 30 50 inlet;"); sp_=q.add("#X obj 30 80 spigot 1;"); ro=q.add("#X obj 30 110 route off;")

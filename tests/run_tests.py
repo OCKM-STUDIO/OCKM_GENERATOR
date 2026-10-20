@@ -904,7 +904,7 @@ def touchscreen_drives_the_engine(work):
     assert "1" in printed(out, "ockm-d1-mute"), "perform: the kick tile should mute d1"
     assert "1" in printed(out, "ockm-d2-mute"), "mixer: M on strip 2 should mute d2"
     bl = [float(x) for x in printed(out, "ockm-bass-level")]
-    assert any(0.65 < x < 0.85 for x in bl), f"mixer: bass fader halfway should be about 0.75 (faders go to 1.5): {bl}"
+    assert any(0.19 < x < 0.24 for x in bl), f"mixer: bass fader halfway is -13 dB (faders are in dB, unity three quarters up): {bl}"
     assert "6" in printed(out, "ockm-chord-type"), f"chord tab: colour 9ths should pick the ninth chord type (6): {printed(out, 'ockm-chord-type')}"
     assert not [l for l in out.splitlines() if "error" in l.lower()], "errors: " + " | ".join(l for l in out.splitlines() if "error" in l.lower())
 
@@ -1719,13 +1719,13 @@ def song_styles_set_the_lot(work):
                 v = l.split()
                 out[v[1]] = float(v[3]) if len(v) > 3 and v[3] not in ("bang",) else None
         return out
-    PEAK, DEEP, SHUFFLE, CLASSIC = "test tap 666 174", "test tap 83 142", "test tap 896 142", "test tap 896 174"
+    PEAK, DEEP, SHUFFLE, CLASSIC = "test tap 584 174", "test tap 83 142", "test tap 896 142", "test tap 896 174"
     t = sent(ui_preview.run(["test tap 477 36", PEAK, CLASSIC]))
     assert t["ockm-bpm"] == 132 and t["ockm-swing"] == 50 and t["ockm-drum-groove"] == 5, t
     assert t["ockm-root"] == 5 and t["ockm-scale"] == 3, "F phrygian"
     assert t["ockm-d1-drive"] == 0.5 and t["ockm-d1-tune"] == -2, "the kick gets harder and lower"
     assert t["ockm-lead-on"] == 1 and t["ockm-bass-rhythm"] == 2 and t["ockm-bass-sync"] == 0 and t["ockm-chord-on"] == 1, t
-    assert t["ockm-style"] == 12, t
+    assert t["ockm-style"] == 13, t
     d = sent(ui_preview.run(["test tap 477 36", DEEP, CLASSIC]))
     assert d["ockm-bpm"] == 122 and d["ockm-scale"] == 2 and d["ockm-chord-engine"] == 4 and d["ockm-lead-on"] == 0, d
     lines = ui_preview.run(["test tap 477 36", DEEP] + [SHUFFLE] * 4)
