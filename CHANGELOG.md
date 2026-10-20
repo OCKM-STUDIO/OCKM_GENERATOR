@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.24 (20 October 2026)
+
+- **The bus effects are on the perform page too,** beside the mutes: pick drums, music or master above the pad, latch, and **set** (its settings sheet, which now also picks the effect). The pad takes the place of the DJ filter strip and the drive: the master bus's filter, unlatched, plays and springs back the same way. The fx tab keeps the big pad and the bass switch
+- The master's delay and reverb stay on perform, with the volume beside them. The master drive moved into the master bus's settings
+- The three macros are shorter (100 px, still an easy hold)
+- The master DJ filter is still there underneath: the lifts, breakdown and your MIDI knob drive it as before
+
 ## v1.23 (20 October 2026)
 
 - **FX page** (next to perform): three buses, each with one effect: **drums**, **music** (lead and chords) and **master**. Pick a bus and its effect (**filter**, **crush**, **drive** or **saturate**), then play it on the **XY pad**: put a finger down and it comes in, move to play it, lift and it goes

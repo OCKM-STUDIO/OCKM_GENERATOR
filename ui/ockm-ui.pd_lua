@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v1.23"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v1.24"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -1247,28 +1247,39 @@ function ui:layout_live(add)
     psend("ockm-rewind", "bang", {}); self:flash_btn("rewind") end }
   add{ kind="pad", x=mx + 2 * (mw + 6), y=80, w=mw, h=52, hook="ockm-drop", label="drop", sub="hold" }
   add{ kind="pad", x=mx + 3 * (mw + 6), y=80, w=mw, h=52, hook="ockm-repeat", label="repeat", sub="hold" }
-  local hold = self.filter_hold
-  add{ kind="hbar", x=mx, y=140, w=iw, h=150, hook="ockm-filter", lo=-1, hi=1, label=hold and "filter (held)" or "filter", bold=true, spring=not hold }
-  add{ kind="choice", x=mx + iw - 64, y=148, w=56, h=30, label="hold", small=true, onbar=true, sel=hold, tap=function()
-    self.filter_hold = not hold
-    if hold then self:filter_spring() end
-  end }
-  local hw = (iw - 6) / 2
-  add{ kind="hbar", x=mx, y=298, w=hw, h=56, hook="ockm-drive", lo=0, hi=1, label="drive", bold=true }
-  add{ kind="hbar", x=mx + hw + 6, y=298, w=hw, h=56, hook="ockm-volume", lo=0, hi=1, label="volume", bold=true, db=0.5 }
+  -- v1.24: the bus effects' XY pad here, beside the mutes (it takes the place of the DJ filter strip and drive: the
+  -- master bus's filter, unlatched, plays and springs back the same way). Pick the bus above it; its settings sheet picks
+  -- the effect. The fx tab has the same pad, bigger
+  local tb = self.fx_target or "drums"
+  self.fx_latch = self.fx_latch or {}
+  local bw = (iw - 12 - 2 * 64) / 3
+  for i, b in ipairs(BUSES) do
+    add{ kind="choice", x=mx + (i - 1) * (bw + 6), y=140, w=bw, h=40, small=true, sel=(tb == b), label=b .. ": " .. self:bfx_name(b),
+         tap=function() self.fx_target = b end }
+  end
+  local lat = self.fx_latch[tb] and true or false
+  add{ kind="choice", x=mx + 3 * (bw + 6), y=140, w=64, h=40, small=true, accent=true, sel=lat, label=lat and "latched" or "latch",
+       tap=function() self.fx_latch[tb] = not lat; if lat then self:bfx_set_on(tb, false) end end }
+  add{ kind="btn", x=mx + 3 * (bw + 6) + 70, y=140, w=58, h=40, small=true, label="set", tap=function() self.sheet = "fxset" end }
+  local nm = self:bfx_name(tb)
+  add{ kind="xy", x=mx, y=186, w=iw, h=226, bus=tb, fx=nm, axes=BFX_AXES[nm], small=true,
+       down=function(x, y) self:bfx_pad(x, y, "down") end, drag=function(x, y) self:bfx_pad(x, y, "move") end, up=function() self:bfx_pad(0, 0, "up") end }
+  -- the master's delay and reverb (each instrument sends to them), and the volume
   local ROW2 = { { "ockm-delay-mix", 0, 1, "delay" }, { "ockm-delay-fb", 0, 0.9, "feedback" }, { "ockm-delay-steps", 1, 8, "time" },
                  { "ockm-verb-mix", 0, 1, "reverb" }, { "ockm-verb-size", 0, 1, "size" } }
-  self:fx_groups(add, ROW2, mx, 362, iw, 56)
+  local vw = 76
+  self:fx_groups(add, ROW2, mx, 418, iw - vw - 8, 56)
+  add{ kind="hbar", x=mx + iw - vw, y=418, w=vw, h=56, hook="ockm-volume", lo=0, hi=1, label="volume", bold=true, db=0.5 }
   local w3 = (iw - 12) / 3
   for i = 1, 3 do
     -- your three slots (pick them in settings, or with the small v on each)
     local rc = self.me.macros[self.me.slots[i]]
     local x = mx + (i - 1) * (w3 + 6)
     local lit = self.macro and self.macro.slot == i
-    add{ kind="hold", x=x, y=426, w=w3, h=156, label=(rc and #rc.moves > 0) and rc.name or "empty",
+    add{ kind="hold", x=x, y=482, w=w3, h=100, label=(rc and #rc.moves > 0) and rc.name or "empty",
          sub=self:macro_sub(i) or ((rc and (rc.bars or 0) > 0) and ("tap: " .. rc.bars .. " bars, or hold") or ("slot " .. string.char(64 + i))),
          on=lit, down=function() self:macro_down(i) end, up=function() self:macro_up(i) end }
-    add{ kind="btn", x=x + w3 - 40, y=432, w=34, h=30, small=true, quiet=true, label="v", tap=function() self.pick_slot = i; self.sheet = "slotpick" end }
+    add{ kind="btn", x=x + w3 - 40, y=488, w=34, h=30, small=true, quiet=true, label="v", tap=function() self.pick_slot = i; self.sheet = "slotpick" end }
   end
 end
 
@@ -1336,12 +1347,21 @@ function ui:layout_fxset(add)
   local rows = { { "ockm-bfx-"..b.."-"..nm.."-mix", "mix (dry to wet)" } }
   if BFX_SET[nm] then rows[#rows + 1] = { "ockm-bfx-"..b.."-"..nm.."-p", BFX_SET[nm] } end
   rows[#rows + 1] = { "ockm-bfx-"..b.."-glide", "glide (how slowly it follows your finger)" }
-  add{ kind="sheet", x=x0, y=y0, w=w0, h=60 + #rows * 62 + 56 }
-  add{ kind="text", x=x0 + 16, y=y0 + 16, w=w0 - 32, h=14, label=b .. " bus: " .. nm .. " settings", size=13, col="txt" }
-  for i, r in ipairs(rows) do
-    add{ kind="hbar", x=x0 + 16, y=y0 + 48 + (i - 1) * 62, w=w0 - 32, h=54, hook=r[1], lo=0, hi=1, label=r[2], bold=true }
+  -- v1.24: the master's own drive (always on, under everything) lives here now
+  if b == "master" then rows[#rows + 1] = { "ockm-drive", "master drive (always on)" } end
+  y0 = math.max(70, (H - (110 + #rows * 62 + 56)) / 2)
+  add{ kind="sheet", x=x0, y=y0, w=w0, h=110 + #rows * 62 + 56 }
+  add{ kind="text", x=x0 + 16, y=y0 + 16, w=w0 - 32, h=14, label=b .. " bus effect", size=13, col="txt" }
+  -- which effect this bus has
+  local fw = (w0 - 32 - 18) / 4
+  for k, e in ipairs(BFX) do
+    add{ kind="choice", x=x0 + 16 + (k - 1) * (fw + 6), y=y0 + 44, w=fw, h=40, small=true, accent=true, label=e, sel=(nm == e),
+         tap=function() self:send("ockm-bfx-"..b.."-type", k - 1) end }
   end
-  add{ kind="btn", x=x0 + w0 - 116, y=y0 + 56 + #rows * 62, w=100, h=40, small=true, label="done", tap=function() self.sheet = nil end }
+  for i, r in ipairs(rows) do
+    add{ kind="hbar", x=x0 + 16, y=y0 + 98 + (i - 1) * 62, w=w0 - 32, h=54, hook=r[1], lo=0, hi=1, label=r[2], bold=true }
+  end
+  add{ kind="btn", x=x0 + w0 - 116, y=y0 + 106 + #rows * 62, w=100, h=40, small=true, label="done", tap=function() self.sheet = nil end }
 end
 
 -- ------------------------------------------------------------------ my settings

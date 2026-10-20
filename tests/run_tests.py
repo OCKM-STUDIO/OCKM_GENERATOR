@@ -877,7 +877,7 @@ def touchscreen_drives_the_engine(work):
     tap(270, 45, 158)                    # bass step 1: made for you, but any step can be edited (it becomes yours)
     tap(280, 600, 236)                   # note picker: third note of the scale
     tap(290, 262, 36)                    # perform tab
-    tap(310, 716, 215)                   # perform: the filter, middle
+    tap(310, 760, 160)                   # perform: the master bus on the pad (v1.24: the pad is where the filter strip was)
     tap(320, 477, 36)                    # song tab
     tap(335, 228, 345)                   # harmony: next progression (v0.99: the stepper is narrower, rate and push beside it)
     tap(338, 725, 36)                    # chord tab
@@ -898,7 +898,6 @@ def touchscreen_drives_the_engine(work):
     assert any(e.startswith("d1 16 ") for e in edits), f"tap after the swipe should edit step 17: {edits}"
     be = printed(out, "ockm-bass-edit")
     assert len(be) >= 2 and be[-1].split()[:2] == ["0", "36"], f"bass step 1 should become C (A minor, third step): {be}"
-    assert any(abs(float(x)) < 0.1 for x in printed(out, "ockm-filter")), "perform: filter in the middle should be about 0"
     assert printed(out, "ockm-chord-prog"), "song: the progression arrow should pick the next progression"
     assert any(e.startswith("d2 1 ") for e in edits), f"tapping the snare lane in all drums should edit d2 step 2: {edits}"
     assert "1" in printed(out, "ockm-bass-mode"), "editing the bass should make it yours"
@@ -1233,21 +1232,21 @@ def drum_lab_character_and_morph(work):
 
 @test
 def touchscreen_filter_springs_and_throw(work):
-    """On perform: sweep the filter and let go, it glides back to 0. With hold on it stays. The repeat pad (v1.17, where throw
-    was) sends 1 then 0."""
+    """v1.24: on perform the pad plays the picked bus's effect (here the master's, set to its filter): lift and it springs
+    back out; latched it stays in. The repeat pad (v1.17, where throw was) sends 1 then 0."""
     if not PDLUA:
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
-    h = Harness(); h.show("ockm-filter-glide", "ockm-repeat", "ockm-filter-now")
-    h.at(100, "ockm-ui-test drag 716 215 636 215")          # sweep the filter left, let go
-    h.at(500, "ockm-ui-test tap 902 163")                   # hold on
-    h.at(550, "ockm-ui-test drag 716 215 636 215")          # sweep again, let go: it stays
+    h = Harness(); h.show("ockm-bfx-master-on", "ockm-repeat")
+    h.at(80, "ockm-bfx-master-type 0")
+    h.at(100, "ockm-ui-test tap 760 160")                   # the master bus on the pad
+    h.at(150, "ockm-ui-test drag 716 300 636 300")          # sweep, let go: out again
+    h.at(500, "ockm-ui-test tap 848 160")                   # latch
+    h.at(550, "ockm-ui-test drag 716 300 636 300")          # sweep again, let go: it stays in
     h.at(900, "ockm-ui-test tap 886 106")                   # repeat
     f = os.path.join(work, "t_spring_ui.pd"); h.finish(1000, f)
     out = run(work, f)
-    gl = printed(out, "ockm-filter-glide")
-    assert len(gl) == 1 and gl[0].split()[-1] == "50", f"only the first sweep should spring back, quickly (50 ms): {gl}"
-    now = [float(v.split()[-1]) for v in printed(out, "ockm-filter-now")]
-    assert min(now) < -0.3 and abs(now[-1]) > 0.3, f"held filter should stay where it was left: last {now[-3:]}"
+    on = [int(float(v.split()[-1])) for v in printed(out, "ockm-bfx-master-on")]
+    assert on == [1, 0, 1], f"in, out when lifted, then in and staying in (latched): {on}"
     assert [int(float(v.split()[-1])) for v in printed(out, "ockm-repeat")] == [1, 0], printed(out, "ockm-repeat")
 
 @test
