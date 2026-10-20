@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v1.09"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v1.10"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -827,8 +827,7 @@ function ui:layout_top(add)
          tap=function() if self.recording then self:record_stop() else self:export_cancel() end end }
   else
     -- save: a disc, orange when there's something to save
-    add{ kind="disc", x=W - 120, y=12, w=50, h=48, tap=function()
-      psend("ockm-save", "bang", {}); self:say("saved " .. ockm_pretty(self.project) .. ": the loop and the kit") end }
+    add{ kind="disc", x=W - 120, y=12, w=50, h=48, tap=function() self:save_variation() end }
   end
   add{ kind="menubtn", x=W - 66, y=12, w=50, h=48, sel=(self.menu or self.screen == "project" or self.screen == "setup"), tap=function() self.menu = not self.menu end }
   if self.screen ~= "project" and self.screen ~= "setup" and self.screen ~= "live" then self:layout_nav(add) end
@@ -3188,6 +3187,30 @@ function ockm_pretty(name)
   if not y then return (name:gsub("%-", " ")) end
   return rest:gsub("%-", " ") .. " · " .. tonumber(d) .. " " .. (MONTHS[tonumber(m)] or "")
 end
+-- v1.10 every save is a variation: the version you had stays as it was, and you carry on in the new one
+-- (velvet-heron, velvet-heron-v2, -v3...). A brand-new project's first save just saves it; nothing to save, nothing made
+local function ockm_base(n) return (tostring(n):gsub("%-v%d+$", "")) end
+local function ockm_ver(n) return tonumber(tostring(n):match("%-v(%d+)$")) or 1 end
+function ui:save_variation()
+  local cur = self.project or "default"
+  if not self.unsaved then self:say("nothing new to save in " .. ockm_pretty(cur)); return end
+  if cur == self.fresh then
+    self.fresh = nil; psend("ockm-save", "bang", {}); self:say("saved " .. ockm_pretty(cur) .. ": the loop and the kit"); return
+  end
+  local n
+  if cur == "default" then n = self:new_name()
+  else
+    local base, top = ockm_base(cur), ockm_ver(cur)
+    local taken = { [cur] = true }
+    for _, q in ipairs(self.projects or {}) do
+      taken[q] = true
+      if ockm_base(q) == base then top = math.max(top, ockm_ver(q)) end
+    end
+    repeat top = top + 1; n = base .. "-v" .. top until not taken[n]
+  end
+  psend("ockm-project-saveas", "symbol", { n }); psend("ockm-project-list", "bang", {})
+  self:say("saved as " .. ockm_pretty(n) .. ". " .. ockm_pretty(cur):match("^[^·]+"):gsub("%s+$", "") .. " stays as it was")
+end
 function ui:new_name()
   local taken = {}
   for _, p in ipairs(self.projects or {}) do taken[p] = true end
@@ -3206,35 +3229,64 @@ function ui:layout_project(add)
   add{ kind="text", x=16, y=130, w=W - 32, h=14, label=self.msg or "the loop, plus the drum kit, tempo and effects", size=11, col=self.msg and "acc" or nil }
   local bw = (W - 32 - 4 * 8) / 5
   local acts = {
-    { "save", function() psend("ockm-save", "bang", {}); self:say("saved " .. ockm_pretty(cur) .. ": the loop and the kit") end },
+    { "save a variation", function() self:save_variation() end },
     { "back to last save", function() psend("ockm-revert", "bang", {}); self:say("back to the last save of " .. ockm_pretty(cur)) end },
     { "save as a copy", function()
         local n = self:new_name(); psend("ockm-project-saveas", "symbol", { n }); psend("ockm-project-list", "bang", {})
         self:say("saved a copy as " .. ockm_pretty(n) .. ". You're now working in the copy") end },
     { "new blank project", function()
-        local n = self:new_name(); self.exists = 1; self.new_pending = true; psend("ockm-project-new", "symbol", { n }); psend("ockm-project-list", "bang", {})
+        local n = self:new_name(); self.exists = 1; self.new_pending = true; self.fresh = n; psend("ockm-project-new", "symbol", { n }); psend("ockm-project-list", "bang", {})
         self.pick = nil; self:say("new project: " .. ockm_pretty(n) .. ". The last one stays as you last saved it") end },
     { "export...", function() psend("ockm-usb-scan", "bang", {}); psend("ockm-exports-ask", "bang", {}); self.sheet = "export" end },
   }
   for i, a in ipairs(acts) do
     add{ kind="btn", x=16 + (i - 1) * (bw + 8), y=152, w=bw, h=52, label=a[1], accent=(i == 4 or i == 5), tap=a[2] }
   end
-  -- every project, newest first
+  -- every project, newest first, one tile each: its variations are in the row under the tiles
   local list = self.projects or {}
-  add{ kind="text", x=16, y=222, w=300, h=12, label="your projects (" .. #list .. ")", size=10 }
+  local groups, order = {}, {}
+  for _, n in ipairs(list) do
+    local b = ockm_base(n)
+    if not groups[b] then groups[b] = {}; order[#order + 1] = b end
+    table.insert(groups[b], n)
+  end
+  for _, g in pairs(groups) do table.sort(g, function(a, b) return ockm_ver(a) < ockm_ver(b) end) end
+  local cur_base = ockm_base(cur)
+  local shown = self.pgroup or cur_base
+  add{ kind="text", x=16, y=222, w=300, h=12, label="your projects (" .. #order .. ")", size=10 }
   local cols, rows = 4, 4
   local per = cols * rows
-  local pages = math.max(1, math.ceil(#list / per))
+  local pages = math.max(1, math.ceil(#order / per))
   self.ppage = clamp(self.ppage or 0, 0, pages - 1)
   local cw = (W - 32 - (cols - 1) * 8) / cols
   for k = 1, per do
-    local name = list[self.ppage * per + k]
-    if not name then break end
+    local b = order[self.ppage * per + k]
+    if not b then break end
+    local g = groups[b]
     local col, row = (k - 1) % cols, math.floor((k - 1) / cols)
-    local is_cur = (name == cur)
+    local is_cur = (b == cur_base)
+    local latest = g[#g]
+    local lbl = ockm_pretty(b) .. (#g > 1 and ("  v" .. ockm_ver(latest)) or "") .. (is_cur and "  (open)" or "")
     add{ kind="choice", x=16 + col * (cw + 8), y=238 + row * 52, w=cw, h=46, small=true,
-         label=ockm_pretty(name) .. (is_cur and "  (open)" or ""), sel=(self.pick == name) or (self.pick == nil and is_cur),
-         tap=function() self.confirm = nil; self.pick = (not is_cur) and name or nil end }
+         label=lbl, sel=(b == shown),
+         tap=function()
+           self.confirm = nil; self.pgroup = b
+           local want = is_cur and cur or latest
+           self.pick = (want ~= cur) and want or nil
+         end }
+  end
+  -- the variations of the project picked (or open), oldest to newest: the last 12
+  local g = groups[shown]
+  if g and #g > 1 then
+    add{ kind="text", x=16, y=444, w=W - 32, h=12, label="variations of " .. ockm_pretty(shown):match("^[^·]+"):gsub("%s+$", "") .. ": each save keeps the one before", size=10 }
+    local first = math.max(1, #g - 11)
+    local vw = (W - 32 - 11 * 6) / 12
+    for i = first, #g do
+      local n = g[i]
+      add{ kind="choice", x=16 + (i - first) * (vw + 6), y=460, w=vw, h=30, small=true,
+           label="v" .. ockm_ver(n) .. (n == cur and " open" or ""), sel=(self.pick == n) or (self.pick == nil and n == cur),
+           tap=function() self.confirm = nil; self.pick = (n ~= cur) and n or nil end }
+    end
   end
   if pages > 1 then
     add{ kind="arrow", x=W - 112, y=216, w=44, h=20, dir=-1, on=self.ppage > 0, tap=function() self.ppage = self.ppage - 1 end }
@@ -3246,8 +3298,8 @@ function ui:layout_project(add)
     local y = H - 64
     add{ kind="text", x=16, y=y - 18, w=W - 32, h=12, label=ockm_pretty(p) .. ": open it, or delete it. Opening swaps out " .. ockm_pretty(cur), size=10 }
     local w3 = (W - 32 - 16) / 3
-    add{ kind="btn", x=16, y=y, w=w3, h=52, label="save " .. ockm_pretty(cur):match("^[^·]+"):gsub("%s+$", "") .. ", then open", accent=true, tap=function()
-      psend("ockm-save", "bang", {}); psend("ockm-project-open", "symbol", { p }); self.pick = nil; self:say("opened " .. ockm_pretty(p)) end }
+    add{ kind="btn", x=16, y=y, w=w3, h=52, label="save a variation, then open", accent=true, tap=function()
+      self:save_variation(); psend("ockm-project-open", "symbol", { p }); self.pick = nil; self:say("opened " .. ockm_pretty(p)) end }
     add{ kind="btn", x=16 + w3 + 8, y=y, w=w3, h=52, label="open without saving", tap=function()
       psend("ockm-project-open", "symbol", { p }); self.pick = nil; self:say("opened " .. ockm_pretty(p)) end }
     add{ kind="btn", x=16 + 2 * (w3 + 8), y=y, w=w3, h=52, label=(self.confirm == p) and "tap again to delete" or "delete", quiet=(self.confirm ~= p), tap=function()

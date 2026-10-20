@@ -356,7 +356,16 @@ lpf=p.add("#X obj 30 215 lop~ 20000;"); hpf=p.add("#X obj 30 235 hip~ 5;")
 rdr=p.add(f"#X obj 500 160 r ockm-{D}1-drive;"); drx=p.add(f"#X obj 500 185 expr 1+{D}f1*6;")
 drv=p.add(f"#X obj 30 255 expr~ if({D}f2>1.001 \\, tanh({D}v1*{D}f2)/tanh({D}f2) \\, {D}v1);")
 out=p.add("#X obj 30 290 outlet~;")
-for c in [(prev,0,lpf,0),(lpf,0,hpf,0),(hpf,0,drv,0),(drv,0,out,0),(rtn,0,tnx,0),(tnx,0,lpf,1),(tnx,1,hpf,1),(rdr,0,drx,0),(drx,0,drv,1)]: p.con(*c)
+# v1.09 hat choke, by role: a hit on a slot playing the closed hat (sound 4) shuts any slot playing the open hat (sound 5)
+# in 8 ms, as on an 808 or 909. A choke within 2 ms of the open hat's own hit is ignored, so both on one step still opens
+csd=p.add(f"#X obj 700 20 r ockm-{D}1-sound;"); cf1=p.add("#X obj 700 70 f;"); cf2=p.add("#X obj 820 120 f;")
+cht=p.add("#X obj 700 45 t b;"); csel=p.add("#X obj 700 95 sel 4 5;"); csend=p.add("#X obj 700 120 s ockm-choke-hat;")
+copen=p.add("#X msg 760 145 1;"); crc=p.add("#X obj 820 70 r ockm-choke-hat;"); ctm=p.add("#X obj 820 95 timer;")
+cms=p.add("#X obj 820 145 moses 2;"); cbb=p.add("#X obj 880 170 t b;"); c5=p.add("#X obj 880 195 sel 5;"); csh=p.add("#X msg 880 220 0 8;")
+cln=p.add("#X obj 760 250 line~;"); cg=p.add("#X obj 30 272 *~;"); clb=p.add("#X obj 760 20 loadbang;")
+for c in [(inl,0,cht,0),(cht,0,ctm,0),(cht,0,cf1,0),(csd,0,cf1,1),(csd,0,cf2,1),(cf1,0,csel,0),(csel,0,csend,0),(csel,1,copen,0),(copen,0,cln,0),(clb,0,copen,0),
+          (crc,0,ctm,1),(ctm,0,cms,0),(cms,1,cbb,0),(cbb,0,cf2,0),(cf2,0,c5,0),(c5,0,csh,0),(csh,0,cln,0),(cln,0,cg,1)]: p.con(*c)
+for c in [(prev,0,lpf,0),(lpf,0,hpf,0),(hpf,0,drv,0),(drv,0,cg,0),(cg,0,out,0),(rtn,0,tnx,0),(tnx,0,lpf,1),(tnx,1,hpf,1),(rdr,0,drx,0),(drx,0,drv,1)]: p.con(*c)
 p.save("voices/ockm-drum.pd","#N canvas 180 180 1100 320 12;")
 
 # ---------------- drum row (up to 128 steps, shown 16 at a time) ----------------
@@ -1040,14 +1049,16 @@ def analogue(q,core,ks,out):
     f1=q.add(f"#X obj 30 310 {svf(1.1)};"); f2=q.add(f"#X obj 30 340 {svf(0.8)};")
     srn=q.add("#X obj 600 230 loadbang;"); srs=q.add("#X obj 600 255 samplerate~;")
     dc=q.add("#X obj 30 290 hip~ 15;")   # the oscillators carry some DC: take it out before the filter (which passes DC)
-    dr=q.add(f"#X obj 30 375 expr~ tanh(1.5*{D}v1)/tanh(1.5);"); am=q.add("#X obj 30 405 *~;"); g=q.add("#X obj 30 435 *~ 0.55;")
+    dr=q.add(f"#X obj 30 375 expr~ tanh(1.5*{D}v1)/tanh(1.5);"); am=q.add("#X obj 30 405 *~;"); g=q.add("#X obj 30 435 *~ 0.58;")
+    # v1.09: the drive's top harmonics read as fizz on a bass: two gentle low-passes take them off
+    at1=q.add("#X obj 120 380 lop~ 4000;"); at2=q.add("#X obj 120 395 lop~ 4000;")
     k1=q.add(f"#X obj 200 140 expr 60*pow(2\\,7.5*{D}f1);"); k3=q.add("#X obj 420 140 * 10;")
     # v0.98: past decay 0.6 the note rings on after its step and fades with the filter envelope (as sub does), so a long
     # decay is a pluck; below it the step ends the note as before
     rg=q.add(f"#X obj 560 140 expr min(1\\, max(0\\, ({D}f1-0.6)*4));")
     ra=q.add(f"#X obj 200 405 expr~ max({D}v1\\, {D}f3*pow(min(1\\, max(0\\, {D}v2))\\, 1.5));")
     for c in [(core,0,mt,0),(mt,0,sw,0),(mt,0,sq,0),(mt,0,hz,0),(hz,0,sb,0),(sw,0,mx,0),(sq,0,mx,1),(sb,0,mx,2),
-              (core,1,co,0),(co,0,f1,1),(co,0,f2,1),(mx,0,dc,0),(dc,0,f1,0),(f1,2,f2,0),(f2,2,dr,0),(srn,0,srs,0),(srs,0,f1,2),(srs,0,f2,2),(dr,0,am,0),(core,2,ra,0),(core,1,ra,1),(ra,0,am,1),(am,0,g,0),(g,0,out,0),
+              (core,1,co,0),(co,0,f1,1),(co,0,f2,1),(mx,0,dc,0),(dc,0,f1,0),(f1,2,f2,0),(f2,2,dr,0),(srn,0,srs,0),(srs,0,f1,2),(srs,0,f2,2),(dr,0,at1,0),(at1,0,at2,0),(at2,0,am,0),(core,2,ra,0),(core,1,ra,1),(ra,0,am,1),(am,0,g,0),(g,0,out,0),
               (ks[0],0,k1,0),(k1,0,co,1),(ks[1],0,mx,3),(ks[2],0,k3,0),(k3,0,co,2),(ks[3],0,rg,0),(rg,0,ra,2)]: q.con(*c)
     q.add("#X text 200 110 k1 cutoff / k2 saw to square / k3 filter envelope (how far each note opens it) / k4 decay. With a square sub an octave down.;")
 
@@ -1213,23 +1224,26 @@ def lead_supersaw(q,core,ks,out):
               (f2,0,am,0),(core,2,am,1),(am,0,g,0),(g,0,out,0)]: q.con(*c)
     q.add("#X text 200 110 k1 spread (one saw to seven) / k2 cutoff / k3 drift / k4 decay;")
 
-def raw(q,core,ks,out,hpf=80,gain=0.8):
+def raw(q,core,ks,out,hpf=80,gain=0.8,top=9000):
     # v1.08 raw (MS-20 style): a triangle or saw into a screaming resonant low-pass that self-oscillates at the top of
     # its resonance, the high-pass taking the mud out first, and driven hard after, the way the MS-20's filter breaks up.
     # For hypnotic techno sequences and big tech house riffs. Put the LFO on the cutoff (k1) over 4 or 8 bars for the sweep.
     # k1 cutoff / k2 resonance (screams past about 0.85) / k3 wave (triangle to saw) / k4 decay
-    mt=q.add("#X obj 30 200 mtof~;"); ph=q.add("#X obj 30 230 phasor~;")
-    wv=q.add(f"#X obj 30 260 expr~ (1-{D}f2)*(4*abs({D}v1-0.5)-1) + {D}f2*(2*{D}v1-1);")
+    # v1.09: the saw is band-limited (the plain one aliased into fizz), and two gentle low-passes after the drive keep
+    # the top in check (lower on the bass)
+    mt=q.add("#X obj 30 200 mtof~;"); ph=q.add("#X obj 30 230 phasor~;"); bs=q.add("#X obj 140 230 ockm-blsaw;")
+    wv=q.add(f"#X obj 30 260 expr~ (1-{D}f2)*(4*abs({D}v1-0.5)-1) + {D}f2*{D}v3;")
+    t1=q.add(f"#X obj 30 395 lop~ {top};"); t2=q.add(f"#X obj 30 400 lop~ {top};")
     hp=q.add(f"#X obj 30 290 hip~ {hpf};"); pre=q.add(f"#X obj 30 315 expr~ tanh(1.6*{D}v1);")
     cut=filt_env(q,core,ks,45,8,kidx=None,amt=4500,cmax=12000)
     bob=q.add("#X obj 30 350 bob~;"); k2=q.add(f"#X obj 310 140 expr 0.3+4.1*pow({D}f1\\, 1.3);")
     dr=q.add(f"#X obj 30 380 expr~ tanh(2.8*{D}v1)/tanh(2.8);")
     am=q.add("#X obj 30 410 *~;"); g=q.add(f"#X obj 30 440 *~ {gain};")
     for c in [(core,0,mt,0),(mt,0,ph,0),(ph,0,wv,0),(ks[2],0,wv,1),(wv,0,hp,0),(hp,0,pre,0),(pre,0,bob,0),(cut,0,bob,1),
-              (ks[1],0,k2,0),(k2,0,bob,2),(bob,0,dr,0),(dr,0,am,0),(core,2,am,1),(am,0,g,0),(g,0,out,0)]: q.con(*c)
+              (ks[1],0,k2,0),(k2,0,bob,2),(bob,0,dr,0),(dr,0,t1,0),(t1,0,t2,0),(t2,0,am,0),(core,2,am,1),(am,0,g,0),(g,0,out,0),(mt,0,bs,0),(bs,0,wv,2)]: q.con(*c)
     q.add("#X text 200 110 k1 cutoff / k2 resonance (self-oscillates at the top) / k3 triangle to saw / k4 decay;")
 
-engine("voices/ockm-mono-raw.pd",7,"Raw engine (MS-20 style): triangle or saw into a screaming resonant filter \\, driven. Hypnotic techno and big tech house riffs",lambda q,c,k,o: raw(q,c,k,o,hpf=25,gain=1.1))
+engine("voices/ockm-mono-raw.pd",7,"Raw engine (MS-20 style): triangle or saw into a screaming resonant filter \\, driven. Hypnotic techno and big tech house riffs",lambda q,c,k,o: raw(q,c,k,o,hpf=25,gain=1.15,top=3200))
 
 for nm,fnb,title in [
         ("dx",lead_dx,"DX lead: two-operator FM. Electric piano \\, reed \\, bell or glass"),

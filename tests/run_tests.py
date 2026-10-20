@@ -918,7 +918,7 @@ def touchscreen_screens_draw(work):
         raise Skip("Pillow not installed")
     p = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_preview.py"), os.path.join(work, "preview")], capture_output=True, text=True)
     assert p.returncode == 0, p.stderr[-800:]
-    assert len(os.listdir(os.path.join(work, "preview"))) == 31, "expected thirty-one screen pictures"
+    assert len(os.listdir(os.path.join(work, "preview"))) == 32, "expected thirty-two screen pictures"
 
 @test
 def mute_solo_and_levels(work):
@@ -1651,6 +1651,37 @@ def touchscreen_makes_and_opens_projects(work):
     assert made, f"no new project folder: {os.listdir(os.path.join(work, 'projects'))} {errs[:3]}"
     assert os.path.exists(os.path.join(work, "projects", made[0], "loop.txt")), "the new project should be written straight away"
     assert open(os.path.join(work, "projects", "current.txt")).read().strip() == made[0] + ";"
+
+@test
+def touchscreen_save_makes_variations(work):
+    """v1.10: save keeps the version you had and carries on in a new variation (-v2, -v3). A new project's first save just
+    saves it, and save with nothing changed makes nothing."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness(); h.show("ockm-project-saveas")
+    tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
+    tap(150, 919, 36); tap(151, 830, 95)   # menu, project
+    tap(200, 667, 178)                     # new blank project
+    tap(250, 407, 36)                              # mixer
+    tap(300, 54, 300); tap(320, 865, 36)           # kick fader, then the first save: plain
+    tap(400, 54, 340); tap(420, 865, 36)           # v2
+    tap(500, 865, 36)                              # nothing changed: nothing made
+    tap(600, 54, 380); tap(620, 865, 36)           # v3
+    f = os.path.join(work, "t_variations.pd"); h.finish(800, f)
+    out = run(work, f)
+    P = os.path.join(work, "projects")
+    made = sorted(d for d in os.listdir(P) if re.match(r"\d{4}-\d\d-\d\d-[a-z]+-[a-z]+(-v\d+)?$", d))
+    assert len(made) == 3, f"a project and two variations: {made}"
+    base = made[0]
+    assert made[1:] == [base + "-v2", base + "-v3"], made
+    assert printed(out, "ockm-project-saveas") == ["symbol " + base + "-v2", "symbol " + base + "-v3"] or \
+        [v.split()[-1] for v in printed(out, "ockm-project-saveas")] == [base + "-v2", base + "-v3"], printed(out, "ockm-project-saveas")
+    def lev(d):
+        txt = "".join(open(os.path.join(P, d, f)).read() for f in os.listdir(os.path.join(P, d)) if f.endswith(".txt"))
+        return [l for l in txt.split(";") if l.strip().startswith("ockm-d1-level ")][0].split()[-1]
+    levels = [lev(base), lev(base + "-v2"), lev(base + "-v3")]
+    assert len(set(levels)) == 3, f"each variation keeps its own save: {levels}"
+    assert open(os.path.join(P, "current.txt")).read().strip() == base + "-v3;"
 
 @test
 def drum_grooves_fill_every_slot(work):

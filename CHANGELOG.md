@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.10 (20 October 2026)
+
+- **Every save is a variation:** save keeps the version you had exactly as it was and carries on in a new one (velvet heron, then velvet heron v2, v3...). Nothing is ever overwritten. A brand-new project's first save just saves it, and save with nothing changed makes nothing
+- **The project list shows each project once,** with its latest variation number. Pick one and its variations appear in a row underneath (the last 12): tap any to open it or delete it
+
 ## v1.09 (20 October 2026)
 
 - **Hard stab, more punch:** each hit starts with a spike that drops to the body in 35 ms, the pitch knocks down onto the note from 3 semitones up over the first 15 ms, and the saws spread wider

@@ -57,7 +57,7 @@ local function engine(name, sel, atoms)
   if name == "ockm-play" then pd.send("ockm-playing", "float", { atoms[1] }) end
   -- projects: a pretend projects folder
   if name == "ockm-project-list" then
-    projects = projects or { "default", "2026-10-02-amber-heron", "2026-10-09-neon-otter", "2026-10-12-dusty-lantern" }
+    projects = projects or { "default", "2026-10-02-amber-heron", "2026-10-09-neon-otter", "2026-10-09-neon-otter-v2", "2026-10-09-neon-otter-v3", "2026-10-12-dusty-lantern" }
     pd.send("ockm-project-list-start", "bang", {})
     for _, p in ipairs(projects) do pd.send("ockm-project-item", "symbol", { p }) end
     pd.send("ockm-project-list-end", "bang", {})
