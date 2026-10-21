@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.30 (21 October 2026)
+
+- **MIDI learn** (menu: MIDI learn): tap any control on any screen, then move a knob or hit a pad. That control is that knob or pad from then on, wherever you are. It stays with the slot: a synth's knob 1 stays its knob 1 when you change engine, macro slot A stays slot A whatever recipe is in it, a mute tile stays that track. Pads press and let go (hold a macro, hold drop), buttons tap, knobs move faders and sliders. The fx pad takes two knobs, one across and one up; turning across brings the effect in, back to its resting place takes it out. Learned controls are outlined while learning; **forget it** clears one; **done** finishes. Kept in my-settings.lua, so they're yours across every project. Anything you haven't learned still does what it did
+- **The bus effects now take the reverb and delay with them:** each bus's sends go through a copy of its effect on the way to the master's reverb and delay. Pulling the music filter left now takes about 35 dB off the top, where before the unfiltered reverb and delay tails filled it back in (about 6 dB)
+
 ## v1.29 (21 October 2026)
 
 - **Mutes on transitions:** every join has a mutes row: keep all, drums out, kick out, synths out or kick + bass. They go over the transition and come back on the 1 (the next scene's own mutes win). A recipe with its own mutes (the lifts take the drums out) shows them, and you can change them. A cut with mutes becomes a short mute section before the drop, over 1, 2, 4 or 8 bars

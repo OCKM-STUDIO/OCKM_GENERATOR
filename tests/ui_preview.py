@@ -105,6 +105,7 @@ SHOTS = [
     ("compose", ["test tap 477 36"]),
     ("perform-mutes", ["test tap 262 36", "test tap 74 186", "test tap 103 503"]),   # mute the kick, solo the bass
     ("mixer", ["test tap 407 36"]),
+    ("midi-learn", ["test tap 270 36", "test tap 919 36", "test tap 830 290", "test tap 560 520", "send ockm-midi-cc list 64 21", "test tap 700 300"]),   # v1.30: learn on, a macro slot outlined
     ("arrange", ["test tap 793 36", "test tap 120 566", "test tap 280 566", "test tap 120 566", "test tap 600 566", "test tap 80 190"]),   # v1.28: a version of three scenes plus one, section 1 picked
     ("arrange-trans", ["test tap 230 200", "test tap 640 357"]),         # its transition picked: rise
     ("fx", ["test tap 346 36", "test press 700 250"]),                   # v1.23: the fx page, a finger on the pad (drums: crush in)

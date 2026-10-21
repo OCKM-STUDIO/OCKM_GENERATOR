@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v1.29"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v1.30"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -545,8 +545,14 @@ function ui:postinitialize()
   listen("ockm-step",    function(o, sel, a) o:on_step(math.floor(tonumber(a[1]) or 0)) end)
   listen("ockm-bar",     function(o, sel, a) o:on_bar() end)
   listen("ockm-chord-changed", function(o) o:chord_vary() end)
-  listen("ockm-midi-note", function(o, sel, a) o:midi_pad(tonumber(a[1]) or 0, tonumber(a[2]) or 0) end)
-  listen("ockm-midi-cc",   function(o, sel, a) o:midi_knob(tonumber(a[2]) or 0, tonumber(a[1]) or 0) end)
+  listen("ockm-midi-note", function(o, sel, a)
+    local n, v = tonumber(a[1]) or 0, tonumber(a[2]) or 0
+    if not o:midi_in("note", n, v) then o:midi_pad(n, v) end
+  end)
+  listen("ockm-midi-cc",   function(o, sel, a)
+    local cc, v = tonumber(a[2]) or 0, tonumber(a[1]) or 0
+    if not o:midi_in("cc", cc, v) then o:midi_knob(cc, v) end
+  end)
   listen("ockm-midi-pgm",  function(o, sel, a) o:midi_pgm(tonumber(a[1]) or 0) end)
   for _, n in ipairs({ "ockm-refresh","ockm-edit","ockm-extend","ockm-bass-edit","ockm-lead-edit","ockm-chord-edit",
                        "ockm-bass-gen","ockm-lead-gen","ockm-chord-gen","ockm-drums-changed" }) do
@@ -868,7 +874,7 @@ function ui:layout()
   if self.sheet == "vpick" then self:layout_vpick(add) end
   if self.sheet == "vexport" then self:layout_vexport(add) end
   -- messages on screens that have no message line of their own
-  if self.msg and (self.screen == "perform" or self.screen == "live" or self.screen == "fx" or self.screen == "compose" or self.screen == "mixer" or self.screen == "arrange" or self.screen == "setup" or self.screen == "drums"
+  if self.msg and not self.learn and (self.screen == "perform" or self.screen == "live" or self.screen == "fx" or self.screen == "compose" or self.screen == "mixer" or self.screen == "arrange" or self.screen == "setup" or self.screen == "drums"
                    or (self.msg_undo and self.undo_label)) then
     if self.msg_undo and self.undo_label then
       add{ kind="toast", x=W / 2 - 330, y=H - 50, w=556, h=38, label=self.msg }
@@ -877,6 +883,7 @@ function ui:layout()
       add{ kind="toast", x=W / 2 - 330, y=H - 50, w=660, h=38, label=self.msg }
     end
   end
+  if self.learn then self:layout_learnbar(add) end
   if self.menu then self:layout_menu(add) end      -- last, so it sits on top and gets the taps
   return L
 end
@@ -934,6 +941,8 @@ function ui:layout_menu(add)
     { "export", "audio, stems, MIDI", function() psend("ockm-usb-scan", "bang", {}); psend("ockm-exports-ask", "bang", {}); self.sheet = "export" end },
     { "settings", "tempo, swing, clock, sound", function() self:open("setup") end },
     { "revert", "back to the last save", function() psend("ockm-revert", "bang", {}); self:say("back to the last save of " .. ockm_pretty(self.project)) end },
+    { "MIDI learn", self.learn and "on: tap to finish" or "map your pads and knobs", function()
+        if self.learn then self.learn = nil else self.learn = {}; self.sheet = nil end end },
   }
   if KIOSK then items[#items + 1] = { "quit to desktop", "", function() psend("pd", "quit", {}) end } end
   -- a tap anywhere else closes it
@@ -1218,7 +1227,7 @@ function ui:layout_live(add)
     local x, y = live_tile(n)
     if n <= 11 then
       local t = TRACKS[n]
-      add{ kind="mtile", x=x, y=y, w=LV_COL_W, h=LV_ROW_H, track=t, label=self:track_name(n),
+      add{ kind="mtile", lid="mute-" .. t, x=x, y=y, w=LV_COL_W, h=LV_ROW_H, track=t, label=self:track_name(n),
            tap=function()
              if not self:track_in(t) then self:say(self:track_name(n) .. " is off in this pattern: switch it on on the builder"); return end
              self:qmute(t, (self:mute_target(t) > 0) and 0 or 1)
@@ -1267,11 +1276,11 @@ function ui:layout_live(add)
   self.fx_latch = self.fx_latch or {}
   local bw = (iw - 12 - 2 * 64) / 3
   for i, b in ipairs(BUSES) do
-    add{ kind="choice", x=mx + (i - 1) * (bw + 6), y=140, w=bw, h=40, small=true, sel=(tb == b), label=b .. ": " .. self:bfx_name(b),
+    add{ kind="choice", lid="fxbus-" .. b, x=mx + (i - 1) * (bw + 6), y=140, w=bw, h=40, small=true, sel=(tb == b), label=b .. ": " .. self:bfx_name(b),
          tap=function() self.fx_target = b end }
   end
   local lat = self.fx_latch[tb] and true or false
-  add{ kind="choice", x=mx + 3 * (bw + 6), y=140, w=64, h=40, small=true, accent=true, sel=lat, label=lat and "latched" or "latch",
+  add{ kind="choice", lid="fxlatch", x=mx + 3 * (bw + 6), y=140, w=64, h=40, small=true, accent=true, sel=lat, label=lat and "latched" or "latch",
        tap=function() self.fx_latch[tb] = not lat; if lat then self:bfx_set_on(tb, false) end end }
   add{ kind="btn", x=mx + 3 * (bw + 6) + 70, y=140, w=58, h=40, small=true, label="set", tap=function() self.sheet = "fxset" end }
   local nm = self:bfx_name(tb)
@@ -1289,7 +1298,7 @@ function ui:layout_live(add)
     local rc = self.me.macros[self.me.slots[i]]
     local x = mx + (i - 1) * (w3 + 6)
     local lit = self.macro and self.macro.slot == i
-    add{ kind="hold", x=x, y=482, w=w3, h=100, label=(rc and #rc.moves > 0) and rc.name or "empty",
+    add{ kind="hold", lid="macro" .. i, x=x, y=482, w=w3, h=100, label=(rc and #rc.moves > 0) and rc.name or "empty",
          sub=self:macro_sub(i) or ((rc and (rc.bars or 0) > 0) and ("tap: " .. rc.bars .. " bars, or hold") or ("slot " .. string.char(64 + i))),
          on=lit, down=function() self:macro_down(i) end, up=function() self:macro_up(i) end }
     add{ kind="btn", x=x + w3 - 40, y=488, w=34, h=30, small=true, quiet=true, label="v", tap=function() self.pick_slot = i; self.sheet = "slotpick" end }
@@ -1455,6 +1464,7 @@ local function default_settings()
     slots = { 1, 3, 6 },
     new = { drum = 16, synth = 64, lead = 1 },
     device = { theme = "dark", snap = 1, mutes = 0 },
+    midi = {},       -- v1.30 MIDI learn: { ["cc:21"] = what it moves, ["note:36"] = what it plays }
   }
 end
 local SNAP_MS = { 50, 150, 400 }
@@ -1851,6 +1861,129 @@ function ui:midi_knob(cc, val)
     self:send("ockm-" .. (SYNTHS[self.part or 1] or "bass") .. "-k" .. (k - 4), x)
   end
   self:dirty()
+end
+
+-- ------------------------------------------------------------------ MIDI learn (v1.30)
+-- Turn it on from the menu, tap a control on any screen, then move a knob or hit a pad: that knob or pad is that
+-- control from then on, wherever you are. It stays with the slot: a synth's knob 1 learned stays knob 1 when you change
+-- engine; macro slot A stays slot A whatever recipe is in it. Kept in my-settings.lua (yours, not the project's)
+local LEARN_SKIP = { tab=1, menubtn=1, scrim=1, zone=1, sheet=1, card=1, text=1, menupanel=1, toast=1, steps=1, lane=1, vbar=1, playhead=1, bpm=1 }
+function ui:learn_desc(w)
+  if not w or LEARN_SKIP[w.kind] or self.sheet then return nil end
+  if (w.kind == "hbar" or w.kind == "slider" or w.kind == "vfader") and w.hook and not w.edit then
+    return { type = "value", key = "v:" .. w.hook, hook = w.hook, lo = w.lo, hi = w.hi, db = w.db, log = w.log, label = w.label or w.hook }
+  end
+  if w.kind == "xy" then return { type = "xy", key = "xy", label = "the fx pad" } end
+  if w.kind == "pad" and w.hook then return { type = "pad", key = "pad:" .. w.hook, hook = w.hook, label = w.label or w.hook } end
+  if w.kind == "ms" and w.hook and not w.tap then return { type = "toggle", key = "ms:" .. w.hook, hook = w.hook, label = (w.label or "") .. " " .. w.hook:gsub("^ockm%-", "") } end
+  if w.kind == "play" then return { type = "play", key = "play", label = "play / stop" } end
+  if w.tap or w.down then
+    local lid = w.lid or (w.kind .. ":" .. tostring(w.label or ""))
+    local part = (self.screen == "synth") and self.part or nil
+    return { type = "widget", key = "w:" .. self.screen .. ":" .. tostring(part or "") .. ":" .. lid, screen = self.screen, part = part, lid = lid,
+             label = tostring(w.label or w.kind) }
+  end
+  return nil
+end
+local function ctl_name(kind, n) return (kind == "cc" and "knob " or "pad ") .. math.floor(n) end
+-- find the widget a learned control plays, on its own screen (built as if it were showing)
+function ui:learn_widget(d)
+  local s0, p0, sh0, m0 = self.screen, self.part, self.sheet, self.menu
+  self.screen, self.sheet, self.menu = d.screen, nil, nil
+  if d.part then self.part = d.part end
+  local ok, L = pcall(function() return self:layout() end)
+  self.screen, self.part, self.sheet, self.menu = s0, p0, sh0, m0
+  if not ok then return nil end
+  for _, w in ipairs(L) do
+    if (w.tap or w.down) and (w.lid or (w.kind .. ":" .. tostring(w.label or ""))) == d.lid then return w end
+  end
+end
+-- a knob or pad: learn it, or play what it's learned. Returns true when it was dealt with here
+function ui:midi_in(kind, n, v)
+  local ctl = kind .. ":" .. math.floor(n)
+  local L = self.learn
+  self.me.midi = self.me.midi or {}
+  if L then
+    local t = L.target
+    if t then
+      if kind == "note" and v <= 0 then return true end   -- a pad's release while learning
+      local d = {}
+      for k, x in pairs(t) do d[k] = x end
+      if t.type == "xy" then
+        if kind ~= "cc" then self:say("the fx pad takes two knobs: one across, one up"); return true end
+        if not L.axis then d.axis = "x"; L.axis = "y"; L.xcc = ctl
+        elseif ctl ~= L.xcc then d.axis = "y"; L.target = nil; L.axis = nil
+        else return true end
+        d.key = "xy"
+      else L.target = nil end
+      -- one control does one thing: anything it did before goes
+      self.me.midi[ctl] = d
+      self:save_settings()
+      self:say(ctl_name(kind, n) .. " now " .. ((d.type == "xy") and ("moves the fx pad " .. (d.axis == "x" and "across: now move a second knob for up" or "up")) or ("plays " .. d.label)))
+      self:dirty(); return true
+    end
+    local d = self.me.midi[ctl]
+    if not (kind == "note" and v <= 0) then self:say(ctl_name(kind, n) .. (d and (": " .. (d.type == "xy" and ("fx pad " .. d.axis) or d.label)) or ": not learned yet. Tap a control first")) end
+  end
+  local d = self.me.midi[ctl]
+  if not d then return false end
+  local on = (kind == "cc") and (v >= 64) or (v > 0)
+  if d.type == "value" then
+    self:slide({ kind = "hbar", x = 0, w = 1, hook = d.hook, lo = d.lo, hi = d.hi, db = d.db, log = d.log }, (kind == "cc") and (v / 127) or (on and 1 or 0), 0)
+  elseif d.type == "xy" then
+    local b = self.fx_target or "drums"
+    local x = clamp(v / 127, 0, 1)
+    self:send("ockm-bfx-" .. b .. "-" .. d.axis, x)
+    if d.axis == "x" then
+      -- a knob has no letting go: the effect is in while the knob is away from where the effect does nothing
+      local rest = (self:bfx_name(b) == "filter") and 0.5 or 0
+      self:bfx_set_on(b, math.abs(x - rest) > 0.03 or (self.fx_latch and self.fx_latch[b]) and true or false)
+    end
+  elseif d.type == "pad" then
+    if on ~= (self.pad_on == d.hook) then self.pad_on = on and d.hook or nil; psend(d.hook, "float", { on and 1 or 0 }) end
+  elseif d.type == "toggle" then
+    if on then self:send(d.hook, ((self.v[d.hook] or 0) > 0) and 0 or 1) end
+  elseif d.type == "play" then
+    if on then self:send("ockm-play", (self.playing ~= 0) and 0 or 1) end
+  elseif d.type == "widget" then
+    local held = self.midi_held or {}
+    self.midi_held = held
+    if on and not held[ctl] then
+      local w = self:learn_widget(d)
+      if w then
+        held[ctl] = true
+        if w.down then w.down() elseif w.tap then w.tap() end
+      end
+    elseif not on and held[ctl] then
+      held[ctl] = nil
+      local w = self:learn_widget(d)
+      if w and w.up then w.up() end
+    end
+  end
+  self:dirty()
+  return true
+end
+-- the bar along the bottom while learning
+function ui:layout_learnbar(add)
+  local L = self.learn
+  local t = L.target
+  local y = H - 40
+  add{ kind="sheet", x=16, y=y, w=W - 32, h=36, nolearn=true }
+  local msg
+  if t then
+    msg = (t.type == "xy") and ("the fx pad: move a knob for " .. (L.axis == "y" and "up" or "across")) or ("learning " .. t.label .. ": move a knob or hit a pad")
+  else
+    msg = "MIDI learn: tap a control on any screen, then move a knob or hit a pad"
+  end
+  add{ kind="text", x=30, y=y + 12, w=W - 300, h=14, size=12, col="txt", nolearn=true, label=self.msg or msg }
+  local n = 0
+  if t then for _, d in pairs(self.me.midi or {}) do if d.key == t.key then n = n + 1 end end end
+  if n > 0 then
+    add{ kind="btn", x=W - 16 - 100 - 6 - 110, y=y + 3, w=110, h=30, small=true, nolearn=true, label="forget it", tap=function()
+           for c, d in pairs(self.me.midi) do if d.key == t.key then self.me.midi[c] = nil end end
+           self:save_settings(); self.learn.target = nil; self:say("forgotten") end }
+  end
+  add{ kind="btn", x=W - 16 - 100, y=y + 3, w=100, h=30, small=true, accent=true, nolearn=true, label="done", tap=function() self.learn = nil; self.msg = nil end }
 end
 
 -- ------------------------------------------------------------------ settings screen
@@ -4634,6 +4767,15 @@ end
 
 function ui:press(x, y)
   local w = self:hit(x, y)
+  -- v1.30 MIDI learn: a tap picks the control to learn instead of using it
+  if self.learn and w and not self.menu and not w.nolearn then
+    local d = self:learn_desc(w)
+    if d then
+      self.learn.target = d; self.learn.axis = nil
+      self.touch = { w = nil, x0 = x, y0 = y }
+      self:dirty(); return
+    end
+  end
   self.touch = { w = w, x0 = x, y0 = y, mode = nil }
   if not w then return end
   if w.kind == "pad" then self.touch.mode = "pad"; self.pad_on = w.hook; psend(w.hook, "float", { 1 })
@@ -4792,7 +4934,20 @@ end
 function ui:paint(g)
   if self.s ~= 1 then g:scale(self.s, self.s) end
   self:col(g, "bg"); g:fill_all()
-  for _, w in ipairs(self:layout()) do self:draw(g, w) end
+  local L = self:layout()
+  for _, w in ipairs(L) do self:draw(g, w) end
+  -- v1.30 MIDI learn: what's learned is outlined, the one picked more boldly
+  if self.learn then
+    local bound = {}
+    for _, d in pairs(self.me.midi or {}) do bound[d.key] = true end
+    local tk = self.learn.target and self.learn.target.key
+    for _, w in ipairs(L) do
+      local d = (not w.nolearn) and self:learn_desc(w)
+      if d and (bound[d.key] or d.key == tk) then
+        self:col(g, (d.key == tk) and "on" or "acc"); g:stroke_rounded_rect(w.x - 2, w.y - 2, w.w + 4, w.h + 4, 7, (d.key == tk) and 3 or 2)
+      end
+    end
+  end
 end
 
 -- layer 2: the playhead only, so the clock doesn't redraw the whole screen

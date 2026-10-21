@@ -695,9 +695,10 @@ for r,(nm,snd) in enumerate(SLOTS):
     eqd=p.add(f"#X obj 710 {y+2} ockm-eq {nm};")
     p.con(dgo,0,row,0); p.con(row,0,v,0); p.con(v,0,gt,0); p.con(gt,0,eqd,0); p.con(eqd,0,p.add(f"#X obj 640 {y+22} throw~ ockm-drumbus;"),0); v=eqd   # to the drum bus
     p.con(eqd,0,p.add(f"#X obj 700 {y+22} throw~ ockm-stem-drums;"),0)
-    vs=p.add(f"#X obj 760 {y+2} *~ 0;"); vt=p.add(f"#X obj 830 {y+2} throw~ ockm-revbus;"); vr=p.add(f"#X obj 760 {y-18} r ockm-{nm}-verb;")
+    # v1.30: the sends go through the drums bus's effect too (so a filter or crush takes the tails with it)
+    vs=p.add(f"#X obj 760 {y+2} *~ 0;"); vt=p.add(f"#X obj 830 {y+2} throw~ ockm-rev-drums;"); vr=p.add(f"#X obj 760 {y-18} r ockm-{nm}-verb;")
     p.con(v,0,vs,0); p.con(vs,0,vt,0); p.con(vr,0,vs,1)
-    ds=p.add(f"#X obj 990 {y+2} *~ 0;"); dt_=p.add(f"#X obj 1060 {y+2} throw~ ockm-dlybus;"); dr_=p.add(f"#X obj 990 {y-18} r ockm-{nm}-delay;")
+    ds=p.add(f"#X obj 990 {y+2} *~ 0;"); dt_=p.add(f"#X obj 1060 {y+2} throw~ ockm-dly-drums;"); dr_=p.add(f"#X obj 990 {y-18} r ockm-{nm}-delay;")
     p.con(v,0,ds,0); p.con(ds,0,dt_,0); p.con(dr_,0,ds,1)
 # the drum bus: the eight drums together, then into the mix
 cdb=p.add("#X obj 400 960 catch~ ockm-drumbus;"); dbus=p.add("#X obj 400 980 ockm-drumbus;"); p.con(cdb,0,dbus,0)
@@ -707,6 +708,12 @@ dstut=p.add("#X obj 400 990 ockm-stutter 0 1;"); p.con(dbus,0,dstut,0)   # v1.17
 dfxs=p.add("#X obj 400 1000 +~;"); p.con(dstut,0,dfxs,0); p.con(p.add("#X obj 470 1000 catch~ ockm-dfxin;"),0,dfxs,1)
 dfx=p.add("#X obj 400 1010 ockm-busfx drums 0.25;"); p.con(dfxs,0,dfx,0); p.con(dfx,0,mix,0)
 mfx=p.add("#X obj 300 1010 ockm-busfx music 0.25;"); p.con(p.add("#X obj 300 1000 catch~ ockm-musbus;"),0,mfx,0); p.con(mfx,0,mix,0)
+# v1.30 each bus's reverb and delay sends go through a copy of its effect (same settings) on the way to the master's reverb and delay
+for k,busn in enumerate(("drums","music")):
+    for j,(kind,dest) in enumerate((("rev","ockm-revbus"),("dly","ockm-dlybus"))):
+        xx=1500+k*240+j*120
+        cs_=p.add(f"#X obj {xx} 980 catch~ ockm-{kind}-{busn};"); fx_=p.add(f"#X obj {xx} 1000 ockm-busfx {busn} 0.25;")
+        p.con(cs_,0,fx_,0); p.con(fx_,0,p.add(f"#X obj {xx} 1020 throw~ {dest};"),0)
 rsm=p.add("#X obj 1600 380 r ockm-stepms;"); vsm=p.add("#X obj 1600 405 v ockm_stepms;"); p.con(rsm,0,vsm,0)
 # build and drop (v0.83). ockm-rise 1 starts a build that ends on a loop start at least 2 bars away: the high-pass climbs
 # (slowly at first), a noise riser comes in over the last bar's first 3 beats, the last beat drops out (ockm-gap), and on
@@ -795,16 +802,25 @@ for r,(nm,seqo,voi) in enumerate(SYN):
     p.con(sq,0,vo,0); p.con(vo,0,cho,0); p.con(cho,0,gt0,0)
     if nm=="bass":   # v1.23: the bass goes with the drums (ockm-bass-bus 1) or with the music (0), for the bus effects
         rbb=p.add(f"#X obj 1150 {y} r ockm-bass-bus;"); bbx=p.add(f"#X obj 1150 {y+14} expr {D}f1>0.5 \\; {D}f1<=0.5;")
+        bass_gain=[]
         for j,(bus) in enumerate(("ockm-dfxin","ockm-musbus")):
             pb=p.add(f"#X obj {1150+j*90} {y+28} pack f 20;"); lb_=p.add(f"#X obj {1150+j*90} {y+42} line~;"); gb=p.add(f"#X obj {1150+j*90} {y+56} *~;")
             for c in [(bbx,j,pb,0),(pb,0,lb_,0),(gt,0,gb,0),(lb_,0,gb,1),(gb,0,p.add(f"#X obj {1150+j*90} {y+70} throw~ {bus};"),0)]: p.con(*c)
+            bass_gain.append(lb_)
         bb1=p.add(f"#X msg 1250 {y} 1;"); p.con(p.add(f"#X obj 1250 {y-20} loadbang;"),0,bb1,0); p.con(bb1,0,bbx,0)   # with the drums until a setting says otherwise
     else: p.con(gt,0,p.add(f"#X obj 640 {y+40} throw~ ockm-musbus;"),0)
     p.con(gt,0,p.add(f"#X obj 700 {y+22} throw~ ockm-stem-{nm};"),0)
-    vs=p.add(f"#X obj 760 {y} *~ 0;"); vt=p.add(f"#X obj 830 {y} throw~ ockm-revbus;"); vr=p.add(f"#X obj 760 {y-18} r ockm-{nm}-verb;")
-    p.con(gt,0,vs,0); p.con(vs,0,vt,0); p.con(vr,0,vs,1)
-    ds=p.add(f"#X obj 990 {y} *~ 0;"); dt_=p.add(f"#X obj 1060 {y} throw~ ockm-dlybus;"); dr_=p.add(f"#X obj 990 {y-18} r ockm-{nm}-delay;")
-    p.con(gt,0,ds,0); p.con(ds,0,dt_,0); p.con(dr_,0,ds,1)
+    # v1.30: the sends go through their bus's effect (music; the bass follows its bus), so a filter takes the tails too
+    vs=p.add(f"#X obj 760 {y} *~ 0;"); vr=p.add(f"#X obj 760 {y-18} r ockm-{nm}-verb;")
+    p.con(gt,0,vs,0); p.con(vr,0,vs,1)
+    ds=p.add(f"#X obj 990 {y} *~ 0;"); dr_=p.add(f"#X obj 990 {y-18} r ockm-{nm}-delay;")
+    p.con(gt,0,ds,0); p.con(dr_,0,ds,1)
+    for snd,kind,xx in ((vs,"rev",830),(ds,"dly",1060)):
+        if nm=="bass":
+            for j,busn in enumerate(("drums","music")):
+                g_=p.add(f"#X obj {xx+j*60} {y+14} *~;"); p.con(snd,0,g_,0); p.con(bass_gain[j],0,g_,1)
+                p.con(g_,0,p.add(f"#X obj {xx+j*60} {y+28} throw~ ockm-{kind}-{busn};"),0)
+        else: p.con(snd,0,p.add(f"#X obj {xx} {y} throw~ ockm-{kind}-music;"),0)
     synth_voice[nm]=vo
     if nm=="chord":   # v1.20: the left hand, through the same chorus, gate and EQ
         vlh=p.add(f"#X obj 560 {y+34} ockm-chord-lh chord;")

@@ -918,7 +918,7 @@ def touchscreen_screens_draw(work):
         raise Skip("Pillow not installed")
     p = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_preview.py"), os.path.join(work, "preview")], capture_output=True, text=True)
     assert p.returncode == 0, p.stderr[-800:]
-    assert len(os.listdir(os.path.join(work, "preview"))) == 37, "expected thirty-seven screen pictures"
+    assert len(os.listdir(os.path.join(work, "preview"))) == 38, "expected thirty-eight screen pictures"
 
 @test
 def mute_solo_and_levels(work):
@@ -2048,6 +2048,34 @@ def save_is_a_snapshot_not_movement(work):
     assert kv.get("ockm-d1-mute") == "1", f"the kick's mute is saved: {kv.get('ockm-d1-mute')}"
     assert kv.get("ockm-bfx-drums-on") == "1", f"the latched crush is saved in: {kv.get('ockm-bfx-drums-on')}"
     assert kv.get("ockm-bfx-music-on") == "0", f"the held (not latched) filter is saved out: {kv.get('ockm-bfx-music-on')}"
+
+@test
+def midi_learn_maps_pads_and_knobs(work):
+    """v1.30: MIDI learn (from the menu). Tap rise on perform, hit pad 40: learned. Tap the bass's knob 1, move knob 21:
+    learned. Done; then from the mixer, pad 40 turns rise on and knob 21 moves the bass's knob 1, wherever you are. The
+    learning is kept in my-settings.lua."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness(); h.show("ockm-rise", "ockm-bass-k1")
+    tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
+    tap(100, 270, 36)                      # perform
+    tap(150, 919, 36); tap(160, 830, 290)  # menu, MIDI learn
+    tap(200, 540, 106)                     # rise
+    h.at(250, "ockm-midi-note 40 100 ; ockm-midi-note 40 0")
+    tap(300, 601, 36); tap(350, 600, 396)  # bass tab, its knob 1
+    h.at(400, "ockm-midi-cc 64 21")
+    tap(450, 896, 579)                     # done
+    tap(500, 407, 36)                      # mixer
+    h.at(600, "ockm-midi-note 40 100 ; ockm-midi-note 40 0")
+    h.at(700, "ockm-midi-cc 127 21")
+    f = os.path.join(work, "t_learn.pd"); h.finish(900, f)
+    out = run(work, f)
+    rise = [v.split()[-1] for v in printed(out, "ockm-rise")]
+    assert rise and rise[-1] == "1", f"pad 40 turned rise on from the mixer: {rise}"
+    k1 = [float(v.split()[-1]) for v in printed(out, "ockm-bass-k1")]
+    assert k1 and abs(k1[-1] - 1) < 0.01, f"knob 21 at the top moved the bass's knob 1 to 1: {k1}"
+    me = open(os.path.join(work, "my-settings.lua")).read()
+    assert '"note:40"' in me and '"cc:21"' in me, "learned controls are kept"
 
 @test
 def eight_bar_lift_pushes_late(work):
