@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.27 (21 October 2026)
+
+- **Variations are now scenes,** lettered A, B, C... (then AA, AB...). A project holds up to 64: at 64, saving says so and points you to tidy up. Every save still makes a new scene, and your project folders are unchanged on disk (name, name-v2... as before)
+- Coming next: **versions** on the arrange tab, a running order of scenes with a transition on each join
+
 ## v1.26 (20 October 2026)
 
 - **The project page, redesigned:** your projects in a grid (four across, scroll with a finger), and beside it the one you picked, with its variations in a grid of their own, newest first. Kept variations are outlined in orange, and so is the open project

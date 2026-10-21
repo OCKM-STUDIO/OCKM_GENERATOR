@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v1.26"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v1.27"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -855,7 +855,6 @@ function ui:layout()
   else self:layout_synth(add) end
   if self.sheet == "export" then self:layout_export(add) end
   if self.sheet == "eq" then self:layout_eq(add) end
-  if self.sheet == "variations" then self:layout_variations(add) end
   if self.sheet == "slotpick" then self:layout_slotpick(add) end
   if self.sheet == "fxset" then self:layout_fxset(add) end
   if self.sheet == "pmore" then self:layout_pmore(add) end
@@ -3543,11 +3542,21 @@ local WORDS_B = { "heron", "fox", "harbour", "orchard", "comet", "lantern", "mea
                   "cassette", "ferry", "thistle", "rocket", "lagoon", "beacon", "pebble", "wren" }
 local MONTHS = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" }
 -- '2026-10-14-velvet-heron' -> 'velvet heron · 14 Oct'
+-- v1.27 a project's saved loops are scenes, lettered A to Z, then AA, AB... (the folders stay name, name-v2, name-v3...)
+function scene_letter(v)
+  v = math.max(1, math.floor(v or 1))
+  local s = ""
+  while v > 0 do local r = (v - 1) % 26; s = string.char(65 + r) .. s; v = math.floor((v - 1) / 26) end
+  return s
+end
+local SCENE_MAX = 64
 function ockm_pretty(name)
   name = tostring(name or "default")
   local y, m, d, rest = name:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)%-(.+)$")
   if not y then return (name:gsub("%-", " ")) end
-  return rest:gsub("%-", " ") .. " · " .. tonumber(d) .. " " .. (MONTHS[tonumber(m)] or "")
+  local base, v = rest:match("^(.-)%-v(%d+)$")
+  if base then rest = base:gsub("%-", " ") .. ", scene " .. scene_letter(tonumber(v)) else rest = rest:gsub("%-", " ") end
+  return rest .. " · " .. tonumber(d) .. " " .. (MONTHS[tonumber(m)] or "")
 end
 -- v1.10 every save is a variation: the version you had stays as it was, and you carry on in the new one
 -- (velvet-heron, velvet-heron-v2, -v3...). A brand-new project's first save just saves it; nothing to save, nothing made
@@ -3569,6 +3578,9 @@ function ui:save_variation()
       taken[q] = true
       if ockm_base(q) == base then top = math.max(top, ockm_ver(q)) end
     end
+    local count = 0
+    for _, q in ipairs(self.projects or {}) do if ockm_base(q) == base then count = count + 1 end end
+    if count >= SCENE_MAX then self:say("this project has " .. SCENE_MAX .. " scenes: tidy up or delete some to save another"); return end
     repeat top = top + 1; n = base .. "-v" .. top until not taken[n]
   end
   psend("ockm-project-saveas", "symbol", { n }); psend("ockm-project-list", "bang", {}); self:var_stamp(n)
@@ -3696,7 +3708,7 @@ function ui:layout_project(add)
     local tx, ty = 24 + col * (tw + 6), 158 + row * (PT_H + 6)
     local info = self:var_info(g[1])
     add{ kind="ptile", x=tx, y=ty, w=tw, h=PT_H, label=ockm_pretty(b):match("^[^·]+"):gsub("%s+$", ""), style=info.style or "",
-         sub=((ockm_pretty(b):match("· (.+)$") and (ockm_pretty(b):match("· (.+)$") .. " · ")) or "") .. #g .. (#g == 1 and " variation" or " variations"),
+         sub=((ockm_pretty(b):match("· (.+)$") and (ockm_pretty(b):match("· (.+)$") .. " · ")) or "") .. #g .. (#g == 1 and " scene" or " scenes"),
          sel=(b == self.pgroup), open=(b == ockm_base(home)), vs=pvs,
          tap=function() self.pgroup = b; self.vsel = nil; self.vscroll = 0; self.confirm = nil end }
     add{ kind="pbtn", x=tx + tw - 36, y=ty + PT_H - 36, w=30, h=30, on=(self.pv and self.playing ~= 0 and ockm_base(self.pv.n) == b), vs=pvs,
@@ -3724,7 +3736,7 @@ function ui:layout_project(add)
   add{ kind="btn", x=px + 14 + (bw + 6), y=212, w=bw, h=36, small=true, label="export...", tap=function() self:var_export(sel) end }
   add{ kind="btn", x=px + 14 + 2 * (bw + 6), y=212, w=bw, h=36, small=true, label="more ...", tap=function() self.sheet = "pmore" end }
   -- the variation picked: when, keep, delete
-  local vtxt = "v" .. ockm_ver(sel) .. (info.saved and ("  ·  " .. os.date("%d %b %H:%M", info.saved)) or "")
+  local vtxt = "scene " .. scene_letter(ockm_ver(sel)) .. (info.saved and ("  ·  " .. os.date("%d %b %H:%M", info.saved)) or "")
   add{ kind="text", x=px + 14, y=262, w=150, h=12, label=vtxt, size=11, col="txt" }
   add{ kind="btn", x=px + pw - 14 - 130, y=256, w=62, h=26, small=true, label=info.keep and "kept" or "keep", accent=info.keep and true or false,
        tap=function() local m = self:var_meta(sel); m.keep = not m.keep; self:var_write(sel, m); self.vcache[sel] = nil end }
@@ -3748,7 +3760,7 @@ function ui:layout_project(add)
     local vx, vy = px + 14 + col * (vw + 6), 292 + row * (VT_H + 6)
     local vi = self:var_info(n)
     local when = (n == (self.project or "default") and not self.pv) and "open now" or (vi.keep and "kept" or (vi.saved and os.date("%d %b", vi.saved) or ""))
-    add{ kind="vtile", x=vx, y=vy, w=vw, h=VT_H, label="v" .. ockm_ver(n), sub=when, keep=vi.keep, sel=(n == sel), vs=vvs,
+    add{ kind="vtile", x=vx, y=vy, w=vw, h=VT_H, label=scene_letter(ockm_ver(n)), sub=when, keep=vi.keep, sel=(n == sel), vs=vvs,
          tap=function() self.vsel = n; self.confirm = nil end }
     add{ kind="pbtn", x=vx + 4, y=vy + (VT_H - 28) / 2, w=28, h=28, on=(self.pv and self.pv.n == n and self.playing ~= 0), vs=vvs,
          tap=function() self.vsel = n; self:preview_play(n) end }
@@ -3767,7 +3779,7 @@ function ui:layout_pmore(add)
   add{ kind="text", x=x0 + 16, y=y0 + 16, w=w0 - 32, h=14, label=ockm_pretty(self.pgroup or ""):match("^[^·]+") or "", size=14, col="txt" }
   local bw = w0 - 32
   if sel then
-    add{ kind="btn", x=x0 + 16, y=y0 + 46, w=bw, h=44, small=true, label="copy v" .. ockm_ver(sel) .. " as a new project",
+    add{ kind="btn", x=x0 + 16, y=y0 + 46, w=bw, h=44, small=true, label="copy scene " .. scene_letter(ockm_ver(sel)) .. " as a new project",
          tap=function() self.sheet = nil; self:var_duplicate(sel) end }
   end
   -- tidy up: everything except the kept ones, the newest 5 and the open one goes to the trash folder
@@ -3781,14 +3793,14 @@ function ui:layout_pmore(add)
          if ta then
            if self.pv then self:preview_end() end
            for _, n in ipairs(gone) do self:var_delete(n) end
-           self.confirm = nil; self.vsel = nil; self.sheet = nil; self:say(string.format("%d variations moved to the trash folder", #gone))
+           self.confirm = nil; self.vsel = nil; self.sheet = nil; self:say(string.format("%d scenes moved to the trash folder", #gone))
          else self.confirm = "tidy" end
        end }
   local has_open = false
   for _, n in ipairs(g) do if n == cur and not self.pv then has_open = true end end
   local da = (self.confirm == "delproj")
   add{ kind="btn", x=x0 + 16, y=y0 + 146, w=bw, h=44, small=true, quiet=not da, off=has_open,
-       label=has_open and "delete project: it's open, open another first" or (da and string.format("tap again: all %d variations to the trash", #g) or "delete the whole project"),
+       label=has_open and "delete project: it's open, open another first" or (da and string.format("tap again: all %d scenes to the trash", #g) or "delete the whole project"),
        tap=function()
          if has_open then return end
          if da then
@@ -3877,68 +3889,6 @@ function ui:var_delete(n)
   psend("ockm-project-delete", "symbol", { n }); psend("ockm-project-list", "bang", {})
   if self.vcache then self.vcache[n] = nil end
 end
-function ui:layout_variations(add)
-  local base = self.vbase or ockm_base(self.project or "default")
-  local cur = self.project or "default"
-  local g = self:var_group(base)
-  add{ kind="zone", x=0, y=0, w=W, h=H, tap=function() end }
-  local x, y, w, h = 24, 64, W - 48, H - 72
-  add{ kind="sheet", x=x, y=y, w=w, h=h }
-  add{ kind="text", x=x + 20, y=y + 16, w=w - 200, h=22, label="variations of " .. ockm_pretty(base):match("^[^·]+"):gsub("%s+$", "") .. " (" .. #g .. ")", size=18, col="txt" }
-  add{ kind="btn", x=x + w - 120, y=y + 10, w=100, h=36, label="close", tap=function() self.sheet = nil; self.vconfirm = nil end }
-  local per = 6
-  local pages = math.max(1, math.ceil(#g / per))
-  self.vpage = clamp(self.vpage or 0, 0, pages - 1)
-  local rh, ry = 58, y + 56
-  local bw = 78
-  for k = 1, per do
-    local n = g[self.vpage * per + k]
-    if not n then break end
-    local info = self:var_info(n)
-    local yy = ry + (k - 1) * (rh + 6)
-    local is_cur = (n == cur)
-    add{ kind="text", x=x + 20, y=yy + 6, w=110, h=22, label="v" .. ockm_ver(n), size=20, col=is_cur and "acc" or "txt" }
-    add{ kind="text", x=x + 20, y=yy + 34, w=110, h=12, size=10,
-         label=is_cur and "open now" or (info.saved and os.date("%d %b %H:%M", info.saved) or "") }
-    add{ kind="text", x=x + 110, y=yy + 8, w=w - 110 - 4 * (bw + 6) - 30, h=14, size=12, col="txt", label=info.summary }
-    add{ kind="text", x=x + 110, y=yy + 30, w=w - 110 - 4 * (bw + 6) - 30, h=12, size=10,
-         label=(is_cur and info.saved) and ("saved " .. os.date("%d %b %H:%M", info.saved)) or "" }
-    local bx = x + w - 20 - 4 * bw - 3 * 6
-    add{ kind="btn", x=bx, y=yy, w=bw, h=rh - 6, small=true, label="open", accent=not is_cur, off=is_cur,
-         tap=function() if not is_cur then self:var_open(n) end end }
-    add{ kind="btn", x=bx + (bw + 6), y=yy, w=bw, h=rh - 6, small=true, label=info.keep and "kept" or "keep", accent=info.keep and true or false,
-         tap=function() local m = self:var_meta(n); m.keep = not m.keep; self:var_write(n, m); self.vcache[n] = nil end }
-    add{ kind="btn", x=bx + 2 * (bw + 6), y=yy, w=bw, h=rh - 6, small=true, label="export", tap=function() self:var_open(n, true) end }
-    local armed = (self.vconfirm == n)
-    add{ kind="btn", x=bx + 3 * (bw + 6), y=yy, w=bw, h=rh - 6, small=true, quiet=not armed, off=is_cur,
-         label=armed and "sure?" or "delete",
-         tap=function()
-           if is_cur then self:say("that's the one you're in: open another first"); return end
-           if armed then self:var_delete(n); self.vconfirm = nil; self:say(ockm_pretty(n) .. " moved to the trash folder")
-           else self.vconfirm = n end
-         end }
-  end
-  if pages > 1 then
-    add{ kind="arrow", x=x + w - 112, y=y + h - 50, w=44, h=36, dir=-1, on=self.vpage > 0, tap=function() self.vpage = self.vpage - 1 end }
-    add{ kind="arrow", x=x + w - 60, y=y + h - 50, w=44, h=36, dir=1, on=self.vpage < pages - 1, tap=function() self.vpage = self.vpage + 1 end }
-  end
-  -- tidy up: everything except the kept ones, the newest 3 and the open one goes to the trash folder
-  local gone = {}
-  for i, n in ipairs(g) do
-    if i > 3 and n ~= cur and not self:var_info(n).keep then gone[#gone + 1] = n end
-  end
-  local armed = (self.vconfirm == "tidy")
-  add{ kind="btn", x=x + 20, y=y + h - 54, w=360, h=44, small=true, off=(#gone == 0), quiet=not armed,
-       label=(#gone == 0) and "tidy up: nothing to clear" or (armed and string.format("tap again: %d to the trash", #gone) or string.format("tidy up: keep the kept and the newest 3 (%d go)", #gone)),
-       tap=function()
-         if #gone == 0 then return end
-         if armed then
-           for _, n in ipairs(gone) do self:var_delete(n) end
-           self.vconfirm = nil; self:say(string.format("%d variations moved to the trash folder", #gone))
-         else self.vconfirm = "tidy" end
-       end }
-end
-
 -- ------------------------------------------------------------------ mute, solo, mixer
 function ui:soloing()
   for _, t in ipairs(TRACKS) do if (self.v["ockm-"..t.."-solo"] or 0) > 0 then return true end end
