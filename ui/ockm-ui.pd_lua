@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v1.30"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v1.31"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -1885,7 +1885,7 @@ function ui:learn_desc(w)
   end
   return nil
 end
-local function ctl_name(kind, n) return (kind == "cc" and "knob " or "pad ") .. math.floor(n) end
+local function ctl_name(kind, n) return (kind == "cc" and "knob " or "note ") .. math.floor(n) end   -- a note: a pad or a key
 -- find the widget a learned control plays, on its own screen (built as if it were showing)
 function ui:learn_widget(d)
   local s0, p0, sh0, m0 = self.screen, self.part, self.sheet, self.menu
@@ -1916,6 +1916,9 @@ function ui:midi_in(kind, n, v)
         else return true end
         d.key = "xy"
       else L.target = nil end
+      if kind == "note" and d.type == "value" then
+        d.mode = "velocity"; d.amount = self.v[d.hook] or d.lo or 0   -- how a key plays a fader (v1.31): velocity by default
+      end
       -- one control does one thing: anything it did before goes
       self.me.midi[ctl] = d
       self:save_settings()
@@ -1929,7 +1932,36 @@ function ui:midi_in(kind, n, v)
   if not d then return false end
   local on = (kind == "cc") and (v >= 64) or (v > 0)
   if d.type == "value" then
-    self:slide({ kind = "hbar", x = 0, w = 1, hook = d.hook, lo = d.lo, hi = d.hi, db = d.db, log = d.log }, (kind == "cc") and (v / 127) or (on and 1 or 0), 0)
+    local fw = { kind = "hbar", x = 0, w = 1, hook = d.hook, lo = d.lo, hi = d.hi, db = d.db, log = d.log }
+    if kind == "cc" then
+      -- pick-up: a knob takes over only once it reaches (or passes) where the control already is, so nothing jumps
+      local f = clamp(v / 127, 0, 1)
+      local cur = self:learn_norm(d, self.v[d.hook])
+      local pk = self.midi_pick or {}; self.midi_pick = pk
+      local st = pk[ctl]
+      if st and st.sent ~= nil and self.v[d.hook] ~= st.sent then st.on = false end   -- moved elsewhere since: pick up again
+      st = st or { on = false }; pk[ctl] = st
+      if not st.on then
+        if math.abs(f - cur) < 0.03 or (st.last and (st.last - cur) * (f - cur) <= 0) then st.on = true
+        else st.last = f; self:say(ctl_name(kind, n) .. ": turn it to " .. math.floor(cur * 100 + 0.5) .. "% to pick up " .. (d.label or "")); return true end
+      end
+      st.last = f
+      self:slide(fw, f, 0); st.sent = self.v[d.hook]
+    else
+      local prev = self.midi_prev or {}; self.midi_prev = prev
+      local mode = d.mode or "velocity"
+      local cur = self:learn_norm(d, self.v[d.hook])
+      if mode == "up" or mode == "down" then
+        if on then self:slide(fw, clamp(cur + ((mode == "up") and 0.05 or -0.05), 0, 1), 0) end
+      elseif on then
+        prev[ctl] = self.v[d.hook]
+        local f = (mode == "hold") and self:learn_norm(d, d.amount) or clamp(v / 127, 0, 1)
+        self:slide(fw, f, 0)
+      elseif prev[ctl] ~= nil then
+        -- let go: back to where it was
+        self:send(d.hook, prev[ctl]); prev[ctl] = nil
+      end
+    end
   elseif d.type == "xy" then
     local b = self.fx_target or "drums"
     local x = clamp(v / 127, 0, 1)
@@ -1963,6 +1995,82 @@ function ui:midi_in(kind, n, v)
   self:dirty()
   return true
 end
+-- where a value sits, 0 to 1, the way its fader shows it
+function ui:learn_norm(d, val)
+  val = val or d.lo or 0
+  if d.db then return fader_pos(val, d.db) end
+  local lo, hi = d.lo or 0, d.hi or 1
+  if d.log and lo > 0 and val > 0 then return clamp(math.log(val / lo) / math.log(hi / lo), 0, 1) end
+  if hi == lo then return 0 end
+  return clamp((val - lo) / (hi - lo), 0, 1)
+end
+-- what a learned control is, in words: the slot, not what's in it right now
+local function learn_name(d)
+  if d.type == "xy" then return "fx pad " .. (d.axis == "x" and "across" or "up") end
+  if d.type == "value" and d.hook then
+    local p, k = d.hook:match("^ockm%-(%a+)%-k(%d)$")
+    if p then return p .. " knob " .. k end
+    return (d.label or d.hook:gsub("^ockm%-", "")):gsub("%-", " ")
+  end
+  if d.type == "widget" then
+    local where = d.screen == "live" and "perform" or (d.screen == "synth" and (SYNTHS[d.part or 1] or "synth")) or d.screen
+    local lid = d.lid or ""
+    if lid:match("^macro%d") then return "macro slot " .. string.char(64 + tonumber(lid:match("%d"))) end
+    if lid:match("^mute%-") then return "mute " .. lid:gsub("^mute%-", "") end
+    return (d.label or "?") .. " (" .. tostring(where) .. ")"
+  end
+  return d.label or "?"
+end
+local KEY_MODES = { { "velocity", "how hard" }, { "hold", "held to " }, { "up", "nudge up" }, { "down", "nudge down" } }
+-- settings: MIDI. Every knob and pad you've learned, what it does, how a key plays a fader, and forget
+function ui:layout_set_midi(add)
+  local SX = 184   -- the settings screen's content column (as its other sections)
+  local cw = W - 16 - SX
+  local M = self.me.midi or {}
+  local rows = {}
+  for c, d in pairs(M) do rows[#rows + 1] = { c, d } end
+  table.sort(rows, function(a, b)
+    local ka, na = a[1]:match("^(%a+):(%d+)$"); local kb, nb = b[1]:match("^(%a+):(%d+)$")
+    if ka ~= kb then return ka < kb end
+    return tonumber(na) < tonumber(nb)
+  end)
+  add{ kind="text", x=SX, y=80, w=cw, h=14, size=13, col="txt", label="your MIDI controls (" .. #rows .. ")" }
+  add{ kind="text", x=SX, y=100, w=cw, h=12, size=10,
+       label=(#rows == 0) and "none yet: menu, MIDI learn, then tap a control and move a knob or hit a pad" or "they work on every screen. Knobs pick up: they take over once they reach the control's setting" }
+  local per = 7
+  local pages = math.max(1, math.ceil(#rows / per))
+  self.midi_page = clamp(self.midi_page or 0, 0, pages - 1)
+  for k = 1, per do
+    local r = rows[self.midi_page * per + k]
+    if not r then break end
+    local c, d = r[1], r[2]
+    local kind, num = c:match("^(%a+):(%d+)$")
+    local y = 122 + (k - 1) * 54
+    add{ kind="card", x=SX, y=y, w=cw, h=48 }
+    add{ kind="text", x=SX + 14, y=y + 16, w=110, h=14, size=13, col="txt", label=ctl_name(kind, tonumber(num)) }
+    add{ kind="text", x=SX + 130, y=y + 16, w=cw - 130 - 300, h=14, size=12, col="txt", label=learn_name(d) }
+    if kind == "note" and d.type == "value" then
+      local mi = 1; for q, m in ipairs(KEY_MODES) do if m[1] == (d.mode or "velocity") then mi = q end end
+      local lab = KEY_MODES[mi][2]
+      if d.mode == "hold" then lab = lab .. math.floor(self:learn_norm(d, d.amount) * 100 + 0.5) .. "%" end
+      add{ kind="btn", x=SX + cw - 290, y=y + 8, w=170, h=32, small=true, label=lab,
+           tap=function() d.mode = KEY_MODES[mi % #KEY_MODES + 1][1]; self:save_settings() end }
+    end
+    local armed = (self.confirm == "midi:" .. c)
+    add{ kind="btn", x=SX + cw - 110, y=y + 8, w=100, h=32, small=true, quiet=not armed, label=armed and "sure?" or "forget",
+         tap=function() if armed then M[c] = nil; self.confirm = nil; self:save_settings() else self.confirm = "midi:" .. c end end }
+  end
+  local by = 122 + per * 54 + 4
+  if pages > 1 then
+    add{ kind="arrow", x=SX, y=by, w=44, h=36, dir=-1, on=self.midi_page > 0, tap=function() self.midi_page = self.midi_page - 1 end }
+    add{ kind="arrow", x=SX + 50, y=by, w=44, h=36, dir=1, on=self.midi_page < pages - 1, tap=function() self.midi_page = self.midi_page + 1 end }
+  end
+  local fa = (self.confirm == "midi:all")
+  if #rows > 0 then
+    add{ kind="btn", x=SX + cw - 160, y=by, w=160, h=36, small=true, quiet=not fa, label=fa and "sure? all of them" or "forget all",
+         tap=function() if fa then self.me.midi = {}; self.confirm = nil; self:save_settings() else self.confirm = "midi:all" end end }
+  end
+end
 -- the bar along the bottom while learning
 function ui:layout_learnbar(add)
   local L = self.learn
@@ -1987,7 +2095,7 @@ function ui:layout_learnbar(add)
 end
 
 -- ------------------------------------------------------------------ settings screen
-local SECTIONS = { "this project", "new projects", "this device", "macros" }
+local SECTIONS = { "this project", "new projects", "this device", "macros", "MIDI" }
 local SX = 184                       -- where a section's content starts
 function ui:layout_setup(add)
   local sec = self.set_sec or 1
@@ -1999,6 +2107,7 @@ function ui:layout_setup(add)
   if sec == 1 then self:layout_set_project(add)
   elseif sec == 2 then self:layout_set_new(add)
   elseif sec == 3 then self:layout_set_device(add)
+  elseif sec == 5 then self:layout_set_midi(add)
   else self:layout_set_macros(add) end
 end
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.31 (21 October 2026)
+
+- **Knobs pick up:** a learned knob takes over only once it reaches (or passes) where the control already is, so nothing jumps. Until then it tells you where to turn it. If something else moves the control, the knob picks up again
+- **Keys on faders and sliders play four ways** (set per key in settings, MIDI): **how hard** (the default: velocity sets the amount, letting go puts it back), **held to** (goes to the amount it had when you learned it while held, then back), **nudge up** and **nudge down** (5% a press, and it stays)
+- **Settings, MIDI:** every knob and note you've learned and what it does (the slot: bass knob 1, macro slot A, mute d1, the fx pad across), how each key plays, forget one, forget all
+
 ## v1.30 (21 October 2026)
 
 - **MIDI learn** (menu: MIDI learn): tap any control on any screen, then move a knob or hit a pad. That control is that knob or pad from then on, wherever you are. It stays with the slot: a synth's knob 1 stays its knob 1 when you change engine, macro slot A stays slot A whatever recipe is in it, a mute tile stays that track. Pads press and let go (hold a macro, hold drop), buttons tap, knobs move faders and sliders. The fx pad takes two knobs, one across and one up; turning across brings the effect in, back to its resting place takes it out. Learned controls are outlined while learning; **forget it** clears one; **done** finishes. Kept in my-settings.lua, so they're yours across every project. Anything you haven't learned still does what it did

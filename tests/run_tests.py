@@ -918,7 +918,7 @@ def touchscreen_screens_draw(work):
         raise Skip("Pillow not installed")
     p = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_preview.py"), os.path.join(work, "preview")], capture_output=True, text=True)
     assert p.returncode == 0, p.stderr[-800:]
-    assert len(os.listdir(os.path.join(work, "preview"))) == 38, "expected thirty-eight screen pictures"
+    assert len(os.listdir(os.path.join(work, "preview"))) == 39, "expected thirty-nine screen pictures"
 
 @test
 def mute_solo_and_levels(work):
@@ -2051,12 +2051,13 @@ def save_is_a_snapshot_not_movement(work):
 
 @test
 def midi_learn_maps_pads_and_knobs(work):
-    """v1.30: MIDI learn (from the menu). Tap rise on perform, hit pad 40: learned. Tap the bass's knob 1, move knob 21:
+    """v1.30: MIDI learn (from the menu). v1.31: knobs pick up, a key on a fader plays it by velocity and lets go back.
+    Tap rise on perform, hit pad 40: learned. Tap the bass's knob 1, move knob 21:
     learned. Done; then from the mixer, pad 40 turns rise on and knob 21 moves the bass's knob 1, wherever you are. The
     learning is kept in my-settings.lua."""
     if not PDLUA:
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
-    h = Harness(); h.show("ockm-rise", "ockm-bass-k1")
+    h = Harness(); h.show("ockm-rise", "ockm-bass-k1", "ockm-delay-mix")
     tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
     tap(100, 270, 36)                      # perform
     tap(150, 919, 36); tap(160, 830, 290)  # menu, MIDI learn
@@ -2064,16 +2065,24 @@ def midi_learn_maps_pads_and_knobs(work):
     h.at(250, "ockm-midi-note 40 100 ; ockm-midi-note 40 0")
     tap(300, 601, 36); tap(350, 600, 396)  # bass tab, its knob 1
     h.at(400, "ockm-midi-cc 64 21")
+    tap(420, 270, 36); tap(430, 520, 446)  # v1.31: perform, the delay level
+    h.at(440, "ockm-midi-note 41 100 ; ockm-midi-note 41 0")
     tap(450, 896, 579)                     # done
     tap(500, 407, 36)                      # mixer
     h.at(600, "ockm-midi-note 40 100 ; ockm-midi-note 40 0")
-    h.at(700, "ockm-midi-cc 127 21")
+    h.at(650, "ockm-midi-cc 127 21")      # v1.31 pick-up: the knob is far from the setting, so nothing happens yet
+    h.at(700, "ockm-midi-cc 0 21 ; ockm-midi-cc 30 21 ; ockm-midi-cc 60 21 ; ockm-midi-cc 90 21 ; ockm-midi-cc 127 21")   # turned through it: it takes over
+    h.at(750, "ockm-midi-note 41 64")      # key 41 on the delay: velocity sets it, about half
+    h.at(780, "ockm-midi-note 41 0")       # let go: back
     f = os.path.join(work, "t_learn.pd"); h.finish(900, f)
     out = run(work, f)
     rise = [v.split()[-1] for v in printed(out, "ockm-rise")]
     assert rise and rise[-1] == "1", f"pad 40 turned rise on from the mixer: {rise}"
     k1 = [float(v.split()[-1]) for v in printed(out, "ockm-bass-k1")]
-    assert k1 and abs(k1[-1] - 1) < 0.01, f"knob 21 at the top moved the bass's knob 1 to 1: {k1}"
+    assert k1 and abs(k1[-1] - 1) < 0.01, f"knob 21 turned through the setting and on to the top: the bass's knob 1 at 1: {k1}"
+    assert 0.9 not in k1[:1] and len(k1) <= 5, f"it didn't jump before it picked up: {k1}"
+    dl = [float(v.split()[-1]) for v in printed(out, "ockm-delay-mix")]
+    assert any(abs(x - 0.5) < 0.05 for x in dl) and abs(dl[-1] - dl[0]) < 0.01, f"key 41: about half while held, then back: {dl}"
     me = open(os.path.join(work, "my-settings.lua")).read()
     assert '"note:40"' in me and '"cc:21"' in me, "learned controls are kept"
 
