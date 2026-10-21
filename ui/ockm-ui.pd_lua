@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v1.28"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v1.29"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -3287,6 +3287,8 @@ local TR_BUILTIN = {
   { "gap", { gap = 4, moves = {} } },
 }
 local TR_BARS = { 1, 2, 4, 8 }
+-- v1.29 mutes over a transition (codes as the mutes move: 1 kick + bass, 2 drums only, 3 no drums, 4 no kick)
+local TR_MUTES = { { "keep all", 0 }, { "drums out", 3 }, { "kick out", 4 }, { "synths out", 2 }, { "kick + bass", 1 } }
 local SEC_TAGS = { "", "intro", "build", "drop", "breakdown", "break", "outro" }
 -- the transitions you can pick: cut, rise, echo out, filter swap, gap, then your recipes that run for a length
 function ui:tr_list()
@@ -3355,9 +3357,17 @@ function ui:sec_choices(scene)
   if #c == 0 then c[1] = lb end
   return c
 end
-function ui:sec_trbars(sec)
+-- the mutes a transition makes: yours if you've picked them, otherwise its recipe's own
+function ui:sec_trmute(sec)
+  if sec.trmute then return sec.trmute end
   local t = sec.tr and self:tr_find(sec.tr)
-  if not t or not t.r then return 0 end
+  for _, m in ipairs((t and t.r and t.r.moves) or {}) do if m.t == "mutes" then return m.v end end
+  return 0
+end
+function ui:sec_trbars(sec)
+  local t = self:tr_find(sec.tr or "cut")
+  if not t then return 0 end
+  if not t.r and self:sec_trmute(sec) == 0 then return 0 end   -- a plain cut
   return math.min(sec.bars or 16, t.bars or sec.trbars or 4)
 end
 function ui:arr_total()
@@ -3422,9 +3432,15 @@ function ui:arr_bar()
   local nx = v.sections[a.i + 1]
   local n = self:sec_trbars(sec)
   if nx and n > 0 and a.bar == (sec.bars or 16) - n + 1 then
-    local t = self:tr_find(sec.tr)
+    local t = self:tr_find(sec.tr or "cut")
     local r = {}
-    for k, x in pairs(t.r) do r[k] = x end
+    for k, x in pairs(t.r or { moves = {} }) do r[k] = x end
+    -- its moves, with the mutes picked for this join in place of the recipe's own
+    local mv = {}
+    for _, m in ipairs(r.moves or {}) do if m.t ~= "mutes" then mv[#mv + 1] = m end end
+    local mu = self:sec_trmute(sec)
+    if mu > 0 then mv[#mv + 1] = { t = "mutes", v = mu, how = 1, back = 1 } end
+    r.moves = mv
     r.bars = n
     psend("ockm-mute-quant", "float", { 0 })   -- its mutes land now, on this bar line
     self:macro_go(5, r, true)
@@ -3507,7 +3523,7 @@ function ui:layout_arrange(add)
   local sc = sel and S[sel]
   if sc then
     local px, pw = 16, 456
-    add{ kind="card", x=px, y=292, w=pw, h=172 }
+    add{ kind="card", x=px, y=292, w=pw, h=198 }
     local info = self:var_info(sc.scene)
     add{ kind="text", x=px + 14, y=302, w=pw - 28, h=16, label="section " .. sel .. ": scene " .. scene_letter(ockm_ver(sc.scene)), size=13, col="txt" }
     add{ kind="text", x=px + 14, y=322, w=pw - 28, h=12, label=info.summary or "", size=9 }
@@ -3532,27 +3548,36 @@ function ui:layout_arrange(add)
     add{ kind="text", x=px + 14, y=428, w=pw - 28, h=12, size=9, label=(sel < #S) and "the transition out of it is on the right" or "the last section: the version ends after it" }
     -- the transition
     local qx, qw = 488, W - 16 - 488
-    add{ kind="card", x=qx, y=292, w=qw, h=172 }
+    add{ kind="card", x=qx, y=292, w=qw, h=198 }
     if sel < #S then
       local trn = sc.tr or "cut"
       local tt = self:tr_find(trn)
+      local nb = self:sec_trbars(sc)
       add{ kind="text", x=qx + 14, y=302, w=qw - 28, h=16, label="into section " .. (sel + 1) .. ": " .. trn, size=13, col="txt" }
       add{ kind="text", x=qx + 14, y=322, w=qw - 28, h=12, size=9,
-           label=(trn == "cut") and "straight in on the 1" or ("over the last " .. self:sec_trbars(sc) .. " bars of this section, then the next drops on the 1") }
+           label=(nb == 0) and "straight in on the 1" or ("over the last " .. nb .. (nb == 1 and " bar" or " bars") .. " of this section, then the next drops in on the 1") }
       local L = self:tr_list()
       local tw = (qw - 28 - 3 * 6) / 4
       for k, tr in ipairs(L) do
         if k > 8 then break end
         local r, c = math.floor((k - 1) / 4), (k - 1) % 4
-        add{ kind="choice", x=qx + 14 + c * (tw + 6), y=340 + r * 40, w=tw, h=34, small=true, accent=true, label=tr.name, sel=(trn == tr.name),
-             tap=function() sc.tr = tr.name; self:vers_save(base) end }
+        add{ kind="choice", x=qx + 14 + c * (tw + 6), y=338 + r * 38, w=tw, h=32, small=true, accent=true, label=tr.name, sel=(trn == tr.name),
+             tap=function() sc.tr = tr.name; sc.trmute = nil; self:vers_save(base) end }
       end
-      if tt and tt.free and tt.r then
-        add{ kind="text", x=qx + 14, y=430, w=40, h=12, size=9, label="over" }
+      local mu = self:sec_trmute(sc)
+      if tt and tt.free and (tt.r or mu > 0) then
+        add{ kind="text", x=qx + 14, y=422, w=50, h=12, size=9, label="over" }
         for k, b in ipairs(TR_BARS) do
-          add{ kind="choice", x=qx + 50 + (k - 1) * 70, y=422, w=64, h=30, small=true, label=b .. (b == 1 and " bar" or " bars"), sel=((sc.trbars or 4) == b),
+          add{ kind="choice", x=qx + 70 + (k - 1) * 66, y=414, w=60, h=28, small=true, label=b .. (b == 1 and " bar" or " bars"), sel=((sc.trbars or 4) == b),
                tap=function() sc.trbars = b; self:vers_save(base) end }
         end
+      end
+      -- mutes over the transition: back on the 1 (the next scene's own mutes win)
+      add{ kind="text", x=qx + 14, y=458, w=50, h=12, size=9, label="mutes" }
+      local mw = (qw - 28 - 56 - 4 * 4) / 5
+      for k, m in ipairs(TR_MUTES) do
+        add{ kind="choice", x=qx + 70 + (k - 1) * (mw + 4), y=450, w=mw, h=28, small=true, accent=(m[2] > 0), label=m[1], sel=(mu == m[2]),
+             tap=function() sc.trmute = m[2]; self:vers_save(base) end }
       end
     else
       add{ kind="text", x=qx + 14, y=302, w=qw - 28, h=16, label="the end", size=13, col="txt" }
@@ -3562,7 +3587,7 @@ function ui:layout_arrange(add)
     add{ kind="text", x=16, y=300, w=W - 32, h=14, size=11, label="pick a section to set its length and name, and the transition into the next" }
   end
   -- the project's scenes: ▶ to hear one, + to put it on the end (or in the picked section's place, when swapping)
-  add{ kind="text", x=16, y=474, w=W - 32, h=12, size=9, label="this project's scenes: ▶ to hear one, + to add it to the end" }
+  add{ kind="text", x=16, y=498, w=W - 32, h=12, size=9, label=(self.aswap and sel) and "tap swap in on the scene to put in section " .. sel or "this project's scenes: ▶ to hear one, + to add it to the end" }
   local tw = (W - 32 - 5 * 6) / 6
   self.lscroll = clamp(self.lscroll or 0, 0, math.max(0, #scenes - 6))
   local ls = { row = tw + 6, across = true, get = function() return self.lscroll end, set = function(x) self.lscroll = clamp(x, 0, math.max(0, #scenes - 6)) end }
@@ -3571,11 +3596,12 @@ function ui:layout_arrange(add)
     if not n then break end
     local xx = 16 + (k - 1) * (tw + 6)
     local vi = self:var_info(n)
-    add{ kind="vtile", x=xx, y=490, w=tw, h=50, label=scene_letter(ockm_ver(n)), sub=vi.keep and "kept" or (vi.saved and os.date("%d %b", vi.saved) or ""), keep=vi.keep, vs=ls,
+    add{ kind="vtile", x=xx, y=514, w=tw, h=74, label=scene_letter(ockm_ver(n)), sub=vi.keep and "kept" or (vi.saved and os.date("%d %b", vi.saved) or ""), keep=vi.keep, vs=ls,
          tap=function() end }
-    add{ kind="pbtn", x=xx + 4, y=501, w=28, h=28, on=(self.pv and not self.arr and self.pv.n == n and self.playing ~= 0), vs=ls,
+    add{ kind="pbtn", x=xx + 4, y=520, w=28, h=28, on=(self.pv and not self.arr and self.pv.n == n and self.playing ~= 0), vs=ls,
          tap=function() if self.arr then return end; self:preview_play(n) end }
-    add{ kind="btn", x=xx, y=546, w=tw, h=40, small=true, label=(self.aswap and sel) and "swap in" or "+ add", accent=(self.aswap and sel) and true or false, vs=ls,
+    local sw = (self.aswap and sel) and true or false
+    add{ kind="btn", x=xx + 4, y=554, w=tw - 8, h=30, small=true, label=sw and "swap in" or "+ add", accent=sw, vs=ls,
          tap=function()
            if self.aswap and sel and S[sel] then
              S[sel].scene = n; self.aswap = false

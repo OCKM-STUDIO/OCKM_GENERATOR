@@ -1988,11 +1988,12 @@ def touchscreen_fx_pad_plays_and_latches(work):
 
 @test
 def arrange_plays_a_version(work):
-    """v1.28: arrange. Two scenes (A and B) in a version, four bars each, a gap between: it plays A, then B on the 1
-    of bar 5 with the mix dropped out for the beat before, then stops and puts back what was open."""
+    """v1.28: arrange. Two scenes (A and B) in a version, four bars each, a gap between (v1.29: with the drums out over
+    it): it plays A, then B on the 1 of bar 5 with the mix dropped out for the beat before, then stops and puts back what
+    was open."""
     if not PDLUA:
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
-    h = Harness(); h.show("ockm-project-open", "ockm-unstash", "ockm-gap-arm", "ockm-bar")
+    h = Harness(); h.show("ockm-project-open", "ockm-unstash", "ockm-gap-arm", "ockm-bar", "ockm-d1-mute")
     tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
     tap(150, 919, 36); tap(151, 830, 95)   # menu, project
     tap(200, 808, 100)                     # new blank project
@@ -2002,7 +2003,8 @@ def arrange_plays_a_version(work):
     tap(950, 793, 36)                      # arrange
     tap(1000, 245, 566); tap(1010, 60, 357)   # + A (the second tile: newest first), 4 bars
     tap(1020, 90, 566); tap(1030, 60, 357)    # + B, 4 bars
-    tap(1040, 60, 200); tap(1050, 550, 397)   # section 1, its transition: gap
+    tap(1040, 60, 200); tap(1050, 550, 392)   # section 1, its transition: gap
+    tap(1060, 668, 464)                       # v1.29: and drums out over it
     tap(1100, 778, 100)                    # play from start
     f = os.path.join(work, "t_arrange.pd"); h.finish(1100 + 17500, f)
     out = run(work, f, timeout=150)
@@ -2015,6 +2017,10 @@ def arrange_plays_a_version(work):
     assert nbar == 5, f"B comes in on bar 5: {nbar} bars before it"
     assert any(l.startswith("ockm-gap-arm") and l.split()[-1] == "4" for l in lines), "the gap is armed before the drop"
     assert any(l.startswith("ockm-unstash") for l in lines), "at the end, what was open comes back"
+    mutes = [l.split()[-1] for l in lines[:ob] if l.startswith("ockm-d1-mute")]
+    assert "1" in mutes, f"the drums go out over the transition: {mutes}"
+    after = [l.split()[-1] for l in lines[ob:] if l.startswith("ockm-d1-mute")]
+    assert not after or after[-1] == "0", f"and come back with scene B: {after}"
 
 @test
 def save_is_a_snapshot_not_movement(work):

@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.29 (21 October 2026)
+
+- **Mutes on transitions:** every join has a mutes row: keep all, drums out, kick out, synths out or kick + bass. They go over the transition and come back on the 1 (the next scene's own mutes win). A recipe with its own mutes (the lifts take the drums out) shows them, and you can change them. A cut with mutes becomes a short mute section before the drop, over 1, 2, 4 or 8 bars
+- The arrange panels are a little taller and the scenes row more compact
+
 ## v1.28 (21 October 2026)
 
 - **Arrange: versions.** A version is a running order of the project's scenes. Tap **+ add** on a scene to put it on the end; tap a section to set how long it plays (whole loops, 4 to 64 bars), name it (intro, build, drop, breakdown, break, outro), move it, swap its scene or remove it
