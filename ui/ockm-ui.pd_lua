@@ -25,7 +25,7 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v1.27"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v1.28"   -- shown on screen, so you can tell which version plugdata has loaded
 
 local THEMES = {
   dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
@@ -283,9 +283,10 @@ end
 local UI_NOW
 local NOT_CHANGES = { ["ockm-play"]=1, ["ockm-want"]=1, ["ockm-page"]=1, ["ockm-save"]=1, ["ockm-revert"]=1, 
   ["ockm-project-list"]=1, ["ockm-project-open"]=1, ["ockm-project-new"]=1, ["ockm-project-saveas"]=1, ["ockm-project-delete"]=1,
-  ["ockm-resync"]=1, ["ockm-snapshot"]=1, ["ockm-usb-scan"]=1, ["ockm-exports-ask"]=1, ["ockm-mkdir"]=1, ["ockm-rec-stop"]=1, ["ockm-filter"]=1, ["ockm-filter-glide"]=1, ["ockm-delay-throw"]=1 }
+  ["ockm-resync"]=1, ["ockm-snapshot"]=1, ["ockm-usb-scan"]=1, ["ockm-exports-ask"]=1, ["ockm-mkdir"]=1, ["ockm-rec-stop"]=1, ["ockm-filter"]=1, ["ockm-filter-glide"]=1, ["ockm-delay-throw"]=1, ["ockm-stash"]=1, ["ockm-unstash"]=1, ["ockm-mute-bar"]=1, ["ockm-mute-quant"]=1, ["ockm-gap-arm"]=1 }
 local function psend(name, sel, atoms)
-  if UI_NOW and not NOT_CHANGES[name] and not name:match("^ockm%-rec%-") and not name:match("%-mute$") and not name:match("%-mute%-q$") and not name:match("%-solo$") and not name:match("%-audition$")
+  -- v1.28: mutes and solos are saved now, so they count as changes; playing the fx pad (x, y) doesn't
+  if UI_NOW and not NOT_CHANGES[name] and not name:match("^ockm%-rec%-") and not name:match("^ockm%-bfx%-.+%-[xy]$") and not name:match("%-audition$")
      and name ~= "ockm-samples-scan" then UI_NOW.unsaved = true end
   pd["send"](name, sel, atoms)
 end
@@ -403,6 +404,7 @@ function ui:hooks()
   h[#h+1] = "ockm-bass-bus"   -- v1.23 bus effects
   for _, b in ipairs(BUSES) do
     h[#h+1] = "ockm-bfx-"..b.."-type"; h[#h+1] = "ockm-bfx-"..b.."-glide"
+    h[#h+1] = "ockm-bfx-"..b.."-on"; h[#h+1] = "ockm-bfx-"..b.."-x"; h[#h+1] = "ockm-bfx-"..b.."-y"
     for _, e in ipairs(BFX) do h[#h+1] = "ockm-bfx-"..b.."-"..e.."-mix"; h[#h+1] = "ockm-bfx-"..b.."-"..e.."-p" end
   end
   for _, t in ipairs(SYNTHS) do h[#h+1] = "ockm-"..t.."-level"; h[#h+1] = "ockm-"..t.."-mode" end
@@ -521,6 +523,11 @@ function ui:postinitialize()
   end)
   listen("ockm-project-name", function(o) if o.new_pending then o.new_pending = nil; if o.newclock then o.newclock:delay(300) end end end)
   for _, n in ipairs({ "ockm-saved", "ockm-revert", "ockm-project-name" }) do listen(n, function(o) o.unsaved = false; o:dirty() end) end
+  -- v1.28: a scene that loads with a bus effect in had it latched when it was saved
+  listen("ockm-project-name", function(o)
+    o.fx_latch = o.fx_latch or {}
+    for _, b in ipairs(BUSES) do o.fx_latch[b] = (o.v["ockm-bfx-"..b.."-on"] or 0) > 0 end
+  end)
   for _, n in ipairs({ "ockm-revert", "ockm-project-name" }) do listen(n, function(o) o.undo_label = nil end) end
   listen("ockm-project-item", function(o, sel, a) if o.incoming then o.incoming[#o.incoming + 1] = tostring(a[1]) end end)
   listen("ockm-project-list-end", function(o)
@@ -858,6 +865,8 @@ function ui:layout()
   if self.sheet == "slotpick" then self:layout_slotpick(add) end
   if self.sheet == "fxset" then self:layout_fxset(add) end
   if self.sheet == "pmore" then self:layout_pmore(add) end
+  if self.sheet == "vpick" then self:layout_vpick(add) end
+  if self.sheet == "vexport" then self:layout_vexport(add) end
   -- messages on screens that have no message line of their own
   if self.msg and (self.screen == "perform" or self.screen == "live" or self.screen == "fx" or self.screen == "compose" or self.screen == "mixer" or self.screen == "arrange" or self.screen == "setup" or self.screen == "drums"
                    or (self.msg_undo and self.undo_label)) then
@@ -915,7 +924,7 @@ function ui:layout_top(add)
     add{ kind="disc", x=W - 120, y=12, w=50, h=48, tap=function() self:save_variation() end }
   end
   add{ kind="menubtn", x=W - 66, y=12, w=50, h=48, sel=(self.menu or self.screen == "project" or self.screen == "setup"), tap=function() self.menu = not self.menu end }
-  if self.screen ~= "project" and self.screen ~= "setup" and self.screen ~= "live" and self.screen ~= "fx" then self:layout_nav(add) end
+  if self.screen ~= "project" and self.screen ~= "setup" and self.screen ~= "live" and self.screen ~= "fx" and self.screen ~= "arrange" then self:layout_nav(add) end
 end
 
 -- the menu (top right): everything that isn't a screen you play or make on
@@ -1595,8 +1604,12 @@ function ui:macro_down(slot)
   if mc then self:macro_finish() end
   local r = (slot == 4) and self.me.macros[self.try_sel or 1] or self.me.macros[self.me.slots[slot]]
   if not r then return end
-  local run = (r.bars or 0) > 0 and self.playing ~= 0
-  if run then self:set_mute_bar(true) end   -- its mutes go on the 1, not part way through a bar
+  self:macro_go(slot, r)
+end
+-- start a recipe. now: its mutes land straight away (an arrangement's transition, started on the bar line)
+function ui:macro_go(slot, r, now)
+  local run = (r.bars or 0) > 0 and (self.playing ~= 0 or now)
+  if run and not now then self:set_mute_bar(true) end   -- its mutes go on the 1, not part way through a bar
   local saved = { set = {}, mutes = {}, filter = self.v["ockm-filter"] or 0 }
   for _, m in ipairs(r.moves) do
     local t = TARGET[m.t]
@@ -1681,11 +1694,13 @@ function ui:set_mute_bar(on) self.mute_bar = on or nil; pd.send("ockm-mute-bar",
 function ui:macro_end()
   local mc = self.macro
   mc.ending = true
+  self:set_mute_bar(true)   -- the mutes come back on the next 1
   -- v1.22: the gap before the drop (the mix drops out for the bar's last steps; too late in the bar and it's skipped)
   if (mc.recipe.gap or 0) > 0 and self.playing ~= 0 then pd.send("ockm-gap-arm", "float", { mc.recipe.gap }) end
   for tr, x in pairs(mc.saved.mutes) do if self:mute_target(tr) ~= x then self:qmute(tr, x) end end
 end
 function ui:on_bar()
+  if self.arr then self:arr_bar() end
   self:evo_bar()
   local mc = self.macro
   if not (mc and mc.run) then return end
@@ -2035,11 +2050,12 @@ end
 
 function ui:open(screen)
   if screen == "perform" then screen = "live" end   -- v0.87: Perform A is gone; its drum grid is the drums tab's all drums view
-  if screen ~= "project" and self.pv and not self.pv.export then self:preview_end() end   -- v1.26: leaving puts yours back
+  if screen ~= "project" and screen ~= "arrange" and self.pv and not self.pv.export and not self.pv.arrange then self:preview_end() end   -- v1.26: leaving puts yours back
   self.msg = nil
   self.screen = screen
   self.pick, self.confirm, self.sheet = nil, nil, nil
   if screen == "project" then psend("ockm-project-list", "bang", {}); self.pg_home = nil end
+  if screen == "arrange" then psend("ockm-project-list", "bang", {}) end
   if screen == "drums" then psend("ockm-samples-scan", "bang", {}) end   -- pick up files added since
   self.sel_step = 0
   self:set_page(self:play_block())
@@ -3259,12 +3275,376 @@ end
 -- ------------------------------------------------------------------ arrange
 -- One loop, many arrangements: a row of 16-bar units with a transition at each joint. Being built in steps
 -- (see the design doc); for now the tab says what's coming.
+-- ------------------------------------------------------------------ arrange: versions (v1.28)
+-- A version is a running order of the project's scenes: each plays for a number of bars (whole loops), and each join has
+-- a transition: a recipe that runs over the end of the section before, then the next scene drops in on the 1. A project
+-- can have several versions; they're kept in versions/<project>.lua beside projects/
+local TR_BUILTIN = {
+  { "cut", nil },
+  { "rise", { moves = { { t = "rise", v = 1, how = 1, back = 1 } } } },
+  { "echo out", { moves = { { t = "throw", v = 1, how = 1, back = 1 }, { t = "feedback", v = 0.7, how = 1, back = 1 } } } },
+  { "filter swap", { moves = { { t = "filter", v = 0.55, how = 5, back = 1 } } } },
+  { "gap", { gap = 4, moves = {} } },
+}
+local TR_BARS = { 1, 2, 4, 8 }
+local SEC_TAGS = { "", "intro", "build", "drop", "breakdown", "break", "outro" }
+-- the transitions you can pick: cut, rise, echo out, filter swap, gap, then your recipes that run for a length
+function ui:tr_list()
+  local L = {}
+  for _, t in ipairs(TR_BUILTIN) do L[#L + 1] = { name = t[1], r = t[2], free = true } end
+  for _, r in ipairs(self.me.macros or {}) do
+    if (r.bars or 0) > 0 and #r.moves > 0 then L[#L + 1] = { name = r.name, r = r, bars = r.bars } end
+  end
+  return L
+end
+function ui:tr_find(name)
+  for _, t in ipairs(self:tr_list()) do if t.name == name then return t end end
+end
+function ui:vers_path(base)
+  if not self._loadpath or self._loadpath == "" then return nil end
+  return self._loadpath .. "../versions/" .. base .. ".lua"
+end
+local function lua_str(v, ind)
+  ind = ind or ""
+  if type(v) == "table" then
+    local out, n = {}, #v
+    for i = 1, n do out[#out + 1] = ind .. "  " .. lua_str(v[i], ind .. "  ") end
+    for k, x in pairs(v) do
+      if not (type(k) == "number" and k >= 1 and k <= n) then out[#out + 1] = ind .. "  " .. string.format("[%q] = ", k) .. lua_str(x, ind .. "  ") end
+    end
+    return "{\n" .. table.concat(out, ",\n") .. "\n" .. ind .. "}"
+  elseif type(v) == "string" then return string.format("%q", v)
+  else return tostring(v) end
+end
+function ui:vers_load(base)
+  self.vers = self.vers or {}
+  if self.vers[base] then return self.vers[base] end
+  local t
+  local p = self:vers_path(base)
+  local f = p and io.open(p, "r")
+  if f then
+    local src = f:read("a"); f:close()
+    local fn = load(src, "versions", "t", {}); local ok, x = pcall(fn or function() end)
+    if ok and type(x) == "table" then t = x end
+  end
+  t = t or { list = {}, cur = 1 }
+  t.list = t.list or {}
+  if #t.list == 0 then t.list[1] = { name = "version 1", sections = {} } end
+  t.cur = clamp(t.cur or 1, 1, #t.list)
+  self.vers[base] = t
+  return t
+end
+function ui:vers_save(base)
+  local t = self.vers and self.vers[base]
+  local p = self:vers_path(base)
+  if not (t and p) then return end
+  psend("ockm-mkdir", "symbol", { self._loadpath .. "../versions" })
+  local f = io.open(p, "w")
+  if f then f:write("-- OCKM_GENERATOR versions of " .. base .. "\nreturn " .. lua_str(t) .. "\n"); f:close() end
+end
+function ui:arr_base() return ockm_base(self:home()) end
+function ui:arr_version()
+  local t = self:vers_load(self:arr_base())
+  return t.list[t.cur], t
+end
+-- whole loops: a section is 1 to 8 times its scene's loop, up to 64 bars
+function ui:sec_choices(scene)
+  local lb = self:scene_bars(scene)
+  local c = {}
+  for _, b in ipairs({ 4, 8, 16, 32, 64 }) do if b >= lb and b % lb == 0 then c[#c + 1] = b end end
+  if #c == 0 then c[1] = lb end
+  return c
+end
+function ui:sec_trbars(sec)
+  local t = sec.tr and self:tr_find(sec.tr)
+  if not t or not t.r then return 0 end
+  return math.min(sec.bars or 16, t.bars or sec.trbars or 4)
+end
+function ui:arr_total()
+  local v = self:arr_version()
+  local bars, secs = 0, 0
+  for _, sc in ipairs(v.sections) do bars = bars + (sc.bars or 16); secs = secs + sc.bars * 4 * 60 / math.max(40, self:scene_kv(sc.scene)["ockm-bpm"] or 124) end
+  return #v.sections, bars, secs
+end
+
+-- ---------- playing a version
+function ui:arr_play(exporting)
+  local v = self:arr_version()
+  if #v.sections == 0 then self:say("add a scene or two first: tap + on one below"); return end
+  if self.playing ~= 0 and not self.arr then psend("ockm-play", "float", { 0 }) end
+  if not self.pv then
+    self.pv = { home = self.project or "default", unsaved = self.unsaved, fresh = self.fresh }
+    psend("ockm-stash", "bang", {})
+  end
+  self.pv.arrange = true; self.pv.busy = true
+  self.arr = { i = 1, bar = 0, v = v, export = exporting }
+  self.v["ockm-mute-quant-was"] = self.v["ockm-mute-quant"] or 0
+  self.pv.n = v.sections[1].scene
+  psend("ockm-project-open", "symbol", { v.sections[1].scene })
+  psend("ockm-play", "float", { 1 })
+  self.pv.busy = false
+  self:dirty()
+end
+function ui:arr_stop()
+  local a = self.arr
+  if not a then return end
+  self.arr = nil
+  if self.macro then self:macro_finish() end
+  psend("ockm-mute-quant", "float", { self.v["ockm-mute-quant-was"] or 0 })
+  if self.pv then self.pv.arrange = nil end
+  if a.export and self.exporting then
+    self.exporting.song = true
+    psend("ockm-play", "float", { 0 })   -- the export sees the stop, lets the effects ring out, then closes the files
+  end
+  if self.playing ~= 0 then psend("ockm-play", "float", { 0 }) end
+  self:preview_end()
+  self:dirty()
+end
+-- every bar while a version plays: count, start the transition over the section's last bars, switch scene on the 1
+function ui:arr_bar()
+  local a = self.arr
+  local v = a.v
+  local sec = v.sections[a.i]
+  if not sec then self:arr_stop(); return end
+  a.bar = a.bar + 1
+  if a.bar > (sec.bars or 16) then
+    -- the next section, on this 1
+    a.i = a.i + 1; a.bar = 1
+    local nx = v.sections[a.i]
+    if not nx then self:arr_stop(); return end
+    if self.macro then self:macro_finish() end   -- the transition lets go first: the next scene's own mutes and effects win
+    self.pv.busy = true; self.pv.n = nx.scene
+    psend("ockm-project-open", "symbol", { nx.scene })
+    self.pv.busy = false
+    sec = nx
+  end
+  -- the transition out of this section starts its last N bars from the end
+  local nx = v.sections[a.i + 1]
+  local n = self:sec_trbars(sec)
+  if nx and n > 0 and a.bar == (sec.bars or 16) - n + 1 then
+    local t = self:tr_find(sec.tr)
+    local r = {}
+    for k, x in pairs(t.r) do r[k] = x end
+    r.bars = n
+    psend("ockm-mute-quant", "float", { 0 })   -- its mutes land now, on this bar line
+    self:macro_go(5, r, true)
+    psend("ockm-mute-quant", "float", { self.v["ockm-mute-quant-was"] or 0 })
+    if self.macro then
+      -- counted like a tapped recipe: on_bar adds this bar straight after, and ends it at the start of its last bar
+      self.macro.latched = true; self.macro.bars = 0; self.macro.arr = true
+    end
+    -- a different tempo next: glide to it over the transition
+    local b0, b1 = self.v["ockm-bpm"] or 124, self:scene_kv(nx.scene)["ockm-bpm"]
+    if b1 and math.abs(b1 - b0) > 0.5 then self:ramp("ockm-bpm", b1, steps_ms(self, 16 * n)) end
+  end
+  self:dirty()
+end
+function ui:arr_export()
+  local v = self:arr_version()
+  if #v.sections == 0 then self:say("add a scene or two first"); return end
+  local e = self:exp_opts()
+  local dir, where = self:exp_dir()
+  self.exp_where = where
+  local base = (self:arr_base() .. "-" .. (v.name or "version")):gsub("[^%w%-]", "-") .. "-" .. os.date("%H%M%S")
+  self:rec_open(dir, base, e.stems > 0)
+  self.exporting = { t0 = os.time(), base = base }
+  self:rec_start(e.stems > 0)
+  self:arr_play(true)
+  self.tickclock:delay(500)
+end
+
+-- ---------- the screen
+local SEC_Y, SEC_H = 150, 96
 function ui:layout_arrange(add)
-  add{ kind="text", x=40, y=150, w=W - 80, h=24, label="Arrange is being rebuilt", size=22, col="txt" }
-  add{ kind="text", x=40, y=192, w=W - 80, h=14, size=13,
-       label="Soon: your loop becomes a track here, as a row of 16-bar units with a transition at every joint." }
-  add{ kind="text", x=40, y=214, w=W - 80, h=14, size=13,
-       label="Generate one, or build it by hand. Your loop is never changed." }
+  local base = self:arr_base()
+  local v, t = self:arr_version()
+  local groups = self:proj_groups()
+  local scenes = groups[base] or {}
+  local nsec, nbars, secs = self:arr_total()
+  add{ kind="text", x=16, y=76, w=300, h=12, label="version", size=9 }
+  add{ kind="text", x=16, y=88, w=520, h=22, label=ockm_pretty(base):match("^[^·]+"):gsub("%s+$", "") .. ": " .. (v.name or "version"), size=18, col="txt" }
+  add{ kind="text", x=16, y=114, w=520, h=12, size=10, col=self.msg and "acc" or nil,
+       label=self.msg or string.format("%d sections · %d bars · %d:%02d", nsec, nbars, math.floor(secs / 60), math.floor(secs % 60)) }
+  local playing = self.arr ~= nil
+  add{ kind="btn", x=W - 16 - 90 - 6 - 140 - 6 - 120, y=80, w=120, h=40, small=true, label=(v.name or "version") .. " ▾", tap=function() self.sheet = "vpick" end }
+  add{ kind="btn", x=W - 16 - 90 - 6 - 140, y=80, w=140, h=40, small=true, accent=true, label=playing and "stop" or "play from start",
+       tap=function() if self.arr then self:arr_stop() else self:arr_play() end end }
+  add{ kind="btn", x=W - 16 - 90, y=80, w=90, h=40, small=true, accent=true, label="export...", tap=function()
+         if self.arr then return end; psend("ockm-usb-scan", "bang", {}); self.sheet = "vexport" end }
+  -- the strip: sections with the transitions between them, scrolled a section at a time
+  add{ kind="card", x=16, y=134, w=W - 32, h=150 }
+  local S = v.sections
+  local total = 0; for _, sc in ipairs(S) do total = total + (sc.bars or 16) end
+  local avail = W - 32 - 16
+  local per = math.max(4, avail / math.max(32, total))   -- px a bar
+  self.ascroll = clamp(self.ascroll or 0, 0, math.max(0, #S - 1))
+  local hs = { row = 80, get = function() return self.ascroll end, set = function(x) self.ascroll = clamp(x, 0, math.max(0, #S - 1)) end, across = true }
+  local x = 24
+  local sel = self.asel
+  for i = self.ascroll + 1, #S do
+    local sc = S[i]
+    local w = math.max(64, (sc.bars or 16) * per - 44)
+    if x + 40 > W - 24 then break end
+    w = math.min(w, W - 24 - x)
+    local now = playing and self.arr.i == i
+    add{ kind="vtile", noplay=true, x=x, y=SEC_Y, w=w, h=SEC_H, label=scene_letter(ockm_ver(sc.scene)), sub=((sc.tag and sc.tag ~= "") and (sc.tag .. " · ") or "") .. (sc.bars or 16) .. " bars",
+         sel=(sel == i), keep=now, vs=hs, tap=function() self.asel = i end }
+    if now then
+      local f = (self.arr.bar - 1 + (self.step % 16) / 16) / (sc.bars or 16)
+      add{ kind="playhead", x=x + w * clamp(f, 0, 1), y=SEC_Y - 4, w=2, h=SEC_H + 8 }
+    end
+    x = x + w
+    if i < #S and x + 44 < W - 24 then
+      local trn = sc.tr or "cut"
+      add{ kind="chip", x=x + 4, y=SEC_Y + 30, w=36, h=36, label=trn, sel=(sel == i and self.asel_tr), vs=hs,
+           tap=function() self.asel = i; self.asel_tr = true end }
+      x = x + 44
+    end
+  end
+  if #S == 0 then add{ kind="text", x=32, y=SEC_Y + 36, w=600, h=14, size=12, label="empty: tap + on a scene below to start the running order" } end
+  add{ kind="text", x=24, y=262, w=W - 48, h=12, size=9, label="tap a section to change it, a ↝ for its transition. Drag sideways to scroll a long version" }
+  -- the section picked, and the transition out of it
+  local sc = sel and S[sel]
+  if sc then
+    local px, pw = 16, 456
+    add{ kind="card", x=px, y=292, w=pw, h=172 }
+    local info = self:var_info(sc.scene)
+    add{ kind="text", x=px + 14, y=302, w=pw - 28, h=16, label="section " .. sel .. ": scene " .. scene_letter(ockm_ver(sc.scene)), size=13, col="txt" }
+    add{ kind="text", x=px + 14, y=322, w=pw - 28, h=12, label=info.summary or "", size=9 }
+    local ch = self:sec_choices(sc.scene)
+    local cw = (pw - 28 - (#ch - 1) * 6) / #ch
+    for k, b in ipairs(ch) do
+      add{ kind="choice", x=px + 14 + (k - 1) * (cw + 6), y=340, w=cw, h=34, small=true, label=b .. " bars", sel=(sc.bars == b),
+           tap=function() sc.bars = b; self:vers_save(base) end }
+    end
+    local bw = (pw - 28 - 4 * 6) / 5
+    local tg = 1; for k, x in ipairs(SEC_TAGS) do if x == (sc.tag or "") then tg = k end end
+    local acts = {
+      { (sc.tag and sc.tag ~= "") and sc.tag or "name it", function() sc.tag = SEC_TAGS[tg % #SEC_TAGS + 1]; self:vers_save(base) end },
+      { "< move", function() if sel > 1 then S[sel], S[sel - 1] = S[sel - 1], S[sel]; self.asel = sel - 1; self:vers_save(base) end end },
+      { "move >", function() if sel < #S then S[sel], S[sel + 1] = S[sel + 1], S[sel]; self.asel = sel + 1; self:vers_save(base) end end },
+      { self.aswap and "tap a scene" or "swap scene", function() self.aswap = not self.aswap end },
+      { "remove", function() table.remove(S, sel); self.asel = nil; self:vers_save(base) end },
+    }
+    for k, a in ipairs(acts) do
+      add{ kind="btn", x=px + 14 + (k - 1) * (bw + 6), y=382, w=bw, h=34, small=true, label=a[1], accent=(k == 4 and self.aswap), quiet=(k == 5), tap=a[2] }
+    end
+    add{ kind="text", x=px + 14, y=428, w=pw - 28, h=12, size=9, label=(sel < #S) and "the transition out of it is on the right" or "the last section: the version ends after it" }
+    -- the transition
+    local qx, qw = 488, W - 16 - 488
+    add{ kind="card", x=qx, y=292, w=qw, h=172 }
+    if sel < #S then
+      local trn = sc.tr or "cut"
+      local tt = self:tr_find(trn)
+      add{ kind="text", x=qx + 14, y=302, w=qw - 28, h=16, label="into section " .. (sel + 1) .. ": " .. trn, size=13, col="txt" }
+      add{ kind="text", x=qx + 14, y=322, w=qw - 28, h=12, size=9,
+           label=(trn == "cut") and "straight in on the 1" or ("over the last " .. self:sec_trbars(sc) .. " bars of this section, then the next drops on the 1") }
+      local L = self:tr_list()
+      local tw = (qw - 28 - 3 * 6) / 4
+      for k, tr in ipairs(L) do
+        if k > 8 then break end
+        local r, c = math.floor((k - 1) / 4), (k - 1) % 4
+        add{ kind="choice", x=qx + 14 + c * (tw + 6), y=340 + r * 40, w=tw, h=34, small=true, accent=true, label=tr.name, sel=(trn == tr.name),
+             tap=function() sc.tr = tr.name; self:vers_save(base) end }
+      end
+      if tt and tt.free and tt.r then
+        add{ kind="text", x=qx + 14, y=430, w=40, h=12, size=9, label="over" }
+        for k, b in ipairs(TR_BARS) do
+          add{ kind="choice", x=qx + 50 + (k - 1) * 70, y=422, w=64, h=30, small=true, label=b .. (b == 1 and " bar" or " bars"), sel=((sc.trbars or 4) == b),
+               tap=function() sc.trbars = b; self:vers_save(base) end }
+        end
+      end
+    else
+      add{ kind="text", x=qx + 14, y=302, w=qw - 28, h=16, label="the end", size=13, col="txt" }
+      add{ kind="text", x=qx + 14, y=322, w=qw - 28, h=12, size=9, label="the version stops after this section (the effects ring out)" }
+    end
+  else
+    add{ kind="text", x=16, y=300, w=W - 32, h=14, size=11, label="pick a section to set its length and name, and the transition into the next" }
+  end
+  -- the project's scenes: ▶ to hear one, + to put it on the end (or in the picked section's place, when swapping)
+  add{ kind="text", x=16, y=474, w=W - 32, h=12, size=9, label="this project's scenes: ▶ to hear one, + to add it to the end" }
+  local tw = (W - 32 - 5 * 6) / 6
+  self.lscroll = clamp(self.lscroll or 0, 0, math.max(0, #scenes - 6))
+  local ls = { row = tw + 6, across = true, get = function() return self.lscroll end, set = function(x) self.lscroll = clamp(x, 0, math.max(0, #scenes - 6)) end }
+  for k = 1, 6 do
+    local n = scenes[self.lscroll + k]
+    if not n then break end
+    local xx = 16 + (k - 1) * (tw + 6)
+    local vi = self:var_info(n)
+    add{ kind="vtile", x=xx, y=490, w=tw, h=50, label=scene_letter(ockm_ver(n)), sub=vi.keep and "kept" or (vi.saved and os.date("%d %b", vi.saved) or ""), keep=vi.keep, vs=ls,
+         tap=function() end }
+    add{ kind="pbtn", x=xx + 4, y=501, w=28, h=28, on=(self.pv and not self.arr and self.pv.n == n and self.playing ~= 0), vs=ls,
+         tap=function() if self.arr then return end; self:preview_play(n) end }
+    add{ kind="btn", x=xx, y=546, w=tw, h=40, small=true, label=(self.aswap and sel) and "swap in" or "+ add", accent=(self.aswap and sel) and true or false, vs=ls,
+         tap=function()
+           if self.aswap and sel and S[sel] then
+             S[sel].scene = n; self.aswap = false
+             local ch = self:sec_choices(n); local ok = false
+             for _, b in ipairs(ch) do if b == S[sel].bars then ok = true end end
+             if not ok then S[sel].bars = ch[math.min(2, #ch)] end
+           else
+             local ch = self:sec_choices(n)
+             S[#S + 1] = { scene = n, bars = ch[math.min(2, #ch)], tr = "cut", trbars = 4 }
+             self.asel = #S
+           end
+           self:vers_save(base)
+         end }
+  end
+end
+-- versions: pick, add, copy, delete
+function ui:layout_vpick(add)
+  local base = self:arr_base()
+  local t = self:vers_load(base)
+  add{ kind="scrim", x=0, y=0, w=W, h=H, tap=function() self.sheet = nil; self.confirm = nil end }
+  local x0, y0, w0 = W / 2 - 240, 90, 480
+  local n = math.min(#t.list, 6)
+  add{ kind="sheet", x=x0, y=y0, w=w0, h=70 + n * 50 + 110 }
+  add{ kind="text", x=x0 + 16, y=y0 + 16, w=w0 - 32, h=14, label="versions of " .. (ockm_pretty(base):match("^[^·]+") or ""), size=14, col="txt" }
+  for i = 1, n do
+    local vv = t.list[i]
+    local bars = 0; for _, sc in ipairs(vv.sections) do bars = bars + (sc.bars or 16) end
+    add{ kind="choice", x=x0 + 16, y=y0 + 44 + (i - 1) * 50, w=w0 - 32, h=44, small=true, sel=(t.cur == i),
+         label=(vv.name or ("version " .. i)) .. "  ·  " .. #vv.sections .. " sections, " .. bars .. " bars",
+         tap=function() if self.arr then self:arr_stop() end; t.cur = i; self.asel = nil; self.ascroll = 0; self:vers_save(base); self.sheet = nil end }
+  end
+  local by = y0 + 54 + n * 50
+  local bw = (w0 - 32 - 12) / 3
+  local function newname() local k = #t.list + 1; return "version " .. k end
+  add{ kind="btn", x=x0 + 16, y=by, w=bw, h=40, small=true, label="new, empty", off=(#t.list >= 6), tap=function()
+         if #t.list >= 6 then return end; t.list[#t.list + 1] = { name = newname(), sections = {} }; t.cur = #t.list; self.asel = nil; self:vers_save(base); self.sheet = nil end }
+  add{ kind="btn", x=x0 + 16 + bw + 6, y=by, w=bw, h=40, small=true, label="copy this one", off=(#t.list >= 6), tap=function()
+         if #t.list >= 6 then return end
+         local src = t.list[t.cur]; local cp = { name = newname(), sections = {} }
+         for _, sc in ipairs(src.sections) do local c = {}; for k, x in pairs(sc) do c[k] = x end; cp.sections[#cp.sections + 1] = c end
+         t.list[#t.list + 1] = cp; t.cur = #t.list; self:vers_save(base); self.sheet = nil end }
+  local armed = (self.confirm == "vdel")
+  add{ kind="btn", x=x0 + 16 + 2 * (bw + 6), y=by, w=bw, h=40, small=true, quiet=not armed, off=(#t.list <= 1),
+       label=armed and "sure?" or "delete this one", tap=function()
+         if #t.list <= 1 then return end
+         if armed then if self.arr then self:arr_stop() end; table.remove(t.list, t.cur); t.cur = math.max(1, t.cur - 1); self.confirm = nil; self.asel = nil; self:vers_save(base); self.sheet = nil
+         else self.confirm = "vdel" end end }
+  add{ kind="btn", x=x0 + w0 - 116, y=by + 50, w=100, h=40, small=true, label="close", tap=function() self.sheet = nil; self.confirm = nil end }
+end
+-- exporting a version: the mix (and stems), recorded as it plays from start to end
+function ui:layout_vexport(add)
+  local e = self:exp_opts()
+  add{ kind="scrim", x=0, y=0, w=W, h=H, tap=function() self.sheet = nil end }
+  local x0, y0, w0 = W / 2 - 240, 150, 480
+  add{ kind="sheet", x=x0, y=y0, w=w0, h=230 }
+  local _, bars, secs = self:arr_total()
+  add{ kind="text", x=x0 + 16, y=y0 + 16, w=w0 - 32, h=14, label="export this version", size=14, col="txt" }
+  add{ kind="text", x=x0 + 16, y=y0 + 40, w=w0 - 32, h=12, size=10,
+       label=string.format("it plays from start to end, %d:%02d, and is recorded as it goes (you'll hear it)", math.floor(secs / 60), math.floor(secs % 60)) }
+  local on = (e.stems or 0) > 0
+  add{ kind="choice", x=x0 + 16, y=y0 + 66, w=220, h=36, small=true, accent=true, sel=true, label="stereo mix (WAV)", tap=function() end }
+  add{ kind="choice", x=x0 + 244, y=y0 + 66, w=220, h=36, small=true, accent=true, sel=on, label="stems too", tap=function() e.stems = on and 0 or 1 end }
+  local usb = self.usb and self.usb[1]
+  if e.dest == 2 and not usb then e.dest = 1 end
+  add{ kind="choice", x=x0 + 16, y=y0 + 112, w=220, h=36, small=true, sel=(e.dest ~= 2), label="exports folder", tap=function() e.dest = 1 end }
+  add{ kind="choice", x=x0 + 244, y=y0 + 112, w=220, h=36, small=true, sel=(e.dest == 2), label=usb and ("USB: " .. usb:match("[^/]+$")) or "USB (none found)",
+       tap=function() if usb then e.dest = 2 else psend("ockm-usb-scan", "bang", {}) end end }
+  add{ kind="btn", x=x0 + 16, y=y0 + 170, w=140, h=44, small=true, quiet=true, label="cancel", tap=function() self.sheet = nil end }
+  add{ kind="btn", x=x0 + w0 - 196, y=y0 + 170, w=180, h=44, small=true, accent=true, label="export", tap=function() self.sheet = nil; e.mix = 1; self:arr_export() end }
 end
 
 -- ------------------------------------------------------------------ export
@@ -3560,13 +3940,13 @@ function ockm_pretty(name)
 end
 -- v1.10 every save is a variation: the version you had stays as it was, and you carry on in the new one
 -- (velvet-heron, velvet-heron-v2, -v3...). A brand-new project's first save just saves it; nothing to save, nothing made
-local function ockm_base(n) return (tostring(n):gsub("%-v%d+$", "")) end
-local function ockm_ver(n) return tonumber(tostring(n):match("%-v(%d+)$")) or 1 end
+function ockm_base(n) return (tostring(n):gsub("%-v%d+$", "")) end
+function ockm_ver(n) return tonumber(tostring(n):match("%-v(%d+)$")) or 1 end
 function ui:save_variation()
   local cur = self.project or "default"
   if not self.unsaved then self:say("nothing new to save in " .. ockm_pretty(cur)); return end
   if cur == self.fresh then
-    self.fresh = nil; psend("ockm-save", "bang", {}); self:var_stamp(cur)
+    self.fresh = nil; psend("ockm-save", "bang", {}); self:clean_saved(cur); self:var_stamp(cur)
     self:say("saved " .. ockm_pretty(cur) .. ": the loop and the kit"); return
   end
   local n
@@ -3583,8 +3963,27 @@ function ui:save_variation()
     if count >= SCENE_MAX then self:say("this project has " .. SCENE_MAX .. " scenes: tidy up or delete some to save another"); return end
     repeat top = top + 1; n = base .. "-v" .. top until not taken[n]
   end
-  psend("ockm-project-saveas", "symbol", { n }); psend("ockm-project-list", "bang", {}); self:var_stamp(n)
+  psend("ockm-project-saveas", "symbol", { n }); self:clean_saved(n); psend("ockm-project-list", "bang", {}); self:var_stamp(n)
   self:say("saved as " .. ockm_pretty(n) .. ". " .. ockm_pretty(cur):match("^[^·]+"):gsub("%s+$", "") .. " stays as it was")
+end
+-- v1.28 a save is a snapshot of everything in place, but not movement: mutes, solos and latched bus effects are kept;
+-- the DJ filter is saved centred, rise and pump off, a bus effect you're holding as out. Patched into the files just written
+function ui:clean_saved(n)
+  local d = self:proj_dir(n)
+  if not d then return end
+  for _, fn in ipairs({ "project.txt", "loop.txt" }) do
+    local f = io.open(d .. fn, "r")
+    if f then
+      local src = f:read("a"); f:close()
+      local out = src:gsub("(ockm%-filter) [^;]*;", "%1 0;"):gsub("(ockm%-rise) [^;]*;", "%1 0;"):gsub("(ockm%-pump) [^;]*;", "%1 0;")
+      -- a bus effect you're holding on the pad is movement: saved as out. Latched, it's saved as it stands
+      for _, bus in ipairs(BUSES) do
+        if not (self.fx_latch and self.fx_latch[bus]) then out = out:gsub("(ockm%-bfx%-" .. bus .. "%-on) [^;]*;", "%1 0;") end
+      end
+      if out ~= src then local w = io.open(d .. fn, "w"); if w then w:write(out); w:close() end end
+    end
+  end
+  if self.skv then self.skv[n] = nil end
 end
 function ui:new_name()
   local taken = {}
@@ -3675,7 +4074,7 @@ function ui:layout_project(add)
     { "save", 70, function() self:save_variation() end },
     { "back to last save", 128, function() psend("ockm-revert", "bang", {}); self:say("back to the last save of " .. ockm_pretty(home)) end },
     { "save as copy", 104, function()
-        local n = self:new_name(); psend("ockm-project-saveas", "symbol", { n }); psend("ockm-project-list", "bang", {})
+        local n = self:new_name(); psend("ockm-project-saveas", "symbol", { n }); self:clean_saved(n); psend("ockm-project-list", "bang", {})
         self:say("saved a copy as " .. ockm_pretty(n) .. ". You're now working in the copy") end },
     { "new blank", 92, function()
         local n = self:new_name(); self.exists = 1; self.new_pending = true; self.fresh = n; psend("ockm-project-new", "symbol", { n }); psend("ockm-project-list", "bang", {})
@@ -3844,12 +4243,27 @@ local function read_kv(path, into)
   end
   f:close(); return into
 end
-function ui:var_info(n)
-  self.vcache = self.vcache or {}
-  if self.vcache[n] then return self.vcache[n] end
+-- a scene's saved settings (cached): tempo, loop lengths, style...
+function ui:scene_kv(n)
+  self.skv = self.skv or {}
+  if self.skv[n] then return self.skv[n] end
   local d = self:proj_dir(n)
   local kv = {}
   if d then read_kv(d .. "loop.txt", kv); read_kv(d .. "project.txt", kv) end
+  self.skv[n] = kv
+  return kv
+end
+-- how many bars its loop is (the longest part)
+function ui:scene_bars(n)
+  local kv = self:scene_kv(n)
+  local m = 16
+  for _, k in ipairs({ "ockm-drum-len", "ockm-bass-len", "ockm-lead-len", "ockm-chord-len" }) do m = math.max(m, kv[k] or 16) end
+  return math.max(1, math.floor(m / 16))
+end
+function ui:var_info(n)
+  self.vcache = self.vcache or {}
+  if self.vcache[n] then return self.vcache[n] end
+  local kv = self:scene_kv(n)
   local bits = {}
   local st = kv["ockm-style"]
   if st and st >= 0 and STYLES[st + 1] then bits[#bits + 1] = STYLES[st + 1][1] end
@@ -4250,8 +4664,11 @@ function ui:move(x, y)
   if t.mode == "vlane" then self:lane_set(t.w, x, y); return end
   if t.mode == nil and t.w.kind == "bpm" and math.abs(dy) > 8 then t.mode = "bpm" end
   -- v1.26: a grid that scrolls a row at a time: drag up or down anywhere on it
-  if t.mode == nil and t.w.vs and math.abs(dy) > 14 and math.abs(dy) > math.abs(dx) then t.mode = "vscroll"; t.vs0 = t.w.vs.get() end
-  if t.mode == "vscroll" then t.w.vs.set(t.vs0 - math.floor(dy / t.w.vs.row + 0.5)); return end
+  if t.mode == nil and t.w.vs then
+    local d1, d2 = (t.w.vs.across and dx or dy), (t.w.vs.across and dy or dx)   -- v1.28: some scroll sideways
+    if math.abs(d1) > 14 and math.abs(d1) > math.abs(d2) then t.mode = "vscroll"; t.vs0 = t.w.vs.get() end
+  end
+  if t.mode == "vscroll" then t.w.vs.set(t.vs0 - math.floor((t.w.vs.across and dx or dy) / t.w.vs.row + 0.5)); return end
   if t.mode == "bpm" then
     self:send("ockm-bpm", clamp(math.floor(t.v0 - dy / 3 + 0.5), 40, 200)); return
   end
@@ -4599,9 +5016,17 @@ function ui:draw(g, w)
       self:text(g, w.style, w.x + 10, w.y + 27, 9, mc, w.w - 50)
       self:text(g, w.sub, w.x + 10, w.y + 44, 9, mc, w.w - 50)
     else
-      self:text(g, w.label, w.x + 38, w.y + 8, 12, c, w.w - 40)
-      self:text(g, w.sub, w.x + 38, w.y + 30, 8, (w.keep and not w.sel) and "acc" or mc, w.w - 40)
+      local tx = w.noplay and 10 or 38
+      self:text(g, w.label, w.x + tx, w.y + 8, w.noplay and 16 or 12, c, w.w - tx - 2)
+      self:text(g, w.sub, w.x + tx, w.y + (w.noplay and w.h - 22 or 30), w.noplay and 10 or 8, (w.keep and not w.sel) and "acc" or mc, w.w - tx - 2)
     end
+  elseif k == "playhead" then
+    self:col(g, "acc"); g:fill_rect(w.x, w.y, w.w, w.h)
+  elseif k == "chip" then
+    -- a transition between two sections: a round button, its name under it
+    self:col(g, w.sel and "acc" or ((w.label == "cut") and "off" or "dim")); g:fill_rounded_rect(w.x, w.y, w.w, w.h, w.w / 2)
+    self:ctext(g, (w.label == "cut") and "|" or "~", w, 16, w.sel and "#ffffff" or "txt")
+    self:ctext(g, w.label, { x=w.x - 22, y=w.y + w.h + 4, w=w.w + 44, h=12 }, 8, w.sel and "acc" or "mute")
   elseif k == "pbtn" then
     -- ▶ or, while it plays, ❚❚
     self:col(g, w.on and "acc" or "dim"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, w.w / 2)

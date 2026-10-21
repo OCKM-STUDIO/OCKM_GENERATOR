@@ -105,6 +105,8 @@ SHOTS = [
     ("compose", ["test tap 477 36"]),
     ("perform-mutes", ["test tap 262 36", "test tap 74 186", "test tap 103 503"]),   # mute the kick, solo the bass
     ("mixer", ["test tap 407 36"]),
+    ("arrange", ["test tap 793 36", "test tap 120 566", "test tap 280 566", "test tap 120 566", "test tap 600 566", "test tap 80 190"]),   # v1.28: a version of three scenes plus one, section 1 picked
+    ("arrange-trans", ["test tap 230 200", "test tap 640 357"]),         # its transition picked: rise
     ("fx", ["test tap 346 36", "test press 700 250"]),                   # v1.23: the fx page, a finger on the pad (drums: crush in)
     ("fx-settings", ["test release 700 250", "test tap 250 198"]),      # the drums bus's settings
     ("mixer-eq", ["send ockm-d4-lowcut float 300", "send ockm-d4-eqmid float -6", "send ockm-d4-eqmidf float 500", "send ockm-d4-eqhigh float 5", "test tap 407 36", "test tap 288 232"]),

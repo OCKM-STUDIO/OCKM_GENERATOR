@@ -525,6 +525,10 @@ PATTERN_KEYS=[("ockm-end",0,None),("ockm-impact",0,None),("ockm-pump",0,None),("
               ("ockm-evolve-every",0,None),("ockm-evolve-mode",1,None),("ockm-evolve-parts",15,None)]   # v1.00 evolve: phrase bars, 1 gentle 2 lively, which parts (1 drums 2 bass 4 lead 8 chords)
 for t,d in SYNTH_DEFAULTS.items():
     PATTERN_KEYS+=[(f"ockm-{t}-{k}",v,None) for k,v in d.items()]
+# v1.28 a save is a snapshot of everything in place (but not movement): mutes and solos, and each bus effect's in/out and
+# pad position (the screen saves a bus effect as out unless it's latched)
+PATTERN_KEYS+=[(f"ockm-{t}-{k}",0,None) for t in [n for n,_ in SLOTS]+["bass","lead","chord"] for k in ("mute","solo")]
+PATTERN_KEYS+=[(f"ockm-bfx-{b}-{k}",d,None) for b in ("drums","music","master") for k,d in (("on",0),("x",0.5),("y",0.5))]
 TABLES=[f"ockm-pat-{n}" for n,_ in SLOTS]+[f"ockm-pat-{n}-nudge" for n,_ in SLOTS]+[f"ockm-pat-{t}-{f}" for t in ("bass","lead") for f in MONO]+[f"ockm-pat-chord-{f}" for f in CHORD]
 PROJ_DIR="projects/default"
 p=P()

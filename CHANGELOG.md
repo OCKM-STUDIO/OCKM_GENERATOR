@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.28 (21 October 2026)
+
+- **Arrange: versions.** A version is a running order of the project's scenes. Tap **+ add** on a scene to put it on the end; tap a section to set how long it plays (whole loops, 4 to 64 bars), name it (intro, build, drop, breakdown, break, outro), move it, swap its scene or remove it
+- **Transitions on every join:** cut, rise, echo out, filter swap, gap, or any of your recipes that run for a length (the 8 and 4 bar lifts, breakdown...). A transition runs over the end of the section, then the next scene drops in on the 1. Rise, echo out, filter swap and gap can run over 1, 2, 4 or 8 bars
+- **Play from start** plays the version (what you had open is set aside and comes back at the end). A scene at a different tempo is glided to over the transition
+- **Export...** records the version from start to end: the mix, and stems if you want them
+- **Several versions a project** (up to 6): new, copy this one, delete. Kept in versions/ beside projects/
+- **A save is a snapshot of everything in place, but not movement:** mutes and solos are saved now, and so is a bus effect you've latched (the saturator on, say). A bus effect you're only holding on the pad, the DJ filter mid-sweep, rise and pump are saved as off
+- Mutes and solos now count as changes to save
+
 ## v1.27 (21 October 2026)
 
 - **Variations are now scenes,** lettered A, B, C... (then AA, AB...). A project holds up to 64: at 64, saving says so and points you to tidy up. Every save still makes a new scene, and your project folders are unchanged on disk (name, name-v2... as before)

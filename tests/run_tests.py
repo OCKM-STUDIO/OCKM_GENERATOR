@@ -918,7 +918,7 @@ def touchscreen_screens_draw(work):
         raise Skip("Pillow not installed")
     p = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_preview.py"), os.path.join(work, "preview")], capture_output=True, text=True)
     assert p.returncode == 0, p.stderr[-800:]
-    assert len(os.listdir(os.path.join(work, "preview"))) == 36, "expected thirty-six screen pictures"
+    assert len(os.listdir(os.path.join(work, "preview"))) == 37, "expected thirty-seven screen pictures"
 
 @test
 def mute_solo_and_levels(work):
@@ -1985,6 +1985,63 @@ def touchscreen_fx_pad_plays_and_latches(work):
          "test tap 600 390"] + ["test tap 490 394"] * 8 + ["test press 800 550"]
     L = ui_preview.run(s)
     assert "sent ockm-bfx-drums-on float 1" in L and "sent ockm-bfx-drums-type float 1" in L, [l for l in L if "bfx" in l]
+
+@test
+def arrange_plays_a_version(work):
+    """v1.28: arrange. Two scenes (A and B) in a version, four bars each, a gap between: it plays A, then B on the 1
+    of bar 5 with the mix dropped out for the beat before, then stops and puts back what was open."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness(); h.show("ockm-project-open", "ockm-unstash", "ockm-gap-arm", "ockm-bar")
+    tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
+    tap(150, 919, 36); tap(151, 830, 95)   # menu, project
+    tap(200, 808, 100)                     # new blank project
+    tap(700, 407, 36)                      # mixer
+    tap(750, 54, 300); tap(770, 865, 36)   # scene A (its first save)
+    tap(850, 54, 380); tap(870, 865, 36)   # scene B
+    tap(950, 793, 36)                      # arrange
+    tap(1000, 245, 566); tap(1010, 60, 357)   # + A (the second tile: newest first), 4 bars
+    tap(1020, 90, 566); tap(1030, 60, 357)    # + B, 4 bars
+    tap(1040, 60, 200); tap(1050, 550, 397)   # section 1, its transition: gap
+    tap(1100, 778, 100)                    # play from start
+    f = os.path.join(work, "t_arrange.pd"); h.finish(1100 + 17500, f)
+    out = run(work, f, timeout=150)
+    opens = [l.split()[-1] for l in out.splitlines() if l.startswith("ockm-project-open")]
+    assert len(opens) >= 2 and opens[-2] != opens[-1] and opens[-1].endswith("-v2"), f"A, then B: {opens}"
+    lines = out.splitlines()
+    bars = [i for i, l in enumerate(lines) if l.startswith("ockm-bar")]
+    ob = [i for i, l in enumerate(lines) if l.startswith("ockm-project-open") and l.endswith("-v2")][-1]
+    nbar = sum(1 for i in bars if i < ob and i > [j for j, l in enumerate(lines) if l.startswith("ockm-project-open")][-2])
+    assert nbar == 5, f"B comes in on bar 5: {nbar} bars before it"
+    assert any(l.startswith("ockm-gap-arm") and l.split()[-1] == "4" for l in lines), "the gap is armed before the drop"
+    assert any(l.startswith("ockm-unstash") for l in lines), "at the end, what was open comes back"
+
+@test
+def save_is_a_snapshot_not_movement(work):
+    """v1.28: a save keeps everything in place: a mute, and a latched bus effect (crush on the drums). Not movement: a bus
+    effect only held on the pad is saved as out."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness()
+    tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
+    tap(150, 919, 36); tap(151, 830, 95)   # menu, project
+    tap(200, 808, 100)                     # new blank project
+    tap(700, 270, 36); tap(750, 70, 190)   # perform: mute the kick
+    tap(800, 346, 36)                      # fx
+    tap(850, 100, 198); tap(900, 700, 250) # drums: latch, then play it (crush): it stays in
+    tap(950, 100, 262)                     # the music bus on the pad
+    h.at(1000, "ockm-ui-test press 700 400")   # held (not latched) while saving
+    tap(1100, 865, 36)                     # save
+    f = os.path.join(work, "t_snapshot.pd"); h.finish(1400, f)
+    run(work, f)
+    P = os.path.join(work, "projects")
+    made = [d for d in os.listdir(P) if re.match(r"\d{4}-", d)]
+    assert made, os.listdir(P)
+    txt = "".join(open(os.path.join(P, made[0], fn)).read() for fn in ("loop.txt", "project.txt"))
+    kv = dict(re.findall(r"(ockm-[\w-]+) ([-\d.]+);", txt))
+    assert kv.get("ockm-d1-mute") == "1", f"the kick's mute is saved: {kv.get('ockm-d1-mute')}"
+    assert kv.get("ockm-bfx-drums-on") == "1", f"the latched crush is saved in: {kv.get('ockm-bfx-drums-on')}"
+    assert kv.get("ockm-bfx-music-on") == "0", f"the held (not latched) filter is saved out: {kv.get('ockm-bfx-music-on')}"
 
 @test
 def eight_bar_lift_pushes_late(work):
