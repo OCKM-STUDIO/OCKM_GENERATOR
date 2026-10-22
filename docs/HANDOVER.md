@@ -58,6 +58,8 @@ python3 tests/ui_preview.py out dark          # every screen as a PNG in out/: l
 lua5.4 tests/lua/test_chordmaker.lua .        # plain-Lua generator tests (run_tests.py runs these too)
 ```
 
+**Where to run them:** the Pi has everything the tests need (vanilla `pd`, pd-lua, Lua 5.4, Python with Pillow and numpy): `ssh simon@ockm.local 'cd OCKM_GENERATOR && python3 tests/run_tests.py <name>'`. The full run takes about 10 minutes; run it with the app idle, or run just the tests for what you changed. Simon's Mac has plugdata (to play it) but not command-line Pure Data, so the tests don't run there unless vanilla Pd and pd-lua are installed.
+
 `run_tests.py` copies the built folder to a temp directory per test, so your projects are safe. Tests drive the screen with `ockm-ui-test tap <x> <y>` (coordinates in the 960x600 logical screen), `drag`, `press` and `release`, and read Pd messages with `h.show(...)` and `printed(out, name)`.
 
 The preview list (`SHOTS` in `ui_preview.py`) is cumulative: each shot continues from the last, so a tap meant for one screen can land on another if a tab moves. `touchscreen_screens_draw` checks the number of unique shot names.
