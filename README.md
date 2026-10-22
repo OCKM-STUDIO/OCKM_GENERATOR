@@ -6,7 +6,7 @@ Tap a style and it builds a whole loop in that style: tempo, groove, key, chords
 
 ![Perform screen](docs/img/perform.png)
 
-**Status:** v1.28, a personal project that works and gets played, moving fast. I'm looking for collaborators (see [below](#looking-for-collaborators)).
+**Status:** v1.31, a personal project that works and gets played, moving fast. I'm looking for collaborators (see [below](#looking-for-collaborators)).
 
 ## What's in it
 
@@ -15,11 +15,11 @@ Tap a style and it builds a whole loop in that style: tempo, groove, key, chords
 - **Chords:** poly, hard stab, organ, house piano and Rhodes engines, with progressions, voicings, strum, push and drift. Piano, organ and Rhodes can play with two hands: a left hand on the root in five patterns
 - **The builder:** key, scale and progression shared by every part, phrase length, turnarounds, and an evolve setting that changes one part every phrase and brings it back
 - **Fifteen styles,** from deep house and Chicago through Italo piano, filter house and trance to peak time and hard techno. Every tap is a fresh take inside the style
-- **Perform:** mutes that land on the beat or bar, solos, a DJ filter, drive, rise, drop, a DJ rewind, beat repeat, and macros (8 bar lift, 4 bar lift, breakdown) that combine mutes and effects over 4 bars
+- **Perform:** mutes that land on the beat or bar, solos, rise, drop, a DJ rewind, beat repeat, the bus effects' XY pad, and macros (8 bar lift, 4 bar lift, breakdown) that combine mutes and effects over a number of bars, with a gap before the drop
 - **FX page:** three buses (drums, music, master), each with a filter, crush, drive or saturator played on an XY pad, latchable, and movable from macros
 - **Mixer:** dB faders, sends, mute and solo, and a 4-band EQ per track
 - **Scenes and versions:** every save is a scene; arrange scenes into versions with a transition (rise, lifts, breakdown, echo out, gap) on each join, and export them as finished tracks; export the mix, stems and MIDI
-- **MIDI:** USB controllers (pads mute and fire macros, knobs move the effects and the synth you're on), and MIDI clock in and out
+- **MIDI:** MIDI learn for any USB controller (a knob or pad stays with its slot on every screen; knobs pick up, keys play faders by velocity), and MIDI clock in and out
 
 | Builder | Drums | Mixer |
 |---|---|---|

@@ -174,22 +174,25 @@ The Pi runs the same app as the Mac, drawn at double size (`--ui-scale 2`), so t
 3. ~~Drum accents per step, plus tune, decay and level per drum~~ (v0.3)
 4. ~~More drum voices, up to 8: snare, rim, toms, percussion~~ (v0.3)
 5. ~~Front panel for testing on the Mac~~ (v0.12). ~~Touchscreen interface in Lua: perform, drum and synth screens, swipe between blocks~~ (v0.13). Still to come: a settings strip for swing, accent, effects and MIDI
-6. Knobs for live bass control: MIDI mapping, plus drive and accent level (waiting on a controller to test with)
+6. ~~Knobs for live control~~: MIDI learn (v1.30), with knob pick-up and key modes (v1.31)
 7. ~~Bass engines (acid, sub, FM, Reese, pluck) and master effects (drive, delay, filter)~~ (v0.4)
 8. ~~MIDI clock sync~~ (v0.5)
-9. Move to the Pi and start on boot
+9. ~~Move to the Pi and start on boot~~
 10. ~~6 flexible drum slots and patterns up to 128 steps~~ (v0.9)
 11. ~~8 drum slots, chord and lead synth tracks~~ (v0.10)
 12. ~~One central settings store: projects, patterns and the drum kit, saved and restored~~ (v0.11)
 13. ~~Your drum samples, chosen per slot~~ (v0.36). Later: load sample folders from a USB stick or SD card on the Pi
-14. ~~Song mode, MPC style~~ (v0.26). ~~Arrange: turn pattern 1 into a whole track~~ (v0.40, beta: needs more work on transitions and drops). ~~Export: mix, stems, MIDI and live recording~~ (v0.41)
+14. ~~Song mode, MPC style~~ (v0.26). ~~Export: mix, stems, MIDI and live recording~~ (v0.41). ~~Scenes and versions: arrange a project's scenes into versions with transitions~~ (v1.27 to v1.29)
 15. ~~A usability pass~~ (v0.26). Keep going after each round of playing
 16. ~~A setup screen for tempo, swing, accents, volume and MIDI clock~~ (v0.26)
 17. **iPad app, once the screens and sounds are right on the Mac and Pi.** The sound engine moves across on libpd; the screens get a native drawing layer fed by the same widget list; pdlua (GPL) is replaced for the App Store. Until then: keep screen logic apart from drawing, add no new Lua inside Pd unless it earns its place, keep file paths in one place, and keep Mac/Pi-only things (USB scan, kiosk) at the edges. Reese and acid filter with bob~, which may not be in the iPad's Pd: move them onto the analogue engine's state-variable filter (core Pd only)
 
+18. **Next up** (October 2026): MIDI export of a version; names for scenes; learning the controls inside pop-up panels; stereo bus effects with flanger and phaser; MIDI map banks; playing drums and synths live from pads and keys
+
 ## Decisions made
 
-- **Arrange is a beta feature** (decided October 2026). It's useful as a starting point; making transitions and drops properly musical will take a lot more work, so it's parked as beta rather than polished now.
+- **Arrange is versions of scenes** (decided October 2026, v1.28). Every save is a scene (A, B, C..., up to 64 a project); a version is a running order of scenes with a transition on each join. Versions stay inside one project: a project can hold anything, so cross-project sets aren't needed.
+- **A save is a snapshot of everything in place, but not movement** (v1.28): mutes, solos and latched bus effects are saved; the DJ filter, rise, pump and a bus effect only held on the pad are saved off.
 - **Raspberry Pi, not Daisy or Arduino.** No hardware skills needed, and it runs full Pd, so nothing has to be rewritten.
 - **11 tracks: 8 drum slots plus 3 synths (bass, lead, chord).** Between a TR-6S and a TR-8. More would make the screen too busy without making the music better.
 - **One loop, a length per part** (decided October 2026). Drums, bass, lead and chords each 1 to 16 bars; the loop is the longest. Shown 16 steps at a time.
@@ -204,8 +207,8 @@ The Pi runs the same app as the Mac, drawn at double size (`--ui-scale 2`), so t
 - **Synthesised drums for now.** Samples can be swapped in later, one voice at a time.
 - **Projects and patterns saved as readable text files** in `projects/`, so saving works on the Pi without a keyboard.
 - **The drum kit belongs to the project; synth sounds belong to the loop.** See "How it's organised".
-- **V1 is touchscreen only** (decided October 2026). The Pi box works like a dedicated iPad app: everything is reachable on the screen, landscape only. A hardware controller and MIDI mapping come in V2. An iPad app is a likely phase two: same Pd engine (via libpd), screens rebuilt natively.
-- **One loop, many arrangements** (decided October 2026, replacing song mode and the 8 pattern slots). Every project is one loop of 8 or 16 bars. An arrangement is a row of 16-bar units, each a state of the loop, with a transition from a toolkit at every joint. See the design doc, "One loop, many arrangements".
+- **Touchscreen first, MIDI learn for playing** (October 2026). Everything is reachable on the screen, landscape only. A USB controller maps through MIDI learn (v1.30): a learned control stays with its slot (a synth's knob 1, macro slot A) whatever's in it. An iPad app is a likely phase two: same Pd engine (via libpd), screens rebuilt natively.
+- **One loop per scene** (decided October 2026, replacing song mode and the 8 pattern slots). Each scene is one loop (each part 1 to 16 bars). Arrangement happens in versions, out of scenes (see above).
 
 ## Parked ideas
 
@@ -247,7 +250,7 @@ The Pi runs the same app as the Mac, drawn at double size (`--ui-scale 2`), so t
 - *Sound tweaks* (tune, levels, knobs, patterns): use the controls in the patch, as normal.
 - *Structural changes* (new objects, new voices, rewiring): made in `tools/build.py`, then rebuilt with `python3 tools/build.py`. Don't rewire the generated `.pd` files by hand, because the next rebuild would overwrite it. The build only creates project files that are missing, so your saved work is never overwritten. `--reset-patterns` rewrites the starter project, which deletes your saved patterns.
 
-**Tests.** `python3 tests/run_tests.py` runs 24 checks in about two and a half minutes. It needs vanilla Pure Data's `pd` command, which comes with the Pi's `puredata` package. The touchscreen test also needs pdlua (set `PDLUA=/folder/with/pdlua`); without it, that test is skipped. It works on a temporary copy, so your patterns are safe.
+**Tests.** `python3 tests/run_tests.py` runs 114 checks in about ten minutes (`python3 tests/run_tests.py <name>` runs the ones whose names contain it). It needs vanilla Pure Data's `pd` command, which comes with the Pi's `puredata` package. The touchscreen test also needs pdlua (set `PDLUA=/folder/with/pdlua`); without it, that test is skipped. It works on a temporary copy, so your patterns are safe.
 
 **Internal names.** Every shared name starts with `ockm-` so nothing clashes with other patches. Pattern tables are `ockm-pat-<track>`, slot banks are `ockm-bank-<track>`, and the step squares are `ockm-sq-<track>-<square>`. Drum tracks are `d1` to `d8`, synth tracks are `bass`, `lead` and `chord`.
 
@@ -261,6 +264,10 @@ The data model, smallest first:
 4. **Kit:** the 8 drum sounds together.
 5. **Loop:** the steps for all 11 tracks, plus each part's length (1 to 16 bars), swing, key and scale, generator choices and **the three synth sounds**.
 6. **Project:** a whole set. The loop, **the drum kit**, tempo, master effects, MIDI settings and accent amount.
+7. **Scene** (v1.27): one save of a project. On disk each scene is its own folder in `projects/`: `2026-10-20-misty-otter` is scene A, `...-v2` scene B and so on, each holding `loop.txt`, `project.txt` and `variation.txt` (when it was saved, and keep).
+8. **Version** (v1.28): a running order of a project's scenes with a transition on each join, kept in `versions/<project>.lua` beside `projects/`.
+
+Beside `projects/` there are also `stash/` (what was open, set aside while a scene plays from the project page or arrange), `trash/` (deleted scenes), `undo/` (the one-step undo) and `my-settings.lua` (your macros, MIDI learn and device settings: yours, not any project's).
 
 | Setting | Lives in |
 |---|---|
@@ -271,7 +278,8 @@ The data model, smallest first:
 | Generator choices | Loop |
 
 **Rules**
-- **Save** writes the loop and the project to disk. **Revert** reloads the whole project from disk. Closing without saving loses unsaved changes.
+- **Save** writes a new scene (v1.27): the scene you were in stays as it was. **Revert** reloads the scene from disk. Closing without saving loses unsaved changes.
+- A save is a snapshot of everything in place, but not movement (v1.28): mutes, solos and latched bus effects are kept; the DJ filter, rise, pump and a bus effect only held on the pad are saved off.
 - Files are plain text, one setting or one track per line, so they're easy to read, copy and back up.
 
 ## Named hooks
@@ -281,6 +289,7 @@ These let other things control the patch: tests now, and the touchscreen, knobs 
 | Name | Does |
 |---|---|
 | `ockm-play` | 1 to start, 0 to stop |
+| `ockm-gap-arm` | <steps>: silences the whole mix for the bar's last <steps> (the gap before a drop, v1.22); 0 lets go |
 | `ockm-want` | Pick a pattern slot, 0 to 7 |
 | `ockm-save` | Save the loop and the project to disk |
 | `ockm-revert` | Throw away unsaved changes: reload the whole project from disk |

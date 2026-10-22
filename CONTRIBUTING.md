@@ -44,7 +44,7 @@ All tests should pass. If you change what something does, change or add the test
 
 ## Where things are
 
-The [manual](docs/manual.md) explains every screen, engine and internal hook (`ockm-*` names), and how the parts are wired together.
+The [manual](docs/manual.md) explains every screen, engine and internal hook (`ockm-*` names), and how the parts are wired together. [docs/HANDOVER.md](docs/HANDOVER.md) is the developer's map: where code lives, how to build, test and deploy, the traps, and what's next.
 
 ## Working with AI
 
