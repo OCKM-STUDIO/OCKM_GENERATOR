@@ -99,6 +99,14 @@ Nobody can listen for you, so measure. Render with the test harness (record to W
 
 ## What's next
 
+**Next feature, agreed with Simon (22 October 2026): robot voices.** Spoken robot vocal phrases that shuffle, on a new vox track. The plan:
+- **Make the phrases offline, once.** Write a few hundred short lines in sets: hooks ("feel it", "all night long"), commands ("move", "jack your body"), spoken lines ("this is the sound of the underground"), counts and numbers. Render each with three or four voices (deep, flat, female...) using Piper text-to-speech (github.com/rhasspy/piper) on a computer, and ship them as WAVs in `samples/vox/<set>/`. Only use Piper voices whose licence allows release (check each voice's model card), and never imitate a real person. The Pi then never runs the voice engine: it only plays files
+- **The vox track:** plays one phrase on chosen bars (every 4, 8 or 16), shuffled from the current set, with a send to the delay and a pitch amount. Phrases are one-shots, played whole (no chopping: an earlier decision). Its settings are saved with the scene
+- **Styles pick the set** (peak time and hard techno: techno lines; Chicago: jack; deep house: soulful hooks)
+- **Mixer and buses:** a twelfth track on the mixer, on the music bus by default
+- **Later:** a vocoder in Pd so the chord synth sings the phrase (Daft Punk, Laurent Garnier), and an on-screen way to make new phrases on the box
+- Check impact like everything else: the phrase must sit clearly in the mix, level-matched, and the track must cost little CPU on the Pi
+
 Agreed or raised, not built:
 - MIDI export of a version (audio export works)
 - Names for scenes (they're letters; sections in a version can be named)
