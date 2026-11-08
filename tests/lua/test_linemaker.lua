@@ -62,4 +62,41 @@ local QUARTERS = { 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0 }
 note = lm.line(settings({ lead = true, outside = 0, offset = 24 }), tables(QUARTERS, { 1 }), 16, 0)
 check(note[1] == 57, "inside: the 2nd moves down onto the root (A3)")
 
+-- v1.49 call and answer: every 2 bars, the second bar answers the first. Over many seeds every kind of answer turns up,
+-- each answer is in the key, and the call bars are left as they were
+do
+  local CALL = { 2, 0, 1, 0, 1, 0, 2, 0, 1, 0, 1, 0, 2, 0, 1, 1 }
+  local inkey = function(n) local pc = (n - 9) % 12; for _, x in ipairs(MINOR) do if x == pc then return true end end return false end
+  local kinds_changed, allkey, callsame = 0, true, true
+  for seed = 0, 40 do
+    local s = settings({ seed = seed, answer = 2 })
+    local n, o, a, sl = lm.line(s, tables(CALL, { 0, 2, 4, 7 }), 64, 0)
+    local n0 = {}; for k = 1, 64 do n0[k] = n[k] end
+    lm.answer(s, n, o, a, sl, 64, MINOR)
+    for k = 1, 16 do if n[k] ~= n0[k] then callsame = false end end
+    local diff = false
+    for k = 17, 32 do if o[k] > 0 and n[k] then if not inkey(n[k]) then allkey = false end; if n[k] ~= n0[k] or o[k] ~= (n0[k] and 1 or 0) then diff = true end end end
+    if diff then kinds_changed = kinds_changed + 1 end
+  end
+  check(callsame, "answer: the call bar is untouched")
+  check(allkey, "answer: every answer note is in the key")
+  check(kinds_changed > 25, "answer: the answer bar changes (most seeds): " .. kinds_changed)
+  local s = settings({ answer = 0 })
+  local n, o, a, sl = lm.line(s, tables(CALL, { 0, 2, 4, 7 }), 32, 0)
+  local before = n[20]; lm.answer(s, n, o, a, sl, 32, MINOR)
+  check(n[20] == before, "answer off: nothing changes")
+end
+
+-- v1.49 the mood: chill means fewer notes (and more rests on the lead), peak more notes and slides; 0.5 leaves it alone
+do
+  local s = settings({ density = 1, slideamt = 0.2, rests = 0.1, lead = true })
+  check(lm.moodded(s, 0.5) == s, "mood 0.5: the settings as they are")
+  local c, p_ = lm.moodded(s, 0), lm.moodded(s, 1)
+  check(c.density < 1 and p_.density > 1, "chill thins, peak fills")
+  check(p_.slideamt > s.slideamt and c.slideamt == s.slideamt, "peak slides more")
+  check(c.rests > s.rests and p_.rests == s.rests, "chill rests more on the lead")
+  check(s.density == 1 and s.slideamt == 0.2, "the settings themselves are left alone")
+end
+
+
 if fails == 0 then print("ok") else os.exit(1) end

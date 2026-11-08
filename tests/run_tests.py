@@ -188,6 +188,37 @@ def drum_voices_sound_and_respond(work):
     assert 1.6 < f1 / f0 < 2.4, f"kick tuned +12 should be about twice the pitch ({f0:.0f} -> {f1:.0f})"
 
 @test
+def synth_kits_sound_like_their_machines(work):
+    """v1.49 the synth kits (no samples): the 808 kick is a long, low boom; the 909 kick is shorter and has more click up
+    top; the 909 long kick rings longer than the 909. Every kit's kick, snare, clap and hats sound and don't clip."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    def hit(kit, snd):
+        h = Harness(dut="ockm-drum x"); name = f"kit{kit}-{snd}"
+        h.record(os.path.join(work, name + ".wav"), source="dut")
+        h.at(20, f"ockm-x-sound {snd} ; ockm-x-synth 0 ; ockm-x-sample 0 ; ockm-x-labkit {kit}")
+        h.at(100, "test-in 1")
+        _, (x, sr) = play(work, h, name, with_main=False, ms=1600)
+        return x[int(0.1 * sr):], sr
+    def length(x, sr):   # how long until it falls 40 dB under its peak (in 10 ms blocks)
+        pk = peak(x); n = int(0.01 * sr); last = 0
+        for i in range(0, len(x) - n, n):
+            if peak(x[i:i + n]) > pk * 0.01: last = i
+        return last / sr
+    def top(x, sr):   # share of the first 20 ms in the top end (sample-to-sample differences)
+        a = x[:int(0.02 * sr)]
+        d = sum(abs(a[i] - a[i - 1]) for i in range(1, len(a))); e = sum(abs(v) for v in a) or 1
+        return d / e
+    k808, sr = hit(1, 0); k909, _ = hit(2, 0); k909l, _ = hit(3, 0)
+    assert length(k808, sr) > length(k909, sr) * 1.5, f"the 808 kick rings much longer: {length(k808, sr):.2f} vs {length(k909, sr):.2f}"
+    assert length(k909l, sr) > length(k909, sr) * 1.3, f"the 909 long kick rings longer than the 909: {length(k909l, sr):.2f} vs {length(k909, sr):.2f}"
+    assert top(k909, sr) > top(k808, sr) * 1.3, f"the 909 kick has more click: {top(k909, sr):.3f} vs {top(k808, sr):.3f}"
+    for kit in (1, 2, 3):
+        for snd in (1, 2, 4, 5):
+            x, sr = hit(kit, snd)
+            assert 0.05 < peak(x) <= 1.0, f"kit {kit} sound {snd}: level {peak(x):.2f}"
+
+@test
 def accents_and_step_edits(work):
     h = Harness(dut="ockm-row zz"); h.show("test-out")
     h.add("#X obj 400 70 print ROWOUT;"); h.con(h.dut, len([o for o in h.objs if not o[1]]) - 1)
@@ -205,6 +236,210 @@ def accents_and_step_edits(work):
     assert printed(out, "ROWOUT") == ["0.7", "1"], f"accent strengths wrong: {printed(out, 'ROWOUT')}"
     assert printed(out, "KICK")[0].split()[3] == "2", "ockm-edit did not set drum slot 1 step 4 to accent"
     assert printed(out, "BASSNOTE")[0] == "40", "ockm-bass-edit did not set bass step 1"
+
+@test
+def drum_lanes_thin_and_roll(work):
+    """v1.49 smarter drum lanes, in Pd: thinning keeps the important steps, a roll plays its hits across the step,
+    and a bar condition holds a lane back."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness(dut="ockm-row zz"); h.show("test-out")
+    h.add("#X obj 400 70 print ROWOUT;"); h.con(h.dut, len([o for o in h.objs if not o[1]]) - 1)
+    h.at(100, "ockm-pat-zz 0 1 1 1 1 1 1 1 1 ; ockm-accent 0.3 ; ockm-stepms 100 ; ockm-zz-thin 0.5")
+    h.at(120, "test-in 0 , 1 , 2 , 3")
+    h.at(200, "ockm-zz-thin 0 ; ockm-rat zz 4 3")
+    h.at(220, "test-in 4")
+    h.at(500, "ockm-zz-when 3 ; ockm-bar bang")
+    h.at(520, "test-in 5")
+    h.at(600, "ockm-bar bang ; ockm-bar bang ; ockm-bar bang")
+    h.at(620, "test-in 6")
+    f = os.path.join(work, "t_lanes.pd"); h.finish(900, f)
+    out = run(work, f)
+    got = [round(float(x), 2) for x in printed(out, "ROWOUT")]
+    assert len(got) == 5, f"expected 1 thinned hit, a roll of 3, then 1 hit in the 4th bar: {got}"
+    assert got[0] == 0.7 and got[1] == 0.7 and got[2] < 0.7 and got[3] < got[2], f"roll hits wrong: {got}"
+
+@test
+def four_bar_build_climbs_then_drops(work):
+    """v1.49 the 4 bar build: armed, it starts on the next bar line. The snare plays quarters, then 8ths, then 16ths,
+    then rolls (more hits than steps) in bar 4; the kick drops out for bar 4; after four bars the drums are their own
+    again, on the drop."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    def bars(sound, pat):
+        h = Harness(dut="ockm-row zz"); h.show("test-out")
+        h.add("#X obj 400 70 print ROWOUT;"); h.con(h.dut, len([o for o in h.objs if not o[1]]) - 1)
+        h.at(100, f"ockm-pat-zz const 0 ; ockm-pat-zz 0 {pat} ; ockm-accent 0.3 ; ockm-stepms 40 ; ockm-zz-sound {sound} ; ockm-build 1")
+        t = 200
+        for b in range(5):
+            h.at(t, f"ockm-bar bang ; test-print symbol BAR{b}"); t += 20
+            for st in range(16):
+                h.at(t, f"test-in {st}"); t += 45
+        p_ = h.add("#X obj 600 40 r test-print;"); pr = h.add("#X obj 600 70 print ROWOUT;"); h.con(p_, pr)
+        f = os.path.join(work, f"t_build{sound}.pd"); h.finish(t + 200, f)
+        out = run(work, f)
+        counts, cur = [], None
+        for line in out.splitlines():
+            if line.startswith("ROWOUT:"):
+                v = line.split(":", 1)[1].strip()
+                if v.startswith("symbol BAR") or v.startswith("BAR"): counts.append(0); continue
+                if counts: counts[-1] += 1
+        return counts
+    snare = bars(1, "")
+    assert snare[:3] == [4, 8, 16], f"the snare climbs: quarters, 8ths, 16ths: {snare}"
+    assert snare[3] > 16, f"bar 4 rolls (more hits than steps): {snare}"
+    assert snare[4] == 0, f"after four bars the snare is your own pattern again (empty here): {snare}"
+    kick = bars(0, "1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0")
+    assert kick == [4, 4, 4, 0, 4], f"the kick plays on, drops out for bar 4, and is back on the drop: {kick}"
+
+@test
+def restart_keeps_unsaved_work(work):
+    """v1.49 an update restarts the box: unsaved work comes back. A blank project gets a style (not saved); the restart
+    script's "keep;" (UDP 3091) stashes it and leaves a note; the next start opens the project and brings it back from
+    the stash, so it plays. Saved work isn't touched: with nothing unsaved, no note is left."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    pdsend = shutil.which("pdsend")
+    proj = os.path.join(work, "projects", "kp")
+    shutil.copytree(os.path.join(work, "projects", "default"), proj)
+    open(os.path.join(work, "projects", "current.txt"), "w").write("kp;\n")
+    note = os.path.join(work, "stash", "kept-on-restart.txt")
+    lp = os.path.join(proj, "loop.txt"); before = open(lp).read()
+    h = Harness()
+    h.at(1200, "ockm-ui-test tap 239 36"); h.at(1300, "ockm-ui-test tap 584 174")   # build, a style: unsaved
+    f = os.path.join(work, "t_keep1.pd"); h.finish(3500 if pdsend else 2500, f)
+    if pdsend:
+        p = subprocess.Popen([PD, "-nogui", "-nosound", "-nomidi", "-stderr", "-path", PDLUA, "-lib", "pdlua", "-open", "OCKM_GENERATOR.pd", "-open", f],
+                             cwd=work, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        import time; time.sleep(2.2)
+        subprocess.run([pdsend, "3091", "localhost", "udp"], input="keep;\n", text=True, timeout=5)
+        p.communicate(timeout=60)
+    else:
+        h2 = Harness(); h2.at(1200, "ockm-ui-test tap 239 36"); h2.at(1300, "ockm-ui-test tap 584 174"); h2.at(1800, "ockm-keep bang")
+        h2.finish(2500, f); run(work, f)
+    assert os.path.exists(note) and open(note).read().strip() == "kp", "keep: a note naming the open project"
+    assert open(lp).read() == before, "the project itself isn't saved"
+    h3 = Harness(); h3.record(os.path.join(work, "kept.wav")); h3.at(1500, "ockm-play 1"); h3.at(4500, "ockm-play 0")
+    _, (snd, sr) = play(work, h3, "t_keep2", ms=5000)
+    assert peak(snd) > 0.05, f"after the restart the unsaved loop plays: peak {peak(snd):.3f}"
+    assert not os.path.exists(note), "the note is used up"
+    # nothing unsaved: no note
+    h4 = Harness(); h4.at(1500, "ockm-keep bang"); f4 = os.path.join(work, "t_keep3.pd"); h4.finish(2000, f4); run(work, f4)
+    assert not os.path.exists(note), "saved (just opened): keep leaves nothing"
+
+@test
+def four_bar_rush_brings_the_kick_back(work):
+    """v1.49 the 4 bar rush: the kick is out for three bars and back four to the floor in the last, the open hat plays
+    every 8th in the last bar, and after it the drums are your own."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    def bars(sound, pat):
+        h = Harness(dut="ockm-row zz"); h.show("test-out")
+        h.add("#X obj 400 70 print ROWOUT;"); h.con(h.dut, len([o for o in h.objs if not o[1]]) - 1)
+        h.at(100, f"ockm-pat-zz const 0 ; ockm-pat-zz 0 {pat} ; ockm-accent 0.3 ; ockm-stepms 40 ; ockm-zz-sound {sound} ; ockm-build 2")
+        t = 200
+        for b in range(5):
+            h.at(t, f"ockm-bar bang ; test-print symbol BAR{b}"); t += 20
+            for st in range(16):
+                h.at(t, f"test-in {st}"); t += 45
+        p_ = h.add("#X obj 600 40 r test-print;"); pr = h.add("#X obj 600 70 print ROWOUT;"); h.con(p_, pr)
+        f = os.path.join(work, f"t_rush{sound}.pd"); h.finish(t + 200, f)
+        counts = []
+        for line in run(work, f).splitlines():
+            if line.startswith("ROWOUT:"):
+                v = line.split(":", 1)[1].strip()
+                if "BAR" in v: counts.append(0)
+                elif counts: counts[-1] += 1
+        return counts
+    kick = bars(0, "1 0 0 0 1 0 0 0 1 0 0 0 1 0 0 0")
+    assert kick == [0, 0, 0, 4, 4], f"the kick: out, out, out, back for the last bar, then yours: {kick}"
+    ohat = bars(5, "")
+    assert ohat[:4] == [0, 0, 0, 8] and ohat[4] == 0, f"the open hat on every 8th in the last bar: {ohat}"
+
+@test
+def links_open_the_filters(work):
+    """v1.49 links: with the bass's kick link up, each kick pushes its first knob (the filter) up, and it closes again
+    over about a beat; the chords' snare link the same on a snare. Off, nothing moves."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness(); h.show("ockm-bass-k1-m", "ockm-chord-k1-m")
+    h.at(200, "ockm-bpm 120 ; ockm-bass-lfo-depth 0 ; ockm-bass-k1 0.3 ; ockm-chord-k1 0.4 ; ockm-bass-link 1 ; ockm-chord-link 0")
+    h.at(400, "ockm-kick-hit 1 ; ockm-snare-hit 1")
+    f = os.path.join(work, "t_links.pd"); h.finish(1600, f)
+    out = run(work, f)
+    b = [float(x) for x in printed(out, "ockm-bass-k1-m")]
+    assert b and max(b) > 0.6 and abs(b[-1] - 0.3) < 0.02, f"the bass filter jumps on the kick, then back: {b[:3]} .. {b[-3:]}"
+    c = [float(x) for x in printed(out, "ockm-chord-k1-m")]
+    assert not c or max(c) <= 0.41, f"the chords' link is off: nothing moves: {c[:5]}"
+
+@test
+def slice_reorders_the_drum_steps(work):
+    """v1.49 slice: reverse plays the bar backwards (a kick on step 1 lands on step 16); off, it's back where it was."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    def kick_steps(slice_):
+        h = Harness(); h.show("ockm-step", "ockm-kick-hit")
+        h.at(200, f"ockm-bpm 240 ; ockm-swing 50 ; ockm-drum-len 16 ; ockm-length 16 ; " + " ; ".join(f"ockm-pat-d{i} const 0" for i in range(1, 9)) +
+             f" ; ockm-pat-d1 0 2 ; ockm-d1-sound 0 ; ockm-slice {slice_}")
+        h.at(400, "ockm-play 1"); h.at(400 + 2 * 16 * 63, "ockm-play 0")
+        f = os.path.join(work, f"t_slice{slice_}.pd"); h.finish(3000, f)
+        steps, cur = [], None
+        for line in run(work, f).splitlines():
+            if line.startswith("ockm-step:"): cur = int(float(line.split(":")[1]))
+            elif line.startswith("ockm-kick-hit:") and cur is not None: steps.append(cur % 16)
+        return steps
+    assert set(kick_steps(0)) == {0}, f"off: the kick on step 1: {kick_steps(0)}"
+    rv = kick_steps(3)
+    assert rv and set(rv) == {15}, f"reverse: the kick on step 16: {rv}"
+
+@test
+def build_rush_crash_and_key_on_screen(work):
+    """v1.49 Perform: slot B (the 4 bar build) switches the build on, and off on the drop. The 4 bar rush (picked onto
+    slot B) asks for the rush pattern and plays a crash on the drop. A recipe with a key change raises the root on its
+    drop, and a breakdown brings it back."""
+    sys.path.insert(0, os.path.join(ROOT, "tests"))
+    import ui_preview
+    if not ui_preview.LUA:
+        raise Skip("no lua to run the screen")
+    bars = ["send ockm-bar bang"] * 6
+    go = ["send ockm-root float 9", "send ockm-play float 1", "send ockm-playing float 1", "test tap 616 36"]
+    L = ui_preview.run(go + ["test tap 716 480"] + bars)
+    b = [l for l in L if l.startswith("sent ockm-build ")]
+    assert b[:1] == ["sent ockm-build float 1"] and b[-1:] == ["sent ockm-build float 0"], f"the build on, then off on the drop: {b}"
+    L = ui_preview.run(go + ["test tap 766 458", "test tap 480 522", "test tap 716 480"] + bars)
+    b = [l for l in L if l.startswith("sent ockm-build ")]
+    assert b[:1] == ["sent ockm-build float 2"], f"the rush pattern: {b}"
+    assert any(l.startswith("sent ockm-impact-go") for l in L), "a crash on the rush's drop"
+    # the key change: the 4 bar rewind (slot A) set to +2 in the recipe editor, then played; then breakdown (slot C)
+    L = ui_preview.run(["send ockm-root float 9", "test tap 919 36", "test tap 830 195", "test tap 90 272", "test tap 594 508"] + go +
+                       ["test tap 560 480"] + bars + ["mark dropped", "test tap 860 480"] + bars)
+    roots = [l.split()[-1] for l in L if l.startswith("sent ockm-root ")]
+    assert "11" in roots, f"up 2 on the drop (A to B): {roots}"
+    assert roots[-1] == "9", f"back to A at the breakdown: {roots}"
+
+@test
+def screens_have_no_collisions(work):
+    """v1.49 every screen, drawn as the Pi draws it (Pd's fonts, wrapped where told): no text spilling out of its box or
+    into another, no lines through words, no boxes overlapping or touching (tests/ui_review.py draws the faults)."""
+    import ui_review
+    f = ui_review.faults_on_every_screen()
+    assert not f, f"{len(f)} layout faults (python3 tests/ui_review.py shows them): " + " | ".join(f"{a}: {b} {c} {d}" for a, b, c, d in f[:6])
+
+@test
+def mood_moves_the_hats(work):
+    """v1.49 the mood: at chill a hat's off-beat 16ths and 8ths drop out; the kick's don't."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness(dut="ockm-row zz"); h.show("test-out")
+    h.add("#X obj 400 70 print ROWOUT;"); h.con(h.dut, len([o for o in h.objs if not o[1]]) - 1)
+    h.at(100, "ockm-pat-zz 0 1 1 1 1 ; ockm-accent 0.3 ; ockm-zz-sound 4 ; ockm-mood 0")
+    h.at(120, "test-in 0 , 1 , 2 , 3")
+    h.at(200, "ockm-zz-sound 0")
+    h.at(220, "test-in 0 , 1 , 2 , 3")
+    f = os.path.join(work, "t_mood.pd"); h.finish(400, f)
+    out = run(work, f)
+    got = printed(out, "ROWOUT")
+    assert len(got) == 1 + 4, f"a hat at chill plays just the 1; a kick plays all four: {got}"
 
 @test
 def loop_save_and_reload(work):
@@ -516,7 +751,7 @@ def chord_shapes_move_as_one_block(work):
 
 @test
 def chord_progressions_fill_and_lengthen(work):
-    h = Harness(); h.show("ockm-len")
+    h = Harness(); h.show("ockm-len", "ockm-chord-len")
     h.at(100, "ockm-resync bang ; ockm-chord-rhythm 0 ; ockm-chord-prog 4")       # garage: half-bar changes, 2 bars
     g = h.add("#X obj 10 300 r test-get;"); t = h.add("#X obj 10 330 t b b;")
     a1 = h.add("#X obj 10 360 array get ockm-pat-chord-deg 0 32;"); p1 = h.add("#X obj 10 390 print DEG;")
@@ -525,7 +760,7 @@ def chord_progressions_fill_and_lengthen(work):
     h.at(200, "test-get bang")
     f = os.path.join(work, "t_prog.pd"); h.finish(300, f)
     out = run(work, f)
-    assert "32" in printed(out, "ockm-len"), f"a 2-bar progression should make a 16-step pattern 32 long: {printed(out, 'ockm-len')}"
+    assert "32" in printed(out, "ockm-chord-len"), f"a 2-bar progression should make the chords 32 long: {printed(out, 'ockm-chord-len')}"   # (v1.49 the loop is 4 bars: the lead keeps 4)
     deg = [int(float(x)) for x in printed(out, "DEG")[0].split()]
     assert deg == [0] * 8 + [5] * 8 + [3] * 8 + [4] * 8, f"garage should change chord every half bar (i VI iv v): {deg}"
     on = [int(float(x)) for x in printed(out, "ON")[0].split()]
@@ -682,7 +917,8 @@ def chord_engines_sound(work):
 
 @test
 def bass_engines_play_in_tune(work):
-    for eng, name in [(0, "acid"), (1, "sub"), (2, "fm"), (3, "wide"), (5, "analogue"), (6, "donk")]:   # 4 (pluck) retired in v0.98
+    levels = {}
+    for eng, name in [(0, "acid"), (1, "sub"), (2, "fm"), (3, "wide"), (5, "analogue"), (6, "donk"), (8, "swarm"), (9, "pulse")]:   # 4 (pluck) retired in v0.98
         h = Harness(dut="ockm-mono zz")
         h.record(os.path.join(work, f"b_{name}.wav"), source="dut")
         h.at(20, f"ockm-zz-engine {eng} ; ockm-zz-k1-m 0.5 ; ockm-zz-k2-m 0.3 ; ockm-zz-k3-m 0 ; ockm-zz-k4-m 0.9 ; ockm-zz-drive 0")
@@ -692,12 +928,16 @@ def bass_engines_play_in_tune(work):
         assert peak(x) > 0.02, f"{name} engine is silent"
         f0 = cycles_per_second(x, sr)
         assert 45 < f0 < 68, f"{name} engine plays {f0:.0f}Hz for A1, expected about 55Hz"
+        levels[name] = math.sqrt(sum(v * v for v in x) / len(x))
+    print("      bass levels (rms): " + ", ".join(f"{k} {v:.2f}" for k, v in levels.items()))
+    for nm in ("swarm", "pulse"):   # v1.39: the new ones sit with the default (analogue)
+        assert 0.4 < levels[nm] / levels["analogue"] < 2.5, f"{nm} is far from analogue's level: {levels}"
 
 @test
 def lead_engines_play_in_tune_and_level(work):
     """Every lead engine sounds, plays A2 at about 110 Hz, and sits at a similar level to the others."""
     levels = {}
-    for eng, name in [(2, "dx"), (3, "sync"), (4, "analogue"), (5, "supersaw")]:   # 0 acid and 1 juno retired in v0.98
+    for eng, name in [(2, "dx"), (3, "sync"), (4, "analogue"), (5, "supersaw"), (7, "pulse")]:   # 0 acid and 1 juno retired in v0.98
         h = Harness(dut="ockm-lead zz")
         h.record(os.path.join(work, f"l_{name}.wav"), source="dut")
         k1, k3 = (0, 0) if name == "sync" else (0.15, 0.3) if name == "supersaw" else (0.5, 0) if name == "dx" else (0.5, 0.3)   # sync: zero sync, so the pitch counter sees the fundamental
@@ -809,6 +1049,17 @@ def midi_clock_leader(work):
     assert sent.count("248") == 97, f"expected 96 clocks per bar plus the next downbeat, got {sent.count('248')}"
 
 @test
+def midi_clock_goes_out_with_the_engine(work):
+    """v1.49 the clock leaves a quarter step late, as the engine plays: at 124 bpm (a step 121 ms) start goes out about
+    30 ms after play, so gear following it lands with the box rather than ahead of it."""
+    h = Harness(); h.show("ockm-clock-sent", "ockm-mark")
+    h.at(100, "ockm-bpm 124 ; ockm-play 1"); h.at(115, "ockm-mark 1"); h.at(145, "ockm-mark 2"); h.at(400, "ockm-play 0")
+    f = os.path.join(work, "t_lag.pd"); h.finish(600, f)
+    out = [l for l in run(work, f).splitlines() if l.startswith("ockm-clock-sent:") or l.startswith("ockm-mark:")]
+    i250 = out.index("ockm-clock-sent: 250")
+    assert out.index("ockm-mark: 1") < i250 < out.index("ockm-mark: 2"), f"start between 15 and 45 ms after play: {out[:5]}"
+
+@test
 def midi_clock_follower(work):
     h = Harness(); h.show("ockm-step", "ockm-bpm")
     h.at(100, "ockm-sync 1 ; ockm-midi-rt 250")
@@ -828,6 +1079,20 @@ def full_mix_does_not_clip(work):
     _, (s, sr) = play(work, h, "t_mix", ms=8000)
     assert 0.1 < peak(s) < 0.99, f"mix peak {peak(s):.2f}"
 
+
+@test
+def master_limiter_holds_a_pushed_mix(work):
+    """v1.49 the master's look-ahead limiter: everything pushed to the top still peaks under 0.81 (its ceiling is 0.79,
+    the soft limiter after it only a safety), and the delay's feedback can't run away (capped at 0.85)."""
+    h = Harness(); h.record(os.path.join(work, "loud.wav"))
+    up = " ; ".join(f"ockm-d{i}-level 1.5" for i in range(1, 9))
+    h.at(100, f"{up} ; ockm-bass-level 1.5 ; ockm-lead-level 1.5 ; ockm-chord-level 1.5 ; ockm-drum-punch 1 ; ockm-delay-fb 2 ; ockm-delay-mix 1 ; "
+              "ockm-bass-gen bang ; ockm-chord-gen bang ; ockm-lead-gen bang ; ockm-play 1")
+    h.at(8000, "ockm-play 0")
+    _, (s, sr) = play(work, h, "t_loud", ms=12000)
+    assert peak(s) < 0.81, f"pushed mix peak {peak(s):.3f}"
+    tail = s[int(10.5 * sr):]
+    assert peak(tail) < 0.2, f"the echoes die away after it stops: {peak(tail):.3f}"
 
 # ---------------------------------------------------------------- runner
 @test
@@ -863,31 +1128,31 @@ def touchscreen_drives_the_engine(work):
     h = Harness(); h.show("ockm-edit", "ockm-page", "ockm-len", "ockm-load", "ockm-d1-sound", "ockm-bass-edit", "ockm-want", "ockm-lead-k1", "ockm-filter", "ockm-chord-prog", "ockm-chord-type", "ockm-d1-mute", "ockm-d2-mute", "ockm-bass-level", "ockm-bass-mode")
     tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
     h.at(100, "ockm-resync bang")
-    tap(150, 539, 36)                    # drums tab (the kick slot)
+    tap(150, 301, 36)                    # drums tab (the kick slot)
     tap(170, 160, 212); tap(180, 160, 212)   # step 3: on, then accent
-    tap(190, 262, 36)                    # perform tab
-    tap(200, 539, 36)                    # drums tab (back to the kick slot)
+    tap(190, 608, 36)                    # perform tab
+    tap(200, 301, 36)                    # drums tab (back to the kick slot)
     tap(210, 668, 88)                    # drum length: 2 bars (navigation strip)
     h.at(220, "ockm-ui-test drag 600 212 200 212")   # swipe left: steps 17-32
     tap(230, 45, 212)                    # step 17
     h.at(240, "ockm-ui-test drag 200 212 600 212")   # swipe right: back to 1-16
     tap(245, 194, 88)                    # forward arrow (steps 17-32)
     tap(248, 38, 88)                     # back arrow (steps 1-16)
-    tap(260, 601, 36)                    # bass tab (bass is on auto)
+    tap(260, 363, 36)                    # bass tab (bass is on auto)
     tap(270, 45, 158)                    # bass step 1: made for you, but any step can be edited (it becomes yours)
     tap(280, 600, 236)                   # note picker: third note of the scale
-    tap(290, 262, 36)                    # perform tab
+    tap(290, 608, 36)                    # perform tab
     tap(310, 760, 160)                   # perform: the master bus on the pad (v1.24: the pad is where the filter strip was)
-    tap(320, 477, 36)                    # song tab
+    tap(320, 239, 36)                    # song tab
     tap(335, 228, 345)                   # harmony: next progression (v0.99: the stepper is narrower, rate and push beside it)
-    tap(338, 725, 36)                    # chord tab
+    tap(338, 487, 36)                    # chord tab
     tap(340, 298, 421)                   # colour: 9ths
-    tap(345, 262, 36); tap(346, 74, 186)   # perform tab, mute the kick tile
-    tap(347, 539, 36); tap(348, 896, 134)  # drums tab, all drums
+    tap(345, 608, 36); tap(346, 74, 186)   # perform tab, mute the kick tile
+    tap(347, 301, 36); tap(348, 818, 134)  # drums tab, all drums (v1.45: pads is right of it)
     tap(349, 192 + 47 * 1 + 20, 165)     # all drums: snare lane, step 2
-    tap(350, 407, 36)                    # mixer tab
-    tap(355, 673, 361)                   # bass fader, halfway (below the EQ button)
-    tap(360, 130, 505)                   # mute on strip 2
+    tap(350, 719, 36)                    # mixer tab (v1.38: 407 is the samples tab)
+    tap(355, 623, 361)                   # bass fader, halfway (below the EQ button)
+    tap(360, 123, 505)                   # mute on strip 2
     f = os.path.join(work, "t_touch.pd"); h.finish(600, f)
     out = run(work, f)
     edits = printed(out, "ockm-edit")
@@ -918,7 +1183,11 @@ def touchscreen_screens_draw(work):
         raise Skip("Pillow not installed")
     p = subprocess.run([sys.executable, os.path.join(ROOT, "tests", "ui_preview.py"), os.path.join(work, "preview")], capture_output=True, text=True)
     assert p.returncode == 0, p.stderr[-800:]
-    assert len(os.listdir(os.path.join(work, "preview"))) == 39, "expected thirty-nine screen pictures"
+    sys.path.insert(0, os.path.join(ROOT, "tests"))
+    import ui_preview
+    want = len({name for name, _ in ui_preview.SHOTS})   # one picture per screen in the list (v1.49: was a fixed 46)
+    got = len(os.listdir(os.path.join(work, "preview")))
+    assert got == want, f"expected {want} screen pictures, got {got}"
 
 @test
 def mute_solo_and_levels(work):
@@ -999,7 +1268,7 @@ def touchscreen_song_parts_in_and_out(work):
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness(); h.show("ockm-drums-on", "ockm-bass-on", "ockm-chord-on", "ockm-lead-on", "ockm-turn-every", "ockm-fill-every", "ockm-bass-mute")
     tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
-    tap(150, 477, 36)                    # song
+    tap(150, 239, 36)                    # song
     tap(200, 129, 250)                   # drums out
     tap(250, 363, 250)                   # bass out
     tap(300, 597, 250)                   # chords out
@@ -1007,9 +1276,9 @@ def touchscreen_song_parts_in_and_out(work):
     tap(400, 129, 250)                   # drums back in
     tap(440, 586, 402)                   # phrase: 8 bars (the drum fill comes on with it)
     tap(450, 810, 406)                   # and the turnaround at the end of each phrase (v1.03: fill, turnaround, half-time)
-    tap(500, 601, 36)                    # bass tab
+    tap(500, 363, 36)                    # bass tab
     tap(550, 916, 283)                   # on/off switch: back on
-    tap(600, 270, 36)                    # perform B
+    tap(600, 616, 36)                    # perform B
     tap(650, 360, 190)                   # the lead's tile: it's out, so nothing changes
     f = os.path.join(work, "t_song.pd"); h.finish(800, f)
     out = run(work, f)
@@ -1069,7 +1338,7 @@ def live_mutes_land_on_the_bar(work):
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness(); h.show("ockm-d1-mute", "ockm-bass-mute", "ockm-bar", "ockm-d2-mute")
     h.at(100, "ockm-bpm 120 ; ockm-play 1")
-    h.at(150, "ockm-ui-test tap 270 36")       # live tab
+    h.at(150, "ockm-ui-test tap 616 36")       # live tab
     h.at(200, "ockm-ui-test tap 400 97")       # mutes land: next bar
     h.at(700, "test-mark 1 ; ockm-ui-test tap 60 180")      # kick tile, part way through the first bar (a bar is 2 s)
     h.at(2600, "ockm-ui-test tap 74 556")      # scene: drums only (after the kick has gone)
@@ -1090,13 +1359,14 @@ def live_mutes_land_on_the_bar(work):
 
 @test
 def live_macros_move_several_things_and_put_them_back(work):
-    """Out of the box, slot B is lift and slot C breakdown (stopped, so each plays while held). Hold lift: the drums mute,
-    the high-pass comes in (the filter goes up) and the reverb rises; let go and it all comes back. Breakdown does the same
-    with the low-pass (the filter goes down). The bass keeps playing throughout."""
+    """Out of the box, slot B is the 4 bar build (v1.49; it was the lift) and slot C breakdown (stopped, so each plays while
+    held). Hold the build: the build pattern is switched on, the high-pass comes in (the filter goes up) and the reverb
+    rises; let go and it all comes back. Breakdown mutes the drums and brings in the low-pass (the filter goes down). The
+    bass keeps playing throughout."""
     if not PDLUA:
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
-    h = Harness(); h.show("ockm-verb-mix", "ockm-d2-mute", "ockm-d1-mute", "ockm-bass-mute", "ockm-filter-glide")
-    h.at(100, "ockm-ui-test tap 270 36")       # perform
+    h = Harness(); h.show("ockm-verb-mix", "ockm-d2-mute", "ockm-d1-mute", "ockm-bass-mute", "ockm-filter-glide", "ockm-build")
+    h.at(100, "ockm-ui-test tap 616 36")       # perform
     h.at(200, "ockm-ui-test press 700 500")    # lift, held
     h.at(300, "ockm-ui-test release 700 500")
     h.at(400, "ockm-ui-test press 850 500")    # breakdown, held
@@ -1108,8 +1378,9 @@ def live_macros_move_several_things_and_put_them_back(work):
     gl = [float(x.split()[0]) for x in printed(out, "ockm-filter-glide")]
     assert gl and gl[0] > 0.2, f"lift: the high-pass first (filter up): {gl}"
     assert any(x < -0.5 for x in gl), f"breakdown: the low-pass (filter down): {gl}"
-    assert printed(out, "ockm-d2-mute") == ["1", "0", "1", "0"], f"the snare mutes and comes back, twice: {printed(out, 'ockm-d2-mute')}"
-    assert printed(out, "ockm-d1-mute") == ["1", "0", "1", "0"] and not printed(out, "ockm-bass-mute"), "the kick goes too, the bass keeps playing"
+    assert printed(out, "ockm-build")[:2] == ["1", "0"], f"the build switches on, then off: {printed(out, 'ockm-build')}"
+    assert printed(out, "ockm-d2-mute") == ["1", "0"], f"breakdown: the snare mutes and comes back: {printed(out, 'ockm-d2-mute')}"
+    assert printed(out, "ockm-d1-mute") == ["1", "0"] and not printed(out, "ockm-bass-mute"), "the kick goes too, the bass keeps playing"
 
 @test
 def settings_macro_library_and_slots(work):
@@ -1123,11 +1394,11 @@ def settings_macro_library_and_slots(work):
     h.at(100, "ockm-bpm 120 ; ockm-ui-test tap 919 36")   # menu
     h.at(150, "ockm-ui-test tap 830 195")      # settings
     h.at(200, "ockm-ui-test tap 90 272")       # macros
-    h.at(250, "ockm-ui-test tap 260 371")      # recipe 4: sink
+    h.at(250, "ockm-ui-test tap 260 328")      # recipe 5: sink (v1.49: the 4 bar rewind is first; nine recipes, shorter rows)
     h.at(300, "ockm-ui-test tap 532 552")      # on slot A
-    h.at(350, "ockm-ui-test tap 270 36")       # Perform B
-    h.at(400, "ockm-ui-test press 550 520")    # hold slot A
-    h.at(2600, "ockm-ui-test release 550 520")
+    h.at(350, "ockm-ui-test tap 616 36")       # Perform B
+    h.at(400, "ockm-ui-test press 550 480")    # hold slot A
+    h.at(2600, "ockm-ui-test release 550 480")
     f = os.path.join(work, "t_settings.pd"); h.finish(2800, f)
     out = run(work, f)
     try:
@@ -1138,7 +1409,40 @@ def settings_macro_library_and_slots(work):
     assert gl and gl[0].split()[0] == "-0.85", f"sink should take the filter down: {gl}"
     dr = [float(x) for x in printed(out, "ockm-drive")]
     assert dr and max(dr) > 0.65 and len([x for x in dr if 0.05 < x < 0.65]) >= 3 and dr[-1] < 0.01, f"drive should rise over the bar, then go back: {dr[:6]} ... {dr[-3:]}"
-    assert '"slots"' in saved and re.search(r'"slots"\]\s*=\s*\{\s*4', saved), f"slot A should be saved as recipe 4: {saved[:400]}"
+    assert '"slots"' in saved and re.search(r'"slots"\]\s*=\s*\{\s*5', saved), f"slot A should be saved as recipe 5: {saved[:400]}"
+
+@test
+def six_macro_slots_on_perform(work):
+    """v1.49 Perform B has six macro slots, two rows of three (A-F): 8 bar lift, rush and dub out join the rewind, build
+    and breakdown. Slot E plays the rush. Settings saved with three slots get D, E and F filled once."""
+    sys.path.insert(0, os.path.join(ROOT, "tests"))
+    import ui_preview
+    if not ui_preview.LUA:
+        raise Skip("no lua to run the screen")
+    L = ui_preview.run(["test tap 616 36", "paint a"])
+    a = L[L.index("begin a"):L.index("end a")]
+    for nm in ("4 bar rewind", "4 bar build", "breakdown", "8 bar lift", "4 bar rush", "dub out"):
+        assert any(nm in l for l in a), f"{nm} on a slot"
+    assert any(l.startswith("text") and l.split()[-1] == "F" for l in a), "the slots are lettered to F"
+    L = ui_preview.run(["send ockm-playing float 1", "test tap 616 36", "test tap 716 548"] + ["send ockm-bar bang"] * 2)
+    assert "sent ockm-build float 2" in L, "slot E: the rush"
+    # settings from before: three slots. D, E and F fill from the recipes not on a slot
+    mine = os.path.join(work, "my-settings.lua")
+    with open(mine, "w") as f: f.write('return { ["slots"] = { 5, 3, 4 } }')
+    try:
+        h = Harness(); h.show("ockm-build", "ockm-filter-glide")
+        h.at(100, "ockm-ui-test tap 616 36")       # Perform B
+        h.at(200, "ockm-ui-test press 716 548")    # slot E
+        h.at(400, "ockm-ui-test release 716 548")
+        h.at(500, "ockm-ui-test press 566 480")    # slot A: sink, as it was
+        h.at(700, "ockm-ui-test release 566 480")
+        fp = os.path.join(work, "t_six.pd"); h.finish(900, fp)
+        out = run(work, fp)
+    finally:
+        if os.path.exists(mine): os.remove(mine)
+    assert printed(out, "ockm-build")[:1] == ["2"], f"slot E filled with the rush: {printed(out, 'ockm-build')}"
+    gl = printed(out, "ockm-filter-glide")
+    assert any(g.split()[0] == "-0.85" for g in gl), f"slot A still sink: {gl}"
 
 @test
 def drum_lab_renders_claps_and_snares(work):
@@ -1283,21 +1587,16 @@ def melody_uses_chord_tones(work):
 
 @test
 def synths_sit_at_similar_levels(work):
-    """Bass, melody and every chord engine come out at a similar loudness (within about 4 dB), so nothing gets lost."""
-    def rms(x): return math.sqrt(sum(v * v for v in x) / max(1, len(x)))
-    tracks = ["d1","d2","d3","d4","d5","d6","d7","d8","bass","lead","chord"]
-    levels = {}
-    for part, setup, eng in [("bass", "ockm-bass-rhythm 12 ; ockm-bass-notes 3", None),   # the acid riff: a busy, typical bass line ("chord", "ockm-chord-prog 3 ; ockm-chord-rhythm 4", 0),
-                             ("chord", "ockm-chord-prog 3 ; ockm-chord-rhythm 4", 1), ("chord", "ockm-chord-prog 3 ; ockm-chord-rhythm 4", 2)]:
-        h = Harness(); name = f"lv-{part}{eng}"; h.record(os.path.join(work, name + ".wav"))
-        mutes = " ; ".join(f"ockm-{t}-mute {0 if t == part else 1}" for t in tracks) + " ; ockm-bass-level 1 ; ockm-chord-level 1 ; ockm-lead-level 1"   # the engines, at unity (the starting mix sits lower)
-        extra = f" ; ockm-chord-engine {eng}" if eng is not None else ""
-        h.at(100, f"ockm-verb-mix 0 ; ockm-delay-mix 0 ; {mutes}{extra} ; {setup}"); h.at(200, "ockm-play 1"); h.at(3200, "ockm-play 0")
-        _, (snd, sr) = play(work, h, name, ms=3200)
-        levels[name] = rms(snd[int(0.3 * sr):int(3.0 * sr)])
-    ref = levels["lv-bassNone"]
-    for k, v in levels.items():
-        assert 0.6 * ref < v < 1.6 * ref, f"{k} is out of balance with the bass: {v:.3f} vs {ref:.3f} ({levels})"
+    """Bass, lead and chords sit together: each part's first sound is within a few dB of the bass's (chords a little
+    under, as in a mix). v1.49: measured as the ear weighs it (measure_sounds), every other sound is levelled to its
+    part's first by its trim (sounds_sit_at_one_level)."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    lv = measure_sounds(work, first_only=True)
+    ref = lv["bass"][0]
+    for part in ("lead", "chord"):
+        db = 20 * math.log10(max(lv[part][0], 1e-9) / ref)
+        assert -6 < db < 2, f"{part} is out of balance with the bass: {db:+.1f} dB"
 
 @test
 def drum_fill_on_the_fourth_bar(work):
@@ -1501,7 +1800,7 @@ def sidechain_pump_ducks_the_synths(work):
     for pump in (0, 1, 2):     # 2: the pump off, but the chords' own sidechain all the way up
         h = Harness(); h.record(os.path.join(work, f"pump{pump}.wav"))
         mutes = " ; ".join(f"ockm-{t}-mute 1" for t in ["d1","d2","d3","d4","d5","d6","d7","d8","bass","lead"])
-        h.at(100, f"ockm-bpm 120 ; ockm-length 16 ; ockm-verb-mix 0 ; ockm-delay-mix 0 ; ockm-swing 50 ; ockm-chord-engine 1 ; ockm-chord-mode 1 ; {mutes}")
+        h.at(100, f"ockm-bpm 120 ; ockm-length 16 ; ockm-verb-mix 0 ; ockm-delay-mix 0 ; ockm-swing 50 ; ockm-chord-engine 1 ; ockm-chord-mode 1 ; ockm-chord-scshape 1 ; {mutes}")   # v1.49 pump named (duck is the default shape now)
         h.at(150, "ockm-pat-chord-on const 0 ; ockm-pat-chord-deg const 0 ; ockm-chord-edit 0 1 0 ; ockm-chord-k3 0 ; ockm-chord-k4 1")
         h.at(170, "ockm-pat-d1 const 0 ; ockm-d1-sound 0 ; ockm-edit d1 0 2 ; ockm-edit d1 4 2 ; ockm-edit d1 8 2 ; ockm-edit d1 12 2 ; ockm-pump " + str(min(pump, 1) if pump < 2 else 0) + " ; ockm-chord-sidechain " + str(1 if pump == 2 else 0))
         h.at(300, "ockm-play 1"); h.at(2400, "ockm-play 0")
@@ -1522,7 +1821,7 @@ def rise_builds_then_drops(work):
     and a bit. With 16 steps to go the riser starts (3 beats long), the gap takes the last beat, then on the 1: rise turns
     itself off, the gap ends, the riser cuts, the filter snaps back (in 5 ms, not a 100 ms glide) and the impact plays."""
     h = Harness(); h.show("ockm-rise", "ockm-gap", "ockm-riser-go", "ockm-impact-go", "ockm-rise-now", "ockm-step")
-    h.at(100, "ockm-bpm 120 ; ockm-length 16 ; ockm-drum-len 16 ; ockm-bass-len 16 ; ockm-lead-len 16 ; ockm-chord-len 16")
+    h.at(100, "ockm-lead-sync 0 ; ockm-bpm 120 ; ockm-length 16 ; ockm-drum-len 16 ; ockm-bass-len 16 ; ockm-lead-len 16 ; ockm-chord-len 16")
     h.at(200, "ockm-play 1"); h.at(200 + 2 * 125 + 60, "ockm-rise 1")       # pressed during step 2
     f = os.path.join(work, "t_rise.pd"); h.finish(200 + 52 * 125, f)
     out = run(work, f)
@@ -1587,14 +1886,14 @@ def sidechain_shapes_duck_pump_gate(work):
     for shape in (-1, 0, 1, 2):     # -1: no sidechain, the reference
         h = Harness(); h.record(os.path.join(work, f"sc{shape}.wav"))
         mutes = " ; ".join(f"ockm-{t}-mute 1" for t in ["d1","d2","d3","d4","d5","d6","d7","d8","bass","lead"])
-        h.at(100, f"ockm-bpm 120 ; ockm-length 16 ; ockm-verb-mix 0 ; ockm-delay-mix 0 ; ockm-swing 50 ; ockm-chord-engine 1 ; ockm-chord-mode 1 ; {mutes}")
+        h.at(100, f"ockm-bpm 120 ; ockm-length 16 ; ockm-verb-mix 0 ; ockm-delay-mix 0 ; ockm-swing 50 ; ockm-chord-engine 1 ; ockm-chord-mode 1 ; ockm-chord-level 0.3 ; {mutes}")   # v1.49 under the master limiter, so it measures the dip alone
         h.at(150, "ockm-pat-chord-on const 0 ; ockm-pat-chord-deg const 0 ; ockm-chord-edit 0 1 0 ; ockm-chord-k3 0 ; ockm-chord-k4 1")
         h.at(170, "ockm-pat-d1 const 0 ; ockm-d1-sound 0 ; ockm-edit d1 0 2 ; ockm-edit d1 4 2 ; ockm-edit d1 8 2 ; ockm-edit d1 12 2 ; ockm-pump 0 ; "
                   f"ockm-chord-sidechain {0 if shape < 0 else 1} ; ockm-chord-scshape {max(shape, 0)}")
         h.at(300, "ockm-play 1"); h.at(2400, "ockm-play 0")
         _, (x, sr) = play(work, h, f"t_sc{shape}", ms=2400)
         rms = lambda a, b: math.sqrt(sum(v * v for v in x[int(a * sr):int(b * sr)]) / max(1, int((b - a) * sr)))
-        k = 0.3 + 0.5 + 0.03125         # beat 2's kick (a quarter step late, like every hit)
+        k = 0.3 + 0.5 + 0.03125 + 0.0045   # beat 2's kick (a quarter step late, like every hit), plus the master limiter's look-ahead (v1.49, 3 ms and a block)
         res[shape] = [rms(k + a, k + b) for a, b in [(0.005, 0.03), (0.11, 0.14), (0.29, 0.32)]]
     g = {s: [v / max(r, 1e-9) for v, r in zip(res[s], res[-1])] for s in (0, 1, 2)}
     shown = {s: [round(v, 2) for v in g[s]] for s in g}
@@ -1665,7 +1964,7 @@ def touchscreen_save_makes_variations(work):
     tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
     tap(150, 919, 36); tap(151, 830, 95)   # menu, project
     tap(200, 808, 100)                     # new blank project
-    tap(250, 407, 36)                              # mixer
+    tap(250, 719, 36)                              # mixer
     tap(300, 54, 300); tap(320, 865, 36)           # kick fader, then the first save: plain
     tap(400, 54, 340); tap(420, 865, 36)           # v2
     tap(500, 865, 36)                              # nothing changed: nothing made
@@ -1696,11 +1995,11 @@ def touchscreen_variation_browser_keeps_and_tidies(work):
     tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
     tap(150, 919, 36); tap(151, 830, 95)   # menu, project
     tap(200, 808, 100)                     # new blank project
-    tap(250, 407, 36)                      # mixer
+    tap(250, 719, 36)                      # mixer
     for i in range(7):                     # seven saves: the project, then v2 to v7
         tap(300 + i * 100, 54, 280 + i * 14); tap(320 + i * 100, 865, 36)
     tap(1100, 919, 36); tap(1101, 830, 95)   # back to the project page (the open project is picked)
-    tap(1150, 740, 376)                    # v2 (newest first: v7 v6 v5 v4 / v3 v2 v1)
+    tap(1150, 885, 376)                    # v2 (newest first, three across since v1.47: v7 v6 v5 / v4 v3 v2 / v1)
     tap(1200, 830, 269)                    # keep it
     tap(1250, 876, 230)                    # more
     tap(1300, 480, 248); tap(1350, 480, 248)   # tidy up, tap again
@@ -1724,11 +2023,11 @@ def project_page_plays_a_variation_and_comes_back(work):
     tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
     tap(150, 919, 36); tap(151, 830, 95)   # menu, project
     tap(200, 808, 100)                     # new blank project
-    tap(700, 407, 36)                      # mixer (after the new project's own first save, 300 ms on)
+    tap(700, 719, 36)                      # mixer (after the new project's own first save, 300 ms on)
     tap(750, 54, 300); tap(770, 865, 36)   # the kick's fader, saved
     tap(850, 54, 380)                      # moved again, not saved
     tap(900, 919, 36); tap(901, 830, 95)   # the project page
-    tap(950, 628, 318)                     # v1's play button
+    tap(950, 668, 318)                     # v1's play button (v1.47: the scenes panel moved right for the table)
     h.at(1250, "ockm-play 0")              # stop
     f = os.path.join(work, "t_preview.pd"); h.finish(1450, f)
     out = run(work, f)
@@ -1759,14 +2058,112 @@ def lua_generators_plain_tests(work):
 # KNOB_MIN fails. Knobs whose change is movement rather than tone (detune, spread, drift, tremolo) are listed apart:
 # the spectrum barely moves when they turn, so they're checked by ear. Loudness mustn't jump either (except length).
 KNOB_ENGINES = {
-    "lead": {2: [0.45, 0.1, 0.25, 0.5], 3: [0.4, 0.55, 0.5, 0.45], 4: [0.55, 0.3, 0.4, 0.45], 5: [0.55, 0.55, 0.3, 0.5], 6: [0.55, 0.82, 0.7, 0.35]},
+    "lead": {2: [0.45, 0.1, 0.25, 0.5], 3: [0.4, 0.55, 0.5, 0.45], 4: [0.55, 0.3, 0.4, 0.45], 5: [0.55, 0.55, 0.3, 0.5], 6: [0.55, 0.82, 0.7, 0.35], 7: None},   # v1.45 7 is the Analog: its knobs are its own (bass_and_lead_play_the_synths)
     "bass": {0: [0.35, 0.6, 0.55, 0.4], 1: [0.45, 0.3, 0.35, 0.55], 2: [0.4, 0.35, 0.45, 0.4], 3: [0.45, 0.5, 0.35, 0.5], 5: [0.42, 0.25, 0.45, 0.45],
-             6: [0.5, 0.5, 0.35, 0.45], 7: [0.3, 0.75, 0.6, 0.35]},
+             6: [0.5, 0.5, 0.35, 0.45], 7: [0.3, 0.75, 0.6, 0.35], 8: None, 9: [0.35, 0.35, 0.3, 0.45]},   # v1.45 8 is the Bass synth
     "chord": {0: [0.45, 0.5, 0.0, 0.32], 6: [0.45, 0.6, 0.6, 0.3], 1: [0.5, 0.4, 0.3, 0.4], 3: [0.5, 0.3, 0.4, 0.4], 4: [0.5, 0.4, 0.3, 0.5]},
 }
 KNOB_MOVEMENT = {("lead", 2, 3), ("lead", 5, 1), ("lead", 5, 3), ("bass", 3, 2), ("bass", 5, 2), ("chord", 0, 2), ("chord", 4, 3)}   # (part, engine, knob 1-4)
 KNOB_LENGTH = 4          # k4 is decay or length: it may change the loudness
 KNOB_MIN, KNOB_LEVEL_MAX = 0.4, 10.0
+def ui_sounds():
+    """The sounds on each part's tab (build.py SOUNDS, as written into the screen code): {part: [(engine, k1..k4, drive, trim)]}."""
+    src = open(os.path.join(ROOT, "ui", "ockm-ui.pd_lua")).read()
+    line = next(l for l in src.splitlines() if l.startswith("ockm_SOUNDS = "))
+    py = re.sub(r"(\w+) = \{", r'"\1": {', line[len("ockm_SOUNDS = "):]).replace("nil", "None")
+    py = py.replace("{", "[").replace("}", "]")
+    py = "{" + py[1:-1] + "}"
+    return eval(py)
+
+
+# v1.49 the second phrase each sound is measured on: long notes (the first, KNOB_PHRASE, is short and busy), so a sound
+# is levelled for both kinds of part and not just the one
+LONG_PHRASE = {"lead": "ockm-lead-rhythm 14 ; ockm-lead-notes 15", "bass": "ockm-bass-rhythm 5 ; ockm-bass-riff 1",
+               "chord": "ockm-chord-rhythm 0 ; ockm-chord-prog 1 ; ockm-chord-type 1"}
+
+
+def measure_sounds(work, parts=("bass", "lead", "chord"), use_trim=True, first_only=False):
+    """Each sound's loudness, averaged (in dB) over a busy phrase and a long one (see measure_sounds_on)."""
+    a = measure_sounds_on(work, KNOB_PHRASE, parts, use_trim, first_only)
+    b = measure_sounds_on(work, LONG_PHRASE, parts, use_trim, first_only)
+    return {pt: [10 ** ((20 * math.log10(max(x, 1e-9)) + 20 * math.log10(max(y, 1e-9))) / 40) for x, y in zip(a[pt], b[pt])] for pt in a}
+
+
+def measure_sounds_on(work, phrases, parts=("bass", "lead", "chord"), use_trim=True, first_only=False):
+    """Play every sound of each part in turn (a typical phrase, nothing else playing, no effects) and measure its
+    loudness (RMS of the master). Returns {part: [rms per sound]}. With use_trim False, every trim is 1 (to work trims out)."""
+    out = {}
+    S = ui_sounds()
+    for part in parts:
+        h = Harness(); name = f"snd-{part}-{abs(hash(phrases[part])) % 1000}"; h.record(os.path.join(work, name + ".wav"))
+        quiet = " ; ".join(f"ockm-{p}-{k} 0" for p in ("bass", "lead", "chord") for k in ("verb", "delay", "lfo-depth", "chorus", "sidechain"))
+        others = " ; ".join(f"ockm-{p}-on {1 if p == part else 0}" for p in ("bass", "lead", "chord"))
+        drums = " ; ".join(f"ockm-d{i}-mute 1" for i in range(1, 9))
+        h.at(100, f"ockm-length 32 ; ockm-fill-every 0 ; ockm-bpm 124 ; ockm-root 9 ; ockm-scale 0 ; ockm-verb-mix 0 ; ockm-delay-mix 0 ; {quiet} ; {others} ; {drums} ; ockm-{part}-level 1 ; {phrases[part]}"
+             + (" ; ockm-lead-sync 0 ; ockm-lead-len 32" if part == "lead" else ""))   # v1.49 the phrase the levels were set on (a following lead is 4 bars now)
+        t, wins = 300, []
+        for snd in (S[part][:1] if first_only else S[part]):
+            e, k, drive, trim = snd[0], snd[1:5], snd[5], snd[6]
+            msg = f"ockm-{part}-engine {e} ; ockm-{part}-trim {trim if use_trim else 1}" + ("" if use_trim else f" ; ockm-{part}-egain 1")
+            if part != "chord": msg += f" ; ockm-{part}-drive {drive}"
+            if k[0] is not None: msg += " ; " + " ; ".join(f"ockm-{part}-k{j + 1} {k[j]}" for j in range(4))
+            elif e == 8 and part == "bass": msg += " ; ib-cutoff 0.3 ; ib-resonance 0.35 ; ib-env 0.35 ; ib-decay 0.35"
+            h.at(t, msg)
+            if t == 300: h.at(400, "ockm-play 1")
+            wins.append((t + 700, t + 2700)); t += 2800
+        f = os.path.join(work, name + ".pd"); h.finish(t, f)
+        run(work, f, timeout=t / 1000 * 3 + 60)
+        snd_, sr = read_wav(h.wav)
+        kw = k_weighted(snd_, sr)
+        def momentary(a, b):   # the loudest 400 ms in the window (how loud the notes are, not how long they ring)
+            n, hop, best = int(0.4 * sr), int(0.1 * sr), 0.0
+            for i in range(int(a / 1000 * sr), int(b / 1000 * sr) - n, hop):
+                seg = kw[i:i + n]; best = max(best, math.sqrt(sum(v * v for v in seg) / n))
+            return best
+        out[part] = [momentary(a, b) for a, b in wins]   # the recording starts at 0
+    return out
+
+
+def k_weighted(x, sr):
+    """The signal as the ear weighs loudness (ITU-R BS.1770's K-weighting: a lift above about 1.5 kHz and a cut below
+    about 40 Hz), so a deep sub and a bright lead are compared fairly."""
+    def biquad(sig, b, a):
+        try:
+            from scipy.signal import lfilter
+            return list(lfilter(b, a, sig))
+        except ImportError:
+            y, x1, x2, y1, y2 = [], 0.0, 0.0, 0.0, 0.0
+            b0, b1, b2 = (v / a[0] for v in b); a1, a2 = a[1] / a[0], a[2] / a[0]
+            for v in sig:
+                o = b0 * v + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2
+                x2, x1, y2, y1 = x1, v, y1, o; y.append(o)
+            return y
+    G, Q, fc = 3.99984385397, 0.7071752369554193, 1681.9744509555319
+    A = 10 ** (G / 40); w = 2 * math.pi * fc / sr; al = math.sin(w) / (2 * Q); c = math.cos(w); sA = math.sqrt(A)
+    b = [A * ((A + 1) + (A - 1) * c + 2 * sA * al), -2 * A * ((A - 1) + (A + 1) * c), A * ((A + 1) + (A - 1) * c - 2 * sA * al)]
+    a = [(A + 1) - (A - 1) * c + 2 * sA * al, 2 * ((A - 1) - (A + 1) * c), (A + 1) - (A - 1) * c - 2 * sA * al]
+    y = biquad(x, b, a)
+    Q, fc = 0.5003270373253953, 38.13547087613982
+    w = 2 * math.pi * fc / sr; al = math.sin(w) / (2 * Q); c = math.cos(w)
+    return biquad(y, [(1 + c) / 2, -(1 + c), (1 + c) / 2], [1 + al, -2 * c, 1 - al])
+
+
+@test
+def sounds_sit_at_one_level(work):
+    """v1.49 every sound on the bass, lead and chord tabs ("analogue 2", "donk 1"...) comes out within about 3 dB of the
+    part's first sound, so stepping through them never jumps the mix (each has a measured trim)."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    lv = measure_sounds(work)
+    bad = []
+    for part, l in lv.items():
+        ref = l[0]
+        for i, v in enumerate(l):
+            db = 20 * math.log10(max(v, 1e-9) / ref)
+            if abs(db) > 3: bad.append(f"{part} sound {i + 1}: {db:+.1f} dB")
+    assert not bad, "out of level: " + ", ".join(bad)
+
+
 KNOB_PHRASE = {"lead": "ockm-lead-rhythm 10 ; ockm-lead-notes 15", "bass": "ockm-bass-rhythm 0 ; ockm-bass-riff 1",
                "chord": "ockm-chord-rhythm 2 ; ockm-chord-prog 1 ; ockm-chord-type 1"}
 
@@ -1789,6 +2186,8 @@ def every_synth_knob_makes_a_difference(work):
         others = " ; ".join(f"ockm-{p}-on {1 if p == part else 0}" for p in ("bass", "lead", "chord"))
         h.at(t, f"{others} ; {KNOB_PHRASE[part]} ; ockm-play 1"); t += 100
         for eng, dk in engines.items():
+            if dk is None:   # a synth engine: skipped, its time kept so the rest land on the same bars as before
+                t += 8 * 2200; continue
             for j in range(4):
                 for v in (0, 1):
                     k = list(dk); k[j] = v
@@ -1816,6 +2215,7 @@ def every_synth_knob_makes_a_difference(work):
     weak, loud = [], []
     for part, engines in KNOB_ENGINES.items():
         for eng in engines:
+            if engines[eng] is None: continue
             for j in range(4):
                 (b0, o0, l0), (b1, o1, l1) = F[(part, eng, j, 0)], F[(part, eng, j, 1)]
                 impact = max(float(np.mean(np.abs(b1 - b0))) / 6, abs(o1 - o0) / 0.15)
@@ -1842,7 +2242,7 @@ def touchscreen_scene_switches_on_and_off(work):
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness(); h.show("ockm-bass-mute", "ockm-lead-mute", "ockm-d1-mute")
     tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
-    tap(100, 299, 36)                       # perform
+    tap(100, 610, 36)                       # perform
     h.at(150, "ockm-bass-mute 1")           # the bass muted by hand
     tap(200, 74, 556)                       # drums only: on
     tap(300, 74, 556)                       # and off again
@@ -1961,6 +2361,171 @@ def bus_effects_shape_their_bus(work):
     assert abs(m2 - m0) < 0.3 and abs(mh2 - mh0) < 0.3, "out, the effect leaves the bus alone"
 
 @test
+def gate_chops_the_music_in_time(work):
+    """v1.49 the gate (bus effect 4, after PERF-1's): chords on the music bus, the gate in at 1/16 and full depth, go
+    silent between the 16ths (compared window by window with the same chords ungated); at 1/8 the gaps are twice as long;
+    the 3-3-2 pattern silences more than straight; at the bottom of the pad it does nothing."""
+    try:
+        import numpy as np
+    except ImportError:
+        raise Skip("numpy not installed")
+    def rec(name, msgs):
+        h = Harness(); h.record(os.path.join(work, name + ".wav"))
+        h.at(100, "ockm-bpm 120 ; ockm-drums-on 0 ; ockm-bass-on 0 ; ockm-lead-on 0 ; ockm-chord-engine 3 ; ockm-chord-rhythm 9 ; ockm-chord-verb 0 ; ockm-chord-delay 0 ; "
+             "ockm-delay-mix 0 ; ockm-verb-mix 0 ; ockm-chord-sidechain 0 ; " + msgs + " ; ockm-play 1")
+        h.at(4000, "ockm-play 0"); f = os.path.join(work, name + ".pd"); h.finish(4100, f)
+        r = subprocess.run([PD, "-nogui", "-nosound", "-nomidi", "-batch"] + (["-path", PDLUA, "-lib", "pdlua"] if PDLUA else []) +
+                           ["-open", "OCKM_GENERATOR.pd", "-open", f], cwd=work, capture_output=True, text=True, timeout=300)
+        assert "expr" not in r.stderr.lower() or "error" not in r.stderr.lower(), r.stderr[-800:]
+        wv = wave.open(os.path.join(work, name + ".wav")); sr = wv.getframerate()
+        x = np.frombuffer(wv.readframes(wv.getnframes()), np.int16).astype(float)[::wv.getnchannels()] / 32768
+        x = x[int(1.0 * sr):int(3.8 * sr)]
+        n = int(0.004 * sr); return np.sqrt((x[:len(x) // n * n].reshape(-1, n) ** 2).mean(1))
+    w0 = rec("gate0", "ockm-bfx-music-on 0")
+    loud = w0 > 0.2 * np.percentile(w0, 90)
+    def cut(w):
+        q = (w < 0.1 * w0) & loud
+        runs, k = [], 0
+        for v in q[loud]:
+            if v: k += 1
+            elif k: runs.append(k); k = 0
+        return q.sum() / max(1, loud.sum()), (np.median(runs) if runs else 0)
+    g = " ; ockm-bfx-music-type 4 ; ockm-bfx-music-on 1 ; ockm-bfx-music-y 1 ; ockm-bfx-music-glide 0"
+    q16, r16 = cut(rec("gate16", g + " ; ockm-bfx-music-x 0.6"))
+    q8, r8 = cut(rec("gate8", g + " ; ockm-bfx-music-x 0.3"))
+    q332, _ = cut(rec("gate332", g + " ; ockm-bfx-music-x 0.6 ; ockm-bfx-music-gate-p 0.34"))
+    qlo, _ = cut(rec("gatelo", g + " ; ockm-bfx-music-x 0.6 ; ockm-bfx-music-y 0"))
+    assert loud.mean() > 0.3, f"the chords play ({loud.mean():.2f} of the time loud)"
+    assert 0.25 < q16 < 0.65, f"1/16 at full depth: silent between the chops ({q16:.2f})"
+    assert r8 > 1.6 * r16, f"1/8: longer gaps than 1/16 ({r8} against {r16} windows)"
+    assert q332 > q16 + 0.15, f"3-3-2: more of the bar silent than straight ({q332:.2f} against {q16:.2f})"
+    assert qlo < 0.05, f"the bottom of the pad: no gating ({qlo:.2f})"
+
+@test
+def gate_on_the_fx_screen(work):
+    """v1.49 the gate on screen: a fifth effect button on each bus; on the pad it says its rate; its settings have four
+    pattern buttons (3-3-2 sends a third)."""
+    sys.path.insert(0, os.path.join(ROOT, "tests"))
+    import ui_preview
+    if not ui_preview.LUA:
+        raise Skip("no lua to run the screen")
+    L = ui_preview.run(["test tap 668 36", "test tap 300 306", "test press 760 300", "paint a", "test release 760 300", "test tap 254 352", "test tap 422 310"])
+    assert "sent ockm-bfx-music-type float 4" in L, "the music bus's gate button"
+    a = L[L.index("begin a"):L.index("end a")]
+    assert any(l.endswith("in: 1/16") for l in a), "the pad says its rate while it plays"
+    assert any(l.startswith("sent ockm-bfx-music-gate-p float 0.333") for l in L), [l for l in L if "gate-p" in l]
+
+@test
+def bass_follows_its_bus(work):
+    """The fx page's bass goes with the drums (ockm-bass-bus 1) or with the music (0). A low-pass on the drums bus
+    dulls the bass only while it's with the drums."""
+    try:
+        import numpy as np
+    except ImportError:
+        raise Skip("numpy not installed")
+    def rec(name, bus):
+        h = Harness(); h.record(os.path.join(work, name + ".wav"))
+        # reese-ish analogue line, nothing else, no sends. The drums bus is a closed low-pass; the music bus is dry
+        # donk, brightness up: it has harmonics for the drums' low-pass to take away
+        h.at(100, "ockm-resync bang ; ockm-bpm 124 ; ockm-drums-on 0 ; ockm-lead-on 0 ; ockm-chord-on 0 ; "
+                  "ockm-bass-on 1 ; ockm-bass-engine 6 ; ockm-bass-k1 0.9 ; "
+                  "ockm-bass-sync 0 ; ockm-bass-notes 2 ; ockm-bass-rhythm 1 ; "
+                  "ockm-bass-verb 0 ; ockm-bass-delay 0 ; ockm-bfx-drums-type 0 ; ockm-bfx-drums-on 1 ; "
+                  "ockm-bfx-drums-x 0.08 ; ockm-bfx-drums-y 0.15 ; ockm-bfx-music-on 0 ; ockm-play 1")
+        h.at(600, f"ockm-bass-bus {bus}")   # after the project has loaded, so its saved 1 doesn't win
+        h.at(4000, "ockm-play 0"); f = os.path.join(work, name + ".pd"); h.finish(4100, f)
+        subprocess.run([PD, "-nogui", "-nosound", "-nomidi", "-batch"] + (["-path", PDLUA, "-lib", "pdlua"] if PDLUA else []) +
+                       ["-open", "OCKM_GENERATOR.pd", "-open", f], cwd=work, capture_output=True, text=True, timeout=300)
+        wv = wave.open(os.path.join(work, name + ".wav")); sr = wv.getframerate()
+        x = np.frombuffer(wv.readframes(wv.getnframes()), np.int16).astype(float)[::wv.getnchannels()] / 32768
+        x = x[int(1.2 * sr):int(3.6 * sr)]
+        X = np.abs(np.fft.rfft(x)) ** 2; fr = np.fft.rfftfreq(len(x), 1 / sr)
+        tot = max(1e-12, X[fr > 20].sum())
+        return 10 * np.log10((x ** 2).mean() + 1e-12), 10 * np.log10(X[fr > 300].sum() / tot + 1e-12)
+    d_lvl, d_hi = rec("bassbus_drums", 1)
+    m_lvl, m_hi = rec("bassbus_music", 0)
+    assert d_lvl > -40 and m_lvl > -40, f"the bass should be audible either way: drums {d_lvl:.1f} dB, music {m_lvl:.1f} dB"
+    assert m_hi > d_hi + 6, f"with music, the drums' low-pass should leave the bass: {d_hi:.1f} dB above 300 Hz with drums, {m_hi:.1f} with music"
+
+@test
+def bass_bus_buttons_send(work):
+    """The fx page's with drums / with music buttons send ockm-bass-bus 1 and 0."""
+    sys.path.insert(0, os.path.join(ROOT, "tests"))
+    import ui_preview
+    if not ui_preview.LUA:
+        raise Skip("no lua to run the screen")
+    L = ui_preview.run(["test tap 668 36", "test tap 275 562"])
+    assert "sent ockm-bass-bus float 0" in L, [l for l in L if "bass-bus" in l]
+    L = ui_preview.run(["test tap 668 36", "test tap 275 562", "test tap 160 562"])
+    sent = [l for l in L if l.startswith("sent ockm-bass-bus")]
+    assert sent == ["sent ockm-bass-bus float 0", "sent ockm-bass-bus float 1"], sent
+
+@test
+def drum_lane_screen_sends(work):
+    """v1.49 the drums tab: rolls (tap a hit: a roll of 2, then 3 ...), and the lane panel's plays-in buttons."""
+    sys.path.insert(0, os.path.join(ROOT, "tests"))
+    import ui_preview
+    if not ui_preview.LUA:
+        raise Skip("no lua to run the screen")
+    pre = ["test tap 301 36", "array ockm-pat-d1 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1"]
+    L = ui_preview.run(pre + ["test tap 196 282", "test tap 106 319", "test tap 106 319"])   # (the list starts at step 0: step 1 is the first hit)
+    rat = [l for l in L if l.startswith("sent ockm-rat")]
+    assert len(rat) >= 1 and rat[0].endswith(" 1 2"), rat
+    L = ui_preview.run(pre + ["test tap 430 364", "test tap 160 512"])
+    assert "sent ockm-d1-when float 1" in L, [l for l in L if "when" in l]
+
+@test
+def synth_presets_are_whole_sounds(work):
+    """v1.49 on the Bass synth's page: random, then a preset: everything the preset doesn't set goes back to the synth's
+    starting point first (nothing left over from random or your knobs), and the volume is left alone."""
+    sys.path.insert(0, os.path.join(ROOT, "tests"))
+    import ui_preview
+    if not ui_preview.LUA:
+        raise Skip("no lua to run the screen")
+    L = ui_preview.run(["test tap 363 36", "test tap 866 350", "test tap 859 314", "send ib-noise float 0.7", "send ib-pdecay float 0.9",
+                        "test tap 349 408", "mark here", "test tap 130 408"])
+    after = L[next(i for i, l in enumerate(L) if l.startswith("mark")):]
+    sent = [l for l in after if l.startswith("sent ib-")]
+    assert "sent ib-noise float 0" in sent and "sent ib-pdecay float 0.15" in sent, f"leftovers reset: {sent[:12]}"
+    assert not any(l.startswith("sent ib-level") for l in sent), "the volume is kept"
+    assert "sent ib-resonance float 0.8" in sent, "then the preset (rubber acid)"
+
+@test
+def show_page_opens_from_the_menu(work):
+    """v1.49 the show page: menu, show; the chord as a shape with its name; a tap anywhere goes back."""
+    sys.path.insert(0, os.path.join(ROOT, "tests"))
+    import ui_preview
+    if not ui_preview.LUA:
+        raise Skip("no lua to run the screen")
+    L = ui_preview.run(["test tap 919 36", "test tap 830 245", "paint a", "test tap 300 300", "paint b"])
+    a = L[L.index("begin a"):L.index("end a")]; b = L[L.index("begin b"):L.index("end b")]
+    assert any("show: tap anywhere" in l for l in a), "the show page opened"
+    assert any(l.startswith("text") and l.split()[-1].startswith("A") and "m" in l.split()[-1] for l in a), "the chord's name in the middle"
+    assert not any("show: tap anywhere" in l for l in b), "a tap goes back"
+    # the colours button steps through the four schemes (and doesn't go back)
+    L = ui_preview.run(["test tap 919 36", "test tap 830 245", "test tap 880 36", "paint c", "test tap 880 36", "test tap 880 36", "test tap 880 36", "paint d"])
+    c = L[L.index("begin c"):L.index("end c")]; d = L[L.index("begin d"):L.index("end d")]
+    assert any("colours: neon" in l for l in c), "one tap: the second scheme"
+    assert any("colours: dusk" in l for l in d), "four taps: round to the first again"
+    # v1.49 the view button: the bloom (no circle-of-fifths text), then back to the circle
+    L = ui_preview.run(["test tap 919 36", "test tap 830 245", "test tap 724 36", "paint e", "test tap 724 36", "paint f"])
+    e = L[L.index("begin e"):L.index("end e")]; f = L[L.index("begin f"):L.index("end f")]
+    assert any("view: bloom" in l for l in e) and not any("circle of fifths" in l for l in e), "the bloom"
+    assert any("view: circle" in l for l in f) and any("circle of fifths" in l for l in f), "back to the circle"
+
+@test
+def answer_button_steps_through(work):
+    """v1.49 call and answer on the bass and lead tabs: one button, each tap the next of off, 2, 4 and 8 bars."""
+    sys.path.insert(0, os.path.join(ROOT, "tests"))
+    import ui_preview
+    if not ui_preview.LUA:
+        raise Skip("no lua to run the screen")
+    for part, tab in (("bass", 364), ("lead", 416)):
+        L = ui_preview.run([f"test tap {tab} 36"] + ["test tap 472 283"] * 4)
+        sent = [l.split()[-1] for l in L if l.startswith(f"sent ockm-{part}-answer")]
+        assert sent == ["2", "4", "8", "0"], f"{part}: {sent}"
+
+@test
 def touchscreen_fx_pad_plays_and_latches(work):
     """v1.23: on the fx page a finger on the pad brings the bus's effect in at that spot and lifting takes it out;
     latched, it stays in. Macros can move a bus effect too."""
@@ -1968,17 +2533,21 @@ def touchscreen_fx_pad_plays_and_latches(work):
     import ui_preview
     if not ui_preview.LUA:
         raise Skip("no lua to run the screen")
-    L = ui_preview.run(["test tap 346 36", "test press 400 100", "test release 400 100"])
+    L = ui_preview.run(["test tap 668 36", "test press 400 100", "test release 400 100"])
     sent = [l for l in L if l.startswith("sent ockm-bfx-drums-")]
     # lifted, not latched: it springs back to the centre (v1.25; it goes out 60 ms later: checked in Pd, the next test)
     assert "sent ockm-bfx-drums-on float 1" in sent and sent[-2:] == ["sent ockm-bfx-drums-x float 0.5", "sent ockm-bfx-drums-y float 0.5"], sent
     x = [float(l.split()[3]) for l in sent if "-x " in l][0]
     assert x < 0.2, f"near the left edge: {x}"
-    L = ui_preview.run(["test tap 346 36", "test tap 100 198", "test press 700 300", "test release 700 300"])
+    L = ui_preview.run(["test tap 668 36", "test tap 100 198", "test press 700 300", "test release 700 300"])
     sent = [l for l in L if l.startswith("sent ockm-bfx-drums-on")]
     assert sent == ["sent ockm-bfx-drums-on float 1"], f"latched: stays in after lifting: {sent}"
+    # v1.49 unlatching: it goes out and the pad goes back to the centre
+    L = ui_preview.run(["test tap 668 36", "test tap 100 198", "test press 700 300", "test release 700 300", "mark here", "test tap 100 198"])
+    after = [l for l in L[next(i for i, l in enumerate(L) if l.startswith("mark")):] if l.startswith("sent ockm-bfx-drums-")]
+    assert after == ["sent ockm-bfx-drums-x float 0.5", "sent ockm-bfx-drums-y float 0.5", "sent ockm-bfx-drums-on float 0"], f"unlatched: out, the pad centred: {after}"
     # the music bus, its filter picked
-    L = ui_preview.run(["test tap 346 36", "test tap 100 262", "test press 900 500", "test release 900 500"])
+    L = ui_preview.run(["test tap 668 36", "test tap 100 262", "test press 900 500", "test release 900 500"])
     assert any(l.startswith("sent ockm-bfx-music-on float 1") for l in L), "the music bus is the pad's now"
     # a macro with a drums fx move (added in the editor: + add a move, then step the move round to drums fx), tried
     s = ["test tap 919 36", "test tap 830 195", "test tap 90 216", "test tap 90 272", "test tap 260 119", "send ockm-playing float 1",
@@ -1997,10 +2566,10 @@ def arrange_plays_a_version(work):
     tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
     tap(150, 919, 36); tap(151, 830, 95)   # menu, project
     tap(200, 808, 100)                     # new blank project
-    tap(700, 407, 36)                      # mixer
+    tap(700, 719, 36)                      # mixer
     tap(750, 54, 300); tap(770, 865, 36)   # scene A (its first save)
     tap(850, 54, 380); tap(870, 865, 36)   # scene B
-    tap(950, 793, 36)                      # arrange
+    tap(950, 805, 36)                      # arrange
     tap(1000, 245, 566); tap(1010, 60, 357)   # + A (the second tile: newest first), 4 bars
     tap(1020, 90, 566); tap(1030, 60, 357)    # + B, 4 bars
     tap(1040, 60, 200); tap(1050, 550, 392)   # section 1, its transition: gap
@@ -2032,8 +2601,8 @@ def save_is_a_snapshot_not_movement(work):
     tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
     tap(150, 919, 36); tap(151, 830, 95)   # menu, project
     tap(200, 808, 100)                     # new blank project
-    tap(700, 270, 36); tap(750, 70, 190)   # perform: mute the kick
-    tap(800, 346, 36)                      # fx
+    tap(700, 616, 36); tap(750, 70, 190)   # perform: mute the kick
+    tap(800, 668, 36)                      # fx
     tap(850, 100, 198); tap(900, 700, 250) # drums: latch, then play it (crush): it stays in
     tap(950, 100, 262)                     # the music bus on the pad
     h.at(1000, "ockm-ui-test press 700 400")   # held (not latched) while saving
@@ -2059,16 +2628,16 @@ def midi_learn_maps_pads_and_knobs(work):
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness(); h.show("ockm-rise", "ockm-bass-k1", "ockm-delay-mix")
     tap = lambda ms, x, y: h.at(ms, f"ockm-ui-test tap {x} {y}")
-    tap(100, 270, 36)                      # perform
-    tap(150, 919, 36); tap(160, 830, 290)  # menu, MIDI learn
+    tap(100, 616, 36)                      # perform
+    tap(150, 919, 36); tap(160, 830, 345)  # menu, MIDI learn (v1.49 a row lower: show is above it)
     tap(200, 540, 106)                     # rise
     h.at(250, "ockm-midi-note 40 100 ; ockm-midi-note 40 0")
-    tap(300, 601, 36); tap(350, 600, 396)  # bass tab, its knob 1
+    tap(300, 363, 36); tap(350, 600, 396)  # bass tab, its knob 1
     h.at(400, "ockm-midi-cc 64 21")
-    tap(420, 270, 36); tap(430, 520, 446)  # v1.31: perform, the delay level
+    tap(420, 616, 36); tap(430, 520, 406)  # v1.31: perform, the delay level (v1.49 40 higher: six slots)
     h.at(440, "ockm-midi-note 41 100 ; ockm-midi-note 41 0")
     tap(450, 896, 579)                     # done
-    tap(500, 407, 36)                      # mixer
+    tap(500, 719, 36)                      # mixer
     h.at(600, "ockm-midi-note 40 100 ; ockm-midi-note 40 0")
     h.at(650, "ockm-midi-cc 127 21")      # v1.31 pick-up: the knob is far from the setting, so nothing happens yet
     h.at(700, "ockm-midi-cc 0 21 ; ockm-midi-cc 30 21 ; ockm-midi-cc 60 21 ; ockm-midi-cc 90 21 ; ockm-midi-cc 127 21")   # turned through it: it takes over
@@ -2087,18 +2656,26 @@ def midi_learn_maps_pads_and_knobs(work):
     assert '"note:40"' in me and '"cc:21"' in me, "learned controls are kept"
 
 @test
-def eight_bar_lift_pushes_late(work):
-    """v1.22: slot A is the 8 bar lift: drums out, and the high-pass goes 60% of the way (0.36) over 4 bars, then on to 0.6
-    by the end of bar 7."""
+def four_bar_rewind_spins_into_the_drop(work):
+    """v1.49: slot A is the 4 bar rewind: drums out and the high-pass climbs to 0.5 over the 4 bars, then on the way out it
+    arms a rewind of a beat (4 steps), which the patch spins on the bar's last beat and stops right on the drop."""
     sys.path.insert(0, os.path.join(ROOT, "tests"))
     import ui_preview
     if not ui_preview.LUA:
         raise Skip("no lua to run the screen")
-    L = ui_preview.run(["send ockm-playing float 1", "test tap 566 500"])
+    L = ui_preview.run(["send ockm-playing float 1", "test tap 566 500"] + ["send ockm-bar bang"] * 5)
     gl = [l for l in L if l.startswith("sent ockm-filter-glide ")]
-    assert gl and abs(float(gl[0].split()[3]) - 0.36) < 1e-6, f"first 60% of the way: {gl}"
+    assert gl and abs(float(gl[0].split()[3]) - 0.5) < 1e-6, f"the high-pass up to 0.5: {gl}"
     ms = float(gl[0].split()[4]); assert 7000 < ms < 8500, f"over four bars at 124 bpm (about 7.7 s): {ms}"
     assert any(l.startswith("sent ockm-d1-mute-q ") and l.endswith(" 1") for l in L), "the drums go"
+    assert any(l.startswith("sent ockm-rewind-arm ") and l.split()[3] == "4" for l in L), "a beat's rewind armed before the drop"
+    # the patch: armed, it spins on step 12 of the bar for the 4 steps to the bar line
+    h = Harness(); h.show("ockm-rewind-to")
+    h.at(100, "ockm-bpm 120 ; ockm-rewind-arm 4"); h.at(200, "ockm-play 1"); h.at(2400, "ockm-play 0")
+    f = os.path.join(work, "t_rw.pd"); h.finish(2500, f)
+    out = run(work, f)
+    got = printed(out, "ockm-rewind-to")
+    assert len(got) == 1 and abs(float(got[0]) - (4 * 125 - 4)) < 1, f"one rewind, a beat long, just short of the bar line: {got}"
 
 @test
 def drum_grooves_fill_every_slot(work):
@@ -2139,7 +2716,7 @@ def suggest_chords_fit_the_melody(work):
         on = " ".join("1" if i % 4 == 0 else "0" for i in range(64))
         nt = " ".join(str(notes[(i // 4) % len(notes)]) for i in range(64))
         lines = ui_preview.run(["send ockm-length float 64", f"array ockm-pat-lead-on {on}", f"array ockm-pat-lead-note {nt}",
-                                "send ockm-lead-mode float 1", "test tap 477 36", "test tap 324 402", "test tap 324 402"])
+                                "send ockm-lead-mode float 1", "test tap 239 36", "test tap 324 402", "test tap 324 402"])
         return [int(float(l.split()[3])) for l in lines if l.startswith("sent ockm-chord-prog")]
     a_minor = picks([57, 60, 64])           # A C E: the home chord
     assert a_minor[0] == 0, f"a melody on A C E should suggest one chord first: {a_minor}"
@@ -2147,7 +2724,7 @@ def suggest_chords_fit_the_melody(work):
     # a melody that walks A minor, F, C, G one bar each: the pop progression (i VI III VII) should come first
     pop = picks([57, 60, 64, 57, 65, 69, 72, 65, 60, 64, 67, 60, 67, 71, 74, 67])
     assert ui_preview_shapes()[pop[0]] == [(0, 16), (5, 16), (2, 16), (6, 16)], f"expected the pop progression first: {pop}"
-    empty = ui_preview.run(["test tap 477 36", "test tap 324 402"])
+    empty = ui_preview.run(["test tap 239 36", "test tap 324 402"])
     assert not any(l.startswith("sent ockm-chord-prog") for l in empty), "no melody, no suggestion"
 
 @test
@@ -2168,15 +2745,15 @@ def song_styles_set_the_lot(work):
                 out[v[1]] = float(v[3]) if len(v) > 3 and v[3] not in ("bang",) else None
         return out
     PEAK, DEEP, SHUFFLE, CLASSIC = "test tap 584 174", "test tap 83 142", "test tap 896 142", "test tap 896 174"
-    t = sent(ui_preview.run(["test tap 477 36", PEAK, CLASSIC]))
+    t = sent(ui_preview.run(["test tap 239 36", PEAK, CLASSIC]))
     assert t["ockm-bpm"] == 132 and t["ockm-swing"] == 50 and t["ockm-drum-groove"] == 5, t
     assert t["ockm-root"] == 5 and t["ockm-scale"] == 3, "F phrygian"
     assert t["ockm-d1-drive"] == 0.5 and t["ockm-d1-tune"] == -2, "the kick gets harder and lower"
     assert t["ockm-lead-on"] == 1 and t["ockm-bass-rhythm"] == 2 and t["ockm-bass-sync"] == 0 and t["ockm-chord-on"] == 1, t
     assert t["ockm-style"] == 13, t
-    d = sent(ui_preview.run(["test tap 477 36", DEEP, CLASSIC]))
+    d = sent(ui_preview.run(["test tap 239 36", DEEP, CLASSIC]))
     assert d["ockm-bpm"] == 122 and d["ockm-scale"] == 2 and d["ockm-chord-engine"] == 4 and d["ockm-lead-on"] == 0, d
-    lines = ui_preview.run(["test tap 477 36", DEEP] + [SHUFFLE] * 4)
+    lines = ui_preview.run(["test tap 239 36", DEEP] + [SHUFFLE] * 4)
     chunks, cur = [], []
     for l in lines:
         if l.startswith("sent "):
@@ -2191,10 +2768,10 @@ def song_styles_set_the_lot(work):
     assert len(chunks) == 5, f"four shuffles: {len(chunks)}"
     assert len(seen) > 1, "shuffle should come out differently"
     kit = ["send ockm-sample-counts list 31 6 0 0 0 0 0", "send ockm-sample-name list 0 31 kit-breaks", "send ockm-d1-sample float 31",
-           "test tap 477 36", DEEP]
+           "test tap 239 36", DEEP]
     k = sent(ui_preview.run(kit))
     assert k.get("ockm-d1-sample") == 0, "a kick on a kit goes back to the synth kick"
-    own = sent(ui_preview.run(["send ockm-d1-sample float 2", "test tap 477 36", PEAK]))
+    own = sent(ui_preview.run(["send ockm-d1-sample float 2", "test tap 239 36", PEAK]))
     # every style's lists only point at presets that exist
     import re as _re
     src = open(os.path.join(ROOT, "ui", "ockm-ui.pd_lua")).read()
@@ -2226,9 +2803,9 @@ def phrase_sets_the_fill_and_turnaround(work):
     def sends(lines, key):
         return [float(l.split()[3]) for l in lines if l.startswith("sent " + key + " ")]
     L = ui_preview.run(["send ockm-fill-every float 0", "send ockm-turn-every float 0",
-                        "test tap 539 36", "test tap 900 569",       # drums tab: breakbeat fill
-                        "test tap 477 36", "test tap 810 406",       # builder: turnaround on
-                        "test tap 539 36", "test tap 600 529"])      # drums tab: no fill
+                        "test tap 301 36", "test tap 900 569",       # drums tab: breakbeat fill
+                        "test tap 239 36", "test tap 810 406",       # builder: turnaround on
+                        "test tap 301 36", "test tap 600 529"])      # drums tab: no fill
     assert sends(L, "ockm-fill-style")[-1:] == [4], "breakbeat picked"
     assert sends(L, "ockm-fill-every")[-2:] == [8, 0], f"the fill every 8, then off: {sends(L, 'ockm-fill-every')}"
     assert sends(L, "ockm-turn-every")[-1:] == [8], f"the turnaround on the same 8-bar phrase: {sends(L, 'ockm-turn-every')}"
@@ -2241,7 +2818,7 @@ def drums_tab_swipes_to_all_drums(work):
     import ui_preview
     if not ui_preview.LUA:
         raise Skip("no lua to run the screen")
-    L = ui_preview.run(["test tap 539 36", "test drag 600 134 200 134",      # swipe left across the slots
+    L = ui_preview.run(["test tap 301 36", "test drag 600 134 200 134",      # swipe left across the slots
                         "test tap 259 165",                                   # all drums: snare lane, step 2
                         "test drag 40 200 300 200",                           # swipe right across the names
                         "test tap 45 212"])                                   # one drum: step 1 of the kick
@@ -2306,7 +2883,7 @@ def midi_pads_and_knobs(work):
     C = lambda cc, v: f"send ockm-midi-cc list {v} {cc} 1"
     P = lambda pg: f"send ockm-midi-pgm list {pg} 10"
     L = ui_preview.run([N(40, 100), N(40, 0), "send ockm-d1-mute float 1", N(40, 100), N(49, 100), "mark held", N(49, 0), "mark up", N(51, 90), N(51, 0),
-                        C(70, 0), C(70, 64), C(70, 127), "test tap 663 36", C(74, 127), C(1, 127), "mark keys", N(60, 100), N(60, 0), "mark pgm",
+                        C(70, 0), C(70, 64), C(70, 127), "test tap 425 36", C(74, 127), C(1, 127), "mark keys", N(60, 100), N(60, 0), "mark pgm",
                         "send ockm-d1-mute float 0", "send ockm-playing float 1", P(4), P(13), "mark tapped", P(15), P(15)])
     kick = [l.split()[3] for l in L[:L.index("mark keys")] if l.startswith("sent ockm-d1-mute-q ")]
     assert kick[:2] == ["1", "0"], f"the top-left pad toggles the kick: {kick}"
@@ -2333,7 +2910,7 @@ def retired_engines_move_on_and_engines_load_their_sweet_spot(work):
     if not ui_preview.LUA:
         raise Skip("no lua to run the screen")
     L = ui_preview.run(["send ockm-bass-engine float 4", "mark bass", "send ockm-lead-engine float 1", "mark lead",
-                        "send ockm-chord-engine float 5", "mark chord", "test tap 601 36", "mark tab"])
+                        "send ockm-chord-engine float 5", "mark chord", "test tap 363 36", "mark tab"])
     def after(mark, until=None):
         i = L.index("mark " + mark); j = L.index("mark " + until) if until else len(L)
         return {l.split()[1]: float(l.split()[3]) for l in L[i:j] if l.startswith("sent ") and len(l.split()) > 3}
@@ -2347,7 +2924,7 @@ def retired_engines_move_on_and_engines_load_their_sweet_spot(work):
     c = before("chord", "lead")
     assert c.get("ockm-chord-engine") == 0 and c.get("ockm-chord-k3") == 0.7 and c.get("ockm-chord-chorus") == 2, f"strings become poly: {c}"
     # the bass tab's engine row: analogue, acid, sub 808, wide, fm, donk. Tap acid (the second)
-    lines = ui_preview.run(["test tap 601 36", "paint tab"])
+    lines = ui_preview.run(["test tap 363 36", "paint tab"])
     import re as _re
     shot = [l for l in lines if l.startswith("text ")]
     names = [" ".join(l.split()[4:]) for l in shot]
@@ -2365,7 +2942,7 @@ def evolve_moves_one_part_a_phrase_and_comes_home(work):
     if not ui_preview.LUA:
         raise Skip("no lua to run the screen")
     BAR = "send ockm-bar bang"
-    script = ["test tap 477 36", "test tap 83 142", "send ockm-lead-on float 1", "test tap 190 438", "send ockm-playing float 1", "mark start"]
+    script = ["test tap 239 36", "test tap 83 142", "send ockm-lead-on float 1", "test tap 190 438", "send ockm-playing float 1", "mark start"]
     for b in range(1, 42):
         script += [BAR, f"mark bar{b}"]
     L = ui_preview.run(script)
@@ -2399,9 +2976,9 @@ def refit_my_line_when_the_harmony_moves(work):
     nt = " ".join("57" for i in range(64))
     lines = ui_preview.run(["send ockm-lead-len float 64", "send ockm-chord-len float 64", f"array ockm-pat-lead-on {on}", f"array ockm-pat-lead-note {nt}",
                             "array ockm-pat-chord-deg " + " ".join("0" for _ in range(64)), "send ockm-lead-mode float 1",
-                            "test tap 663 36", "test tap 5 595",                     # lead tab: remembers the harmony it was written over
+                            "test tap 425 36", "test tap 5 595",                     # lead tab: remembers the harmony it was written over
                             "array ockm-pat-chord-deg " + " ".join("4" for _ in range(64)), "send ockm-chord-prog float 5",
-                            "test tap 663 36", "test tap 395 283"])                  # the harmony moved: refit my line
+                            "test tap 425 36", "test tap 395 283"])                  # the harmony moved: refit my line
     edits = [l.split()[3:] for l in lines if l.startswith("sent ockm-lead-edit")]
     assert len(edits) == 16, f"every note on the beat should be refitted: {len(edits)} {edits[:2]}"
     assert all(int(float(e[1])) == 55 for e in edits), f"A moves to G, the nearest note of E minor: {edits[:3]}"
@@ -2428,7 +3005,7 @@ def touchscreen_velocity_timing_loop_and_banks(work):
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness(); h.show("ockm-edit", "ockm-nudge", "ockm-drum-len", "ockm-drum-double", "ockm-drum-groove")
     h.at(100, "ockm-length 64 ; ockm-edit d1 0 1")
-    h.at(200, "ockm-ui-test tap 539 36")              # drums tab
+    h.at(200, "ockm-ui-test tap 301 36")              # drums tab
     h.at(300, "ockm-ui-test drag 45 336 45 302")      # velocity: drag step 1 to the top (accent)
     h.at(400, "ockm-ui-test tap 145 282")             # timing
     h.at(500, "ockm-ui-test drag 45 319 45 336")      # pull step 1 early
@@ -2466,8 +3043,8 @@ def touchscreen_exports_audio_stems_and_midi(work):
     files = sorted(os.listdir(ex)) if os.path.isdir(ex) else []
     wavs = [n for n in files if n.endswith(".wav")]
     mids = [n for n in files if n.endswith(".mid")]
-    assert len(wavs) == 6, f"expected the mix and 5 stems: {files}"
-    mix = [n for n in wavs if not any(n.endswith(f"-{s}.wav") for s in ["drums", "bass", "lead", "chord", "fx"])][0]
+    assert len(wavs) == 7, f"expected the mix and 6 stems: {files}"
+    mix = [n for n in wavs if not any(n.endswith(f"-{s}.wav") for s in ["drums", "bass", "lead", "chord", "vox", "fx"])][0]
     w = wave.open(os.path.join(ex, mix)); assert w.getnchannels() == 2 and w.getsampwidth() == 3, "the mix should be 24-bit stereo"
     secs = w.getnframes() / w.getframerate()
     assert 3.0 < secs < 6.5, f"one bar at 160 bpm plus the tail should be about 4 seconds: {secs:.1f}"
@@ -2495,7 +3072,7 @@ def touchscreen_exports_the_loop_and_records_live(work):
     h.at(8000, "ockm-ui-test tap 919 36 ; ockm-ui-test tap 830 95"); h.at(8100, "ockm-ui-test tap 902 100")
     h.at(8200, "ockm-ui-test tap 154 544")    # record what I play
     h.at(8300, "ockm-play 1")
-    h.at(9800, "ockm-ui-test tap 803 36")     # stop recording
+    h.at(9800, "ockm-ui-test tap 815 36")     # stop recording
     f = os.path.join(work, "t_export_song.pd"); h.finish(10200, f)
     run(work, f, timeout=60)
     ex = os.path.join(work, "exports")
@@ -2569,8 +3146,8 @@ def touchscreen_demud_listens_and_cuts(work):
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness(); h.show("ockm-d1-lowcut", "ockm-d4-lowcut", "ockm-bass-lowcut", "ockm-spec-all")
     h.at(100, "ockm-bass-gen bang ; ockm-chord-gen bang ; ockm-play 1")
-    h.at(600, "ockm-ui-test tap 407 36")      # mixer
-    h.at(700, "ockm-ui-test tap 905 232")     # de-mud (master strip)
+    h.at(600, "ockm-ui-test tap 719 36")      # mixer
+    h.at(700, "ockm-ui-test tap 908 232")     # de-mud (master strip)
     h.at(5200, "ockm-play 0")
     f = os.path.join(work, "t_demud.pd"); h.finish(5400, f)
     out = run(work, f, timeout=60)
@@ -2595,8 +3172,8 @@ def undo_takes_back_the_last_big_change(work):
     h.at(300, "test-get bang")
     h.at(350, "ockm-undo bang")
     h.at(450, "test-get bang")
-    h.at(500, "ockm-ui-test tap 407 36")      # mixer
-    h.at(550, "ockm-ui-test tap 905 232")     # de-mud while stopped: fixed low cuts, with an undo button
+    h.at(500, "ockm-ui-test tap 719 36")      # mixer
+    h.at(550, "ockm-ui-test tap 908 232")     # de-mud while stopped: fixed low cuts, with an undo button
     h.at(600, "ockm-ui-test tap 761 569")     # undo
     f = os.path.join(work, "t_undo.pd"); h.finish(800, f)
     out = run(work, f)
@@ -2618,7 +3195,7 @@ def touchscreen_steps_act_on_press(work):
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness(); h.show("ockm-edit", "ockm-page")
     h.at(50, "ockm-length 32")                        # 2 bars, so there's a second page to swipe to
-    h.at(100, "ockm-ui-test tap 539 36")              # drums
+    h.at(100, "ockm-ui-test tap 301 36")              # drums
     h.at(200, "ockm-ui-test press 105 212")           # step 2 of the kick: finger down only
     h.at(300, "ockm-ui-test release 105 212")
     h.at(400, "ockm-ui-test drag 400 212 100 212")    # press step 7, then swipe left
@@ -2670,6 +3247,21 @@ def parts_following_the_chords_take_their_length(work):
     assert printed(out, "ockm-lead-len")[-1] == "16", f"the melody doesn't follow, so it stays 1 bar: {printed(out, 'ockm-lead-len')}"
 
 @test
+def a_following_lead_is_at_least_four_bars(work):
+    """v1.49 a one-chord progression is one bar: a bass that follows it loops that bar, but the lead stays 4 bars.
+    A length set by hand still goes to every part that follows."""
+    h = Harness(); h.show("ockm-bass-len", "ockm-lead-len")
+    h.at(100, "ockm-bass-sync 1 ; ockm-lead-sync 1 ; ockm-bass-len 64 ; ockm-lead-len 64 ; ockm-chord-mode 0")
+    h.at(200, "ockm-resync bang ; ockm-chord-rhythm 0 ; ockm-chord-prog 4")   # a 2-bar progression: the chords fit themselves to 2 bars
+    h.at(300, "ockm-chord-len 128")     # a length set by hand: both follow
+    f = os.path.join(work, "t_lead_four.pd"); h.finish(500, f)
+    out = run(work, f)
+    bl, ll = printed(out, "ockm-bass-len"), printed(out, "ockm-lead-len")
+    assert "32" in bl, f"the bass follows a 2-bar progression: {bl}"
+    assert "16" not in ll and "32" not in ll, f"the lead stays 4 bars: {ll}"
+    assert ll[-1] == "128", f"the lead still follows longer chords: {ll}"
+
+@test
 def part_lengths_save_and_older_files_load(work):
     """Part lengths are saved with the loop and come back. An older loop file with one length and a drums loop
     loads as: drums the drums-loop length, every other part the old length."""
@@ -2705,7 +3297,7 @@ def touchscreen_part_lengths_and_undo(work):
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness(); h.show("ockm-bass-len", "ockm-len", "ockm-drum-len")
     h.at(90, "ockm-bass-sync 0")                      # its own length, not the chords'
-    h.at(100, "ockm-ui-test tap 601 36")              # bass tab
+    h.at(100, "ockm-ui-test tap 363 36")              # bass tab
     h.at(200, "ockm-ui-test tap 724 88")              # 4 bars
     h.at(300, "ockm-ui-test tap 612 88")              # 1 bar: shorter, so undo is offered
     h.at(400, "ockm-ui-test tap 761 569")             # undo
@@ -2789,10 +3381,11 @@ def touchscreen_picks_samples_and_kits(work):
     kd = os.path.join(work, "samples", "kick")
     write_tone(os.path.join(kd, "01.wav"), 110, 0.2); write_tone(os.path.join(kd, "02.wav"), 220, 0.2)
     h = Harness(); h.show("ockm-d1-sample", "ockm-d1-audition")
-    h.at(100, "ockm-ui-test tap 539 36")      # drums tab: counts the folders
-    h.at(400, "ockm-ui-test tap 354 364")     # the synth kick -> sample 1
-    h.at(500, "ockm-ui-test tap 354 364")     # 2
-    h.at(700, "ockm-ui-test tap 354 364")     # only 2 kicks: stays put
+    h.at(100, "ockm-ui-test tap 301 36")      # drums tab: counts the folders
+    for t_ in (250, 300, 350): h.at(t_, "ockm-ui-test tap 264 364")   # v1.49 past the synth kits: 808, 909, 909 long
+    h.at(400, "ockm-ui-test tap 264 364")     # the synth kick -> sample 1
+    h.at(500, "ockm-ui-test tap 264 364")     # 2
+    h.at(700, "ockm-ui-test tap 264 364")     # only 2 kicks: stays put
     h.at(900, "ockm-ui-test tap 200 364")     # tap the box: hear it
     f = os.path.join(work, "t_samples_ui.pd"); h.finish(1300, f)
     out = run(work, f)
@@ -2808,12 +3401,13 @@ def touchscreen_saves_drum_sounds(work):
     if not PDLUA:
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness(); h.show("ockm-d1-labrseed", "ockm-d1-labmorph", "ockm-d1-tune")
-    h.at(100, "ockm-ui-test tap 539 36 ; ockm-d1-sample 0 ; ockm-d1-labrseed 4242 ; ockm-d1-labramt 0.35 ; ockm-d1-tune 3")
-    h.at(300, "ockm-ui-test tap 404 364")     # save: kick 1
+    h.at(100, "ockm-ui-test tap 301 36 ; ockm-d1-sample 0 ; ockm-d1-labrseed 4242 ; ockm-d1-labramt 0.35 ; ockm-d1-tune 3")
+    h.at(300, "ockm-ui-test tap 314 364")     # save: kick 1
     h.at(400, "ockm-d1-labrseed 0 ; ockm-d1-labramt 0 ; ockm-d1-tune 0")
-    h.at(500, "ockm-ui-test tap 354 364")     # arrow right: kick 1
+    for t_ in (440, 460, 480): h.at(t_, "ockm-ui-test tap 264 364")   # v1.49 past the synth kits: 808, 909, 909 long
+    h.at(500, "ockm-ui-test tap 264 364")     # arrow right: kick 1
     h.at(600, "ockm-ui-test dump")
-    h.at(700, "ockm-ui-test tap 404 364")     # on kick 1 the icon is delete
+    h.at(700, "ockm-ui-test tap 314 364")     # on kick 1 the icon is delete
     h.at(800, "ockm-ui-test dump")
     h.at(900, "ockm-d1-labmorph 0.6")
     h.at(1000, "ockm-ui-test tap 301 403")    # random: morph goes back to 0
@@ -2833,7 +3427,7 @@ def touchscreen_drum_synth_random_and_reset(work):
     if not PDLUA:
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness(); h.show("ockm-d1-labrseed", "ockm-d1-labramt", "ockm-d1-labchar")
-    h.at(100, "ockm-ui-test tap 539 36 ; ockm-d1-sample 0 ; ockm-d1-labchar 0.5")
+    h.at(100, "ockm-ui-test tap 301 36 ; ockm-d1-sample 0 ; ockm-d1-labchar 0.5")
     h.at(300, "ockm-ui-test tap 316 403")     # new sound
     h.at(500, "ockm-ui-test tap 316 403")     # and another
     h.at(700, "ockm-ui-test tap 420 403")     # reset
@@ -2852,7 +3446,7 @@ def touchscreen_drum_slider_previews_when_stopped(work):
     if not PDLUA:
         raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
     h = Harness(); h.show("ockm-d1-audition", "ockm-d1-labrseed")
-    h.at(100, "ockm-ui-test tap 539 36 ; ockm-d1-sample 0")
+    h.at(100, "ockm-ui-test tap 301 36 ; ockm-d1-sample 0")
     h.at(300, "ockm-ui-test drag 200 490 360 490")       # drag the decay slider
     h.at(800, "ockm-d1-sample 1")
     h.at(900, "ockm-ui-test tap 301 403")                # random, greyed out: nothing
@@ -2861,6 +3455,658 @@ def touchscreen_drum_slider_previews_when_stopped(work):
     aud = printed(out, "ockm-d1-audition")
     assert len(aud) >= 1, f"dragging a slider while stopped should play the sound: {aud}"
     assert not printed(out, "ockm-d1-labrseed"), "random is greyed out while the slot plays a sample"
+
+INST_PHRASE = [(0, "note 36 110"), (200, "off 36"), (250, "note 48 90"), (450, "off 48"), (500, "note 43 90 1"), (700, "note 41 110 1"),
+               (1000, "off 41"), (1100, "note 36 90"), (1600, "off 36")]
+INST_CONTROLS = {
+    "bass": [("wave", 2), ("swarm", 1), ("sub", 1), ("noise", 0.6), ("cutoff", 0.1), ("resonance", 1), ("env", 0), ("filter", 1), ("decay", 0.05),
+             ("fdecay", 1), ("pitch-amt", 0.6), ("lfo-amt", 0.8), ("drive", 1), ("glide", 1), ("amode", 1)],
+    "analog": [("pulse", 0), ("saw", 1), ("sub", 1), ("sub-mode", 1), ("width", 0.9), ("pwm", 1), ("cutoff", 0.1), ("resonance", 1), ("env", 0),
+               ("lfo-filter", 1), ("lfo-pitch", 1), ("sustain", 0), ("attack", 0.6), ("glide", 0.6), ("noise", 0.8)],
+}
+
+@test
+def instruments_play_in_tune_and_every_control_counts(work):
+    """v1.39 the Bass and Analog instruments: each plays in tune, and every main control changes the sound clearly
+    (the recording differs by at least a fifth of its own level) without blowing up the level."""
+    try:
+        import numpy as np
+    except ImportError:
+        raise Skip("numpy not installed")
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    import wave as wv
+    for kind, pre in (("bass", "ib"), ("analog", "ia")):
+        h = Harness(dut=f"ockm-inst-{kind} {pre}")
+        w_ = h.add("#X obj 600 40 writesf~ 1;"); r_ = h.add("#X obj 600 10 r test-wav;"); h.con(r_, w_); h.con(h.dut, w_)
+        cases, t = [], 200
+        only = {"bass": {"lfo-pitch", "pulse", "saw", "width", "pwm", "sub-mode", "lfo-filter"}, "analog": {"swarm", "lfo-amt", "pitch-amt", "wave", "filter", "fdecay", "drive"}}[kind]
+        def take(name, sets, phrase):
+            nonlocal t
+            sets = {k: v for k, v in sets.items() if k not in only}
+            path = os.path.join(work, f"{kind}-{name}.wav")
+            h.at(t, " ; ".join(f"{pre}-{k} {v}" for k, v in sets.items()) or f"{pre}-level 0.8")
+            h.at(t + 50, f"test-wav open {path} , start")
+            for dt, m in phrase: h.at(t + 100 + dt, f"test-in {m}")
+            h.at(t + 2000, "test-wav stop"); h.at(t + 2050, "test-in panic")
+            t += 2300; cases.append((name, path))
+        # in tune: a held A, nothing moving the pitch
+        flat = {"swarm": 0, "sub": 0, "cutoff": 0.9, "resonance": 0, "lfo-amt": 0, "pitch-amt": 0, "amode": 1, "lfo-pitch": 0, "pulse": 1, "saw": 0, "width": 0, "pwm": 0, "env": 0}
+        take("tune", flat, [(0, "note 33 90" if kind == "bass" else "note 45 90"), (1500, "off 45"), (1500, "off 33")])
+        defaults = {k: v for k, v in (("swarm", 0.3), ("sub", 0.5 if kind == "bass" else 0.4), ("cutoff", 0.35 if kind == "bass" else 0.45),
+                    ("resonance", 0.6 if kind == "bass" else 0.4), ("lfo-amt", 0), ("pitch-amt", 0), ("amode", 0), ("lfo-pitch", 0), ("pulse", 0.8),
+                    ("saw", 0), ("width", 0.2), ("pwm", 0), ("env", 0.55 if kind == "bass" else 0.45), ("wave", 0), ("noise", 0), ("filter", 0),
+                    ("decay", 0.35 if kind == "bass" else 0.4), ("fdecay", 0.35), ("drive", 0.3), ("glide", 0.3 if kind == "bass" else 0),
+                    ("sub-mode", 0), ("lfo-filter", 0), ("sustain", 0 if kind == "bass" else 0.6), ("attack", 0.02))}
+        take("ref", defaults, INST_PHRASE)
+        for k, v in INST_CONTROLS[kind]:
+            sets = dict(defaults); sets[k] = v
+            take(f"{k}-{v}", sets, INST_PHRASE)
+            take(f"{k}-{v}-back", defaults, [])   # put it back (and let it ring out) before the next
+        f = os.path.join(work, f"t_inst_{kind}.pd"); h.finish(t + 100, f)
+        p = subprocess.run([PD, "-nogui", "-nosound", "-nomidi", "-batch", "-path", PDLUA, "-lib", "pdlua", "-open", f],
+                           cwd=work, capture_output=True, text=True, timeout=900)
+        errs = [l for l in (p.stdout + p.stderr).splitlines() if "error" in l.lower() or "couldn't" in l]
+        assert not errs, errs[:5]
+        def load(path):
+            w = wv.open(path); sr = w.getframerate()
+            x = np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(float) / 32768
+            return x, sr
+        x, sr = load(os.path.join(work, f"{kind}-tune.wav"))
+        seg = list(x[int(0.4 * sr):int(1.2 * sr)])
+        f0 = cycles_per_second(seg, sr); want = 55 if kind == "bass" else 110
+        assert abs(f0 - want) < want * 0.08, f"{kind} plays {f0:.1f} Hz for an A, expected {want}"
+        ref, _ = load(os.path.join(work, f"{kind}-ref.wav"))
+        rr = np.sqrt((ref ** 2).mean())
+        assert rr > 0.03, f"{kind} is too quiet: rms {rr:.3f}"
+        weak = []
+        for name, path in cases:
+            if name in ("tune", "ref") or name.endswith("-back"): continue
+            y, _ = load(path); n = min(len(y), len(ref))
+            d = np.sqrt(((y[:n] - ref[:n]) ** 2).mean()) / rr
+            lvl = 20 * np.log10(np.sqrt((y ** 2).mean()) / rr + 1e-9)
+            if d < 0.2 or abs(lvl) > 14: weak.append(f"{name}: diff {d:.2f}, level {lvl:+.1f} dB")
+        assert not weak, f"{kind}: " + " | ".join(weak)
+        print(f"      {kind}: in tune ({f0:.1f} Hz), rms {rr:.2f}, {len(INST_CONTROLS[kind])} controls each change it")
+
+QUIET = "ockm-drums-on 0 ; ockm-bass-on 0 ; ockm-lead-on 0 ; ockm-chord-on 0 ; "
+
+def smp_files(work):
+    """Starter line 1 and 2 (hooks, deep) as tones, and one file of your own in samples/user."""
+    folder = os.path.join(work, "samples", "vox", "hooks", "deep")
+    os.makedirs(folder, exist_ok=True)
+    for i in range(1, 17):
+        write_tone(os.path.join(folder, f"{i:02d}.wav"), 440 if i == 1 else 330, 1.6, sr=48000)
+    user = os.path.join(work, "samples", "user", "voice")
+    os.makedirs(user, exist_ok=True)
+    write_tone(os.path.join(user, "b-second.wav"), 220, 0.5, sr=48000)
+    write_tone(os.path.join(user, "a-first.wav"), 880, 1.6, sr=44100)   # 44.1k: it must still play at its own pitch
+
+def onset(x, sr, after=0.0, level=0.02):
+    for i in range(int(after * sr), len(x)):
+        if abs(x[i]) > level:
+            return i / sr
+    return -1
+
+@test
+def samples_steps_play_to_the_end(work):
+    """v1.38 the samples part: a step starts its sample, which plays to its end (no gate), until a later step
+    takes over. A one-bar part repeats inside a longer loop. Your own file is found by its place in samples/user."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    smp_files(work)
+    h = Harness(); h.show("ockm-vox-load", "ockm-smp-user", "ockm-vox-which")
+    h.record(os.path.join(work, "smp.wav"))
+    # 120 bpm: a step is 125 ms, a bar 2 s. Step 0: line 1 (a 1.6 s tone). Step 12 (1.5 s): your first file
+    h.at(800, QUIET + "ockm-vox-len 16 ; ockm-vox-level 1 ; ockm-vox-pitch 0 ; ockm-pat-vox-smp const 0 ; ockm-pat-vox-fx const 0 ; "
+              "ockm-pat-vox-smp 0 1 ; ockm-pat-vox-smp 12 1001 ; ockm-bpm 120 ; ockm-play 1")
+    h.at(5200, "ockm-play 0")
+    out, (x, sr) = play(work, h, "t_smp", ms=5600)
+    loads = [v.split()[-1] for v in printed(out, "ockm-vox-load")]
+    users = [" ".join(v.split()[-2:]) for v in printed(out, "ockm-smp-user")]
+    assert loads[:2] and all(l.endswith("vox/hooks/deep/01.wav") for l in loads[:2]), f"line 1 on the 1 of each bar: {loads}"
+    assert users[:1] == ["voice 1"], f"your first voice file (by name) on step 12: {users}"
+    which = [int(float(v.split()[-1])) for v in printed(out, "ockm-vox-which")]
+    assert which[:4] == [1, 1001, 1, 1001], f"the one-bar part repeats in the loop: {which}"
+    t0 = onset(x, sr)
+    assert t0 > 0, "the sample should be heard: " + " | ".join(l for l in out.splitlines() if "error" in l.lower())[:400]
+    def seg(a, b): return x[int((t0 + a) * sr):int((t0 + b) * sr)]
+    # no gate: line 1 is still sounding a whole second in (a drum hit would be long gone), at its own pitch
+    late = seg(1.0, 1.4)
+    assert peak(late) > 0.02, f"the sample should play on past its step: {peak(late):.3f}"
+    assert abs(cycles_per_second(late, sr) - 440) < 30, f"still line 1 at 1.0 s: {cycles_per_second(late, sr):.0f} Hz"
+    # step 12 takes over: your file (880 Hz) from 1.5 s, not line 1
+    took = seg(1.6, 1.9)
+    assert abs(cycles_per_second(took, sr) - 880) < 60, f"the later step takes over: {cycles_per_second(took, sr):.0f} Hz"
+    # stopping the transport stops it
+    end = x[int(5.4 * sr):]
+    assert peak(end) < 0.01, f"stop should silence the sample: {peak(end):.3f}"
+
+@test
+def samples_old_scene_stays_quiet(work):
+    """The old vox settings (on, every, set, seed) make no steps, and no errors. A scene with no steps is quiet.
+    The two step tables are saved with a scene, and an older scene that lacks them clears them."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    smp_files(work)
+    h = Harness(); h.show("ockm-vox-load", "ockm-smp-user")
+    h.record(os.path.join(work, "old.wav"))
+    h.at(800, QUIET + "ockm-pat-vox-smp const 0 ; ockm-vox-on 1 ; ockm-vox-set 1 ; ockm-vox-voice 1 ; ockm-vox-every 1 ; "
+              "ockm-vox-seed 3 ; ockm-vox-pick 65535 ; ockm-vox-stut 1 ; ockm-vox-level 1 ; ockm-bpm 180 ; ockm-play 1")
+    h.at(3200, "ockm-play 0")
+    out, (x, sr) = play(work, h, "t_smpold", ms=3400)
+    assert not printed(out, "ockm-vox-load") and not printed(out, "ockm-smp-user"), "old vox settings must not invent steps"
+    errs = [l for l in out.splitlines() if "ockm-vox" in l and ("error" in l.lower() or "no such" in l.lower())]
+    assert not errs, errs
+    assert peak(x[int(0.9 * sr):int(3.0 * sr)]) < 0.01, "no steps, no sound"
+    store = open(os.path.join(work, "seq", "ockm-store.pd")).read()
+    for t in ("ockm-pat-vox-smp", "ockm-pat-vox-fx"):
+        assert f"add {t} 0" in store or t in store, f"{t} should be saved with a scene"
+    assert "ockm-pat-vox-smp const 0" in store and "ockm-vox-len 16" in store, "an older scene should load with no samples steps"
+
+@test
+def samples_length_and_extend(work):
+    """The samples part has its own length (1 to 16 bars) and counts in the loop. Growing it repeats its steps."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness(); h.show("ockm-len", "ockm-vox-load")
+    h.at(500, "ockm-lead-sync 0 ; ockm-drum-len 16 ; ockm-bass-len 16 ; ockm-lead-len 16 ; ockm-chord-len 16 ; "
+              "ockm-pat-vox-smp const 0 ; ockm-pat-vox-smp 3 5 ; ockm-pat-vox-fx 3 2 ; ockm-vox-len 16")
+    h.at(700, "ockm-vox-len 64")
+    h.at(900, "ockm-vox-len 256")
+    h.at(1100, "ockm-vox-len 32")
+    f = os.path.join(work, "t_smplen.pd"); h.finish(1300, f)
+    out = run(work, f)
+    lens = [int(float(v)) for v in printed(out, "ockm-len")]
+    assert 64 in lens and 256 in lens and lens[-1] == 32, f"the loop follows the samples part when it's longest: {lens}"
+    h2 = Harness(); h2.show("ockm-vox-load", "ockm-smp-fx", "ockm-vox-which", "ockm-smp-again")
+    h2.at(500, QUIET + "ockm-pat-vox-smp const 0 ; ockm-pat-vox-fx const 0 ; ockm-vox-len 16 ; ockm-pat-vox-smp 3 5 ; ockm-pat-vox-fx 3 2")
+    h2.at(700, "ockm-vox-len 32 ; ockm-drum-len 32 ; ockm-bpm 240 ; ockm-play 1")
+    h2.at(4600, "ockm-play 0")
+    f2 = os.path.join(work, "t_smpext.pd"); h2.finish(4800, f2)
+    out2 = run(work, f2)
+    loads = printed(out2, "ockm-vox-load")
+    which = [int(float(v)) for v in printed(out2, "ockm-vox-which")]
+    fx = [int(float(v)) for v in printed(out2, "ockm-smp-fx")]
+    assert len(which) >= 2 and all(w == 5 for w in which), f"bar 2 repeats bar 1 after growing: {which}"
+    assert len(loads) == 1 and loads[0].endswith("vox/hooks/deep/05.wav"), f"the file is read once, then replayed: {loads}"
+    assert len(printed(out2, "ockm-smp-again")) == len(which) - 1, "the same file again replays what's loaded"
+    assert fx and all(v == 2 for v in fx), f"the step's effect comes with it: {fx}"
+
+@test
+def samples_stutter_chops(work):
+    """A step with stutter restarts its sample every 16th, so the level jumps back up. Off, it just plays."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    smp_files(work)
+    def run_one(fx, name):
+        h = Harness(); h.record(os.path.join(work, name + ".wav"))
+        h.at(800, QUIET + f"ockm-vox-len 16 ; ockm-vox-level 1 ; ockm-vox-pitch 0 ; ockm-pat-vox-smp const 0 ; ockm-pat-vox-fx const 0 ; "
+                  f"ockm-pat-vox-smp 0 1 ; ockm-pat-vox-fx 0 {fx} ; ockm-bpm 180 ; ockm-play 1")
+        h.at(2500, "ockm-play 0")
+        _, (x, sr) = play(work, h, name, ms=2800)
+        return x, sr
+    def rises(x, sr):
+        t0 = max(0, onset(x, sr))
+        a, b, w = int(t0 * sr), int((t0 + 0.4) * sr), max(1, int(0.004 * sr))
+        env, i = [], a
+        while i + w < b:
+            seg = x[i:i + w]
+            env.append((sum(v * v for v in seg) / len(seg)) ** 0.5)
+            i += w // 2
+        top = max(env) if env else 0
+        if top < 0.01:
+            return 0
+        return sum(1 for i in range(1, len(env)) if env[i] > env[i - 1] + 0.2 * top)
+    plain, sr = run_one(0, "t_smpplain")
+    chopped, _ = run_one(1, "t_smpchop")
+    assert peak(plain) > 0.02 and peak(chopped) > 0.02, "the sample should be heard either way"
+    pr, cr = rises(plain, sr), rises(chopped, sr)
+    assert cr >= 2 and cr > pr, f"a stutter step should restart the sample: {cr} rises, play-through {pr}"
+
+@test
+def samples_delay_step_sends(work):
+    """A delay step sends the sample to the delay; an off step stays dry. Measured after the sample ends."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    folder = os.path.join(work, "samples", "vox", "hooks", "deep")
+    os.makedirs(folder, exist_ok=True)
+    for i in range(1, 17):
+        write_tone(os.path.join(folder, f"{i:02d}.wav"), 440, 0.15, sr=48000)
+    def run_one(fx, name):
+        h = Harness(); h.record(os.path.join(work, name + ".wav"))
+        h.at(800, QUIET + f"ockm-vox-len 16 ; ockm-vox-level 1 ; ockm-vox-verb 0 ; ockm-vox-delay 0 ; ockm-pat-vox-smp const 0 ; "
+                  f"ockm-pat-vox-fx const 0 ; ockm-pat-vox-smp 0 1 ; ockm-pat-vox-fx 0 {fx} ; ockm-bpm 120 ; ockm-play 1")
+        h.at(2600, "ockm-play 0")
+        _, (x, sr) = play(work, h, name, ms=2800)
+        return x, sr
+    dry, sr = run_one(0, "t_smpdry")
+    wet, _ = run_one(2, "t_smpdly")
+    t0 = onset(dry, sr)
+    tail = lambda x: peak(x[int((t0 + 0.3) * sr):int((t0 + 1.4) * sr)])
+    assert tail(wet) > 0.01 and tail(wet) > 4 * tail(dry), f"delay echoes after the sample: wet {tail(wet):.4f}, dry {tail(dry):.4f}"
+
+@test
+def instruments_arpeggiator_and_sequencer(work):
+    """v1.39: held keys through the arpeggiator play one at a time (up: 57 60 64 57...; down the other way), with no
+    transport running. With the arpeggiator off a key goes straight through. The sequencer's generator writes a pattern
+    in the key (every note in A minor) and plays it with the transport."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness(); h.show("ia-note", "ib-note")
+    h.at(300, "ockm-bpm 120 ; ia-arp 1 ; ia-arp-oct 1 ; ia-play note 57 100 ; ia-play note 60 100 ; ia-play note 64 100")
+    h.at(1300, "ia-play off 57 ; ia-play off 60 ; ia-play off 64")
+    h.at(1500, "ia-arp 2 ; ia-play note 57 100 ; ia-play note 64 100")
+    h.at(2000, "ia-play off 57 ; ia-play off 64 ; ia-arp 0")
+    h.at(2200, "ia-play note 50 100 ; ia-play off 50")
+    h.at(2400, "ockm-root 9 ; ockm-scale 0 ; ib-on 1 ; ib-len 16 ; ib-gstyle 0 ; ib-gbusy 1 ; ib-gen bang ; ockm-play 1")
+    h.at(4500, "ockm-play 0")
+    f = os.path.join(work, "t_arp.pd"); h.finish(4800, f)
+    out = run(work, f)
+    notes = [v.split() for v in printed(out, "ia-note")]
+    ons = [int(float(n[1])) for n in notes if n[0] == "note"]
+    first = ons[:6]
+    assert first == [57, 60, 64, 57, 60, 64], f"up: one at a time, lowest first: {ons}"
+    s_ = " ".join(map(str, ons))
+    assert " 64 57 64 57" in s_[s_.index("57 60 64"):].split(" 60 ")[-1] or "64 57 64 57" in s_, f"down: highest first: {ons}"
+    assert 50 in ons, "arpeggiator off: a key goes straight through"
+    errs = [l for l in out.splitlines() if "error" in l.lower()]
+    assert not errs, errs[:4]
+    bn = [int(float(v.split()[1])) for v in printed(out, "ib-note") if v.startswith("note")]
+    assert len(bn) >= 8, f"the generated pattern plays with the transport: {bn}"
+    minor = {9, 11, 0, 2, 4, 5, 7}
+    assert all(n % 12 in minor for n in bn), f"every note in A minor: {bn}"
+
+@test
+def instruments_analog_voices(work):
+    """v1.40 the Analog's voices: mono plays one note of three held, poly all three, chord mode plays the set chord from
+    one key, and unison stacks detuned voices on one note (they beat)."""
+    try:
+        import numpy as np
+    except ImportError:
+        raise Skip("numpy not installed")
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    import wave as wv
+    h = Harness(dut="ockm-inst-analog ia")
+    w_ = h.add("#X obj 600 40 writesf~ 1;"); r_ = h.add("#X obj 600 10 r test-wav;"); h.con(r_, w_); h.con(h.dut, w_)
+    common = "ia-pulse 0 ; ia-saw 1 ; ia-sub 0 ; ia-cutoff 0.9 ; ia-env 0 ; ia-resonance 0 ; ia-sustain 1 ; ia-attack 0 ; ia-glide 0 ; ia-lfo-pitch 0 ; ia-uni 0.6"
+    takes, t = [], 200
+    for name, mode, keys in (("mono", 0, (57, 61, 64)), ("poly", 3, (57, 61, 64)), ("chord", 2, (57,)), ("unison", 1, (57,))):
+        path = os.path.join(work, f"v-{name}.wav")
+        h.at(t, f"{common} ; ia-mode {mode} ; ia-ch1 4 ; ia-ch2 7 ; ia-ch3 0")
+        h.at(t + 100, f"test-wav open {path} , start")
+        for k in keys: h.at(t + 150, f"test-in note {k} 90")
+        h.at(t + 1150, "test-wav stop")
+        for k in keys: h.at(t + 1200, f"test-in off {k}")
+        h.at(t + 1250, "test-in panic")
+        takes.append((name, path)); t += 1600
+    f = os.path.join(work, "t_voices.pd"); h.finish(t, f)
+    p = subprocess.run([PD, "-nogui", "-nosound", "-nomidi", "-batch", "-path", PDLUA, "-lib", "pdlua", "-open", f], cwd=work, capture_output=True, text=True, timeout=300)
+    errs = [l for l in (p.stdout + p.stderr).splitlines() if "error" in l.lower()]
+    assert not errs, errs[:4]
+    def energy(path):
+        w = wv.open(path); sr = w.getframerate(); x = np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(float)
+        x = x[int(0.2 * sr):]; X = np.abs(np.fft.rfft(x * np.hanning(len(x)))); fr = np.fft.rfftfreq(len(x), 1 / sr)
+        band = lambda f0: X[(fr > f0 * 0.985) & (fr < f0 * 1.015)].max()
+        e = {n: band(440 * 2 ** ((n - 69) / 12)) for n in (57, 61, 64)}
+        top = max(e.values())
+        return {n: v / top for n, v in e.items()}, x, sr
+    got = {name: energy(path) for name, path in takes}
+    mono, poly, chord = got["mono"][0], got["poly"][0], got["chord"][0]
+    assert sum(1 for v in mono.values() if v > 0.3) == 1, f"mono plays one of the three: {mono}"
+    assert all(v > 0.3 for v in poly.values()), f"poly plays all three: {poly}"
+    assert all(v > 0.3 for v in chord.values()), f"one key in chord mode plays the chord (A, C#, E): {chord}"
+    # unison: four detuned copies beat, so the level wobbles
+    x, sr = got["unison"][1], got["unison"][2]
+    env = np.array([np.sqrt((x[i:i + 480] ** 2).mean()) for i in range(0, len(x) - 480, 480)])
+    assert env.std() / env.mean() > 0.05, f"unison should beat: {env.std() / env.mean():.3f}"
+
+@test
+def midi_out_plays_the_parts(work):
+    """v1.40 MIDI out: on channel 2 the bass sends note on/off; an accent goes out at 120, a plain note at 90; a glide
+    starts the new note before the old one stops (a slide on a TD-3); a mute lets go of what it holds; the chords send
+    all their notes; on 0 (this box only) nothing goes out."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness(dut="ockm-midiout bass")
+    pr = h.add("#X obj 400 80 print MB;"); h.con(h.dut, pr)
+    c = h.add("#X obj 600 40 ockm-midiout chord;"); pc = h.add("#X obj 600 80 print MC;"); h.con(c, pc)
+    h.at(100, "ockm-bass-midi 1 ; ockm-bass-mch 2 ; ockm-stepms 125")
+    h.at(150, "ockm-bass-notes-out 45 1 0 1")      # accent, held into the next
+    h.at(200, "ockm-bass-notes-out 48 0 1 1")      # glides in
+    h.at(250, "ockm-bass-mute 1")                  # muted: lets go
+    h.at(300, "ockm-bass-notes-out 50 0 0 0")      # muted: nothing
+    h.at(350, "ockm-bass-mute 0 ; ockm-bass-midi 0")
+    h.at(400, "ockm-bass-notes-out 52 0 0 0")      # this box only: nothing
+    h.at(450, "ockm-chord-midi 2 ; ockm-chord-mch 3 ; ockm-chord-notes-out 57 60 64 0 1")
+    f = os.path.join(work, "t_midiout.pd"); h.finish(1600, f)
+    out = run(work, f)
+    mb = [int(float(v)) for v in printed(out, "MB")]
+    trip = [tuple(mb[i:i + 3]) for i in range(0, len(mb) - 2, 3)]
+    assert trip[:3] == [(145, 45, 120), (145, 48, 90), (129, 45, 0)], f"accent on, glide overlaps: {trip}"
+    assert (129, 48, 0) in trip[3:], f"the mute lets go: {trip}"
+    assert not any(t[1] in (50, 52) for t in trip), f"muted, or this box only: nothing goes out: {trip}"
+    mc = [int(float(v)) for v in printed(out, "MC")]
+    ct = [tuple(mc[i:i + 3]) for i in range(0, len(mc) - 2, 3)]
+    assert [t[:2] for t in ct[:3]] == [(146, 57), (146, 60), (146, 64)], f"the chord's notes on channel 3: {ct}"
+    assert (130, 57, 0) in ct, f"and they let go after their length: {ct}"
+
+@test
+def midi_out_settings(work):
+    """v1.40 settings, MIDI out: the bass to MIDI, the lead's channel up: both sent, and kept."""
+    sys.path.insert(0, os.path.join(ROOT, "tests"))
+    import ui_preview
+    if not ui_preview.LUA:
+        raise Skip("no lua to run the screen")
+    L = ui_preview.run(["test tap 150 36", "test tap 93 384", "test tap 450 251", "test tap 828 309"])   # v1.49 drums first
+    assert "sent ockm-bass-midi float 1" in L, [l for l in L if "-midi" in l]
+    assert "sent ockm-lead-mch float 3" in L, [l for l in L if "-mch" in l]
+
+@test
+def drums_go_out_over_midi(work):
+    """v1.49 drums out: each hit a note on channel 10, velocity from its strength (an accent 127); by sound a kick is 36 and
+    a closed hat 42, on pads slot 4 is 39; a muted slot and drums switched off send nothing. In the patch, the drum hits
+    reach the MIDI out as they play, and on MIDI only the box's drums go quiet."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness(dut="ockm-midiout drums")
+    pr = h.add("#X obj 400 80 print MD;"); h.con(h.dut, pr)
+    h.at(100, "ockm-drums-midi 1 ; ockm-drums-mch 10")
+    h.at(150, "ockm-drums-notes-out d1 1")
+    h.at(250, "ockm-drums-notes-out d4 0.7")
+    h.at(350, "ockm-d2-mute 1 ; ockm-drums-notes-out d2 1")
+    h.at(450, "ockm-drums-map 1 ; ockm-drums-notes-out d4 0.7")
+    h.at(550, "ockm-drums-on 0 ; ockm-drums-notes-out d1 1")
+    h.at(650, "ockm-drums-on 1 ; ockm-drums-midi 0 ; ockm-drums-notes-out d1 1")
+    f = os.path.join(work, "t_dmo.pd"); h.finish(900, f)
+    md = [int(float(v)) for v in printed(run(work, f), "MD")]
+    ons = [tuple(md[i:i + 3]) for i in range(0, len(md) - 2, 3) if md[i] == 153]
+    assert ons == [(153, 36, 127), (153, 42, 89), (153, 39, 89)], f"kick, closed hat, then slot 4 on pads; nothing muted or off: {ons}"
+    assert (137, 36, 0) in [tuple(md[i:i + 3]) for i in range(0, len(md) - 2, 3)], "the notes let go"
+    try:
+        import numpy as np
+    except ImportError:
+        raise Skip("numpy not installed")
+    def rec(name, midi):
+        h = Harness(); h.show("ockm-drums-notes-out"); h.record(os.path.join(work, name + ".wav"))
+        h.at(100, f"ockm-bass-on 0 ; ockm-lead-on 0 ; ockm-chord-on 0 ; ockm-drums-midi {midi} ; ockm-play 1")
+        h.at(2100, "ockm-play 0"); f = os.path.join(work, name + ".pd"); h.finish(2300, f)
+        out = run(work, f)
+        wv = wave.open(os.path.join(work, name + ".wav"))
+        x = np.frombuffer(wv.readframes(wv.getnframes()), np.int16).astype(float)
+        return printed(out, "ockm-drums-notes-out"), np.sqrt((x ** 2).mean()) / 32768
+    hits0, a0 = rec("dm0", 0)
+    hits1, a1 = rec("dm1", 1)
+    assert len(hits1) >= 4 and any(hh.split()[-2:][0] == "d1" for hh in hits1), f"the hits reach the MIDI out: {hits1[:6]}"
+    assert a0 > 0.01 and a1 < a0 * 0.1, f"MIDI only: the box's drums go quiet ({a1:.4f} against {a0:.4f})"
+
+@test
+def drmz_plays_its_groove(work):
+    """v1.40 drmz: picking a groove and new writes it, the transport plays it (kick on the beat), the drums make sound,
+    a muted voice stays quiet, and nothing plays while drmz isn't picked."""
+    try:
+        import numpy as np
+    except ImportError:
+        raise Skip("numpy not installed")
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    import wave as wv
+    h = Harness(); h.show("iz-hit", "test-mark")
+    wav = os.path.join(work, "drmz.wav"); h.record(wav)
+    h.at(300, "ockm-bpm 120 ; iz-on 1 ; iz-len 16 ; iz-gstyle 0 ; iz-gbusy 0 ; iz-gen bang")
+    h.at(400, f"test-wav open {wav} , start ; ockm-play 1")
+    h.at(2400, "ockm-z1-mute 1 ; test-mark 1")
+    h.at(4400, "ockm-z1-mute 0 ; iz-on 0 ; test-mark 2")
+    h.at(5400, "ockm-play 0 ; test-wav stop")
+    f = os.path.join(work, "t_drmz.pd"); h.finish(5600, f)
+    out = run(work, f)
+    errs = [l for l in out.splitlines() if "error" in l.lower()]
+    assert not errs, errs[:4]
+    lines = out.splitlines()
+    def hits(a, b):
+        seg = lines[a:b]
+        return [int(float(l.split(":", 1)[1].split()[0])) for l in seg if l.startswith("iz-hit:")]
+    im = next(i for i, l in enumerate(lines) if l.startswith("test-mark: 1")); io = next(i for i, l in enumerate(lines) if l.startswith("test-mark: 2"))
+    before, muted, off = hits(0, im), hits(im, io), hits(io, len(lines))
+    assert before.count(1) >= 3, f"the kick plays on the beat: {before}"
+    assert muted and 1 not in muted, f"a muted kick stays quiet, the rest play on: {muted}"
+    assert not off, f"nothing plays once drmz isn't picked: {off}"
+    w = wv.open(wav); x = np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(float) / 32768
+    rms = np.sqrt((x[: w.getframerate() * 2] ** 2).mean())
+    assert rms > 0.02, f"the drums should be heard: rms {rms:.4f}"
+
+@test
+def bass_and_lead_play_the_synths(work):
+    """v1.45 the Bass synth is the bass part's engine 8 and the Analog the lead's engine 7: each plays its part's
+    pattern, at the level of the part's other engines, and the synth's own settings change the sound (cutoff up, brighter)."""
+    try:
+        import numpy as np
+    except ImportError:
+        raise Skip("numpy not installed")
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    import wave as wv
+    takes = []
+    def take(name, part, others, eng, extra):
+        h = Harness()
+        wav = os.path.join(work, name + ".wav"); h.record(wav)
+        h.at(300, f"ockm-drums-on 0 ; ockm-{others[0]}-on 0 ; ockm-{others[1]}-on 0 ; ockm-{part}-on 1 ; ockm-{part}-engine {eng} ; ockm-bpm 124 ; ockm-{part}-gen bang" + extra)
+        h.at(800, f"test-wav open {wav} , start ; ockm-play 1")
+        h.at(4800, "ockm-play 0 ; test-wav stop")
+        f = os.path.join(work, name + ".pd"); h.finish(5000, f)
+        out = run(work, f, timeout=120)
+        errs = [l for l in out.splitlines() if "error" in l.lower()]
+        assert not errs, errs[:3]
+        w = wv.open(wav); sr = w.getframerate(); x = np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(float) / 32768
+        X = np.abs(np.fft.rfft(x)); fr = np.fft.rfftfreq(len(x), 1 / sr)
+        P = X ** 2
+        return np.sqrt((x ** 2).mean()), (X * fr).sum() / max(X.sum(), 1e-9), P[fr > 3000].sum() / max(P.sum(), 1e-12)
+    b5 = take("b5", "bass", ("lead", "chord"), 5, "")
+    b8 = take("b8", "bass", ("lead", "chord"), 8, " ; ib-cutoff 0.15")
+    b8o = take("b8o", "bass", ("lead", "chord"), 8, " ; ib-cutoff 0.8")
+    b8d = take("b8d", "bass", ("lead", "chord"), 8, "")   # v1.46 its own starting sound
+    l4 = take("l4", "lead", ("bass", "chord"), 4, "")
+    l7 = take("l7", "lead", ("bass", "chord"), 7, "")
+    assert b8[0] > 0.004 and l7[0] > 0.004, f"the synths play their parts: bass {b8[0]:.4f}, lead {l7[0]:.4f}"
+    assert 0.33 < b8o[0] / b5[0] < 3 and 0.5 < l7[0] / l4[0] < 2, f"level-matched: {b8o[0]:.4f}/{b5[0]:.4f}, {l7[0]:.4f}/{l4[0]:.4f}"
+    assert b8o[1] > b8[1] * 1.3, f"the Bass synth's cutoff opens it up: {b8[1]:.0f} -> {b8o[1]:.0f} Hz"
+    assert b8d[2] < 2.5 * b5[2], f"v1.46 not fizzy: the Bass synth's top end (above 3 kHz) near the default engine's: {100*b8d[2]:.2f}% vs {100*b5[2]:.2f}%"
+
+@test
+def midi_channels_play_the_parts(work):
+    """v1.45 notes on the bass's channel (1) play the bass: on the Bass synth through its keys (and arpeggiator); notes on
+    the lead's channel (2) play the lead, here on another engine, held until the key lets go. Other channels stay pads."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness(); h.show("ib-note", "ockm-lead-live", "ockm-bass-live")
+    h.at(400, "ockm-bass-engine 8 ; ockm-lead-engine 4")
+    h.at(600, "ockm-midi-note 40 100 1"); h.at(700, "ockm-midi-note 40 0 1")
+    h.at(800, "ockm-midi-note 64 80 2"); h.at(900, "ockm-midi-note 64 0 2")
+    h.at(1000, "ockm-midi-note 70 90 5")
+    f = os.path.join(work, "t_mch.pd"); h.finish(1300, f)
+    out = run(work, f)
+    errs = [l for l in out.splitlines() if "error" in l.lower()]
+    assert not errs, errs[:3]
+    ib = printed(out, "ib-note")
+    assert any(v.startswith("note 40") for v in ib) and any(v.startswith("off 40") for v in ib), ib
+    ll = printed(out, "ockm-lead-live")
+    assert ll and ll[0].split()[:2] == ["64", "0"] and "off" in ll[-1], ll
+    assert not printed(out, "ockm-bass-live"), "the bass is on the synth: its keys, not the engine directly"
+
+@test
+def synth_pages_from_the_part(work):
+    """v1.45 on the bass tab, picking the bass synth makes its quick knobs the synth's (cutoff and so on) and shows edit;
+    edit opens the synth's page (volume included) over the groovebox, which isn't switched off; back returns to the tab.
+    The menu has no start screen any more."""
+    sys.path.insert(0, os.path.join(ROOT, "tests"))
+    import ui_preview
+    if not ui_preview.LUA:
+        raise Skip("no lua to run the screen")
+    L = ui_preview.run(["test tap 363 36", "test tap 866 350", "test drag 520 397 640 397",
+                        "test tap 859 314", "test drag 760 36 710 36", "test tap 41 36", "paint back", "test tap 919 36", "paint menu"])
+    sent = [l for l in L if l.startswith("sent ")]
+    assert "sent ockm-bass-engine float 8" in sent, [l for l in sent if "engine" in l]
+    assert "sent ib-resonance float 0.35" in sent and "sent ib-env float 0.35" in sent, "picking it loads a starting sound that sits in the groovebox"
+    cut = [float(l.split()[-1]) for l in sent if l.startswith("sent ib-cutoff float")]
+    assert cut and cut[-1] > 0.4, f"the quick knob moves the synth's cutoff: {cut}"
+    lv = [float(l.split()[-1]) for l in sent if l.startswith("sent ib-level float")]
+    assert lv and lv[-1] < 0.5, f"the page's volume: {lv}"
+    assert not any(l.startswith("sent ockm-inst-mode") or l.startswith("sent ib-on") for l in sent), "the groovebox keeps playing"
+    i0, i1 = L.index("begin back"), L.index("end back")
+    assert any("edit the bass synth" in l for l in L[i0:i1]), "back on the bass tab"
+    i0, i1 = L.index("begin menu"), L.index("end menu")
+    assert not any("start screen" in l for l in L[i0:i1]), "no start screen in the menu"
+
+@test
+def projects_table_and_the_name_under_the_tempo(work):
+    """v1.47 the project screen lists projects as a table (name, made, last saved, scenes, tempo and key, style), newest
+    first; tapping a heading sorts by it (name: a to z). The project you're in and its scene show under the tempo."""
+    sys.path.insert(0, os.path.join(ROOT, "tests"))
+    import ui_preview
+    if not ui_preview.LUA:
+        raise Skip("no lua to run the screen")
+    L = ui_preview.run(["send ockm-project-name symbol 2026-10-22-quiet-fox-v19", "test tap 919 36", "test tap 830 95", "paint t1",
+                        "test tap 120 169", "paint t2"])
+    def texts(tag):
+        i0, i1 = L.index("begin " + tag), L.index("end " + tag)
+        return [" ".join(l.split()[4:]) for l in L[i0:i1] if l.startswith("text ")]
+    t1, t2 = texts("t1"), texts("t2")
+    for h in ("name", "last saved", "scenes", "tempo key", "style"):
+        assert any(x.startswith(h) for x in t1), f"heading {h}: {t1[:20]}"
+    rows = lambda t: [x for x in t if x in ("amber heron", "neon otter", "dusty lantern", "default")]
+    assert rows(t1)[0] == "dusty lantern", f"newest first: {rows(t1)}"
+    assert rows(t2)[:3] == ["amber heron", "default", "dusty lantern"], f"by name: {rows(t2)}"
+    assert any("quiet fox · S" in x for x in t1), "the project and its scene under the tempo"
+
+@test
+def new_project_starts_with_the_lead_empty(work):
+    """v1.47 a new blank project's lead is empty, like the bass and chords (it used to start on the same motif every time)."""
+    if not PDLUA:
+        raise Skip("pdlua not found (set PDLUA=/folder/with/pdlua)")
+    h = Harness(); h.show("ockm-lead-notes-out", "test-mark")
+    m = "ockm-ui-test"
+    h.at(500, f"{m} tap 919 36"); h.at(600, f"{m} tap 830 95"); h.at(700, f"{m} tap 808 100")   # menu, project, new blank
+    h.at(2000, "ockm-play 1 ; test-mark 1"); h.at(5000, "ockm-play 0")
+    f = os.path.join(work, "t_newlead.pd"); h.finish(5200, f)
+    out = run(work, f)
+    lines = out.splitlines()
+    i = next(k for k, l in enumerate(lines) if l.startswith("test-mark: 1"))
+    played = [l for l in lines[i:] if l.startswith("ockm-lead-notes-out:")]
+    assert not played, f"the lead should be empty: {played[:6]}"
+
+@test
+def usb_audio_outputs(work):
+    """v1.48 USB audio out: besides the mix (outputs 1-2), the box sends drum slot 1 (the kick) to 3, the rest of the drums
+    to 4 (the drums less the kick, so the parts add up to the mix), then bass, lead, chords, samples and effects to 5-9.
+    The Pi start-up opens 9 outputs and the USB device has 9 channels."""
+    rec = open(os.path.join(work, "seq", "ockm-recorder.pd")).read()
+    for n in range(3, 10):
+        assert f"dac~ {n};" in rec, f"output {n}"
+    assert "catch~ ockm-usb-kick" in rec and "-~;" in rec, "the kick, and the drums less the kick"
+    main = open(os.path.join(work, "OCKM_GENERATOR.pd")).read()
+    assert main.count("throw~ ockm-usb-kick") == 1, "only drum slot 1 goes to the kick channel"
+    st = open(os.path.join(ROOT, "tools", "pi", "ockm-start.sh")).read()
+    ua = open(os.path.join(ROOT, "tools", "pi", "ockm-usb-audio.sh")).read()
+    assert "-outchannels 9" in st and "0x1ff > $F/p_chmask" in ua, "9 outputs, 9 USB channels"
+    assert "aplay -l 2>/dev/null | grep -q UAC2Gadget" in st, "only when the USB device is there: otherwise the DAC as before"
+
+@test
+def saves_are_power_cut_safe(work):
+    """v1.49 saving writes each file as <file>.new first, then renames it over the old one (one step), so a power cut
+    can't leave a half-written or empty file. After saving: the files are whole, nothing .new is left lying about, and
+    a file left half-written by a cut (here: a stray .new) doesn't stop the project loading."""
+    h = Harness()
+    h.at(300, "ockm-bpm 131 ; ockm-save bang")
+    f = os.path.join(work, "t_safe.pd"); h.finish(1200, f)
+    out = run(work, f)
+    errs = [l for l in out.splitlines() if "error" in l.lower()]
+    assert not errs, errs[:4]
+    left = [os.path.join(dp, fn) for dp, _, fns in os.walk(os.path.join(work, "projects")) for fn in fns if fn.endswith(".new")]
+    assert not left, f"nothing half-written left: {left}"
+    pj = open(os.path.join(work, "projects", "default", "project.txt")).read()
+    assert "ockm-bpm 131" in pj, "the save is in the file"
+    open(os.path.join(work, "projects", "default", "project.txt.new"), "w").write("ockm-bpm 9")   # a cut mid-save
+    h = Harness(); h.show("ockm-bpm")
+    f = os.path.join(work, "t_safe2.pd"); h.finish(800, f)
+    out = run(work, f)
+    assert "131" in " ".join(printed(out, "ockm-bpm")) or not printed(out, "ockm-bpm"), "the whole file is the one read"
+
+@test
+def menu_shut_down_asks_first(work):
+    """v1.43 on the Pi, the menu has shut down: the first tap asks, the second switches the Pi off (a stand-in command
+    here). Off the Pi it isn't there."""
+    sys.path.insert(0, os.path.join(ROOT, "tests"))
+    import ui_preview
+    if not ui_preview.LUA:
+        raise Skip("no lua to run the screen")
+    flag = os.path.join(work, "shutdown-ran")
+    old = dict(os.environ)
+    try:
+        os.environ["OCKM_KIOSK"] = "1"; os.environ["OCKM_SHUTDOWN_CMD"] = f"touch {flag}"
+        L = ui_preview.run(["test screen perform", "test tap 919 36", "paint m1", "test tap 830 445", "paint m2"])
+        import time; time.sleep(0.3)
+        def texts(tag):
+            i0, i1 = L.index("begin " + tag), L.index("end " + tag)
+            return " ".join(l for l in L[i0:i1] if l.startswith("text "))
+        assert "shut down" in texts("m1"), "the menu offers shut down on the Pi"
+        assert "tap again to shut down" in texts("m2"), "the first tap asks"
+        assert not os.path.exists(flag), "one tap doesn't switch it off"
+        L = ui_preview.run(["test screen perform", "test tap 919 36", "test tap 830 445", "test tap 830 445"])
+        time.sleep(0.5)
+        assert os.path.exists(flag), "the second tap switches it off"
+    finally:
+        os.environ.clear(); os.environ.update(old)
+    L = ui_preview.run(["test screen perform", "test tap 919 36", "paint m3"])
+    i0, i1 = L.index("begin m3"), L.index("end m3")
+    assert not any("shut down" in l for l in L[i0:i1]), "not on the Mac"
+
+@test
+def drmz_voices_start_on_their_own_sounds(work):
+    """v1.41 each drmz voice starts on its own sound (kick, snare, clap, perc, hat, open hat, tom, perc 2), even with a
+    scene from before drmz, which has none of its settings."""
+    t = open(os.path.join(work, "voices", "ockm-drmz.pd")).read()
+    for k in range(8):
+        assert f"ockm-z{k + 1}-sound {k}" in t, f"voice {k + 1} should start on sound {k}"
+
+@test
+def samples_screen_places_steps(work):
+    """v1.38 the samples tab: your files are listed, arming one plays it, a step takes the sample and effect,
+    the same pair clears it and a different one replaces it. The part's length and bar pages work like the others."""
+    sys.path.insert(0, os.path.join(ROOT, "tests"))
+    import ui_preview
+    if not ui_preview.LUA:
+        raise Skip("no lua to run the screen")
+    L = ui_preview.run([
+        "test tap 530 36",                       # the samples tab (scans samples/user)
+        "test tap 64 322",                       # your first file
+        "test tap 740 318",                      # delay
+        "test tap 46 166", "test tap 46 166",    # place it, then the same pair clears it
+        "test tap 46 166", "test tap 870 318", "test tap 46 166",   # place it, then verb replaces it
+        "test tap 724 88",                       # 4 bars
+        "test tap 194 88", "test tap 46 166",    # the next bar, its first step
+        "test tap 866 426", "test tap 866 426",  # clear all (asks first)
+        "paint smp",
+    ])
+    sent = [l for l in L if l.startswith("sent ockm-pat-vox") or l.startswith("sent ockm-smp-play") or l.startswith("sent ockm-vox-len")]
+    assert "sent ockm-samples-scan bang " in L or any(l.startswith("sent ockm-samples-scan") for l in L), "opening the tab looks for new files"
+    assert sent[0] == "sent ockm-smp-play list 1001 0", sent
+    want = [
+        "sent ockm-pat-vox-smp list 0 1001", "sent ockm-pat-vox-fx list 0 2",
+        "sent ockm-pat-vox-smp list 0 0", "sent ockm-pat-vox-fx list 0 0",
+        "sent ockm-pat-vox-smp list 0 1001", "sent ockm-pat-vox-fx list 0 2",
+        "sent ockm-pat-vox-smp list 0 1001", "sent ockm-pat-vox-fx list 0 3",
+        "sent ockm-vox-len float 64",
+        "sent ockm-pat-vox-smp list 16 1001", "sent ockm-pat-vox-fx list 16 3",
+        "sent ockm-pat-vox-smp const 0", "sent ockm-pat-vox-fx const 0",
+    ]
+    assert sent[1:] == want, sent
+    txt = [l for l in L if l.startswith("text ")]
+    assert any("everybody" in l for l in txt), "your file's name should show"
+    # the robot tab: all the computer voices in one place, set and voice picked inside
+    R = ui_preview.run(["test tap 530 36", "test tap 335 272", "test tap 170 318", "test tap 600 318", "test tap 64 370"])
+    plays = [l for l in R if l.startswith("sent ockm-smp-play")]
+    assert plays == ["sent ockm-smp-play list 49 0"], f"robot, jack, flat, line 1 is 32 + 16 + 1: {plays}"
 
 def main():
     if not PD:

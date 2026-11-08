@@ -131,6 +131,7 @@ function cm:build(nofit)
   if not nofit and #p ~= v.len then
     local n = math.max(#p, 16)
     self.fitting = true
+    pd.send("ockm-" .. t .. "-fitting", "float", { n })   -- v1.49 the length coming next is the progression's (a following lead keeps 4 bars)
     pd.send("ockm-" .. t .. "-len", "float", { n })
     self.fitting = false
     v.len = n

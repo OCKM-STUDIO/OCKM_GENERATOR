@@ -61,6 +61,8 @@
 #X obj 690 140 expr 1-(0.008*\$f1+0.035*\$f1*\$f1*\$f1) \; 1-0.4*(0.008*\$f1+0.035*\$f1*\$f1*\$f1) \; 1+0.4*(0.008*\$f1+0.035*\$f1*\$f1*\$f1) \; 1+(0.008*\$f1+0.035*\$f1*\$f1*\$f1);
 #X obj 780 140 expr 2+1200*pow(\$f1\, 2.2);
 #X obj 870 140 expr 40+3000*\$f1*\$f1;
+#X obj 80 330 *~ 1;
+#X obj 600 170 expr 1+0.5*(pow(\$f1\, 2)-0.25);
 #X connect 1 0 3 1;
 #X connect 0 0 4 0;
 #X connect 4 1 5 0;
@@ -96,7 +98,8 @@
 #X connect 6 0 15 0;
 #X connect 24 0 30 0;
 #X connect 30 0 31 0;
-#X connect 31 0 13 0;
+#X connect 31 0 45 0;
+#X connect 45 0 13 0;
 #X connect 26 0 27 0;
 #X connect 27 0 28 0;
 #X connect 28 0 29 0;
@@ -166,6 +169,8 @@
 #X obj 690 140 expr 1-(0.008*\$f1+0.035*\$f1*\$f1*\$f1) \; 1-0.4*(0.008*\$f1+0.035*\$f1*\$f1*\$f1) \; 1+0.4*(0.008*\$f1+0.035*\$f1*\$f1*\$f1) \; 1+(0.008*\$f1+0.035*\$f1*\$f1*\$f1);
 #X obj 780 140 expr 2+1200*pow(\$f1\, 2.2);
 #X obj 870 140 expr 40+3000*\$f1*\$f1;
+#X obj 80 330 *~ 1;
+#X obj 600 170 expr 1+0.5*(pow(\$f1\, 2)-0.25);
 #X connect 1 0 3 1;
 #X connect 0 0 4 0;
 #X connect 4 1 5 0;
@@ -201,7 +206,8 @@
 #X connect 6 0 15 0;
 #X connect 24 0 30 0;
 #X connect 30 0 31 0;
-#X connect 31 0 13 0;
+#X connect 31 0 45 0;
+#X connect 45 0 13 0;
 #X connect 26 0 27 0;
 #X connect 27 0 28 0;
 #X connect 28 0 29 0;
@@ -272,6 +278,8 @@
 #X obj 690 140 expr 1-(0.008*\$f1+0.035*\$f1*\$f1*\$f1) \; 1-0.4*(0.008*\$f1+0.035*\$f1*\$f1*\$f1) \; 1+0.4*(0.008*\$f1+0.035*\$f1*\$f1*\$f1) \; 1+(0.008*\$f1+0.035*\$f1*\$f1*\$f1);
 #X obj 780 140 expr 2+1200*pow(\$f1\, 2.2);
 #X obj 870 140 expr 40+3000*\$f1*\$f1;
+#X obj 80 330 *~ 1;
+#X obj 600 170 expr 1+0.5*(pow(\$f1\, 2)-0.25);
 #X connect 1 0 3 1;
 #X connect 0 0 4 0;
 #X connect 4 1 5 0;
@@ -307,7 +315,8 @@
 #X connect 6 0 15 0;
 #X connect 24 0 30 0;
 #X connect 30 0 31 0;
-#X connect 31 0 13 0;
+#X connect 31 0 45 0;
+#X connect 45 0 13 0;
 #X connect 26 0 27 0;
 #X connect 27 0 28 0;
 #X connect 28 0 29 0;
@@ -378,6 +387,8 @@
 #X obj 690 140 expr 1-(0.008*\$f1+0.035*\$f1*\$f1*\$f1) \; 1-0.4*(0.008*\$f1+0.035*\$f1*\$f1*\$f1) \; 1+0.4*(0.008*\$f1+0.035*\$f1*\$f1*\$f1) \; 1+(0.008*\$f1+0.035*\$f1*\$f1*\$f1);
 #X obj 780 140 expr 2+1200*pow(\$f1\, 2.2);
 #X obj 870 140 expr 40+3000*\$f1*\$f1;
+#X obj 80 330 *~ 1;
+#X obj 600 170 expr 1+0.5*(pow(\$f1\, 2)-0.25);
 #X connect 1 0 3 1;
 #X connect 0 0 4 0;
 #X connect 4 1 5 0;
@@ -413,7 +424,8 @@
 #X connect 6 0 15 0;
 #X connect 24 0 30 0;
 #X connect 30 0 31 0;
-#X connect 31 0 13 0;
+#X connect 31 0 45 0;
+#X connect 45 0 13 0;
 #X connect 26 0 27 0;
 #X connect 27 0 28 0;
 #X connect 28 0 29 0;

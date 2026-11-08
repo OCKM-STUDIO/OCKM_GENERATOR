@@ -25,11 +25,20 @@ Tests drive it headless through the receive name ockm-ui-test:
 local ui = pd.Class:new():register("ockm-ui")
 
 local W, H = 960, 600
-local VERSION = "v1.31"   -- shown on screen, so you can tell which version plugdata has loaded
+local VERSION = "v1.49"   -- shown on screen, so you can tell which version plugdata has loaded
 
+-- Core grey. on is a chosen thing. acc is only what is happening now (play, a wait, the playhead, an unsaved save).
+-- acc and accfg are the red default; apply_theme swaps in the colour saved on this device.
 local THEMES = {
-  dark  = { bg="#141414", card="#1e1e1e", off="#2a2a2a", on="#ededed", acc="#ff5a24", mute="#7a7a7a", txt="#ededed", dim="#3a3a3a", beat="#383838" },
-  light = { bg="#f4f3ef", card="#ffffff", off="#e4e2dc", on="#1a1a1a", acc="#ff4f1a", mute="#9a9890", txt="#1a1a1a", dim="#cfccc4", beat="#d6d3cc" },
+  dark  = { bg="#2A2A28", card="#363634", off="#444442", on="#C2C2BE", acc="#C43732", accfg="#FFFFFF", mute="#B0B0AA", txt="#E8E8E4", dim="#5C5C58", beat="#555552" },
+  light = { bg="#D9D9D6", card="#E4E4E1", off="#ECECEA", on="#3F3F3C", acc="#C4262E", accfg="#FFFFFF", mute="#4F4F4A", txt="#111111", dim="#B5B5B1", beat="#C8C8C4" },
+}
+local ACCENT_ORDER = { "red", "orange", "blue", "teal", "wine", "green", "violet", "plain" }
+local ACCENTS = {
+  red = { light="#C4262E", dark="#C43732" }, orange = { light="#B84300", dark="#B84300" },
+  blue = { light="#1E4BB5", dark="#3C6FE0" }, teal = { light="#0E6A62", dark="#1A8C82" },
+  wine = { light="#8E3048", dark="#B44860" }, green = { light="#187A32", dark="#2F9A4A" },
+  violet = { light="#6B3BB8", dark="#8E68D8" }, plain = {},
 }
 
 local SLOTS   = { "d1","d2","d3","d4","d5","d6","d7","d8" }
@@ -40,17 +49,38 @@ local SHORT   = { "kick","snare","clap","perc 1","hat","open hat","tom","perc 2"
 local FOLDERS   = { "kick","snare","clap","perc","hat","open hat","tom" }
 local SOUND_DIR = { 1, 2, 3, 4, 5, 6, 7, 4 }   -- perc 1 and perc 2 share the perc folder
 local SYNTHS  = { "bass","lead","chord" }
-local TRACKS  = { "d1","d2","d3","d4","d5","d6","d7","d8","bass","lead","chord" }
+local TRACKS  = { "d1","d2","d3","d4","d5","d6","d7","d8","bass","lead","chord","vox" }
+local VOX_SETS = { "hooks", "jack", "techno" }
+local VOX_VOICES = { "deep", "flat" }
+local VOX_ALL = 65535   -- bit 0 is line 1. all 16 on, so an old scene still says every line
+local VOX_LINES = {
+  { "stay with me", "feel it rising", "hold on", "keep it warm", "deeper still", "let it carry you", "we keep moving", "soft light",
+    "don't let go", "in time", "breathe it in", "this is ours", "closer now", "all the way", "stay a while", "feel the night" },
+  { "move your feet", "work the floor", "can you move", "let it jack", "hands in the air", "ride the bass", "in the pocket", "keep it rolling",
+    "feel that kick", "now move", "the house is open", "step to it", "jack the groove", "on the floor", "keep dancing", "let the bassline move you" },
+  { "move", "forward", "the signal", "align", "system online", "one", "two", "three", "four",
+    "proceed", "hold the line", "no turning back", "enter", "the grid", "stay in time", "continue" },
+}
+local function vox_mask(v)
+  local m = math.floor(tonumber(v) or VOX_ALL)
+  if m < 0 then m = VOX_ALL end
+  m = m & VOX_ALL
+  if m == 0 then m = 1 end
+  return m
+end
+local function vox_has(m, i)
+  return (m & (1 << (i - 1))) ~= 0
+end
 local NOTES   = { "C","C#","D","D#","E","F","F#","G","G#","A","A#","B" }
 local SCALES  = { {0,2,3,5,7,8,10}, {0,2,4,5,7,9,11}, {0,2,3,5,7,9,10}, {0,1,3,5,7,8,10}, {0,2,4,5,7,9,10}, {0,2,3,5,7,8,11} }
 local SCALE_NAMES = { "minor","major","dorian","phrygian","mixo","harm min" }
-local MONO_ENG  = { "acid","sub 808","fm","reese","pluck","analogue","donk","raw" }
+local MONO_ENG  = { "acid","sub 808","fm","reese","pluck","analogue","donk","raw","bass synth","pulse" }   -- v1.45 8 is the Bass synth (was swarm)   -- v1.39 swarm 8, pulse 9 (from the instruments)
 -- the order the engines are shown in (v0.98: six bass, four lead, four chord). Numbers match ockm-<part>-engine, which
 -- keep their old values so saved projects load; retired ones (bass pluck, lead acid and juno, chord pad and strings) are
 -- left off and moved on to their replacements (RETIRED, below)
-local MONO_ORDER = { 5, 0, 1, 3, 2, 6, 7 }
-local LEAD_ENG  = { "acid","juno","dx","sync","mini","supersaw","raw" }
-local LEAD_ORDER = { 4, 2, 3, 5, 6 }
+local MONO_ORDER = { 5, 0, 1, 3, 2, 6, 7, 8, 9 }
+local LEAD_ENG  = { "acid","juno","dx","sync","mini","supersaw","raw","analog" }   -- v1.45 7 is the Analog synth (was pulse)   -- v1.39 pulse 7
+local LEAD_ORDER = { 4, 2, 3, 5, 6, 7 }
 local CHORD_ENG = { "stab","organ","pad","piano","rhodes","strings","hard" }
 local CHORD_ORDER = { 0, 6, 1, 3, 4 }
 local HIDE_CHORD_RHY = { [6]=true, [7]=true }
@@ -66,22 +96,25 @@ local PROG_ORDER = { 0, 1, 12, 13, 14, 15, 3, 16, 17, 5, 6, 7, 2, 10, 11, 18, 9 
 -- names shown on screen, where they differ from the engine's own
 -- v1.23 bus effects: three buses, one effect slot each, played from the fx page's XY pad (one finger) and from macros
 local BUSES = { "drums", "music", "master" }
-local BFX = { "filter", "crush", "drive", "saturate" }          -- ockm-bfx-<bus>-type 0-3
+local BFX = { "filter", "crush", "drive", "saturate", "gate" }  -- ockm-bfx-<bus>-type 0-4 (v1.49 gate)
 local BFX_DEF = { drums = 1, music = 0, master = 3 }
-local BFX_P = { filter = 0, crush = 0.2, drive = 0.3, saturate = 0.4 }
+local BFX_P = { filter = 0, crush = 0.2, drive = 0.3, saturate = 0.4, gate = 0 }
 -- what the pad's two directions do, and the effect's own setting (nil: none)
 local BFX_AXES = { filter = { "low-pass  <  open  >  high-pass", "resonance" }, crush = { "sample rate (lower to the right)", "bits (fewer up)" },
-                   drive = { "drive", "tone (brighter up)" }, saturate = { "amount", "warmth" } }
-local BFX_SET = { crush = "tone (darker)", drive = "character (grit)", saturate = "bias (tape)" }
+                   drive = { "drive", "tone (brighter up)" }, saturate = { "amount", "warmth" },
+                   gate = { "rate:  1/4   1/8   1/16   1/32", "depth (deeper up)" } }
+local BFX_SET = { crush = "tone (darker)", drive = "character (grit)", saturate = "bias (tape)", gate = "pattern" }
+ui.GATE_PATS = { "straight", "3-3-2", "off-beats", "dotted" }   -- v1.49 the gate's pattern (its setting: 0, 1/3, 2/3, 1)
 local VOICINGS = { "close", "open", "wide" }
 local LH_PATTERNS = { "anchor", "pulse", "synco", "broken", "answer" }   -- v1.20 the left hand (ockm-chord-hands 1-5)
-local ENG_LABEL = { reese = "wide", mini = "analogue", stab = "poly", hard = "hard stab" }
+local ENG_LABEL = { reese = "wide", mini = "analogue", stab = "poly", hard = "hard stab", ["bass synth"] = "synth" }   -- v1.49 "bass synth" was too wide for its button
 local function eng_label(nm) return ENG_LABEL[nm] or nm end
 -- each engine's sweet spot (k1-k4), loaded when it's picked, so it sounds right straight away
 local ENGINE_K = {
   bass  = { [0] = { 0.35, 0.6, 0.55, 0.4 }, [1] = { 0.45, 0.3, 0.35, 0.55 }, [2] = { 0.4, 0.35, 0.45, 0.4 },
-            [3] = { 0.45, 0.5, 0.35, 0.5 }, [5] = { 0.42, 0.25, 0.45, 0.45 }, [6] = { 0.5, 0.5, 0.35, 0.45 }, [7] = { 0.3, 0.75, 0.6, 0.35 } },
-  lead  = { [2] = { 0.45, 0.1, 0.25, 0.5 }, [3] = { 0.4, 0.55, 0.5, 0.45 }, [4] = { 0.55, 0.3, 0.4, 0.45 }, [5] = { 0.55, 0.55, 0.3, 0.5 }, [6] = { 0.55, 0.82, 0.7, 0.35 } },
+            [3] = { 0.45, 0.5, 0.35, 0.5 }, [5] = { 0.42, 0.25, 0.45, 0.45 }, [6] = { 0.5, 0.5, 0.35, 0.45 }, [7] = { 0.3, 0.75, 0.6, 0.35 },
+            [8] = { 0.35, 0.6, 0.45, 0.45 }, [9] = { 0.35, 0.35, 0.3, 0.45 } },
+  lead  = { [2] = { 0.45, 0.1, 0.25, 0.5 }, [3] = { 0.4, 0.55, 0.5, 0.45 }, [4] = { 0.55, 0.3, 0.4, 0.45 }, [5] = { 0.55, 0.55, 0.3, 0.5 }, [6] = { 0.55, 0.82, 0.7, 0.35 }, [7] = { 0.5, 0.4, 0.45, 0.45 } },
   chord = { [0] = { 0.45, 0.5, 0.0, 0.32 }, [1] = { 0.5, 0.4, 0.3, 0.4 }, [3] = { 0.5, 0.3, 0.4, 0.4 }, [4] = { 0.5, 0.4, 0.3, 0.5 }, [6] = { 0.45, 0.6, 0.6, 0.3 } },
 }
 -- retired engines: what a saved project's engine becomes, and the knobs that make it sound like the old one
@@ -102,6 +135,9 @@ local KNOBS = {
   stab  = {"brightness","detune","attack","length"},
   hard  = {"cutoff","resonance","drive","length"},
   raw   = {"cutoff","resonance","wave","decay"},
+  ["bass synth"] = {"cutoff","resonance","env amount","decay"},
+  analog = {"cutoff","resonance","env amount","decay"},
+  pulse = {"cutoff","width","PWM","decay"},
   supersaw = {"spread","cutoff","drift","decay"},
   organ = {"drawbars","click","sub","length"},
   pad   = {"brightness","detune","attack","length"},
@@ -121,6 +157,7 @@ local BASS_RIFFS = { { "root" }, { "octaves" }, { "fifth" }, { "seventh below" }
 local CHORD_RHY = { { "pads" }, { "halves" }, { "offbeat" }, { "skank" }, { "organ" }, { "tresillo" }, { " " }, { " " }, { "call answer" }, { "8ths" }, { "piano riff" }, { "sustained" } }
 local PROGS = { { "one chord", "i" }, { "vamp", "i iv" }, { "dub techno", "i . . VII" }, { "deep house", "i iv VI v" }, { "garage", "i VI iv v" }, { "pop", "i VI III VII" }, { "uplift", "VI VII i" }, { "andalusian", "i VII VI V" }, { "trip hop", "i VII VI v" }, { "soul", "ii V I" }, { "piano house", "I V vi IV" }, { "anthem", "vi IV I V" }, { "seven", "i VII" }, { "six", "i VI" }, { "five", "i v" }, { "two five", "ii v" }, { "lift", "i VII VI VII" }, { "seven four", "i VII iv" }, { "gospel", "I vi ii V" } }
 local SPICE = { { 0, "triad" }, { 1, "7th" }, { 6, "9th" }, { 7, "11th" } }
+ockm_SOUNDS = { bass = { { 5, 0.42, 0.25, 0.45, 0.45, 0, 1.0 }, { 5, 0.3, 0.9, 0.3, 0.4, 0, 0.95 }, { 5, 0.6, 0.1, 0.6, 0.7, 0, 1.01 }, { 5, 0.25, 0.5, 0.2, 0.55, 0, 0.93 }, { 0, 0.35, 0.6, 0.55, 0.4, 0, 1.0 }, { 0, 0.25, 0.8, 0.75, 0.35, 0, 0.83 }, { 0, 0.5, 0.3, 0.3, 0.5, 0, 0.943 }, { 1, 0.45, 0.3, 0.35, 0.55, 0, 1.0 }, { 1, 0.2, 0.2, 0.25, 0.8, 0, 1.059 }, { 1, 0.8, 0.5, 0.4, 0.5, 0.3, 2.529 }, { 3, 0.45, 0.5, 0.35, 0.5, 0, 1.0 }, { 3, 0.3, 0.7, 0.25, 0.6, 0, 0.97 }, { 3, 0.55, 0.6, 0.5, 0.45, 0.4, 1.833 }, { 2, 0.4, 0.35, 0.45, 0.4, 0, 1.0 }, { 2, 0.3, 0.6, 0.3, 0.6, 0, 0.962 }, { 2, 0.6, 0.8, 0.6, 0.35, 0, 0.868 }, { 6, 0.5, 0.5, 0.35, 0.45, 0, 1.0 }, { 6, 0.4, 0.7, 0.7, 0.5, 0, 0.857 }, { 6, 0.65, 0.2, 0.2, 0.4, 0, 1.061 }, { 7, 0.3, 0.75, 0.6, 0.35, 0, 1.0 }, { 7, 0.4, 0.4, 0.1, 0.45, 0, 1.471 }, { 7, 0.35, 0.9, 0.9, 0.3, 0, 0.706 }, { 8, nil, nil, nil, nil, 0, 1.0 }, { 9, 0.35, 0.35, 0.3, 0.45, 0, 1.0 }, { 9, 0.45, 0.75, 0.2, 0.4, 0, 1.101 }, { 9, 0.4, 0.5, 0.8, 0.5, 0, 0.966 } }, lead = { { 4, 0.55, 0.3, 0.4, 0.45, 0, 1.0 }, { 4, 0.7, 0.4, 0.5, 0.4, 0, 1.11 }, { 4, 0.4, 0.15, 0.25, 0.6, 0, 0.9 }, { 2, 0.45, 0.1, 0.25, 0.5, 0, 1.0 }, { 2, 0.5, 0.37, 0.2, 0.45, 0, 0.848 }, { 2, 0.2, 0.62, 0.2, 0.7, 0, 1.043 }, { 2, 0.12, 0.88, 0.2, 0.7, 0, 1.435 }, { 3, 0.4, 0.55, 0.5, 0.45, 0, 1.0 }, { 3, 0.7, 0.6, 0.7, 0.4, 0, 1.024 }, { 3, 0.25, 0.4, 0.3, 0.5, 0, 1.071 }, { 5, 0.55, 0.55, 0.3, 0.5, 0, 1.0 }, { 5, 0.25, 0.6, 0.2, 0.45, 0, 1.039 }, { 5, 0.85, 0.5, 0.5, 0.6, 0, 0.922 }, { 6, 0.55, 0.82, 0.7, 0.35, 0, 1.0 }, { 6, 0.4, 0.5, 0.2, 0.4, 0, 1.548 }, { 7, nil, nil, nil, nil, 0, 1.0 } }, chord = { { 0, 0.45, 0.5, 0.0, 0.32, 0, 1.0 }, { 0, 0.25, 0.4, 0.0, 0.22, 0, 1.21 }, { 0, 0.4, 0.6, 0.7, 0.8, 0, 0.54 }, { 0, 0.75, 0.3, 0.05, 0.35, 0, 0.77 }, { 6, 0.45, 0.6, 0.6, 0.3, 0, 1.0 }, { 6, 0.7, 0.5, 0.8, 0.25, 0, 1.287 }, { 6, 0.3, 0.3, 0.3, 0.35, 0, 0.828 }, { 1, 0.5, 0.4, 0.3, 0.4, 0, 1.0 }, { 1, 0.8, 0.2, 0.6, 0.5, 0, 0.75 }, { 1, 0.3, 0.8, 0.1, 0.25, 0, 1.062 }, { 3, 0.5, 0.3, 0.4, 0.4, 0, 1.0 }, { 3, 0.3, 0.2, 0.2, 0.6, 0, 1.019 }, { 3, 0.75, 0.6, 0.6, 0.35, 0, 0.769 }, { 4, 0.5, 0.4, 0.3, 0.5, 0, 1.0 }, { 4, 0.6, 0.8, 0.1, 0.45, 0, 0.83 }, { 4, 0.4, 0.2, 0.7, 0.7, 0, 0.841 } } }
 local FILLS = { "snare roll", "tom run", "cut out", "snare build", "breakbeat" }
 local GROOVES = { "four floor", "house", "deep house", "tech house", "minimal", "techno", "dub techno", "garage", "breakbeat", "boom bap", "trip hop", "electro", "clear", "chicago", "jackin", "disco", "soulful", "afro house", "lofi house", "2 step", "speed garage", "funky house", "ghetto house", "nu disco", "rolling", "detroit", "berlin", "industrial", "hypnotic", "acid techno", "think break", "jungle", "big beat", "downtempo", "one drop", "half time", "lofi hip hop", "hard house", "dnb two step", "dnb rolling" }
 local GROOVE_BANKS = { { "house", { 0, 1, 2, 13, 14, 15, 16, 17, 21, 22, 23, 24 } }, { "techno", { 3, 4, 5, 6, 25, 26, 27, 28, 29, 11, 37, 32 } } }
@@ -265,6 +302,7 @@ local DRUM_PARAMS = {
   { "level", 0, 1.5 }, { "tune", -12, 12 }, { "decay", 10, 400 }, { "verb", 0, 1, "reverb" }, { "delay", 0, 1 },
   { "tone", -1, 1 }, { "drive", 0, 1 }, { "start", 0, 1 }, { "synth", 0, 2 },
   { "labchar", -1, 1 }, { "labmorph", 0, 1 }, { "labrseed", 0, 99999 }, { "labramt", 0, 1 }, { "labpseed", 0, 99999 },
+  { "labkit", 0, 3 },   -- v1.49 the synth kit (0 the lab's own, 1 808, 2 909, 3 909 long)
 }
 local SYNTH_SLIDERS  = { { "level", 0, 1.5 }, { "tune", -12, 12 }, { "decay", 10, 400 }, { "drive", 0, 1 } }   -- v1.03: no tone (character does it)
 local SAMPLE_SLIDERS = { { "level", 0, 1.5 }, { "tune", -12, 12, "pitch" }, { "decay", 10, 100, "length" }, { "tone", -1, 1 }, { "start", 0, 1 } }
@@ -283,7 +321,10 @@ end
 local UI_NOW
 local NOT_CHANGES = { ["ockm-play"]=1, ["ockm-want"]=1, ["ockm-page"]=1, ["ockm-save"]=1, ["ockm-revert"]=1, 
   ["ockm-project-list"]=1, ["ockm-project-open"]=1, ["ockm-project-new"]=1, ["ockm-project-saveas"]=1, ["ockm-project-delete"]=1,
-  ["ockm-resync"]=1, ["ockm-snapshot"]=1, ["ockm-usb-scan"]=1, ["ockm-exports-ask"]=1, ["ockm-mkdir"]=1, ["ockm-rec-stop"]=1, ["ockm-filter"]=1, ["ockm-filter-glide"]=1, ["ockm-delay-throw"]=1, ["ockm-stash"]=1, ["ockm-unstash"]=1, ["ockm-mute-bar"]=1, ["ockm-mute-quant"]=1, ["ockm-gap-arm"]=1 }
+  ["ockm-resync"]=1, ["ockm-snapshot"]=1, ["ockm-usb-scan"]=1, ["ockm-exports-ask"]=1, ["ockm-mkdir"]=1, ["ockm-rec-stop"]=1, ["ockm-filter"]=1, ["ockm-filter-glide"]=1, ["ockm-delay-throw"]=1, ["ockm-stash"]=1, ["ockm-unstash"]=1, ["ockm-mute-bar"]=1, ["ockm-mute-quant"]=1, ["ockm-gap-arm"]=1, ["ockm-build"]=1,
+  -- v1.49 MIDI out is the device's (your settings), not the project's: sending it at start-up isn't a change
+  ["ockm-bass-mch"]=1, ["ockm-bass-midi"]=1, ["ockm-lead-mch"]=1, ["ockm-lead-midi"]=1, ["ockm-chord-mch"]=1, ["ockm-chord-midi"]=1,
+  ["ockm-drums-mch"]=1, ["ockm-drums-midi"]=1, ["ockm-drums-map"]=1 }
 local function psend(name, sel, atoms)
   -- v1.28: mutes and solos are saved now, so they count as changes; playing the fx pad (x, y) doesn't
   if UI_NOW and not NOT_CHANGES[name] and not name:match("^ockm%-rec%-") and not name:match("^ockm%-bfx%-.+%-[xy]$") and not name:match("%-audition$")
@@ -304,6 +345,7 @@ function ui:initialize(sel, atoms)
   self.theme = THEMES[atoms[2]] or THEMES.dark
   self.v = {}                 -- every hook value we know about
   self.screen = "live"
+  -- v1.45 the start screen is gone: the box opens on the groovebox
   self.slot = 1               -- open drum slot
   self.part = 1               -- open synth part
   self.perf_part = 1          -- synth on the perform screen's sound strip
@@ -311,6 +353,11 @@ function ui:initialize(sel, atoms)
   self.page = 0
   self.step = 0
   self.playing = 0
+  self.vox_lit = 0            -- 1 while a sample (samples part) is playing
+  self.sb = { id = 0, fx = 0 } -- v1.38 the samples brush: the armed sample (0 none) and effect
+  self.sgroup, self.spage = 1, 0                   -- the list: 1 voice, 2 loops, 3 hits (samples/user/...), 4 robot; its page
+  self.sset, self.svoice = 0, 0                    -- robot: hooks, jack or techno; deep or flat
+  self.unames, self.ucount = { {}, {}, {} }, { 0, 0, 0 }   -- your files in each folder, by number
   self.cur = 0                -- pattern slot playing
   self.want = nil             -- pattern slot queued
   self.tables = {}
@@ -347,8 +394,18 @@ function ui:defaults()
   v["ockm-drive"] = 0; v["ockm-delay-fb"] = 0.4; v["ockm-delay-steps"] = 3; v["ockm-verb-size"] = 0.6; v["ockm-verb-tone"] = 0.5
   for _, t in ipairs(SYNTHS) do v["ockm-"..t.."-level"] = MIX_SYNTH[t] end
   for _, t in ipairs(TRACKS) do
-    v["ockm-"..t.."-lowcut"] = 20; v["ockm-"..t.."-eqlow"] = 0; v["ockm-"..t.."-eqmid"] = 0; v["ockm-"..t.."-eqmidf"] = 400; v["ockm-"..t.."-eqhigh"] = 0
+    v["ockm-"..t.."-lowcut"] = (t == "vox") and 120 or 20
+    v["ockm-"..t.."-eqlow"] = 0; v["ockm-"..t.."-eqmid"] = 0; v["ockm-"..t.."-eqmidf"] = 400; v["ockm-"..t.."-eqhigh"] = 0
   end
+  v["ockm-vox-on"] = 0; v["ockm-vox-set"] = 0; v["ockm-vox-voice"] = 0; v["ockm-vox-every"] = 8
+  v["ockm-vox-pitch"] = 0; v["ockm-vox-seed"] = 1; v["ockm-vox-level"] = 1; v["ockm-vox-verb"] = 0; v["ockm-vox-delay"] = 0
+  v["ockm-vox-stut"] = 0
+  v["ockm-vox-pick"] = VOX_ALL
+  v["ockm-vox-len"] = 16
+  for _, nm in ipairs(SLOTS) do   -- v1.49 the drum lanes: out of the box they change nothing
+    v["ockm-" .. nm .. "-chance"] = 1; v["ockm-" .. nm .. "-thin"] = 0; v["ockm-" .. nm .. "-when"] = 0; v["ockm-" .. nm .. "-drift"] = 0
+  end
+  ui.inst_defaults(nil, v)
   v["ockm-bass-on"] = 1; v["ockm-lead-on"] = 1; v["ockm-chord-on"] = 1; v["ockm-drums-on"] = 1; v["ockm-turn-every"] = 0; v["ockm-turn-to"] = 4; v["ockm-bass-walk"] = 0; v["ockm-lead-outside"] = 0.35; v["ockm-rise"] = 0; v["ockm-end"] = 0; v["ockm-impact"] = 0; v["ockm-pump"] = 0
   v["ockm-bass-scshape"] = 1; v["ockm-lead-scshape"] = 1; v["ockm-chord-scshape"] = 1
   v["ockm-bass-riff"] = -1; v["ockm-bass-slideamt"] = 0; v["ockm-bass-octave"] = 0; v["ockm-lead-octave"] = 0
@@ -372,7 +429,7 @@ function ui:defaults()
   for i, nm in ipairs(SLOTS) do
     v["ockm-"..nm.."-sound"] = ({0,1,2,4,5,7,3,6})[i]
     v["ockm-"..nm.."-level"] = MIX_DRUM[v["ockm-"..nm.."-sound"]] or 0.7; v["ockm-"..nm.."-tune"] = 0; v["ockm-"..nm.."-decay"] = 100
-    v["ockm-"..nm.."-verb"] = 0; v["ockm-"..nm.."-delay"] = 0; v["ockm-"..nm.."-sample"] = 0; v["ockm-"..nm.."-synth"] = 0
+    v["ockm-"..nm.."-verb"] = 0; v["ockm-"..nm.."-delay"] = 0; v["ockm-"..nm.."-sample"] = 0; v["ockm-"..nm.."-synth"] = 0; v["ockm-"..nm.."-labkit"] = 0
     v["ockm-"..nm.."-tone"] = 0; v["ockm-"..nm.."-drive"] = 0; v["ockm-"..nm.."-start"] = 0
     v["ockm-"..nm.."-labchar"] = 0; v["ockm-"..nm.."-labmorph"] = 0; v["ockm-"..nm.."-labrseed"] = 0; v["ockm-"..nm.."-labramt"] = 0; v["ockm-"..nm.."-labpseed"] = 1
   end
@@ -393,6 +450,7 @@ function ui:hooks()
   for _, nm in ipairs(SLOTS) do
     for _, p in ipairs(DRUM_PARAMS) do h[#h+1] = "ockm-"..nm.."-"..p[1] end
     h[#h+1] = "ockm-"..nm.."-sound"; h[#h+1] = "ockm-"..nm.."-sample"
+    for _, k in ipairs({ "chance", "thin", "when", "drift" }) do h[#h+1] = "ockm-"..nm.."-"..k end   -- v1.49 the lane
   end
   for _, t in ipairs({"bass","lead"}) do
     for _, k in ipairs({"engine","k1","k2","k3","k4","drive","verb","delay","rhythm","notes","octave"}) do h[#h+1] = "ockm-"..t.."-"..k end
@@ -401,6 +459,10 @@ function ui:hooks()
   for _, k in ipairs({"engine","k1","k2","k3","k4","type","smooth","verb","delay","rhythm","prog","voicing","strum","rate","push","vary","drift","hands"}) do h[#h+1] = "ockm-chord-"..k end
   for _, t in ipairs(SYNTHS) do for _, k in ipairs({ "lfo-shape", "lfo-rate", "lfo-depth", "lfo-target", "chorus" }) do h[#h+1] = "ockm-"..t.."-"..k end end
   for _, t in ipairs(TRACKS) do h[#h+1] = "ockm-"..t.."-mute"; h[#h+1] = "ockm-"..t.."-solo" end
+  h[#h+1] = "ockm-mood"   -- v1.49 the mood, each part's sound version and call and answer
+  for _, t in ipairs(SYNTHS) do h[#h+1] = "ockm-"..t.."-sound" end
+  h[#h+1] = "ockm-bass-answer"; h[#h+1] = "ockm-lead-answer"
+  for _, k in ipairs({ "ockm-humanize", "ockm-slice", "ockm-drum-drift-every", "ockm-drum-drift-mode", "ockm-bass-link", "ockm-chord-link" }) do h[#h+1] = k end   -- v1.49
   h[#h+1] = "ockm-bass-bus"   -- v1.23 bus effects
   for _, b in ipairs(BUSES) do
     h[#h+1] = "ockm-bfx-"..b.."-type"; h[#h+1] = "ockm-bfx-"..b.."-glide"
@@ -422,6 +484,8 @@ function ui:hooks()
                          "ockm-style", "ockm-bass-half", "ockm-lead-half", "ockm-chord-half",
                          "ockm-bass-scshape", "ockm-lead-scshape", "ockm-chord-scshape", "ockm-drum-punch" }) do h[#h+1] = k end
   for _, k in ipairs({ "ockm-volume", "ockm-verb-mix", "ockm-delay-mix", "ockm-drive", "ockm-delay-fb", "ockm-delay-steps", "ockm-verb-size", "ockm-verb-tone" }) do h[#h+1] = k end
+  for _, k in ipairs({ "on", "set", "voice", "every", "pitch", "seed", "level", "verb", "delay", "pick", "stut", "len" }) do h[#h+1] = "ockm-vox-" .. k end
+  ui.inst_hooks(self, h)   -- v1.39 the instruments' settings
   return h
 end
 
@@ -460,7 +524,27 @@ function ui:postinitialize()
     o.playing = tonumber(a[1]) or 0
     if o.playing == 0 and o.macro and o.macro.run then o:macro_finish() end   -- stopped: a running recipe lets go at once
     if o.playing ~= 0 and o.evo then o.evo.bar = 0 end   -- evolve counts phrases from play, as the fills do
+    o.ievo = nil
     o:dirty()
+  end)
+  -- v1.38 your files for the samples part (samples/user, in name order)
+  listen("ockm-smp-count", function(o, sel, a)
+    local g, c = math.floor(tonumber(a[1]) or 0), math.floor(tonumber(a[2]) or 0)
+    if g < 1 or g > 3 then return end
+    o.ucount[g] = c
+    for n in pairs(o.unames[g]) do if n > c then o.unames[g][n] = nil end end
+    o:dirty()
+  end)
+  listen("ockm-smp-name", function(o, sel, a)
+    local g, n = math.floor(tonumber(a[1]) or 0), math.floor(tonumber(a[2]) or 0)
+    if g < 1 or g > 3 or n < 1 then return end
+    local parts = {}
+    for k = 3, #a do parts[#parts + 1] = tostring(a[k]) end
+    o.unames[g][n] = table.concat(parts, " ")
+  end)
+  listen("ockm-vox-lit", function(o, sel, a)
+    o.vox_lit = tonumber(a[1]) or 0
+    if o.screen == "live" or o.screen == "vox" then o:repaint(2) end
   end)
   for _, t in ipairs(TRACKS) do listen("ockm-"..t.."-mute", function(o) if o.mpend then o.mpend[t] = nil end end) end
   listen("ockm-project-name", function(o, sel, a) o.project = tostring(a[1] or "default"); o:dirty() end)
@@ -523,6 +607,28 @@ function ui:postinitialize()
   end)
   listen("ockm-project-name", function(o) if o.new_pending then o.new_pending = nil; if o.newclock then o.newclock:delay(300) end end end)
   for _, n in ipairs({ "ockm-saved", "ockm-revert", "ockm-project-name" }) do listen(n, function(o) o.unsaved = false; o:dirty() end) end
+  -- v1.49 a restart keeps unsaved work: just before an update restarts the box, it asks to keep what's open (ockm-keep).
+  -- Unsaved, it's stashed (not saved) and a note left with the project's name; at the next start, when that project
+  -- opens, it comes back from the stash, still unsaved. Saved, nothing happens
+  listen("ockm-keep", function(o)
+    local path = o:keep_path()
+    if not (path and o.unsaved) then return end
+    psend("ockm-stash", "bang", {})
+    local f = io.open(path, "w"); if f then f:write(o.project or "default"); f:close() end
+  end)
+  listen("ockm-project-name", function(o, sel, a)
+    if o.keep_done then return end
+    o.keep_done = true   -- only the first project opened at start-up
+    local path = o:keep_path()
+    local f = path and io.open(path, "r")
+    if not f then return end
+    local name = f:read("*l"); f:close(); os.remove(path)
+    if name and name == tostring(a[1] or "") then
+      psend("ockm-unstash", "symbol", { name })
+      o.unsaved = true; o.keep_back = true; o:dirty()
+      o:say("your unsaved changes are back (the box restarted): save to keep them")
+    end
+  end)
   -- v1.28: a scene that loads with a bus effect in had it latched when it was saved
   listen("ockm-project-name", function(o)
     o.fx_latch = o.fx_latch or {}
@@ -547,6 +653,11 @@ function ui:postinitialize()
   listen("ockm-chord-changed", function(o) o:chord_vary() end)
   listen("ockm-midi-note", function(o, sel, a)
     local n, v = tonumber(a[1]) or 0, tonumber(a[2]) or 0
+    if o.screen == "inst" and o.inst and not o.learn then   -- v1.39 a keyboard plays the open instrument
+      if v > 0 then pd.send(o.inst .. "-play", "note", { n, v }) else pd.send(o.inst .. "-play", "off", { n }) end   -- through the arpeggiator
+      return
+    end
+    if not o.learn and o:midi_part_note(n, v, tonumber(a[3]) or 0) then return end   -- v1.45 the bass and lead's channels
     if not o:midi_in("note", n, v) then o:midi_pad(n, v) end
   end)
   listen("ockm-midi-cc",   function(o, sel, a)
@@ -572,6 +683,7 @@ function ui:postinitialize()
   self.jobclock = pd.Clock:new():register(self, "job_step")
   self.expclock = pd.Clock:new():register(self, "export_end")
   self.tickclock = pd.Clock:new():register(self, "tick")
+  self.bloomclock = pd.Clock:new():register(self, "bloom_tick")   -- v1.49 the bloom drifts on while stopped
   self.demudclock = pd.Clock:new():register(self, "demud_finish")
   self.rampclock = pd.Clock:new():register(self, "ramp_tick")
   self.lateclock = pd.Clock:new():register(self, "macro_late")
@@ -593,8 +705,8 @@ function ui:sample_count(slot)
   return (self.scount or {})[SOUND_DIR[snd + 1]] or 0
 end
 -- your saved drum sounds: the slot settings each one keeps
-local SOUND_KEYS = { "labchar", "labmorph", "labrseed", "labramt", "labpseed", "tune", "decay", "tone", "drive" }
-local SOUND_DEF = { labchar = 0, labmorph = 0, labrseed = 0, labramt = 0, labpseed = 1, tune = 0, decay = 100, tone = 0, drive = 0 }
+local SOUND_KEYS = { "labchar", "labmorph", "labrseed", "labramt", "labpseed", "tune", "decay", "tone", "drive", "labkit" }
+local SOUND_DEF = { labchar = 0, labmorph = 0, labrseed = 0, labramt = 0, labpseed = 1, tune = 0, decay = 100, tone = 0, drive = 0, labkit = 0 }
 -- which lab voice a slot plays (closed and open hats share the hat)
 function ui:voice_type(slot)
   local n = self:synth_name(slot)
@@ -653,8 +765,17 @@ end
 
 -- where a slot is in its list: first its synth sound(s) (one, or rim / conga / shaker for perc), then your saved
 -- sounds for it, then sample 1 and up
-function ui:synth_count(slot)
+-- v1.49 synth kits: the lab's voices set up as the classic machines (voices/ockm-labdrum.pd_lua, from build_lab.py's
+-- SYNTH_KITS). The synth sounds in a slot's list: the lab's own, then each kit's (808 kick, 909 kick, 909 long kick)
+ui.SYNTH_KITS = { "808", "909", "909 long" }
+ui.STYLE_KIT = { ["808"] = 1, ["909"] = 2, ["909-long"] = 3 }   -- a style's kit, when its samples aren't there
+function ui:synth_types(slot)
   return LAB_PERC[math.floor(self.v["ockm-"..SLOTS[slot].."-sound"] or 0)] and 3 or 1
+end
+function ui:synth_count(slot) return self:synth_types(slot) * (1 + #ui.SYNTH_KITS) end
+function ui:synth_label(slot)   -- the synth sound's name, with its kit
+  local k = ui.SYNTH_KITS[math.floor(self.v["ockm-"..SLOTS[slot].."-labkit"] or 0)]
+  return (k and (k .. " ") or "") .. self:synth_name(slot)
 end
 function ui:synth_name(slot)
   local nm = SLOTS[slot]
@@ -669,7 +790,8 @@ function ui:drum_pos(slot)
   if smp > 0 then return smp + ns + #ps - 1 end
   local cur = self:current_preset(slot)
   if cur then for j, i in ipairs(ps) do if i == cur then return ns + j - 1 end end end
-  return clamp(math.floor(self.v["ockm-"..nm.."-synth"] or 0), 0, ns - 1)
+  local nt = self:synth_types(slot)
+  return clamp(math.floor(self.v["ockm-"..nm.."-labkit"] or 0), 0, #ui.SYNTH_KITS) * nt + clamp(math.floor(self.v["ockm-"..nm.."-synth"] or 0), 0, nt - 1)
 end
 function ui:set_drum_pos(slot, pos)
   local nm = SLOTS[slot]
@@ -678,7 +800,8 @@ function ui:set_drum_pos(slot, pos)
   if pos < ns then
     -- back to a synth sound from a saved one: start from the lab's sound
     if was >= ns and was < ns + #ps then for _, k in ipairs(SOUND_KEYS) do self:send("ockm-"..nm.."-"..k, SOUND_DEF[k]) end end
-    self:send("ockm-"..nm.."-sample", 0); self:send("ockm-"..nm.."-synth", pos)
+    local nt = self:synth_types(slot)
+    self:send("ockm-"..nm.."-sample", 0); self:send("ockm-"..nm.."-synth", pos % nt); self:send("ockm-"..nm.."-labkit", math.floor(pos / nt))
   elseif pos < ns + #ps then
     self:apply_preset(slot, ps[pos - ns + 1])
   else
@@ -734,6 +857,7 @@ function ui:finalize()
   if self.jobclock then self.jobclock:destruct() end
   if self.expclock then self.expclock:destruct() end
   if self.tickclock then self.tickclock:destruct() end
+  if self.bloomclock then self.bloomclock:destruct() end
   if self.demudclock then self.demudclock:destruct() end
   for _, t in pairs(self.tables) do if t.destruct then t:destruct() end end
 end
@@ -770,7 +894,10 @@ function ui:on_step(n)
   if self.macro then self.macro.held = (self.macro.held or 0) + 1 end
   local old = math.floor(self.step / 16)
   self.step = n
-  if math.floor(n / 16) ~= old then self:repaint() else self:repaint(2) end
+  -- v1.49 the show page is all one layer (the chord, the drums, the beat move every step): it redraws in full
+  if self.screen == "show" then
+    if self.me.show_view ~= "bloom" or n % 2 == 0 then self:dirty() end   -- the bloom is heavy to draw: every other step
+  elseif math.floor(n / 16) ~= old then self:repaint() else self:repaint(2) end
 end
 
 -- ------------------------------------------------------------------ data
@@ -786,12 +913,13 @@ function ui:get(name, i)
   return 0
 end
 -- each part has its own length (in steps); the loop is as long as the longest part
-local PART_NAMES = { drum = "drums", bass = "bass", lead = "lead", chord = "chords" }
+local PART_NAMES = { drum = "drums", bass = "bass", lead = "lead", chord = "chords", vox = "samples" }   -- v1.38 vox is the samples part
 function ui:plen(p) return math.max(16, math.floor(self.v["ockm-" .. p .. "-len"] or 64)) end
 function ui:track_part(n) if n <= 8 then return "drum" end return SYNTHS[n - 8] end
-function ui:loop_len() return math.max(self:plen("drum"), self:plen("bass"), self:plen("lead"), self:plen("chord")) end
+function ui:loop_len() return math.max(self:plen("drum"), self:plen("bass"), self:plen("lead"), self:plen("chord"), self:plen("vox")) end
 function ui:screen_part()
   if self.screen == "drums" then return "drum" elseif self.screen == "synth" then return SYNTHS[self.part] end
+  if self.screen == "vox" then return "vox" end
   return nil
 end
 -- the steps shown on this screen: the part's own length on its tab, the whole loop elsewhere
@@ -811,8 +939,8 @@ function ui:loop_label()
   local L = self:loop_len()
   local bars = math.floor(L / 16)
   local who = {}
-  for _, p in ipairs({ "drum", "bass", "lead", "chord" }) do if self:plen(p) >= L then who[#who + 1] = PART_NAMES[p] end end
-  local by = (#who == 4) and "every part" or table.concat(who, ", ")
+  for _, p in ipairs({ "drum", "bass", "lead", "chord", "vox" }) do if self:plen(p) >= L then who[#who + 1] = PART_NAMES[p] end end
+  local by = (#who == 5) and "every part" or table.concat(who, ", ")
   return string.format("loop %d %s (%s)", bars, (bars == 1) and "bar" or "bars", by)
 end
 function ui:set_page(p)
@@ -855,9 +983,19 @@ function ui:note_name(m) return NOTES[(math.floor(m) % 12) + 1] end
 function ui:layout()
   local L = {}
   local function add(w) L[#L+1] = w; return w end
+  -- v1.39 the start screen and the instruments have their own top bar
+  if self.screen == "home" then self:layout_home(add); return L end
+  if self.screen == "inst" then
+    self:layout_inst(add)
+    if self.learn then self:layout_learnbar(add) end
+    if self.menu then self:layout_menu(add) end
+    return L
+  end
+  if self.screen == "show" then self:layout_show(add); return L end   -- v1.49 the show page has its own top
   self:layout_top(add)
   if self.screen == "perform" then self:layout_perform(add)
   elseif self.screen == "live" then self:layout_live(add)
+  elseif self.screen == "vox" then self:layout_vox(add)
   elseif self.screen == "fx" then self:layout_fx(add)
   elseif self.screen == "drums" then self:layout_drums(add)
   elseif self.screen == "mixer" then self:layout_mixer(add)
@@ -896,9 +1034,12 @@ end
 -- the tabs, in three groups: playing (perform A, perform B, mixer), making (compose and the four parts), arranging.
 -- { screen, label, part, width, gap before }
 -- v0.87: one perform screen ("live" inside), as wide as the two it replaces so the other tabs stay where they were
-local TABS = { { "live", "perform", nil, 88 }, { "fx", "fx", nil, 56 }, { "mixer", "mixer", nil, 58 },   -- v1.23: fx takes part of perform's width
-               { "compose", "builder", nil, 58, 8 }, { "drums", "drums", nil, 58 }, { "synth", "bass", 1, 58 }, { "synth", "lead", 2, 58 }, { "synth", "chord", 3, 58 },
-               { "arrange", "arrange", nil, 58, 8 } }
+-- v1.49 reordered into three blocks, left to right: making (build, the parts, samples), playing (perform, fx, mixer),
+-- arranging. Each block sits on its own faint plate, with a gap between
+local TABS = { { "compose", "build", nil, 52 }, { "drums", "drums", nil, 54 }, { "synth", "bass", 1, 48 }, { "synth", "lead", 2, 48 },
+               { "synth", "chord", 3, 54 }, { "vox", "samples", nil, 56 },
+               { "live", "perform", nil, 72, 10 }, { "fx", "fx", nil, 40 }, { "mixer", "mixer", nil, 54 },
+               { "arrange", "arrange", nil, 64, 10 } }
 local NAV_Y, NAV_H = 70, 36
 local KIOSK = os.getenv and os.getenv("OCKM_KIOSK")
 function ui:layout_top(add)
@@ -908,6 +1049,17 @@ function ui:layout_top(add)
   add{ kind="bpm", x=92, y=12, w=124, h=48, tap=function() if self.screen ~= "setup" then self:open("setup") end end }
   local busy = self.recording or self.exporting
   local x = 226
+  -- the blocks' plates first (behind the tabs): a new block starts at each tab with a gap before it
+  do
+    local gx, g0, gend = 226, 226, 226
+    local function plate() add{ kind="plate", x=g0 - 3, y=9, w=gend - g0 + 6, h=54 } end
+    for _, t in ipairs(TABS) do
+      gx = gx + (t[5] or 0)
+      if t[5] then plate(); g0 = gx end
+      gend = gx + t[4]; gx = gx + t[4] + 4
+    end
+    plate()
+  end
   for i, t in ipairs(TABS) do
     x = x + (t[5] or 0)
     local sel = (self.screen == t[1]) and (t[3] == nil or t[3] == self.part)
@@ -924,7 +1076,7 @@ function ui:layout_top(add)
   end
   if busy then
     local secs = os.time() - busy.t0
-    add{ kind="btn", x=766, y=12, w=124, h=48, accent=true, small=true, label=string.format("%s %d:%02d stop", self.recording and "rec" or "export", math.floor(secs / 60), secs % 60),
+    add{ kind="btn", x=766, y=12, w=124, h=48, live=true, small=true, label=string.format("%s %d:%02d stop", self.recording and "rec" or "export", math.floor(secs / 60), secs % 60),
          tap=function() if self.recording then self:record_stop() else self:export_cancel() end end }
   else
     -- save: a disc, orange when there's something to save
@@ -934,19 +1086,35 @@ function ui:layout_top(add)
   if self.screen ~= "project" and self.screen ~= "setup" and self.screen ~= "live" and self.screen ~= "fx" and self.screen ~= "arrange" then self:layout_nav(add) end
 end
 
+-- v1.43 switch the Pi off: stop playing, say so on screen, then power off (OCKM_SHUTDOWN_CMD stands in for tests)
+function ui:power_off()
+  if self.playing ~= 0 then self:send("ockm-play", 0) end
+  self.msg = "shutting down: unplug when the screen goes dark"
+  self:repaint()
+  os.execute((os.getenv("OCKM_SHUTDOWN_CMD") or "sudo -n systemctl poweroff") .. " &")
+end
 -- the menu (top right): everything that isn't a screen you play or make on
 function ui:layout_menu(add)
   local items = {
     { "project", "open, new, save as, delete", function() self:open("project") end },
     { "export", "audio, stems, MIDI", function() psend("ockm-usb-scan", "bang", {}); psend("ockm-exports-ask", "bang", {}); self.sheet = "export" end },
     { "settings", "tempo, swing, clock, sound", function() self:open("setup") end },
+    { "show", "the circle of fifths, full screen", function() self.show_back = self.screen; self:open("show"); self:bloom_tick() end },   -- v1.49
     { "revert", "back to the last save", function() psend("ockm-revert", "bang", {}); self:say("back to the last save of " .. ockm_pretty(self.project)) end },
     { "MIDI learn", self.learn and "on: tap to finish" or "map your pads and knobs", function()
         if self.learn then self.learn = nil else self.learn = {}; self.sheet = nil end end },
   }
   if KIOSK then items[#items + 1] = { "quit to desktop", "", function() psend("pd", "quit", {}) end } end
+  -- v1.43 shut down: the safe way to switch the Pi off (pulling the power mid-write can lose files). Tap twice
+  if KIOSK then
+    local armed = (self.confirm == "shutdown")
+    items[#items + 1] = { armed and "tap again to shut down" or "shut down", armed and "unplug when the screen goes dark" or "switch the Pi off safely", function()
+      if armed then self.confirm = nil; self:power_off()
+      else self.confirm = "shutdown"; self.menu = true end
+    end }
+  end
   -- a tap anywhere else closes it
-  add{ kind="scrim", x=0, y=62, w=W, h=H - 62, tap=function() self.menu = nil end }
+  add{ kind="scrim", x=0, y=62, w=W, h=H - 62, tap=function() self.menu = nil; if self.confirm == "shutdown" then self.confirm = nil end end }
   local mx, my, mw = W - 16 - 230, 66, 230
   add{ kind="menupanel", x=mx, y=my, w=mw, h=12 + #items * 50 - 4 }
   for i, it in ipairs(items) do
@@ -1035,8 +1203,9 @@ function ui:layout_drumgrid(add)
       add{ kind="pcell", x=LANE_X + c * cw, y=y, w=cw, h=LANE_H, slot=i, step=st, tap=function() self:drum_cycle(i, st) end }
     end
   end
-  add{ kind="text", x=16, y=420, w=W - 160, h=12, size=10,
-       label="all drums: tap a step for a hit, again for an accent, again to clear. Tap a name for that drum's sound and settings" }
+  add{ kind="text", x=16, y=420, w=W - 260, h=12, size=10,
+       label="all drums: tap a step for a hit, again for an accent, again to clear. Tap a name for its sound" }
+  add{ kind="btn", x=W - 16 - 130 - 6 - 90, y=410, w=90, h=36, small=true, accent=true, label="pads", tap=function() self.drums_all = false; self.drums_pads = true end }
   add{ kind="btn", x=W - 16 - 130, y=410, w=130, h=36, small=true, accent=true, label="one drum", tap=function() self.drums_all = false end }
 end
 
@@ -1093,19 +1262,19 @@ function ui:layout_perform(add)
   local kw = (iw - 6) / 2
   for k = 1, 4 do
     local col, row = (k - 1) % 2, math.floor((k - 1) / 2)
-    add{ kind="hbar", x=lx + 6 + col * (kw + 6), y=504 + row * 44, w=kw, h=40, hook="ockm-"..part.."-k"..k, lo=0, hi=1, label=kn[k], bold=true }
+    add{ kind="hbar", x=lx + 6 + col * (kw + 6), y=504 + row * 44, w=kw, h=40, hook=self:khook(part, k), lo=0, hi=1, label=kn[k], bold=true }
   end
   -- master effects. Top row: the moves you play (rise and pump switch on and off, drop and throw while held)
   local mx = rx + 6
   local mw = (iw - 18) / 4
   local rise = (self.v["ockm-rise"] or 0) > 0
   local pump = self.v["ockm-pump"] or 0
-  add{ kind="choice", x=mx, y=PART_Y, w=mw, h=PART_H, label="rise", sel=rise, accent=true, tap=function()
+  add{ kind="choice", x=mx, y=PART_Y, w=mw, h=PART_H, label="rise", sel=rise, live=true, tap=function()
     self:send("ockm-rise", rise and 0 or 1)
     self:say(rise and "rise off: no drop" or "rise: building to the next loop start (2 bars or more), then the drop")
   end }
   -- v1.17: rewind (a tap) and beat repeat (hold) in place of pump and throw (the macros still use those)
-  add{ kind="btn", x=mx + (mw + 6), y=PART_Y, w=mw, h=PART_H, label="rewind", edge=true, flash="rewind", tap=function()
+  add{ kind="btn", x=mx + (mw + 6), y=PART_Y, w=mw, h=PART_H, label="rewind", flash="rewind", tap=function()
     psend("ockm-rewind", "bang", {}); self:flash_btn("rewind")
     self:say("rewind: back it spins, then the loop drops in again from the top")
   end }
@@ -1143,10 +1312,10 @@ end
 -- Perform 2: no steps, just the mutes and the master effects, big enough to play with your thumbs.
 -- Mutes can land now, on the next beat or on the next bar (the engine holds them until then).
 local LV_Y = 72
-local LV_GRID_Y, LV_ROW_H, LV_COL_W = 122, 128, (448 - 12 - 18) / 4
-local function live_tile(n)   -- n: 1-8 drums, 9-11 synths, 12 all synths
+local LV_GRID_Y, LV_ROW_H, LV_COL_W, LV_GAP = 114, 138, 108, 4
+local function live_tile(n)   -- n: 1-8 drums, 9-11 synths, 12 vox
   local c, r = (n - 1) % 4, math.floor((n - 1) / 4)
-  return 22 + c * (LV_COL_W + 6), LV_GRID_Y + r * (LV_ROW_H + 8)
+  return 20 + c * (LV_COL_W + LV_GAP), LV_GRID_Y + r * (LV_ROW_H + LV_GAP)
 end
 local QUANT = { { 0, "now" }, { 1, "next beat" }, { 2, "next bar" } }
 
@@ -1210,62 +1379,72 @@ function ui:layout_live(add)
   add{ kind="card", x=lx, y=LV_Y, w=half_w, h=H - 12 - LV_Y }
   add{ kind="card", x=rx, y=LV_Y, w=half_w, h=H - 12 - LV_Y }
   -- mutes: when they land
-  add{ kind="text", x=24, y=89, w=90, h=12, label="mutes land", size=11 }
+  -- v1.49 a label, not a button: smaller and quieter, and the choices follow straight on
+  add{ kind="text", x=22, y=90, w=70, h=12, label="mutes land:", size=10, col="mute" }
   local q = math.floor(self.v["ockm-mute-quant"] or 0)
   local evo_on = math.floor(self.v["ockm-evolve-every"] or 0) > 0
   local qr = evo_on and (458 - 70) or 458   -- v1.00: keep (evolve's new original) takes the end of the row while evolve runs
-  local qw = (qr - 116 - 12) / 3
+  local qx0 = 96   -- v1.49 the synths button moved to the bottom row (in all in's place)
+  local qw = (qr - qx0 - 12) / 3
   if evo_on then
-    add{ kind="btn", x=458 - 64, y=80, w=64, h=34, small=true, accent=true, label="keep", tap=function() self:evo_keep() end }
+    add{ kind="btn", x=458 - 64, y=80, w=64, h=30, small=true, accent=true, label="keep", tap=function() self:evo_keep() end }
   end
   for i, o in ipairs(QUANT) do
-    add{ kind="choice", x=116 + (i - 1) * (qw + 6), y=80, w=qw, h=34, label=o[2], small=true, sel=(q == o[1]),
+    add{ kind="choice", x=qx0 + (i - 1) * (qw + 6), y=80, w=qw, h=30, label=o[2], small=true, sel=(q == o[1]),
          tap=function() self.v["ockm-mute-quant"] = o[1]; pd.send("ockm-mute-quant", "float", { o[1] }) end }
   end
-  -- a tile per track: tap anywhere to mute or bring it back; S in the corner
-  for n = 1, 12 do
+  -- a tile per track: tap anywhere to mute or bring it back; S in the corner. Vox takes the last tile
+  for n = 1, #TRACKS do
     local x, y = live_tile(n)
-    if n <= 11 then
-      local t = TRACKS[n]
-      add{ kind="mtile", lid="mute-" .. t, x=x, y=y, w=LV_COL_W, h=LV_ROW_H, track=t, label=self:track_name(n),
-           tap=function()
-             if not self:track_in(t) then self:say(self:track_name(n) .. " is off in this pattern: switch it on on the builder"); return end
-             self:qmute(t, (self:mute_target(t) > 0) and 0 or 1)
-           end }
-      add{ kind="ms", x=x + LV_COL_W - 40, y=y + LV_ROW_H - 36, w=34, h=30, label="S", hook="ockm-"..t.."-solo" }
-    else
-      add{ kind="mtile", x=x, y=y, w=LV_COL_W, h=LV_ROW_H, group=SYNTHS, label="all synths", tap=function()
-        local any = false
-        for _, p in ipairs(SYNTHS) do if self:mute_target(p) == 0 then any = true end end
-        for _, p in ipairs(SYNTHS) do if self:track_in(p) and self:mute_target(p) ~= (any and 1 or 0) then self:qmute(p, any and 1 or 0) end end
-      end }
-    end
+    local t = TRACKS[n]
+    local sub = nil
+    add{ kind="mtile", lid="mute-" .. t, x=x, y=y, w=LV_COL_W, h=LV_ROW_H, track=t, label=self:track_name(n), sub=sub,
+         tap=function()
+           if not self:track_in(t) then
+             if t == "vox" then self:open("vox")
+             else self:say(self:track_name(n) .. " is off in this pattern: switch it on on the builder") end
+             return
+           end
+           self:qmute(t, (self:mute_target(t) > 0) and 0 or 1)
+         end }
+    add{ kind="ms", x=x + LV_COL_W - 40, y=y + LV_ROW_H - 36, w=34, h=30, label="S", hook="ockm-"..t.."-solo" }
   end
   -- scenes
   local kicks = self:kick_slots()
   local SC = { { "drums only", function(t) return t:match("^d%d") ~= nil end },
                { "no drums", function(t) return t:match("^d%d") == nil end },
                { "kick + bass", function(t) return kicks[t] or t == "bass" end },
-               { "all in", function() return true end } }
-  local sw = (436 - 18) / 4
-  -- v1.15: drums only, no drums and kick + bass are switches: on (orange) applies the scene, off puts back exactly what
+               { "synths", nil } }   -- v1.49 synths in or out (was all in)
+  local sw = LV_COL_W
+  -- v1.15: drums only, no drums and kick + bass are switches: on (a coloured edge) applies the scene, off puts back exactly what
   -- was muted and soloed before. Change a mute by hand while one is on and it lets go (what you hear is yours again).
   -- All in is a one-shot: everything in, solos cleared
   if self.scene_on and not self:scene_matches(SC[self.scene_on][2]) then self.scene_on, self.scene_saved = nil, nil end
   for i, sc in ipairs(SC) do
     local lit = (self.scene_on == i)
-    add{ kind="btn", x=22 + (i - 1) * (sw + 6), y=530, w=sw, h=52, small=true, label=sc[1], edge=not lit, accent=lit, flash="scene" .. i,
-         tap=function() self:scene_switch(i, sc[2], i == #SC); self:flash_btn("scene" .. i) end }
+    local tap = function() self:scene_switch(i, sc[2], false); self:flash_btn("scene" .. i) end
+    if not sc[2] then   -- synths: all of them out, or (if any is out) all back in, on the mutes' timing
+      local out = true
+      for _, p in ipairs(SYNTHS) do if self:track_in(p) and self:mute_target(p) == 0 then out = false end end
+      lit = out
+      tap = function()
+        local any = false
+        for _, p in ipairs(SYNTHS) do if self:mute_target(p) == 0 then any = true end end
+        for _, p in ipairs(SYNTHS) do if self:track_in(p) and self:mute_target(p) ~= (any and 1 or 0) then self:qmute(p, any and 1 or 0) end end
+        self:flash_btn("scene" .. i)
+      end
+    end
+    add{ kind="btn", x=20 + (i - 1) * (sw + LV_GAP), y=542, w=sw, h=40, small=true, label=sc[1], edge=lit, flash="scene" .. i, tap=tap }
   end
   -- master effects, big
   local mx, iw = rx + 6, half_w - 12
   local mw = (iw - 18) / 4
   local rise = (self.v["ockm-rise"] or 0) > 0
   local pump = self.v["ockm-pump"] or 0
-  add{ kind="choice", x=mx, y=80, w=mw, h=52, label="rise", sel=rise, accent=true, tap=function() self:send("ockm-rise", rise and 0 or 1) end }
+  add{ kind="choice", x=mx, y=80, w=mw, h=52, label="rise", sel=rise, live=true, tap=function() self:send("ockm-rise", rise and 0 or 1) end }
   -- v1.17: rewind (tap: it spins back, then the loop restarts from the top) and beat repeat (hold: the slice you're on
   -- loops in time, halving every bar you hold). They replace pump and throw; the macros still use those
-  add{ kind="btn", x=mx + (mw + 6), y=80, w=mw, h=52, label="rewind", edge=true, flash="rewind", tap=function()
+  add{ kind="btn", x=mx + (mw + 6), y=80, w=mw, h=52, label="rewind", flash="rewind", tap=function()
     psend("ockm-rewind", "bang", {}); self:flash_btn("rewind") end }
   add{ kind="pad", x=mx + 2 * (mw + 6), y=80, w=mw, h=52, hook="ockm-drop", label="drop", sub="hold" }
   add{ kind="pad", x=mx + 3 * (mw + 6), y=80, w=mw, h=52, hook="ockm-repeat", label="repeat", sub="hold" }
@@ -1280,28 +1459,32 @@ function ui:layout_live(add)
          tap=function() self.fx_target = b end }
   end
   local lat = self.fx_latch[tb] and true or false
-  add{ kind="choice", lid="fxlatch", x=mx + 3 * (bw + 6), y=140, w=64, h=40, small=true, accent=true, sel=lat, label=lat and "latched" or "latch",
-       tap=function() self.fx_latch[tb] = not lat; if lat then self:bfx_set_on(tb, false) end end }
+  add{ kind="choice", lid="fxlatch", x=mx + 3 * (bw + 6), y=140, w=64, h=40, small=true, live=true, sel=lat, label=lat and "latched" or "latch",
+       tap=function() if lat then self:bfx_unlatch(tb) else self.fx_latch[tb] = true end end }
   add{ kind="btn", x=mx + 3 * (bw + 6) + 70, y=140, w=58, h=40, small=true, label="set", tap=function() self.sheet = "fxset" end }
   local nm = self:bfx_name(tb)
-  add{ kind="xy", x=mx, y=186, w=iw, h=226, bus=tb, fx=nm, axes=BFX_AXES[nm], small=true,
+  add{ kind="xy", x=mx, y=186, w=iw, h=130, bus=tb, fx=nm, axes=BFX_AXES[nm], small=true,
        down=function(x, y) self:bfx_pad(x, y, "down") end, drag=function(x, y) self:bfx_pad(x, y, "move") end, up=function() self:bfx_pad(0, 0, "up") end }
+  -- v1.49 the mood: one dial from chill to peak (the drums' hats and percussion, how busy the bass and lead are, their
+  -- slides, the reverb and delay, drive and a little pump). The style sets where it starts
+  add{ kind="hbar", x=mx, y=322, w=iw, h=46, hook="ockm-mood", lo=0, hi=1, label="mood", bold=true, ends={ "chill", "peak" },
+       valtext=function(v) return "mood: " .. ui.MOOD_WORD(v) end }
   -- the master's delay and reverb (each instrument sends to them), and the volume
   local ROW2 = { { "ockm-delay-mix", 0, 1, "delay" }, { "ockm-delay-fb", 0, 0.9, "feedback" }, { "ockm-delay-steps", 1, 8, "time" },
                  { "ockm-verb-mix", 0, 1, "reverb" }, { "ockm-verb-size", 0, 1, "size" } }
   local vw = 76
-  self:fx_groups(add, ROW2, mx, 418, iw - vw - 8, 56)
-  add{ kind="hbar", x=mx + iw - vw, y=418, w=vw, h=56, hook="ockm-volume", lo=0, hi=1, label="volume", bold=true, db=0.5 }
+  self:fx_groups(add, ROW2, mx, 378, iw - vw - 8, 56)
+  add{ kind="hbar", x=mx + iw - vw, y=378, w=vw, h=56, hook="ockm-volume", lo=0, hi=1, label="volume", bold=true, db=0.5 }
   local w3 = (iw - 12) / 3
-  for i = 1, 3 do
-    -- your three slots (pick them in settings, or with the small v on each)
+  for i = 1, 6 do
+    -- v1.49 your six slots, two rows of three (pick them in settings, or with the small v on each)
     local rc = self.me.macros[self.me.slots[i]]
-    local x = mx + (i - 1) * (w3 + 6)
+    local x, y = mx + ((i - 1) % 3) * (w3 + 6), 444 + math.floor((i - 1) / 3) * 71
     local lit = self.macro and self.macro.slot == i
-    add{ kind="hold", lid="macro" .. i, x=x, y=482, w=w3, h=100, label=(rc and #rc.moves > 0) and rc.name or "empty",
+    add{ kind="hold", lid="macro" .. i, x=x, y=y, w=w3, h=65, letter=string.char(64 + i), label=(rc and #rc.moves > 0) and rc.name or "empty",
          sub=self:macro_sub(i) or ((rc and (rc.bars or 0) > 0) and ("tap: " .. rc.bars .. " bars, or hold") or ("slot " .. string.char(64 + i))),
          on=lit, down=function() self:macro_down(i) end, up=function() self:macro_up(i) end }
-    add{ kind="btn", x=x + w3 - 40, y=488, w=34, h=30, small=true, quiet=true, label="v", tap=function() self.pick_slot = i; self.sheet = "slotpick" end }
+    add{ kind="btn", x=x + w3 - 38, y=y + 3, w=32, h=20, small=true, quiet=true, label="v", tap=function() self.pick_slot = i; self.sheet = "slotpick" end }
   end
 end
 
@@ -1311,6 +1494,12 @@ end
 -- left it). The screen takes one finger at a time, so latch one bus, then play another on the pad
 function ui:bfx_on(b) return (self.v["ockm-bfx-"..b.."-on"] or 0) > 0 end
 function ui:bfx_name(b) return BFX[math.floor(self.v["ockm-bfx-"..b.."-type"] or BFX_DEF[b]) + 1] or "filter" end
+-- v1.49 unlatching lets the effect go and puts its pad back in the centre (as letting go of an unlatched pad does)
+function ui:bfx_unlatch(b)
+  self.fx_latch[b] = false
+  self:send("ockm-bfx-"..b.."-x", 0.5); self:send("ockm-bfx-"..b.."-y", 0.5)
+  self:bfx_set_on(b, false)
+end
 function ui:bfx_set_on(b, on)
   if self:bfx_on(b) ~= on then self:send("ockm-bfx-"..b.."-on", on and 1 or 0) end
 end
@@ -1348,17 +1537,16 @@ function ui:layout_fx(add)
     add{ kind="card", x=cx, y=y, w=cw, h=ch }
     add{ kind="choice", x=cx + 8, y=y + 8, w=cw - 16, h=40, sel=(tb == b), label=b .. ": " .. nm .. (on and "  (in)" or ""),
          tap=function() self.fx_target = b end }
-    local fw = (cw - 16 - 18) / 4
+    local fw = (cw - 16 - 6 * (#BFX - 1)) / #BFX   -- v1.49 five (the gate)
     for k, e in ipairs(BFX) do
       add{ kind="choice", x=cx + 8 + (k - 1) * (fw + 6), y=y + 54, w=fw, h=38, small=true, label=e, sel=(nm == e), accent=true,
            tap=function() self.fx_target = b; self:send("ockm-bfx-"..b.."-type", k - 1) end }
     end
     local hw = (cw - 16 - 6) / 2
     local lat = self.fx_latch[b] and true or false
-    add{ kind="choice", x=cx + 8, y=y + 98, w=hw, h=40, small=true, accent=true, sel=lat, label=lat and "latched" or "latch",
+    add{ kind="choice", x=cx + 8, y=y + 98, w=hw, h=40, small=true, live=true, sel=lat, label=lat and "latched" or "latch",
          tap=function()
-           self.fx_latch[b] = not lat
-           if lat then self:bfx_set_on(b, false) end   -- unlatching lets it go
+           if lat then self:bfx_unlatch(b) else self.fx_latch[b] = true end   -- unlatching lets it go, the pad back to the centre
          end }
     add{ kind="btn", x=cx + 8 + hw + 6, y=y + 98, w=hw, h=40, small=true, label="settings",
          tap=function() self.fx_target = b; self.sheet = "fxset" end }
@@ -1390,13 +1578,24 @@ function ui:layout_fxset(add)
   add{ kind="sheet", x=x0, y=y0, w=w0, h=110 + #rows * 62 + 56 }
   add{ kind="text", x=x0 + 16, y=y0 + 16, w=w0 - 32, h=14, label=b .. " bus effect", size=13, col="txt" }
   -- which effect this bus has
-  local fw = (w0 - 32 - 18) / 4
+  local fw = (w0 - 32 - 6 * (#BFX - 1)) / #BFX
   for k, e in ipairs(BFX) do
     add{ kind="choice", x=x0 + 16 + (k - 1) * (fw + 6), y=y0 + 44, w=fw, h=40, small=true, accent=true, label=e, sel=(nm == e),
          tap=function() self:send("ockm-bfx-"..b.."-type", k - 1) end }
   end
   for i, r in ipairs(rows) do
-    add{ kind="hbar", x=x0 + 16, y=y0 + 98 + (i - 1) * 62, w=w0 - 32, h=54, hook=r[1], lo=0, hi=1, label=r[2], bold=true }
+    local ry = y0 + 98 + (i - 1) * 62
+    if r[2] == "pattern" then
+      -- v1.49 the gate's pattern: four buttons rather than a bar
+      local cur = math.floor((self.v[r[1]] or 0) * 3.99)
+      local pw = (w0 - 32 - 18) / 4
+      for k, nm2 in ipairs(ui.GATE_PATS) do
+        add{ kind="choice", x=x0 + 16 + (k - 1) * (pw + 6), y=ry + 7, w=pw, h=40, small=true, label=nm2, sel=(cur == k - 1),
+             tap=function() self:send(r[1], (k - 1) / 3) end }
+      end
+    else
+      add{ kind="hbar", x=x0 + 16, y=ry, w=w0 - 32, h=54, hook=r[1], lo=0, hi=1, label=r[2], bold=true }
+    end
   end
   add{ kind="btn", x=x0 + w0 - 116, y=y0 + 106 + #rows * 62, w=100, h=40, small=true, label="done", tap=function() self.sheet = nil end }
 end
@@ -1419,6 +1618,8 @@ local TARGETS = {
   -- v1.23: a bus effect (its effect picked in the move; the amount runs from none to full, or for the filter from
   -- closed low-pass through open to high-pass)
   { id = "drums fx", bus = "drums" }, { id = "music fx", bus = "music" }, { id = "master fx", bus = "master" },
+  { id = "snare build", hook = "ockm-build",    switch = true },   -- v1.49 the drums play the 4 bar build (seq/ockm-build.pd_lua)
+  { id = "rush build",  hook = "ockm-build",    switch = true, on = 2 },   -- v1.49 the rush: the kick back in the last bar
 }
 -- where an amount puts a bus effect on the pad (x, y)
 local function bus_xy(fx, v)
@@ -1427,6 +1628,7 @@ local function bus_xy(fx, v)
   v = clamp(v, 0, 1)
   if e == "crush" then return 0.9 * v, v end
   if e == "drive" then return v, 0.6 end
+  if e == "gate" then return 0.6, v end   -- v1.49 1/16, the amount is the depth
   return v, 0.4
 end
 local function bus_range(fx) return ((fx or 0) == 0) and -1 or 0, 1 end
@@ -1435,16 +1637,22 @@ local HOW = { { "jump", 0 }, { "1 beat", 4 }, { "1 bar", 16 }, { "2 bars", 32 },
 local BACK = { "snap back", "glide back", "stay" }
 -- v0.93: a recipe can run for a length: a tap plays it for that many bars, then everything comes back on the 1
 local RUN_BARS = { 0, 1, 2, 4, 8 }
-local GAPS = { { "no gap", 0 }, { "gap: half a beat", 2 }, { "gap: a beat", 4 } }   -- v1.22, in steps
-local MACRO_NAMES = { "8 bar lift", "4 bar lift", "build", "wash", "breakdown", "strip", "sink", "dub out", "lift", "blur", "freeze", "smash", "swell", "haze",
+local GAPS = { { "no gap", 0 }, { "gap: half a beat", 2 }, { "gap: a beat", 4 }, { "rewind: half a beat", 2, true }, { "rewind: a beat", 4, true } }   -- v1.22, in steps; v1.49 or a rewind into the drop
+local MACRO_NAMES = { "8 bar lift", "4 bar lift", "4 bar build", "4 bar rush", "build", "wash", "breakdown", "strip", "sink", "dub out", "lift", "blur", "freeze", "smash", "swell", "haze",
                       "tunnel", "pressure", "drop out", "air", "grit" }
 local function default_settings()
   return {
     sounds = {},     -- your saved drum sounds: { name, type, and the slot settings in SOUND_KEYS }
+    isounds = {},    -- v1.40 your saved instrument sounds: { inst = "ib" or "ia", name = "bass 1", p = { setting = value } }
+    midiout = { bass = { out = 0, ch = 1 }, lead = { out = 0, ch = 2 }, chord = { out = 0, ch = 3 },   -- v1.40 parts on your synths
+                drums = { out = 0, ch = 10 }, dmap = 0, kit = "general" },   -- v1.49 drums too, and the device the channels suit
     macros = {
       -- v1.18: the 8 bar lift (in build's place): the 4 bar lift over twice as long, its high-pass going further, most of it
       -- late (v1.21 late: 60% of the way over the first four bars, all the way by the end of bar 7, held for the last bar).
       -- v1.22: up to 0.6, and gap: the whole mix drops out for the last beat (4 steps) before the drop
+      -- v1.49 the first slot: the 4 bar lift, but the last beat spins back (a rewind) and stops right on the drop
+      { name = "4 bar rewind", bars = 4, rewind = 4, moves = { { t = "mutes", v = 3, how = 1, back = 1 }, { t = "filter", v = 0.5, how = 5, back = 1 },
+                                          { t = "reverb", v = 0.4, how = 2, back = 1 }, { t = "delay", v = 0.3, how = 2, back = 1 } } },
       { name = "8 bar lift", bars = 8, gap = 4, moves = { { t = "mutes", v = 3, how = 1, back = 1 }, { t = "filter", v = 0.6, how = 6, back = 1, late = true },
                                                 { t = "reverb", v = 0.4, how = 2, back = 1 }, { t = "delay", v = 0.3, how = 2, back = 1 } } },
       { name = "wash", moves = { { t = "delay", v = 0.85, how = 1, back = 1 }, { t = "feedback", v = 0.78, how = 1, back = 1 },
@@ -1460,10 +1668,19 @@ local function default_settings()
       -- effects all come back on the 1; or hold it as long as you like and it drops on the next bar after you let go
       { name = "breakdown", bars = 4, moves = { { t = "mutes", v = 3, how = 1, back = 1 }, { t = "filter", v = -0.6, how = 3, back = 1 },
                                                { t = "reverb", v = 0.55, how = 2, back = 1 }, { t = "delay", v = 0.45, how = 2, back = 1 } } },
+      -- v1.49 the 4 bar build: the snare climbs from quarters to rolls over four bars (the clap joins, the hats go to
+      -- 16ths, the kick drops out for the last bar) while the high-pass and reverb rise; a beat of silence, then the drop
+      { name = "4 bar build", bars = 4, gap = 4, moves = { { t = "snare build", v = 1, how = 1, back = 1 }, { t = "filter", v = 0.45, how = 5, back = 1 },
+                                                  { t = "reverb", v = 0.35, how = 5, back = 1 } } },
+      -- v1.49 the 4 bar rush (after PERF-1's build): the kick and the rest out while the snare climbs, the kick back four to
+      -- the floor in the last bar with the open hat on every 8th, two 16ths of silence, then the drop with a crash
+      { name = "4 bar rush", bars = 4, gap = 2, crash = true, moves = { { t = "rush build", v = 1, how = 1, back = 1 }, { t = "filter", v = 0.3, how = 5, back = 1 },
+                                                  { t = "reverb", v = 0.3, how = 5, back = 1 }, { t = "delay", v = 0.25, how = 4, back = 1 } } },
     },
-    slots = { 1, 3, 6 },
+    slots = { 1, 8, 7, 2, 9, 6 },   -- v1.49 six: rewind, build, breakdown; 8 lift, rush, dub out
+    did = {},        -- v1.49 one-off changes already made to your settings (so they're made once)
     new = { drum = 16, synth = 64, lead = 1 },
-    device = { theme = "dark", snap = 1, mutes = 0 },
+    device = { theme = "dark", colour = "red", snap = 1, mutes = 0 },
     midi = {},       -- v1.30 MIDI learn: { ["cc:21"] = what it moves, ["note:36"] = what it plays }
   }
 end
@@ -1483,9 +1700,25 @@ local function ser(v, ind)
   elseif type(v) == "string" then return string.format("%q", v) end
   return tostring(v)
 end
+function ui:keep_path()   -- v1.49 the note a restart leaves (stash/ beside projects/)
+  if not self._loadpath or self._loadpath == "" then return nil end
+  return self._loadpath .. "../stash/kept-on-restart.txt"
+end
 function ui:settings_path()
   if not self._loadpath or self._loadpath == "" then return nil end
   return self._loadpath .. "../my-settings.lua"
+end
+function ui:apply_theme()
+  local dev = (self.me and self.me.device) or { theme = "dark", colour = "red" }
+  local name = (dev.theme == "light") and "light" or "dark"
+  local forced = os.getenv and os.getenv("OCKM_PREVIEW_THEME")
+  if forced == "light" or forced == "dark" then name = forced end
+  local t = {}
+  for k, v in pairs(THEMES[name]) do t[k] = v end
+  local spec = ACCENTS[dev.colour or "red"] or ACCENTS.red
+  if spec.light then t.acc = spec[name]; t.accfg = "#FFFFFF"
+  else t.acc = t.on; t.accfg = t.bg end
+  self.theme = t
 end
 function ui:load_settings()
   local d = default_settings()
@@ -1500,13 +1733,57 @@ function ui:load_settings()
     end
   end
   self.me = d
+  -- v1.49 once: the 4 bar rewind joins your recipes, and takes the 8 bar lift's slot on Perform
+  if not d.did.rewind then
+    d.did.rewind = true
+    local ri
+    for i, r in ipairs(d.macros) do if r.name == "4 bar rewind" then ri = i end end
+    if not ri then table.insert(d.macros, default_settings().macros[1]); ri = #d.macros end
+    for k = 1, 3 do   -- the first three (the slots there were then)
+      local r = d.macros[d.slots[k] or 0]
+      if r and r.name == "8 bar lift" then d.slots[k] = ri end
+    end
+  end
+  -- v1.49 once: the 4 bar build joins your recipes and takes slot B, if B still has the 4 bar lift (the rewind on A is
+  -- the lift with a spin, so the lift on B was close to a repeat)
+  if not d.did.build then
+    d.did.build = true
+    local bi
+    for i, r in ipairs(d.macros) do if r.name == "4 bar build" then bi = i end end
+    if not bi then table.insert(d.macros, default_settings().macros[8]); bi = #d.macros end
+    local r2 = d.macros[d.slots[2] or 0]
+    if r2 and r2.name == "4 bar lift" then d.slots[2] = bi end
+  end
+  -- v1.49 once: the 4 bar rush joins your recipes (not on a slot: pick it with the v)
+  if not d.did.rush then
+    d.did.rush = true
+    local has_r = false
+    for _, r in ipairs(d.macros) do if r.name == "4 bar rush" then has_r = true end end
+    if not has_r then table.insert(d.macros, default_settings().macros[9]) end
+  end
+  -- v1.49 once: six slots on Perform, not three. D, E and F get the 8 bar lift, the rush and dub out, or failing those
+  -- the first recipes not already on a slot
+  if not d.did.six then
+    d.did.six = true
+    local used = {}
+    for s = 1, 3 do if d.slots[s] then used[d.slots[s]] = true end end
+    local function find(nm) for i, r in ipairs(d.macros) do if r.name == nm and not used[i] then return i end end end
+    for s = 4, 6 do
+      if not d.slots[s] then
+        local want = ({ "8 bar lift", "4 bar rush", "dub out" })[s - 3]
+        local i = find(want)
+        if not i then for k = 1, #d.macros do if not used[k] then i = k; break end end end
+        if i then d.slots[s] = i; used[i] = true end
+      end
+    end
+  end
   -- v1.18: lift is the 4 bar lift; build (as it came, with pump) becomes the 8 bar lift
   for i, r in ipairs(d.macros) do
     if r.name == "lift" and r.bars then r.name = "4 bar lift" end
     if r.name == "build" then
       local pumped = false
       for _, m in ipairs(r.moves or {}) do if m.t == "pump" then pumped = true end end
-      if pumped then d.macros[i] = default_settings().macros[1] end
+      if pumped then d.macros[i] = default_settings().macros[2] end
     end
   end
   -- v1.22: the lifts' high-passes go further (8 bar 0.6, from 0.45 or 0.65; 4 bar 0.5, from 0.3), and both gain a gap
@@ -1531,7 +1808,7 @@ function ui:load_settings()
   if not hp then
     for i, r in ipairs(d.macros) do
       if r.name == "strip" then
-        d.macros[i] = default_settings().macros[3]
+        d.macros[i] = default_settings().macros[4]
         if d.slots[2] == 2 then d.slots[2] = i end
         break
       end
@@ -1539,21 +1816,34 @@ function ui:load_settings()
   end
   if not has then
     for i, r in ipairs(d.macros) do
-      if r.name == "lift" and not r.bars then d.macros[i] = default_settings().macros[6]; break end
+      if r.name == "lift" and not r.bars then d.macros[i] = default_settings().macros[7]; break end
     end
   end
   local dev = d.device
-  self.theme = THEMES[dev.theme] or self.theme
+  if dev.theme ~= "light" then dev.theme = "dark" end
+  if not ACCENTS[dev.colour or ""] then dev.colour = "red" end
+  self:apply_theme()
   SPRING_MS = SNAP_MS[dev.snap] or 50
   self.v["ockm-mute-quant"] = dev.mutes or 0
   if self.initclock then self.initclock:delay(0) end     -- tell the engine once everything has loaded
 end
-function ui:init_sends() pd.send("ockm-mute-quant", "float", { self.v["ockm-mute-quant"] or 0 }) end
+function ui:init_sends()
+  pd.send("ockm-mute-quant", "float", { self.v["ockm-mute-quant"] or 0 })
+  self:midiout_send()   -- v1.40 which parts play on your synths (kept on this device)
+end
+-- v1.49 every file the screen writes goes to a new copy first, then replaces the old one in one step (a rename), so a
+-- power cut mid-save leaves the old file whole instead of an empty one
+function ockm_write(path, text)
+  local tmp = path .. ".new"
+  local f = io.open(tmp, "w")
+  if not f then return false end
+  f:write(text); f:close()
+  return os.rename(tmp, path)
+end
 function ui:save_settings()
   local path = self:settings_path()
   if not path then return end
-  local f = io.open(path, "w")
-  if f then f:write("-- OCKM_GENERATOR: your macros and settings (not part of any project)\nreturn " .. ser(self.me) .. "\n"); f:close() end
+  ockm_write(path, "-- OCKM_GENERATOR: your macros and settings (not part of any project)\nreturn " .. ser(self.me) .. "\n")
 end
 
 -- a line describing a recipe: "filter up over 2 bars, reverb, pump"
@@ -1573,6 +1863,7 @@ local function recipe_summary(r)
   local out = {}
   for _, m in ipairs(r.moves) do out[#out + 1] = move_label(m) end
   if (r.gap or 0) > 0 and (r.bars or 0) > 0 then out[#out + 1] = "gap before the drop" end
+  if (r.rewind or 0) > 0 and (r.bars or 0) > 0 then out[#out + 1] = "rewind into the drop" end
   return table.concat(out, ", ")
 end
 
@@ -1612,13 +1903,27 @@ function ui:macro_down(slot)
   end
   if mc and mc.slot == slot and mc.latched then self:macro_finish(); return end   -- a macro that stayed: tap again to let it go
   if mc then self:macro_finish() end
-  local r = (slot == 4) and self.me.macros[self.try_sel or 1] or self.me.macros[self.me.slots[slot]]
+  local r = (slot == 7) and self.me.macros[self.try_sel or 1] or self.me.macros[self.me.slots[slot]]
   if not r then return end
   self:macro_go(slot, r)
 end
 -- start a recipe. now: its mutes land straight away (an arrangement's transition, started on the bar line)
+-- v1.49 the key change on the drop: a recipe with key (2, 3, 5 or 7 semitones) raises the root as it drops; a recipe with
+-- a length but no drop (no gap, rewind or crash: a breakdown) brings it back down as it starts
+function ui:drop_key(r)
+  local k = math.floor(r.key or 0)
+  if k <= 0 or self.key_base then return end
+  local root = math.floor(self.v["ockm-root"] or 9)
+  self.key_base = root
+  self:send("ockm-root", (root + k) % 12)
+end
+function ui:key_back()
+  if not self.key_base then return end
+  self:send("ockm-root", self.key_base); self.key_base = nil
+end
 function ui:macro_go(slot, r, now)
   local run = (r.bars or 0) > 0 and (self.playing ~= 0 or now)
+  if run and (r.gap or 0) == 0 and (r.rewind or 0) == 0 and not r.crash then self:key_back() end
   if run and not now then self:set_mute_bar(true) end   -- its mutes go on the 1, not part way through a bar
   local saved = { set = {}, mutes = {}, filter = self.v["ockm-filter"] or 0 }
   for _, m in ipairs(r.moves) do
@@ -1648,7 +1953,7 @@ function ui:macro_go(slot, r, now)
       pd.send("ockm-filter-glide", "list", { m.v, math.max(30, ms) }); self.v["ockm-filter"] = m.v
     elseif t then
       saved.set[t.hook] = self.v[t.hook] or 0
-      self:ramp(t.hook, t.switch and 1 or m.v, t.switch and 0 or ms)
+      self:ramp(t.hook, t.switch and (t.on or 1) or m.v, t.switch and 0 or ms)
     end
   end
   self.macro = { slot = slot, recipe = r, saved = saved, run = run and r.bars or nil, bars = 0, held = 0 }
@@ -1707,16 +2012,22 @@ function ui:macro_end()
   self:set_mute_bar(true)   -- the mutes come back on the next 1
   -- v1.22: the gap before the drop (the mix drops out for the bar's last steps; too late in the bar and it's skipped)
   if (mc.recipe.gap or 0) > 0 and self.playing ~= 0 then pd.send("ockm-gap-arm", "float", { mc.recipe.gap }) end
+  -- v1.49 or a rewind: the mix spins back over the bar's last steps and stops right on the drop
+  if (mc.recipe.rewind or 0) > 0 and self.playing ~= 0 then pd.send("ockm-rewind-arm", "float", { mc.recipe.rewind }) end
   for tr, x in pairs(mc.saved.mutes) do if self:mute_target(tr) ~= x then self:qmute(tr, x) end end
 end
 function ui:on_bar()
   if self.arr then self:arr_bar() end
   self:evo_bar()
+  self:inst_evo_bar()
   local mc = self.macro
   if not (mc and mc.run) then return end
   if mc.ending then
     if (mc.recipe.gap or 0) > 0 and self.gapclock then self.gapclock:delay(steps_ms(self, 1)) end
     self:macro_restore(true, true); self.macro = nil
+    -- v1.49 the drop: a crash, and a key change if the recipe has one (back down at the next breakdown)
+    if mc.recipe.crash and self.playing ~= 0 then pd.send("ockm-impact-go", "bang", {}) end
+    self:drop_key(mc.recipe)
     self:set_mute_bar(false)
     self:dirty(); return
   end
@@ -1736,7 +2047,7 @@ function ui:macro_up(slot)
 end
 function ui:macro_finish()
   if not self.macro then return end
-  pd.send("ockm-gap-arm", "float", { 0 })
+  pd.send("ockm-gap-arm", "float", { 0 }); pd.send("ockm-rewind-arm", "float", { 0 })
   if self.macro.run then self:set_mute_bar(false); self:macro_restore(true, true); self.macro = nil; return end
   self:macro_restore(true)
   self.macro = nil
@@ -1747,7 +2058,7 @@ function ui:macro_sub(i)
   if not (mc and mc.slot == i) then return nil end
   if mc.run then
     if mc.ending then return "back on the 1" end
-    if not mc.latched then return "hold: drops when you let go" end
+    if not mc.latched then return "let go to drop" end
     return (mc.bars > 0) and ("bar " .. math.min(mc.bars, mc.run) .. " of " .. mc.run .. ": tap to drop") or "starts on the 1"
   end
   if mc.latched then return "tap to let go" end
@@ -1858,7 +2169,7 @@ function ui:midi_knob(cc, val)
     if k == 1 and math.abs(v) < 0.04 then v = 0 end   -- the filter's middle is off: give it a little room
     self:send(m[1], v)
   else
-    self:send("ockm-" .. (SYNTHS[self.part or 1] or "bass") .. "-k" .. (k - 4), x)
+    self:send(self:khook(SYNTHS[self.part or 1] or "bass", k - 4), x)
   end
   self:dirty()
 end
@@ -2095,20 +2406,116 @@ function ui:layout_learnbar(add)
 end
 
 -- ------------------------------------------------------------------ settings screen
-local SECTIONS = { "this project", "new projects", "this device", "macros", "MIDI" }
+local SECTIONS = { "this project", "new projects", "this device", "macros", "MIDI", "MIDI out" }
 local SX = 184                       -- where a section's content starts
 function ui:layout_setup(add)
   local sec = self.set_sec or 1
   for i, nm in ipairs(SECTIONS) do
     add{ kind="choice", x=16, y=80 + (i - 1) * 56, w=154, h=48, label=nm, sel=(sec == i), tap=function() self.set_sec = i; self.edit_move = nil end }
   end
-  add{ kind="text", x=16, y=H - 40, w=160, h=12, label="OCKM " .. VERSION, size=10 }
+  add{ kind="text", x=16, y=H - 40, w=160, h=12, label="OCKM GENERATOR " .. VERSION, size=10 }
   add{ kind="text", x=16, y=H - 26, w=160, h=12, label=ockm_pretty(self.project), size=10 }
   if sec == 1 then self:layout_set_project(add)
   elseif sec == 2 then self:layout_set_new(add)
   elseif sec == 3 then self:layout_set_device(add)
   elseif sec == 5 then self:layout_set_midi(add)
+  elseif sec == 6 then self:layout_set_midiout(add)
   else self:layout_set_macros(add) end
+end
+
+-- v1.40 MIDI out: each synth part on this box, on a synth plugged into the USB ports, or both. Kept on this device
+-- v1.45 a note on the bass or lead's MIDI channel (the same as its MIDI out channel: bass 1, lead 2) plays that part
+-- live, over whatever it's playing. On the Bass synth or the Analog it goes through the keys (and the arpeggiator);
+-- on another engine it plays the engine directly, held until the key lets go
+function ui:midi_part_note(n, v, ch)
+  local M = (self.me and self.me.midiout) or {}
+  for _, p in ipairs({ "bass", "lead" }) do
+    if ch == ((M[p] or {}).ch or ((p == "bass") and 1 or 2)) then
+      local pre = self:synth_of(p)
+      if pre then
+        if v > 0 then pd.send(pre .. "-play", "note", { n, v }) else pd.send(pre .. "-play", "off", { n }) end
+      else
+        if v > 0 then pd.send("ockm-" .. p .. "-live", "list", { n, (v >= 100) and 1 or 0, 0, 1 }) else pd.send("ockm-" .. p .. "-live", "off", {}) end
+      end
+      return true
+    end
+  end
+  return false
+end
+-- v1.49 MIDI out: drums, bass, lead and chords, each on this box, MIDI or both; sequencer mode sends them all out. A device
+-- sets the channels and the drum notes to suit it (the outs stay as they are)
+ui.MOUT_PARTS = { { "drums", "drums", 10 }, { "bass", "bass", 1 }, { "lead", "lead", 2 }, { "chord", "chords", 3 } }
+ui.MOUT_KITS = {   -- name, label, channels (drums, bass, lead, chord), drum notes (0 by sound, 1 pads 36-43)
+  { "general", "general", { 10, 1, 2, 3 }, 0 },
+  { "mpc", "MPC", { 10, 1, 2, 3 }, 1 },
+  { "mc101", "MC-101", { 1, 2, 3, 4 }, 0 } }
+function ui:midiout_tidy()
+  local M = self.me.midiout
+  for _, pp in ipairs(ui.MOUT_PARTS) do M[pp[1]] = M[pp[1]] or { out = 0, ch = pp[3] } end
+  M.dmap = M.dmap or 0; M.kit = M.kit or "general"
+  return M
+end
+function ui:midiout_send()
+  if not self.me then return end
+  local M = self:midiout_tidy()
+  for _, pp in ipairs(ui.MOUT_PARTS) do
+    local m = M[pp[1]]
+    psend("ockm-" .. pp[1] .. "-mch", "float", { m.ch or pp[3] })
+    psend("ockm-" .. pp[1] .. "-midi", "float", { m.out or 0 })
+  end
+  psend("ockm-drums-map", "float", { M.dmap or 0 })
+end
+function ui:midiout_all(out)   -- v1.49 sequencer mode (1: every part out) or all back on the box (0)
+  local M = self:midiout_tidy()
+  for _, pp in ipairs(ui.MOUT_PARTS) do M[pp[1]].out = out end
+  self:save_settings(); self:midiout_send()
+end
+function ui:midiout_kit(k)
+  local M = self:midiout_tidy()
+  local kt = ui.MOUT_KITS[k]
+  M.kit = kt[1]; M.dmap = kt[4]
+  for i, pp in ipairs(ui.MOUT_PARTS) do M[pp[1]].ch = kt[3][i] end
+  self:save_settings(); self:midiout_send()
+end
+function ui:layout_set_midiout(add)
+  local cw = W - 16 - SX
+  local M = self:midiout_tidy()
+  add{ kind="text", x=SX, y=80, w=cw, h=14, size=13, col="txt", label="play the parts on your synths and drum machines" }
+  add{ kind="text", x=SX, y=98, w=cw, h=12, size=10, label="plug them in by USB (or a MIDI interface) and set each to listen on its part's channel" }
+  -- the whole box at once, and the device
+  local allm, allb = true, true
+  for _, pp in ipairs(ui.MOUT_PARTS) do
+    if (M[pp[1]].out or 0) ~= 1 then allm = false end
+    if (M[pp[1]].out or 0) ~= 0 then allb = false end
+  end
+  add{ kind="choice", x=SX, y=118, w=150, h=40, small=true, label="all on this box", sel=allb, tap=function() self:midiout_all(0) end }
+  add{ kind="choice", x=SX + 156, y=118, w=150, h=40, small=true, label="sequencer mode", sel=allm, tap=function() self:midiout_all(1) end }
+  add{ kind="text", x=SX + 330, y=131, w=60, h=12, size=11, label="device" }
+  for k, kt in ipairs(ui.MOUT_KITS) do
+    add{ kind="choice", x=SX + 384 + (k - 1) * 94, y=118, w=88, h=40, small=true, label=kt[2], sel=(M.kit == kt[1]), tap=function() self:midiout_kit(k) end }
+  end
+  for k, pp in ipairs(ui.MOUT_PARTS) do
+    local m = M[pp[1]]
+    local y = 168 + (k - 1) * 58
+    add{ kind="card", x=SX, y=y, w=cw, h=52 }
+    add{ kind="text", x=SX + 14, y=y + 18, w=80, h=14, size=14, col="txt", label=pp[2] }
+    for j, lab in ipairs({ "this box", "MIDI", "both" }) do
+      add{ kind="choice", x=SX + 100 + (j - 1) * 112, y=y + 6, w=106, h=40, small=true, label=lab, sel=((m.out or 0) == j - 1),
+           tap=function() m.out = j - 1; self:save_settings(); self:midiout_send() end }
+    end
+    add{ kind="text", x=SX + 450, y=y + 19, w=70, h=12, size=11, label="channel" }
+    add{ kind="arrow", x=SX + 516, y=y + 6, w=40, h=40, dir=-1, on=(m.ch or 1) > 1, tap=function() m.ch = math.max(1, (m.ch or 1) - 1); self:save_settings(); self:midiout_send() end }
+    add{ kind="btn", x=SX + 560, y=y + 6, w=60, h=40, label=tostring(m.ch or 1) }
+    add{ kind="arrow", x=SX + 624, y=y + 6, w=40, h=40, dir=1, on=(m.ch or 1) < 16, tap=function() m.ch = math.min(16, (m.ch or 1) + 1); self:save_settings(); self:midiout_send() end }
+  end
+  local y = 168 + 4 * 58 + 4
+  add{ kind="text", x=SX, y=y + 13, w=90, h=12, size=11, label="drum notes" }
+  for j, lab in ipairs({ "by sound (kick 36, snare 38...)", "pads 36-43 (slot 1-8)" }) do
+    add{ kind="choice", x=SX + 96 + (j - 1) * 236, y=y, w=230, h=40, small=true, label=lab, sel=((M.dmap or 0) == j - 1),
+         tap=function() M.dmap = j - 1; self:save_settings(); self:midiout_send() end }
+  end
+  add{ kind="text", x=SX, y=y + 52, w=cw, h=12, size=11, label="on MIDI a part's own sound here goes quiet; both plays them together. Accents go out harder, slides as overlapping notes" }
+  add{ kind="text", x=SX, y=y + 70, w=cw, h=12, size=11, label="(a TD-3 slides), drum rolls and flams as real hits. The clock goes out with the notes, so gear following it lands in time" }
 end
 
 function ui:layout_set_project(add)
@@ -2152,19 +2559,34 @@ function ui:layout_set_new(add)
   local function idx(t, x) for i, v in ipairs(t) do if v == x then return i end end return 1 end
   self:set_row(add, 104, "drums", "you can build up from here", { "1 bar", "2 bars", "4 bars" }, idx(DL, n.drum), function(i) n.drum = DL[i]; self:save_settings() end)
   self:set_row(add, 164, "synths", "bass, lead and chords", { "2 bars", "4 bars", "8 bars" }, idx(SL, n.synth), function(i) n.synth = SL[i]; self:save_settings() end)
-  -- v1.06: the lead's start isn't a setting any more: styles set it, and a blank project starts on motif and phrase
+  -- v1.06: the lead's start isn't a setting any more: styles set it. v1.47: a blank project starts with the lead empty
 end
 
 function ui:layout_set_device(add)
   local d = self.me.device
   add{ kind="text", x=SX, y=80, w=600, h=12, label="this device: kept here, not in projects", size=10 }
   self:set_row(add, 104, "theme", "", { "dark", "light" }, (d.theme == "light") and 2 or 1, function(i)
-    d.theme = (i == 2) and "light" or "dark"; self.theme = THEMES[d.theme]; self:save_settings() end)
-  self:set_row(add, 164, "filter lets go", "how fast it goes home", { "snap", "quick", "slow" }, d.snap, function(i)
+    d.theme = (i == 2) and "light" or "dark"; self:apply_theme(); self:save_settings() end)
+  add{ kind="text", x=SX, y=198, w=170, h=14, label="colour", size=13, col="txt" }
+  local mode = (d.theme == "light") and "light" or "dark"
+  local function colour_row(y, ids)
+    local x0, cw = SX + 180, W - 16 - SX - 180
+    local ow = (cw - 6 * (#ids - 1)) / #ids
+    for i, id in ipairs(ids) do
+      local spec = ACCENTS[id]
+      local sel = (d.colour or "red") == id
+      add{ kind="choice", x=x0 + (i - 1) * (ow + 6), y=y, w=ow, h=48, label=id, small=true, sel=sel, live=sel,
+           mark=(spec.light and not sel) and spec[mode] or nil,
+           tap=function() d.colour = id; self:apply_theme(); self:save_settings() end }
+    end
+  end
+  colour_row(164, { "red", "orange", "blue", "teal" })
+  colour_row(220, { "wine", "green", "violet", "plain" })
+  self:set_row(add, 284, "filter lets go", "how fast it goes home", { "snap", "quick", "slow" }, d.snap, function(i)
     d.snap = i; SPRING_MS = SNAP_MS[i]; self:save_settings() end)
-  self:set_row(add, 224, "mutes land", "where Perform B starts", { "now", "next beat", "next bar" }, (d.mutes or 0) + 1, function(i)
+  self:set_row(add, 344, "mutes land", "where Perform starts", { "now", "next beat", "next bar" }, (d.mutes or 0) + 1, function(i)
     d.mutes = i - 1; self.v["ockm-mute-quant"] = i - 1; pd.send("ockm-mute-quant", "float", { i - 1 }); self:save_settings() end)
-  add{ kind="text", x=SX, y=300, w=W - 16 - SX, h=12, label="audio out (DAC or headphones) comes here once the DAC is fitted", size=10 }
+  add{ kind="text", x=SX, y=420, w=W - 16 - SX, h=12, label="audio out (DAC or headphones) comes here once the DAC is fitted", size=10 }
   if KIOSK then
     add{ kind="btn", x=SX, y=H - 76, w=220, h=56, label="quit to desktop", tap=function() psend("pd", "quit", {}) end }
   end
@@ -2175,11 +2597,15 @@ function ui:layout_set_macros(add)
   local me = self.me
   local sel = self.mac_sel or 1
   local lw = 236
-  for i = 1, 6 do
+  local n = math.max(6, math.min(9, #me.macros))   -- v1.49 up to nine
+  local pitch = (n > 6) and 56 or 84
+  for i = 1, n do
     local r = me.macros[i]
     local slot
-    for s = 1, 3 do if me.slots[s] == i then slot = string.char(64 + s) end end
-    add{ kind="recipe", x=SX, y=80 + (i - 1) * 84, w=lw, h=78, label=(r and #r.moves > 0) and r.name or "empty", sub=recipe_summary(r), slot=slot, sel=(sel == i),
+    for s = 1, 6 do if me.slots[s] == i then slot = string.char(64 + s) end end
+    local sub = recipe_summary(r)
+    if pitch < 84 and #sub > 84 then sub = sub:sub(1, 81):gsub("[,%s]+%S*$", "") .. " ..." end   -- two lines in the shorter rows
+    add{ kind="recipe", x=SX, y=80 + (i - 1) * pitch, w=lw, h=pitch - 6, label=(r and #r.moves > 0) and r.name or "empty", sub=sub, slot=slot, sel=(sel == i),
          tap=function() self.mac_sel = i end }
   end
   local r = me.macros[sel]
@@ -2238,36 +2664,56 @@ function ui:layout_set_macros(add)
   local rb = r.bars or 0
   local ri = 1; for q, b in ipairs(RUN_BARS) do if b == rb then ri = q end end
   add{ kind="text", x=ix, y=H - 118, w=iw, h=12, size=10,
-       label=(rb > 0) and ("a tap plays it for " .. rb .. (rb == 1 and " bar" or " bars") .. ", then it all comes back on the 1 (mutes land on the bar). Or hold it") or "plays while held (moves that stay keep it lit)" }
+       label=(rb > 0) and ("a tap plays it for " .. rb .. (rb == 1 and " bar" or " bars") .. ", then it all comes back on the 1. Or hold it") or "plays while held (moves that stay keep it lit)" }
   add{ kind="btn", x=ix + iw - 150, y=H - 104, w=150, h=24, small=true, label=(rb > 0) and ("runs " .. rb .. (rb == 1 and " bar" or " bars")) or "no length",
        tap=function() r.bars = RUN_BARS[ri % #RUN_BARS + 1]; if r.bars == 0 then r.bars = nil end; self:save_settings() end }
   -- v1.22: a gap before the drop: everything out for the last half beat or beat, then the drop on the 1
   if rb > 0 then
-    local gi = 1; for q, g in ipairs(GAPS) do if g[2] == (r.gap or 0) then gi = q end end
+    local gi = 1
+    for q, g in ipairs(GAPS) do
+      if (g[3] and g[2] == (r.rewind or 0)) or (not g[3] and (r.rewind or 0) == 0 and g[2] == (r.gap or 0)) then gi = q end
+    end
     add{ kind="btn", x=ix + iw - 150 - 156, y=H - 104, w=150, h=24, small=true, label=GAPS[gi][1],
-         tap=function() r.gap = GAPS[gi % #GAPS + 1][2]; if r.gap == 0 then r.gap = nil end; self:save_settings() end }
+         tap=function()
+           local nx = GAPS[gi % #GAPS + 1]
+           if nx[3] then r.rewind, r.gap = nx[2], nil else r.gap, r.rewind = (nx[2] > 0) and nx[2] or nil, nil end
+           self:save_settings() end }
+  end
+  -- v1.49 the drop: a crash, and a key change (back down at the next breakdown)
+  if rb > 0 then
+    add{ kind="choice", x=ix, y=H - 104, w=84, h=24, small=true, accent=true, sel=(r.crash == true), label="crash",
+         tap=function() r.crash = (not r.crash) or nil; self:save_settings() end }
+    local KEYS = { 0, 2, 3, 5, 7 }
+    local kk = math.floor(r.key or 0)
+    local ki = 1; for q, x in ipairs(KEYS) do if x == kk then ki = q end end
+    add{ kind="btn", x=ix + 90, y=H - 104, w=84, h=24, small=true, label=(kk > 0) and ("key +" .. kk) or "same key",
+         tap=function() local nx = KEYS[ki % #KEYS + 1]; r.key = (nx > 0) and nx or nil; self:save_settings() end }
   end
   -- which slot on Perform B, and try it
   add{ kind="text", x=ix, y=H - 62, w=60, h=12, label="on slot", size=10 }
-  for s = 1, 3 do
-    add{ kind="choice", x=ix + 64 + (s - 1) * 62, y=H - 76, w=56, h=56, label=string.char(64 + s), sel=(me.slots[s] == sel), accent=true,
+  for s = 1, 6 do   -- v1.49 six slots
+    add{ kind="choice", x=ix + 64 + (s - 1) * 46, y=H - 76, w=42, h=56, label=string.char(64 + s), sel=(me.slots[s] == sel), accent=true,
          tap=function() me.slots[s] = sel; self:save_settings() end }
   end
-  local tw = iw - 64 - 3 * 62 - 6
-  add{ kind="hold", x=ix + iw - tw, y=H - 76, w=tw, h=56, label="try it", sub="hold", on=(self.macro and self.macro.slot == 4),
-       down=function() self.try_sel = sel; self:macro_down(4) end, up=function() self:macro_up(4) end }
+  local tw = iw - 64 - 6 * 46 - 6
+  add{ kind="hold", x=ix + iw - tw, y=H - 76, w=tw, h=56, label="try it", sub="hold", on=(self.macro and self.macro.slot == 7),
+       down=function() self.try_sel = sel; self:macro_down(7) end, up=function() self:macro_up(7) end }
 end
 
 -- Perform B: choose which recipe is on a slot
 function ui:layout_slotpick(add)
   local s = self.pick_slot or 1
   add{ kind="scrim", x=0, y=0, w=W, h=H, tap=function() self.sheet = nil end }
-  local x0, y0, w0 = W / 2 - 220, 110, 440
-  add{ kind="sheet", x=x0, y=y0, w=w0, h=6 * 56 + 70 }
+  -- v1.49 up to nine recipes (the build and the rush made eight and nine)
+  local n = math.max(6, math.min(9, #self.me.macros))
+  local pitch = (n > 6) and 54 or 56
+  local x0, w0 = W / 2 - 220, 440
+  local y0 = math.max(16, math.floor((H - (n * pitch + 70)) / 2))
+  add{ kind="sheet", x=x0, y=y0, w=w0, h=n * pitch + 70 }
   add{ kind="text", x=x0 + 16, y=y0 + 16, w=w0 - 32, h=14, label="slot " .. string.char(64 + s) .. ": play which macro?", size=13, col="txt" }
-  for i = 1, 6 do
+  for i = 1, n do
     local r = self.me.macros[i]
-    add{ kind="recipe", x=x0 + 16, y=y0 + 44 + (i - 1) * 56, w=w0 - 32, h=50, label=(r and #r.moves > 0) and r.name or "empty", sub=recipe_summary(r),
+    add{ kind="recipe", x=x0 + 16, y=y0 + 44 + (i - 1) * pitch, w=w0 - 32, h=pitch - 6, label=(r and #r.moves > 0) and r.name or "empty", sub=recipe_summary(r),
          sel=(self.me.slots[s] == i), tap=function() self.me.slots[s] = i; self:save_settings(); self.sheet = nil end }
   end
 end
@@ -2277,8 +2723,7 @@ function ui:apply_new_defaults()
   local n = self.me.new
   if n.drum ~= 16 then psend("ockm-drum-len", "float", { n.drum }) end
   if n.synth ~= 64 then for _, p in ipairs(SYNTHS) do psend("ockm-" .. p .. "-len", "float", { n.synth }) end end
-  local l = NEW_LEAD[2]   -- motif, on the phrase rhythm (a one-note lead is the worst first impression)
-  psend("ockm-lead-rhythm", "float", { l[2] }); psend("ockm-lead-notes", "float", { l[3] })
+  -- v1.47 the lead starts empty like the bass and chords (it was the same motif in every new project): start or a style fills it
   psend("ockm-save", "bang", {})
 end
 
@@ -2286,19 +2731,22 @@ end
 function ui:track_sounding(n)
   local t = TRACKS[n]
   if self:silent(t) then return false end
+  if t == "vox" then return (self.vox_lit or 0) > 0 end
   if n <= 8 then return self:get("ockm-pat-"..t, self.step % self:plen("drum")) > 0 end
   return self:part_sounding(t)
 end
 
 function ui:open(screen)
-  if screen == "perform" then screen = "live" end   -- v0.87: Perform A is gone; its drum grid is the drums tab's all drums view
+  if screen == "perform" then screen = "live" end
+  if screen ~= "inst" and screen ~= "home" then self:inst_leave() end   -- v1.39 back to the groovebox   -- v0.87: Perform A is gone; its drum grid is the drums tab's all drums view
   if screen ~= "project" and screen ~= "arrange" and self.pv and not self.pv.export and not self.pv.arrange then self:preview_end() end   -- v1.26: leaving puts yours back
   self.msg = nil
   self.screen = screen
   self.pick, self.confirm, self.sheet = nil, nil, nil
+  self.smp_clear = nil
   if screen == "project" then psend("ockm-project-list", "bang", {}); self.pg_home = nil end
   if screen == "arrange" then psend("ockm-project-list", "bang", {}) end
-  if screen == "drums" then psend("ockm-samples-scan", "bang", {}) end   -- pick up files added since
+  if screen == "drums" or screen == "vox" then psend("ockm-samples-scan", "bang", {}) end   -- pick up files added since
   self.sel_step = 0
   self:set_page(self:play_block())
 end
@@ -2314,10 +2762,62 @@ function ui:step_row(add, y, h, kind)
   end
 end
 
+-- v1.45 the drums tab's pads view (from drmz): a column per drum, its pad (tap to hear it), mute, level, pitch, length,
+-- drive (tone on a sample), and a new sound. The same eight drums as the other views
+function ui:layout_drumpads(add)
+  add{ kind="text", x=16, y=128, w=500, h=12, size=11, label="pads: tap a pad to hear it, turn its knobs, or try a new sound" }
+  add{ kind="btn", x=W - 16 - 96 - 6 - 96, y=114, w=96, h=40, small=true, label="one drum", tap=function() self.drums_pads = false end }
+  add{ kind="btn", x=W - 16 - 96, y=114, w=96, h=40, small=true, label="all drums", tap=function() self.drums_pads = false; self.drums_all = true end }
+  local cw, gap = (W - 32 - 7 * 8) / 8, 8
+  local f0 = function(v) return string.format("%d", math.floor(v * 100 + 0.5)) end
+  local fs = function(v) local q = math.floor(v + 0.5); return (q > 0 and "+" or "") .. q end
+  local fd = function(v) return string.format("%d", math.floor(v + 0.5)) end
+  for i = 1, 8 do
+    local x = 16 + (i - 1) * (cw + gap)
+    local nm = "ockm-" .. SLOTS[i]
+    local smp = math.floor(self.v[nm .. "-sample"] or 0)
+    add{ kind="card", x=x, y=160, w=cw, h=H - 160 - 8 }
+    add{ kind="btn", x=x + 6, y=166, w=cw - 12, h=50, label=SHORT[(self.v[nm .. "-sound"] or 0) + 1], tap=function() self:audition(i) end }
+    add{ kind="ms", x=x + 6, y=222, w=cw - 12, h=28, label="mute", hook="ockm-" .. TRACKS[i] .. "-mute" }
+    local cx = x + cw / 2
+    local k4 = (smp > 0) and { "tone", -1, 1, "tone", f0 } or { "drive", 0, 1, "drive", f0 }
+    for j, kn in ipairs({ { "level", 0, 1.5, "level", f0 }, { "tune", -12, 12, "pitch", fs }, { "decay", 10, 400, "length", fd }, k4 }) do
+      local cy = 290 + (j - 1) * 70
+      add{ kind="knob", x=cx - 30, y=cy - 30, w=60, h=72, cx=cx, cy=cy, r=22, hook=nm .. "-" .. kn[1], label=kn[4], fmt=kn[5], lo=kn[2], hi=kn[3] }
+    end
+    add{ kind="btn", x=x + 6, y=H - 48, w=cw - 12, h=36, small=true, label="new sound", disabled=(smp > 0), tap=function()
+      if smp > 0 then self:say("a sample: pick a synth sound on one drum to make new ones"); return end
+      self:lab_random(i, 0.35); self:audition_soon(i)
+    end }
+  end
+end
+
+-- v1.49 a drum's lane: how its steps are played, without changing them. Chance, thin (by importance), drift, and which bars
+-- it plays in. Saved with the scene; all of it out of the box changes nothing
+function ui:layout_drumlane(add, nm, half)
+  local THIN_WORDS = { [0] = "none", "16ths", "8ths", "2 + 4", "the 1" }   -- what goes (the 1 alone stays at the top)
+  local WHEN = { "every bar", "bars 1 + 3", "bars 2 + 4", "last of 4", "first of 4", "fills only", "not in fills" }
+  add{ kind="text", x=16, y=358, w=half - 100, h=12, size=11, label=SHORT[(self.v["ockm-" .. nm .. "-sound"] or 0) + 1] .. ": how its steps play" }
+  local pc = function(v) return math.floor(v * 100 + 0.5) .. "%" end
+  add{ kind="slider", x=16, y=390, w=half, h=24, hook="ockm-" .. nm .. "-chance", lo=0, hi=1, label="chance", fmt=pc }
+  add{ kind="slider", x=16, y=420, w=half, h=24, hook="ockm-" .. nm .. "-thin", lo=0, hi=1, label="thin",
+       fmt=function(v) return THIN_WORDS[math.floor(v * 4 + 0.5)] or "" end }
+  add{ kind="slider", x=16, y=450, w=half, h=24, hook="ockm-" .. nm .. "-drift", lo=0, hi=1, label="drift", fmt=pc }
+  add{ kind="text", x=16, y=480, w=half, h=12, size=11, col="mute", label="plays in" }
+  local when = math.floor(self.v["ockm-" .. nm .. "-when"] or 0)
+  local bw = (half - 3 * 6) / 4
+  for k, name in ipairs(WHEN) do
+    local col, row = (k - 1) % 4, math.floor((k - 1) / 4)
+    add{ kind="choice", x=16 + col * (bw + 6), y=496 + row * 32, w=bw, h=28, small=true, label=name, sel=(when == k - 1),
+         tap=function() self:send("ockm-" .. nm .. "-when", k - 1) end }
+  end
+end
+
 function ui:layout_drums(add)
+  if self.drums_pads then return self:layout_drumpads(add) end
   if self.drums_all then return self:layout_drumgrid(add) end
   local nm = SLOTS[self.slot]
-  local AW = 96   -- the all drums button, right of the slots
+  local AW = 96 + 6 + 72   -- the all drums and pads buttons, right of the slots
   local tw = (W - 32 - 7 * 6 - 8 - AW) / 8
   -- which drum: the 8 slots, named by their sound. Swipe left across them for all eight at once
   local to_all = function(dx) if dx < 0 then self.drums_all = true end end
@@ -2327,17 +2827,41 @@ function ui:layout_drums(add)
          label=SHORT[(self.v["ockm-"..SLOTS[i].."-sound"] or 0) + 1] .. (smp > 0 and string.format(" %02d", smp) or ""),
          sel=(i == self.slot), swipe=to_all, tap=function() self.slot = i; self:preview(i, true) end }
   end
-  add{ kind="btn", x=W - 16 - AW, y=114, w=AW, h=40, small=true, accent=true, label="all drums", tap=function() self.drums_all = true end }
+  add{ kind="btn", x=W - 16 - AW, y=114, w=96, h=40, small=true, accent=true, label="all drums", tap=function() self.drums_all = true end }
+  add{ kind="btn", x=W - 16 - 72, y=114, w=72, h=40, small=true, accent=true, label="pads", tap=function() self.drums_pads = true end }
   self:step_row(add, D_STEP_Y, D_STEP_H, "dstep")
   -- the lane under the steps: velocity or timing, dragged up and down per step
   local lane = self.lane or "vel"
-  for i, m in ipairs({ { "vel", "velocity" }, { "time", "timing" } }) do
+  -- v1.49 rolls: tap a hit to make it a roll of 2 to 6 (and round to one hit again)
+  local LANE_SAY = { vel = "velocity: drag the bars up and down, or swipe across them", time = "timing: drag up to push a hit late, down to pull it early",
+                     roll = "rolls: tap a hit for a roll of two, again for three, up to six, then back to one" }
+  for i, m in ipairs({ { "vel", "velocity" }, { "time", "timing" }, { "roll", "rolls" } }) do
     add{ kind="choice", x=16 + (i - 1) * 90, y=270, w=84, h=24, small=true, label=m[2], sel=(lane == m[1]), tap=function()
-      self.lane = m[1]
-      self:say((m[1] == "vel") and "velocity: drag the bars up and down, or swipe across them" or "timing: drag up to push a hit late, down to pull it early")
+      self.lane = m[1]; self:say(LANE_SAY[m[1]])
     end }
   end
-  add{ kind="hbar", x=196, y=270, w=190, h=24, hook="ockm-swing", lo=50, hi=75, label="swing" }
+  add{ kind="hbar", x=286, y=270, w=120, h=24, hook="ockm-swing", lo=50, hi=75, label="swing" }
+  -- v1.49 humanize (each hit a touch softer and later), slice (the bar's steps in another order) and drum drift (your
+  -- pattern, then a variation, every few bars). All for the whole kit, saved with the scene
+  add{ kind="hbar", x=412, y=270, w=110, h=24, hook="ockm-humanize", lo=0, hi=1, label="humanize" }
+  local SLICE = { "off", "halves", "stutter", "reverse", "mirror", "double", "auto" }
+  local sl = math.floor(self.v["ockm-slice"] or 0)
+  add{ kind="choice", x=528, y=270, w=106, h=24, small=true, accent=true, sel=(sl > 0), label="slice: " .. (SLICE[sl + 1] or "off"), tap=function()
+    local nx = (sl + 1) % #SLICE
+    self:send("ockm-slice", nx)
+    self:say(({ "slice off: the bar as written", "halves: the two halves swapped", "stutter: the first beat of each half twice",
+                "reverse: the bar backwards", "mirror: the second half backwards", "double: the first half twice",
+                "auto: a different slice on the last bar of every four" })[nx + 1])
+  end }
+  local DRIFT = { { 0, 1, "off" }, { 4, 1, "4 shift" }, { 8, 1, "8 shift" }, { 16, 1, "16 shift" }, { 4, 2, "4 morph" }, { 8, 2, "8 morph" }, { 16, 2, "16 morph" } }
+  local de, dm = math.floor(self.v["ockm-drum-drift-every"] or 0), math.floor(self.v["ockm-drum-drift-mode"] or 1)
+  local di = 1; for q, d in ipairs(DRIFT) do if d[1] == de and (de == 0 or d[2] == dm) then di = q end end
+  add{ kind="choice", x=640, y=270, w=98, h=24, small=true, accent=true, sel=(de > 0), label="drift: " .. DRIFT[di][3], tap=function()
+    local nx = DRIFT[di % #DRIFT + 1]
+    self:send("ockm-drum-drift-every", nx[1]); self:send("ockm-drum-drift-mode", nx[2])
+    self:say((nx[1] == 0) and "drift off: your drums as written"
+      or ("every " .. nx[1] .. " bars your drums and a variation take turns (" .. ((nx[2] == 2) and "hits moved, added and taken out" or "the odd hit moved") .. "). The kick and clap stay put"))
+  end }
   -- v1.15: M and S for all eight drums together (lit when every drum is muted or soloed)
   local function all_drums(k) for _, nm in ipairs(SLOTS) do if (self.v["ockm-"..nm.."-"..k] or 0) <= 0 then return false end end return true end
   for j, ms in ipairs({ { "M", "mute" }, { "S", "solo" } }) do
@@ -2361,29 +2885,37 @@ function ui:layout_drums(add)
   local cur = self:current_preset(slot)
   local nps = #self:presets_for(slot)
   local last = ns + nps + cnt - 1
-  local bw = 260
-  add{ kind="arrow", x=16, y=346, w=44, h=36, dir=-1, on=(pos > 0), tap=function() if pos > 0 then self:set_drum_pos(slot, pos - 1) end end }
-  add{ kind="preset", x=66, y=346, w=bw, h=36, inline=true, sel=(smp > 0),
-       num=(smp > 0) and string.format("%02d", smp) or (cur and "mine" or "synth"),
-       label=(smp > 0) and (self:kit_of(slot) and (self:kit_of(slot) .. " kit") or ("of " .. cnt .. "  " .. folder)) or (cur and self.me.sounds[cur].name or sname),
-       tap=function() self:audition(slot) end }
-  add{ kind="arrow", x=66 + bw + 6, y=346, w=44, h=36, dir=1, on=(pos < last), tap=function() if pos < last then self:set_drum_pos(slot, pos + 1) end end }
-  if cur then
-    add{ kind="bin", x=66 + bw + 56, y=346, w=44, h=36, lit=(self.flashing == "save"), tap=function() self:delete_sound(cur) end }
+  -- v1.49 the left panel: this drum's sound, or its lane (chance, thin, drift, plays in). The switch sits at the end of the row
+  local lane_on = (self.dpanel == "lane")
+  add{ kind="choice", x=16 + half - 84, y=346, w=84, h=36, small=true, accent=true, sel=lane_on, label=lane_on and "sound" or "lane",
+       tap=function() self.dpanel = lane_on and "sound" or "lane" end }
+  if lane_on then
+    self:layout_drumlane(add, nm, half)
   else
-    add{ kind="disc", x=66 + bw + 56, y=346, w=44, h=36, lit=(self.flashing == "save"), off=(smp > 0) or nil, tap=function() self:save_sound(slot) end }
-  end
-  -- the synth's shape: character (its lab recipe) and morph sweep several settings at once; randomise and reset.
-  -- Greyed out while the slot plays a sample
-  local off = (smp > 0) or nil
-  local y = 388
-  add{ kind="hbar", x=16, y=y, w=128, h=30, hook="ockm-"..nm.."-labchar", lo=-1, hi=1, label=off and "character" or (LAB_CHAR[sname] or "character"), bold=true, off=off, preview=slot }
-  add{ kind="hbar", x=150, y=y, w=110, h=30, hook="ockm-"..nm.."-labmorph", lo=0, hi=1, label="morph", bold=true, off=off, preview=slot }
-  -- v1.03: new sound (was random; wild is gone: morph with a new path travels far) and reset
-  add{ kind="btn", x=266, y=y, w=100, h=30, small=true, label="new sound", off=off, flash="random", tap=function() self:lab_random(slot, 0.35) end }
-  add{ kind="btn", x=372, y=y, w=half - 356, h=30, small=true, quiet=true, label="reset", off=off, flash="reset", tap=function() self:lab_reset(slot) end }
-  for j, p in ipairs((smp > 0) and SAMPLE_SLIDERS or SYNTH_SLIDERS) do
-    add{ kind="slider", x=16, y=424 + (j - 1) * 27, w=half, h=24, hook="ockm-"..nm.."-"..p[1], lo=p[2], hi=p[3], label=p[4] or p[1], preview=slot }
+    local bw = 260 - 90   -- v1.49 room for the lane button
+    add{ kind="arrow", x=16, y=346, w=44, h=36, dir=-1, on=(pos > 0), tap=function() if pos > 0 then self:set_drum_pos(slot, pos - 1) end end }
+    add{ kind="preset", x=66, y=346, w=bw, h=36, inline=true, sel=(smp > 0),
+         num=(smp > 0) and string.format("%02d", smp) or (cur and "mine" or "synth"),
+         label=(smp > 0) and (self:kit_of(slot) and (self:kit_of(slot) .. " kit") or ("of " .. cnt .. "  " .. folder)) or (cur and self.me.sounds[cur].name or self:synth_label(slot)),
+         tap=function() self:audition(slot) end }
+    add{ kind="arrow", x=66 + bw + 6, y=346, w=44, h=36, dir=1, on=(pos < last), tap=function() if pos < last then self:set_drum_pos(slot, pos + 1) end end }
+    if cur then
+      add{ kind="bin", x=66 + bw + 56, y=346, w=44, h=36, lit=(self.flashing == "save"), tap=function() self:delete_sound(cur) end }
+    else
+      add{ kind="disc", x=66 + bw + 56, y=346, w=44, h=36, lit=(self.flashing == "save"), off=(smp > 0) or nil, tap=function() self:save_sound(slot) end }
+    end
+    -- the synth's shape: character (its lab recipe) and morph sweep several settings at once; randomise and reset.
+    -- Greyed out while the slot plays a sample
+    local off = (smp > 0) or nil
+    local y = 388
+    add{ kind="hbar", x=16, y=y, w=128, h=30, hook="ockm-"..nm.."-labchar", lo=-1, hi=1, label=off and "character" or (LAB_CHAR[sname] or "character"), bold=true, off=off, preview=slot }
+    add{ kind="hbar", x=150, y=y, w=110, h=30, hook="ockm-"..nm.."-labmorph", lo=0, hi=1, label="morph", bold=true, off=off, preview=slot }
+    -- v1.03: new sound (was random; wild is gone: morph with a new path travels far) and reset
+    add{ kind="btn", x=266, y=y, w=100, h=30, small=true, label="new sound", off=off, flash="random", tap=function() self:lab_random(slot, 0.35) end }
+    add{ kind="btn", x=372, y=y, w=half - 356, h=30, small=true, quiet=true, label="reset", off=off, flash="reset", tap=function() self:lab_reset(slot) end }
+    for j, p in ipairs((smp > 0) and SAMPLE_SLIDERS or SYNTH_SLIDERS) do
+      add{ kind="slider", x=16, y=424 + (j - 1) * 27, w=half, h=24, hook="ockm-"..nm.."-"..p[1], lo=p[2], hi=p[3], label=p[4] or p[1], preview=slot }
+    end
   end
   -- this drum's reverb and delay sends (the same as on the mixer)
   local sw = (half - 6) / 2
@@ -2512,9 +3044,25 @@ function ui:layout_synth(add)
     add{ kind="btn", x=HTX - 6 - 80, y=266, w=80, h=34, small=true, quiet=true, label="leave it", tap=function() self.claim_harm[part] = self:harm_sig() end }
   else
     local info = self.msg or (yours and ("yours: " .. self:step_info()) or ((part == "chord") and "plays the harmony from the builder. Edit a step and it becomes yours"
-      or "made for you: follows the harmony. Edit a step and it becomes yours"))
+      or "made for you: follows the chords. Edit a step: it's yours"))
     if not self.msg and not yours then info = self:evo_status(part) or info end
-    add{ kind="text", x=16, y=276, w=HTX - 32, h=12, label=info, size=11, col=self.msg and "acc" or nil }
+    local tw = HTX - 32
+    if mono then
+      -- v1.49 call and answer: every 2, 4 or 8 bars the last bar answers the bar before it. One button, tap to step on
+      local ak = "ockm-" .. part .. "-answer"
+      local av = math.floor(self.v[ak] or 0)
+      local AW = 136
+      add{ kind="choice", x=HTX - 6 - AW, y=266, w=AW, h=34, small=true, accent=true, sel=(av >= 2),
+           label=(av >= 2) and ("answer: " .. av .. " bars") or "answer: off",
+           tap=function()
+             local nx = ({ [0] = 2, [2] = 4, [4] = 8 })[av] or 0
+             self:send(ak, nx)
+             self:say((nx == 0) and (PART_NAMES[part] .. ": no answer")
+               or (PART_NAMES[part] .. ": every " .. nx .. " bars, the last bar answers the one before"))
+           end }
+      tw = HTX - 6 - AW - 16 - 16
+    end
+    add{ kind="text", x=16, y=276, w=tw, h=12, label=info, size=11, col=self.msg and "acc" or nil }
     if mono then
       add{ kind="choice", x=MSX - 6 - 86, y=266, w=86, h=34, label="slide", accent=true, small=true, sel=self:mono_get(self.sel_step, "slide") > 0,
            tap=function() self:mono_toggle_slide() end }
@@ -2528,10 +3076,66 @@ function ui:layout_synth(add)
 end
 
 -- pick an engine and load its sweet spot (k: the knobs to use instead, a style's own)
+-- v1.45 the Bass synth (bass engine 8) and the Analog (lead engine 7): the full synths, with their own settings
+function ui:synth_of(part)
+  local e = math.floor(self.v["ockm-"..part.."-engine"] or -1)
+  if part == "bass" and e == 8 then return "ib" end
+  if part == "lead" and e == 7 then return "ia" end
+  return nil
+end
+-- a part's four quick knobs: k1-k4, or on a synth its cutoff, resonance, envelope and decay
+function ui:khook(part, k)
+  local pre = self:synth_of(part)
+  if pre then return pre .. "-" .. ({ "cutoff", "resonance", "env", "decay" })[k] end
+  return "ockm-"..part.."-k"..k
+end
 function ui:pick_engine(part, e, k)
   self:send("ockm-"..part.."-engine", e)
+  local spre = self:synth_of(part)
+  if spre then   -- v1.46 a starting point that sits in the groovebox (cutoff, resonance, envelope, decay); its other settings stay
+    local d = ui.INSTK.pick_k[spre]
+    if d then for j, nm in ipairs({ "cutoff", "resonance", "env", "decay" }) do self:send(spre .. "-" .. nm, d[j]) end end
+    return
+  end
   local d = k or (ENGINE_K[part] or {})[e]
   if d then for j = 1, 4 do self:send("ockm-"..part.."-k"..j, d[j]) end end
+end
+-- v1.49 sounds: recipes on the engines (build.py SOUNDS, written in as ockm_SOUNDS), named by engine and number
+-- ("analogue 2", "donk 1") and stepped through with the arrows on the part's tab. Each sets the engine, its four knobs,
+-- the drive (bass and lead) and the trim that levels it with the part's other sounds
+function ui:sound_version(part, e, si)   -- which version of an engine is playing (1 if none), and how many it has
+  local vi, vn = 1, 0
+  for j, snd in ipairs(ockm_SOUNDS[part] or {}) do
+    if snd[1] == e then vn = vn + 1; if j == si then vi = vn end end
+  end
+  return vi, vn
+end
+function ui:sound_now(part)
+  local S = ockm_SOUNDS[part]
+  local i, e = math.floor(self.v["ockm-"..part.."-sound"] or 1), math.floor(self.v["ockm-"..part.."-engine"] or 0)
+  if S[i] and S[i][1] == e then return i end
+  for j, snd in ipairs(S) do if snd[1] == e then return j end end   -- a scene from before: the engine's first
+  return nil
+end
+function ui:pick_sound(part, i)
+  local S = ockm_SOUNDS[part]
+  i = (i - 1) % #S + 1
+  local snd = S[i]
+  self:send("ockm-"..part.."-sound", i)
+  if snd[2] then self:pick_engine(part, snd[1], { snd[2], snd[3], snd[4], snd[5] }) else self:pick_engine(part, snd[1]) end
+  if part ~= "chord" then self:send("ockm-"..part.."-drive", snd[6] or 0) end
+  self:send("ockm-"..part.."-trim", snd[7] or 1)   -- after the engine (a new engine sets it back to 1)
+end
+function ui:tap_engine(part, e, on)   -- an engine button: its first version, or (already on) its next, round to the first
+  local idx = {}
+  for j, snd in ipairs(ockm_SOUNDS[part] or {}) do if snd[1] == e then idx[#idx + 1] = j end end
+  if #idx == 0 then return self:pick_engine(part, e) end
+  local k = 1
+  if on then
+    local si = self:sound_now(part)
+    for n, j in ipairs(idx) do if j == si then k = n % #idx + 1 end end
+  end
+  self:pick_sound(part, idx[k])
 end
 -- a saved project on a retired engine: move it to the replacement, set to sound like the old one
 function ui:retire_engine(part, old)
@@ -2549,20 +3153,29 @@ function ui:layout_synth_sound(add, part, mono)
   self:gen_controls(add, part, 28, 290, half - 24, 0.88)
   -- right: the sound
   local rx, rw = 16 + half + 16, half
-  add{ kind="text", x=rx, y=314, w=200, h=12, label="sound", size=10 }
+  add{ kind="text", x=rx, y=314, w=300, h=12, label="sound (tap again for the next version)", size=10 }
+  local si = self:sound_now(part)
   local eng = engines_of(part)
   local ew = rw / #eng
   local order = (part == "lead") and LEAD_ORDER or (part == "bass") and MONO_ORDER or CHORD_ORDER
   ew = rw / #order
   for i, e in ipairs(order) do
-    add{ kind="choice", x=rx + (i - 1) * ew, y=330, w=ew - 4, h=40, label=eng_label(eng[e + 1]), small=true, sel=(self.v["ockm-"..part.."-engine"] == e),
-         tap=function() self:pick_engine(part, e) end }
+    local on = (self.v["ockm-"..part.."-engine"] == e)
+    local vi, vn = self:sound_version(part, e, on and si or nil)
+    add{ kind="choice", x=rx + (i - 1) * ew, y=330, w=ew - 4, h=40, label=eng_label(eng[e + 1]), small=true, sel=on,
+         ver=(on and vn > 1) and { vi, vn } or nil,
+         tap=function() self:tap_engine(part, e, on) end }
   end
   local kn = KNOBS[eng[(self.v["ockm-"..part.."-engine"] or 0) + 1]] or KNOBS.acid
+  local spre = self:synth_of(part)
+  if spre then   -- v1.45 the whole synth, over the groovebox (which keeps playing)
+    add{ kind="btn", x=rx + rw - 170, y=300, w=170, h=28, small=true, accent=true, label="edit the " .. ((spre == "ib") and "bass synth" or "analog"),
+         tap=function() self:open_inst(spre) end }
+  end
   local kw = (rw - 6) / 2
   for k = 1, 4 do
     local col, row = (k - 1) % 2, math.floor((k - 1) / 2)
-    add{ kind="hbar", x=rx + col * (kw + 6), y=376 + row * 44, w=kw, h=40, hook="ockm-"..part.."-k"..k, lo=0, hi=1, label=kn[k], bold=true }
+    add{ kind="hbar", x=rx + col * (kw + 6), y=376 + row * 44, w=kw, h=40, hook=self:khook(part, k), lo=0, hi=1, label=kn[k], bold=true }
   end
   -- drive on its own, the reverb and delay sends on one panel, then the chorus (v1.03: level lives on the mixer only)
   local n = mono and 4 or 3
@@ -2701,6 +3314,267 @@ end
 local HIDE_LEAD_RHY = { [2]=true, [3]=true, [4]=true, [5]=true, [6]=true, [7]=true }
 local HIDE_NOTES = { [12]=true, [13]=true, [14]=true }
 
+-- ------------------------------------------------------------------ v1.49 the show page
+-- For when the box is on show while you play. The circle of fifths, the key's root at the top: the key's notes light up
+-- as one arc (with the relative minors on the inside), and the chord playing is a shape on it, so a progression walks
+-- round the circle. The bass and lead are ringed on their notes. In the middle, the chord's name and number, a ticker for
+-- the beat, and eight petals, one per drum, that flash as it hits. The outer ring fills over the phrase. Tap anywhere to
+-- go back
+-- four colour schemes, one colour per part (the colours button on the page steps through them; kept in your settings)
+ui.SHOW_SCHEMES = {
+  { name = "dusk",   drums = "#E9A23B", bass = "#C43732", lead = "#9B8BD6", chord = "#4E95C9", vox = "#6DBE8C", shape = "#283846" },
+  { name = "neon",   drums = "#FFD23F", bass = "#FF3E6C", lead = "#3EF0C8", chord = "#3EA8FF", vox = "#C77DFF", shape = "#1C2940" },
+  { name = "sunset", drums = "#FFB347", bass = "#E85D3F", lead = "#F7D774", chord = "#C2528B", vox = "#7FB7BE", shape = "#3B2232" },
+  { name = "ink",    drums = "#F0F0EC", bass = "#B8B8B2", lead = "#8C8C86", chord = "#D6D6D0", vox = "#6E6E6A", shape = "#3A3A37" },
+}
+function ui:show_scheme() local n = math.floor(self.me.show_scheme or 1); return ui.SHOW_SCHEMES[n] or ui.SHOW_SCHEMES[1], n end
+function ui:layout_show(add)
+  add{ kind="scrim", x=0, y=0, w=W, h=H, tap=function() self:open(self.show_back or "live") end }
+  local bloom = (self.me.show_view == "bloom")
+  add{ kind=bloom and "bloom" or "showpage", x=0, y=0, w=W, h=H }
+  -- v1.49 two views: the circle of fifths, and the bloom (an evolving fractal, a screensaver that plays along)
+  add{ kind="btn", x=W - 16 - 150 - 8 - 130, y=12, w=130, h=48, small=true, label=bloom and "view: bloom" or "view: circle", tap=function()
+    self.me.show_view = bloom and "circle" or "bloom"; self:save_settings()
+    if not bloom then self:bloom_tick() end
+  end }
+  add{ kind="play", x=16, y=12, w=64, h=48, tap=function() self:send("ockm-play", (self.playing ~= 0) and 0 or 1) end }
+  add{ kind="bpm", x=92, y=12, w=124, h=48 }
+  add{ kind="text", x=236, y=30, w=300, h=12, size=11, label="show: tap anywhere to go back" }
+  local sch, n = self:show_scheme()
+  add{ kind="btn", x=W - 16 - 150, y=12, w=150, h=48, small=true, label="colours: " .. sch.name, tap=function()
+    self.me.show_scheme = n % #ui.SHOW_SCHEMES + 1; self:save_settings()
+  end }
+end
+-- the chord sounding now: its pitch classes from the key's root (0-11), its name and its number (i, IV ...)
+function ui:show_chord()
+  local L = self:plen("chord")
+  local st = self.step % L
+  local d = math.floor(self:get("ockm-pat-chord-deg", st))
+  if self:get("ockm-pat-chord-on", st) <= 0 and self.show_deg then d = self.show_deg end
+  self.show_deg = d
+  local sc = self:scale()
+  local dd = ((d % 7) + 7) % 7
+  local ty = CHORD_TYPES[math.floor(self.v["ockm-chord-type"] or 0) + 1] or CHORD_TYPES[1]
+  local seen, pcs = {}, {}
+  local function addpc(pc) pc = pc % 12; if not seen[pc] then seen[pc] = true; pcs[#pcs + 1] = pc end end
+  if ty.k == 1 then   -- a fixed shape: semitones over the chord's root (which is shown too)
+    addpc(sc[dd + 1]); for _, iv in ipairs(ty) do addpc(sc[dd + 1] + iv) end
+  else                -- steps of the scale from the chord's root
+    for _, off in ipairs(ty) do addpc(sc[((dd + off) % 7) + 1]) end
+  end
+  local name, num = self:chord_name(d)
+  return pcs, name, num
+end
+-- a note on a part sounding now (MIDI), or the last one it played
+function ui:show_note(p)
+  local L = self:plen(p)
+  local st = self.step % L
+  if self:get("ockm-pat-" .. p .. "-on", st) > 0 and self:track_in(p) then
+    self.show_notes = self.show_notes or {}
+    self.show_notes[p] = math.floor(self:get("ockm-pat-" .. p .. "-note", st))
+  end
+  return self.show_notes and self.show_notes[p]
+end
+-- the bloom: a branching tree, mirrored round the centre into a kaleidoscope. The chord sets how many arms (six for three
+-- notes, eight for four) and the angle the branches split at, the mood how deep they go, the kick pushes it out, the hats
+-- light the tips. It turns and breathes slowly all the time (while stopped too, on its own clock), so it never sits still
+function ui:bloom_tick()
+  if self.screen ~= "show" or self.me.show_view ~= "bloom" then return end
+  self.bloom_t = (self.bloom_t or 0) + 1
+  if self.playing == 0 then self:dirty() end
+  if self.bloomclock then self.bloomclock:delay(160) end
+end
+function ui:draw_bloom(g, w)
+  local COL = self:show_scheme()
+  local function poly(pts, col)
+    self:col(g, col); local p = Path(pts[1][1], pts[1][2]); for k = 2, #pts do p:line_to(pts[k][1], pts[k][2]) end; p:close(); g:fill_path(p)
+  end
+  local function seg(x1, y1, x2, y2, t, col)
+    local dx, dy = x2 - x1, y2 - y1; local l = math.max(1, math.sqrt(dx * dx + dy * dy))
+    local nx, ny = -dy / l * t / 2, dx / l * t / 2
+    poly({ { x1 + nx, y1 + ny }, { x2 + nx, y2 + ny }, { x2 - nx, y2 - ny }, { x1 - nx, y1 - ny } }, col)
+  end
+  if not self.bloom_t then self.bloom_t = 0; self:bloom_tick() end
+  local playing = self.playing ~= 0
+  local t = (self.bloom_t or 0) * 0.5 + (playing and self.step or 0)   -- slow time, plus the steps while it plays
+  local cx, cy = W / 2, H / 2 + 24
+  local pcs = self:show_chord()
+  local root = math.floor(self.v["ockm-root"] or 9)
+  -- the chord shapes it (no name on it): where its root sits on the circle of fifths sets the split angle, its size the arms
+  local p0 = (((self.show_deg and self:scale()[((self.show_deg % 7) + 7) % 7 + 1] or 0) + root) * 7) % 12
+  local arms = (#pcs >= 4) and 8 or 6
+  local spread = 0.3 + 0.45 * (p0 / 12) + 0.08 * math.sin(t / 23)
+  local twist = 0.12 * math.sin(t / 41)                     -- the two sides of each split lean, so it curls
+  local mood = self.v["ockm-mood"] or 0.5
+  local depth = (mood < 0.35) and 5 or ((mood > 0.7) and 7 or 6)
+  if arms == 8 and depth == 7 then depth = 6 end            -- the most it draws: 6 arms x 7 levels, about 760 strokes
+  self.bloom_kick = ((playing and self:track_sounding(1)) and 1 or (self.bloom_kick or 0) * 0.55)
+  local hats = playing and (self:track_sounding(5) or self:track_sounding(6))
+  local snare = playing and (self:track_sounding(2) or self:track_sounding(3))
+  local base = 128 * (1 + 0.1 * self.bloom_kick) * (1 + 0.04 * math.sin(t / 11))
+  local ratio = 0.7 + 0.04 * math.sin(t / 37)
+  local spin = t * 0.01
+  local cols = { COL.chord, COL.lead, COL.bass, COL.vox, COL.drums, COL.lead, COL.chord }
+  local function branch(x, y, a, len, d, lvl, thick)
+    local x2, y2 = x + len * math.cos(a), y + len * math.sin(a)
+    local c = cols[lvl] or COL.chord
+    if d == 1 and hats then c = COL.drums end                -- the outermost twigs light on the hats
+    seg(x, y, x2, y2, thick, c)
+    if d <= 1 then return end
+    local nt = math.max(1, thick * 0.72)
+    branch(x2, y2, a - spread + twist, len * ratio, d - 1, lvl + 1, nt)
+    branch(x2, y2, a + spread + twist, len * ratio, d - 1, lvl + 1, nt)
+  end
+  -- the main bloom, and a smaller one inside it turning the other way (lit on the snare and clap)
+  for k = 0, arms - 1 do branch(cx, cy, spin + k * 2 * math.pi / arms, base * 0.6, depth, 1, 6) end
+  local inner = snare and COL.bass or nil
+  for k = 0, arms - 1 do
+    local a = -spin * 1.6 + (k + 0.5) * 2 * math.pi / arms
+    local function small(x, y, aa, len, d, thick)
+      local x2, y2 = x + len * math.cos(aa), y + len * math.sin(aa)
+      seg(x, y, x2, y2, thick, inner or "dim")
+      if d <= 1 then return end
+      small(x2, y2, aa - spread * 1.3, len * 0.66, d - 1, math.max(1, thick * 0.75))
+      small(x2, y2, aa + spread * 1.3, len * 0.66, d - 1, math.max(1, thick * 0.75))
+    end
+    small(cx, cy, a, base * 0.3, 4, 2.5)
+  end
+  self:col(g, "bg"); g:fill_ellipse(cx - 10, cy - 10, 20, 20)
+end
+
+function ui:draw_showpage(g, w)
+  local COL = self:show_scheme()
+  local function circ(x, y, r, col) self:col(g, col); g:fill_ellipse(x - r, y - r, 2 * r, 2 * r) end
+  local function poly(pts, col)
+    self:col(g, col); local p = Path(pts[1][1], pts[1][2]); for k = 2, #pts do p:line_to(pts[k][1], pts[k][2]) end; p:close(); g:fill_path(p)
+  end
+  local function line(a, b, t, col)   -- a thick line, as a thin quad
+    local dx, dy = b[1] - a[1], b[2] - a[2]; local l = math.max(1, math.sqrt(dx * dx + dy * dy))
+    local nx, ny = -dy / l * t / 2, dx / l * t / 2
+    poly({ { a[1] + nx, a[2] + ny }, { b[1] + nx, b[2] + ny }, { b[1] - nx, b[2] - ny }, { a[1] - nx, a[2] - ny } }, col)
+  end
+  local function sector(cx, cy, r0, r1, a0, a1, col)   -- a slice of a ring, from angle a0 to a1
+    local pts, n = {}, 6
+    for k = 0, n do local a = a0 + (a1 - a0) * k / n; pts[#pts + 1] = { cx + r1 * math.cos(a), cy + r1 * math.sin(a) } end
+    for k = n, 0, -1 do local a = a0 + (a1 - a0) * k / n; pts[#pts + 1] = { cx + r0 * math.cos(a), cy + r0 * math.sin(a) } end
+    poly(pts, col)
+  end
+  local cx, cy, R = 300, 335, 238
+  local step = self.step % 16
+  local playing = self.playing ~= 0
+  -- the phrase: the outer ring of 48 dots fills over it
+  local ph = math.max(1, self:phrase())
+  local bar = math.floor(self.step / 16) % ph
+  local prog = (bar * 16 + step + 1) / (ph * 16)
+  for k = 0, 47 do
+    local a = -math.pi / 2 + k * math.pi * 2 / 48
+    circ(cx + R * math.cos(a), cy + R * math.sin(a), 3, (playing and k / 48 < prog) and "on" or "off")
+  end
+  -- the circle of fifths, C at the top as on every chart: position p holds the note 7p semitones above C (C G D A E B ...).
+  -- The key lights up wherever it sits, so a change of key turns the lit arc round
+  local root = math.floor(self.v["ockm-root"] or 9)
+  local r = R - 42
+  local function ang(p) return -math.pi / 2 + p * math.pi / 6 end
+  local pts = {}
+  for p = 0, 11 do pts[p] = { cx + r * math.cos(ang(p)), cy + r * math.sin(ang(p)) } end
+  local function pos(pc) return ((pc + root) * 7) % 12 end   -- a note (semitones from the key's root) to its place on the circle
+  -- the key: its notes as one lit arc, over both rings
+  for _, v in ipairs(self:scale()) do
+    local p = pos(v % 12)
+    sector(cx, cy, r - 66, r + 24, ang(p) - math.pi / 12, ang(p) + math.pi / 12, "card")
+  end
+  -- the chord: a shape joining its notes (in their order round the circle)
+  local pcs, cname, cnum = self:show_chord()
+  local inc, order = {}, {}
+  for _, pc in ipairs(pcs) do inc[pos(pc)] = true; order[#order + 1] = pos(pc) end
+  table.sort(order)
+  if #order >= 3 then
+    local shape = {}
+    for _, p in ipairs(order) do shape[#shape + 1] = pts[p] end
+    poly(shape, COL.shape)
+    for k = 1, #shape do line(shape[k], shape[(k % #shape) + 1], 3, COL.chord) end
+  elseif #order == 2 then line(pts[order[1]], pts[order[2]], 3, COL.chord) end
+  -- the bass and lead, ringed on their notes
+  for _, part in ipairs({ "bass", "lead" }) do
+    local n = self:show_note(part)
+    if n then local q = pts[pos((n - root) % 12)]; circ(q[1], q[2], 20, COL[part]); circ(q[1], q[2], 17, "bg") end
+  end
+  -- the notes, and the relative minors inside them
+  for p = 0, 11 do
+    local pc = (7 * p) % 12
+    circ(pts[p][1], pts[p][2], 13, inc[p] and COL.chord or "off")
+    -- named as the charts do: sharps on the right, flats on the left (Db Ab Eb Bb), F# at the bottom
+    local FLAT = { [1] = "Db", [3] = "Eb", [6] = "Gb", [8] = "Ab", [10] = "Bb" }
+    local function nm(q, flat) return (flat and FLAT[q]) or NOTES[q + 1] end
+    self:ctext(g, nm(pc, p >= 7), { x = pts[p][1] - 13, y = pts[p][2] - 13, w = 26, h = 26 }, 11, inc[p] and "bg" or "txt", 0)
+    local ir = r - 44
+    self:ctext(g, string.lower(nm((pc + 9) % 12, p >= 6)) .. "m", { x = cx + ir * math.cos(ang(p)) - 16, y = cy + ir * math.sin(ang(p)) - 8, w = 32, h = 16 }, 9, "mute", 0)
+  end
+  -- the middle: eight petals, one per drum, lit as it hits and fading after
+  circ(cx, cy, 96, "bg")
+  self.show_lv = self.show_lv or {}
+  for i = 1, 8 do
+    local a = -math.pi / 2 + (i - 1) * math.pi / 4
+    local hit = playing and self:track_sounding(i)
+    local lv = hit and 1 or (self.show_lv[i] or 0) * 0.5
+    self.show_lv[i] = lv
+    local function at(rr, da) return { cx + rr * math.cos(a + da), cy + rr * math.sin(a + da) } end
+    local petal = { at(46, 0), at(66, 0.2), at(88, 0), at(66, -0.2) }
+    poly(petal, (lv > 0.6) and COL.drums or ((lv > 0.2) and "mute" or "off"))
+  end
+  -- the chord's name and number, and the beat
+  self:ctext(g, cname or "", { x = cx - 40, y = cy - 26, w = 80, h = 26 }, 22, "txt", 0)
+  self:ctext(g, cnum or "", { x = cx - 30, y = cy + 2, w = 60, h = 14 }, 11, "mute", 0)
+  local beat = math.floor(step / 4)
+  for k = 0, 3 do circ(cx - 15 + k * 10, cy + 28, 3, (playing and k == beat) and "acc" or "dim") end
+  -- the right: where we are, the parts, the mood
+  local drums = (self.v["ockm-drums-on"] or 1) > 0
+  if drums then
+    drums = false
+    for i = 1, 8 do if not self:silent(TRACKS[i]) then drums = true end end
+  end
+  local build = (self.v["ockm-rise"] or 0) > 0 or (self.macro ~= nil)
+  local px, pw = 586, 354
+  self:col(g, "card"); g:fill_rounded_rect(px, 84, pw, 112, 10)
+  local word, big = "groove", "bar " .. (bar + 1) .. " of " .. ph
+  if build then
+    word = "build"
+    local m = self.macro
+    if m and m.run then local left = m.run - (m.bars or 0); big = (left <= 1) and "drop on the 1" or ("drop in " .. left .. " bars") end
+  elseif not drums then word = "breakdown" end
+  self:text(g, word, px + 18, 98, 13, "mute")
+  self:text(g, big, px + 18, 122, 30, "txt", pw - 36)
+  local pj = self.project or "default"
+  self:text(g, "the " .. ph .. " bar phrase · scene " .. scene_letter(ockm_ver(pj)), px + 18, 168, 11, "mute", pw - 36)
+  self:col(g, "card"); g:fill_rounded_rect(px, 206, pw, 196, 10)
+  self:text(g, "parts", px + 18, 218, 12, "mute")
+  self.show_plv = self.show_plv or {}
+  local rows = { { "drums", "drums" }, { "bass", "bass" }, { "lead", "lead" }, { "chords", "chord" }, { "samples", "vox" } }
+  for k, rw in ipairs(rows) do
+    local y = 254 + (k - 1) * 30
+    local key = rw[2]
+    local on
+    if key == "drums" then on = false; for i = 1, 8 do if self:track_sounding(i) then on = true end end
+    else for n, t in ipairs(TRACKS) do if t == key then on = self:track_sounding(n) end end end
+    local lv = (playing and on) and 1 or (self.show_plv[key] or 0) * 0.6
+    self.show_plv[key] = lv
+    circ(px + 24, y, 6, COL[key])
+    self:text(g, rw[1], px + 40, y - 7, 13, "txt", 100)
+    self:col(g, "off"); g:fill_rounded_rect(px + 134, y - 5, 200, 10, 5)
+    if lv > 0.03 then self:col(g, COL[key]); g:fill_rounded_rect(px + 134, y - 5, math.max(10, 200 * lv), 10, 5) end
+  end
+  self:col(g, "card"); g:fill_rounded_rect(px, 412, pw, 84, 10)
+  local mood = self.v["ockm-mood"] or 0.5
+  self:text(g, "mood", px + 18, 424, 12, "mute")
+  local mw = ui.MOOD_WORD(mood)
+  self:text(g, mw, px + pw - 18 - #mw * ockm_charw(13), 424, 13, "txt", 120)
+  self:col(g, "off"); g:fill_rounded_rect(px + 18, 462, pw - 36, 8, 4)
+  self:col(g, "acc"); g:fill_rounded_rect(px + 18, 462, math.max(8, (pw - 36) * mood), 8, 4)
+  self:col(g, "card"); g:fill_rounded_rect(px, 506, pw, 80, 10)
+  self:text(g, "the circle of fifths: the key lights up as an arc, the chord as a shape", px + 18, 520, 11, "mute", pw - 36)
+  self:text(g, "in the middle: each drum as it hits, and the beat", px + 18, 556, 11, "mute", pw - 36)
+end
+
 -- ------------------------------------------------------------------ the song screen (internally "compose")
 -- What's in this pattern (each part in or out: out is silent and Perform can't bring it back) and the harmony: the
 -- progression, key and scale every part follows, with a turnaround, and fitting the chords to a line of your own.
@@ -2709,6 +3583,7 @@ local ROMAN = { "i", "ii", "iii", "iv", "v", "vi", "vii" }
 function ui:part_in(p) return (self.v[PART_ON[p] or ("ockm-"..p.."-on")] or 1) > 0 end
 -- is a track (d1-d8, bass, lead, chord) in this pattern?
 function ui:track_in(t)
+  if t == "vox" then return true end   -- v1.38 the samples part is always in: no steps, no sound
   if string.sub(t, 1, 1) == "d" then return (self.v["ockm-drums-on"] or 1) > 0 end
   return (self.v["ockm-"..t.."-on"] or 1) > 0
 end
@@ -2768,12 +3643,12 @@ local STYLES = {
     drums={ kick={ -1, 110, 0.1, 0 }, clap={ 0, 100, 0, 0.1 } },
     bass={ engine={ 5, 1 }, rhythm={ 9, 3, 1 }, notes={ 2, 0, 6 }, move=1, k={ 0.35, 0.2, 0.4, 0.45 } },
     chord={ engine={ 4, 3 }, rhythm={ 3, 0, 8, 11 }, verb=0.25, delay=0.12, chorus=2, strum=0.12, hands={ 1, 5 } },
-    lead=false },
+    lead=false, vox={ set=0, every=8, delay=0.4 } },
   { "chicago", vary=2, rate={ 1, 0 }, push=1, kit="909", punch=0.6, bpm=125, swing=62, groove={ 13, 14, 22, 1 }, root={ 7, 0, 9, 2 }, scale={ 0, 2 }, prog={ 12, 1, 0, 3 }, type={ 10, 8 },
     drums={ kick={ 0, 90, 0.2, 0.3 }, clap={ 0, 100, 0, 0.2 } },
     bass={ engine={ 5, 0 }, rhythm={ 1, 0, 4 }, notes={ 1, 2, 3 }, move=1 },
     chord={ engine={ 1, 3 }, rhythm={ 4, 2, 5 }, verb=0.12, chorus=2 },
-    lead=false },
+    lead=false, vox={ set=1, every=4, delay=0.25 } },
   { "classic house", second={ 2, 0 }, vary={ 2, 1 }, rate={ 1, 0 }, push=1, kit="909", punch=0.5, bpm=124, swing=56, groove={ 1, 0, 21, 16 }, root={ 0, 7, 2, 5 }, scale={ 1, 4, 0 }, prog={ 16, 5, 3, 18, 10 }, type={ 6, 1 },
     drums={ kick={ 0, 100, 0.1, 0.2 }, clap={ 0, 100, 0, 0 } },
     bass={ engine={ 5, 2 }, rhythm={ 0, 1, 18, 9, 4 }, notes={ 2, 1, 0 }, move=1, sidechain=0.2 },
@@ -2839,12 +3714,14 @@ local STYLES = {
     drums={ kick={ -2, 150, 0.5, 0.5 }, clap={ 0, 70, 0.2, -0.6 } },
     bass={ engine={ 5, 1 }, rhythm={ 2, 1, 4 }, notes={ 0, 1 }, move=0, sidechain=0.5, k={ 0.25, 0.2, 0.35, 0.3 } },
     chord={ engine=6, rhythm={ 8, 5 }, delay=0.35, sidechain=0.5, k={ 0.4, 0.65, 0.7, 0.25 } },
-    lead={ engine={ 6, 3, 5 }, lfo={ { 7, 6 }, 0.3 }, rhythm={ 15, 0, 1 }, notes={ 0, 1 }, outside=0.1, delay=0.2 } },
+    lead={ engine={ 6, 3, 5 }, lfo={ { 7, 6 }, 0.3 }, rhythm={ 15, 0, 1 }, notes={ 0, 1 }, outside=0.1, delay=0.2 },
+    vox={ set=2, every=8, delay=0.3 } },
   { "hard techno", kit="909", punch=1.0, bpm=140, swing=50, groove={ 27, 26, 37 }, root={ 2, 6, 1 }, scale={ 3, 0 }, prog=0, type=0,
     drums={ kick={ -3, 170, 0.8, 0.8 }, clap={ 0, 90, 0.4, -0.3 } },
     bass={ engine={ 1, 3 }, rhythm={ 2, 1, 3 }, notes={ 0, 1 }, move=0, sidechain=0.6, k={ 0.4, 0.8, 0.3, 0.4 } },
     chord={ engine=6, rhythm={ 8, 5 }, delay=0.45, verb=0.15, sidechain=0.6, k={ 0.35, 0.75, 0.9, 0.2 } },
-    lead={ engine={ 6, 4, 5 }, lfo={ 7, 0.35 }, rhythm={ 15, 1 }, notes={ 0, 1 }, outside=0.8, delay=0.3 } },
+    lead={ engine={ 6, 4, 5 }, lfo={ 7, 0.35 }, rhythm={ 15, 1 }, notes={ 0, 1 }, outside=0.8, delay=0.3 },
+    vox={ set=2, every=16, delay=0.15 } },
 }
 -- ------------------------------------------------------------------ evolve (v1.00)
 -- An ongoing mutate. At the start of every phrase one ticked part steps to a variation, in turn: bass, lead, chords,
@@ -2979,6 +3856,8 @@ function ui:layout_compose(add)
   local stw = (W - 32 - SHW - 6 - (per - 1) * 4) / per
   add{ kind="btn", x=W - 16 - SHW, y=128, w=SHW, h=28, accent=true, small=true, label="shuffle", tap=function() self:shuffle_style() end }
   add{ kind="btn", x=W - 16 - SHW, y=160, w=SHW, h=28, small=true, label="classic", tap=function() self:classic_style() end }
+  -- v1.49 the mood, in the style chips' spare place: the style sets it; Perform plays it
+  add{ kind="hbar", x=16 + (per - 1) * (stw + 4), y=160, w=stw, h=28, hook="ockm-mood", lo=0, hi=1, label="mood", bold=true }
   local cst = math.floor(self.v["ockm-style"] or -1)
   for i, st in ipairs(STYLES) do
     local col, row = (i - 1) % per, math.floor((i - 1) / per)
@@ -3046,7 +3925,8 @@ function ui:layout_compose(add)
          tap=function() self:set_phrase(e) end }
   end
   local fon, ton = (self.v["ockm-fill-every"] or 0) > 0, te > 0
-  add{ kind="text", x=676, y=380, w=268, h=10, label="at the end of each phrase:                       all synths:", size=9 }
+  add{ kind="text", x=676, y=380, w=176, h=10, label="at the end of each phrase:", size=9 }   -- v1.49 two labels: spaces don't line up on the Pi
+  add{ kind="text", x=858, y=380, w=86, h=10, label="all synths:", size=9 }
   add{ kind="choice", x=676, y=393, w=86, h=26, small=true, accent=true, sel=fon, label="drum fill",
        tap=function() self:phrase_move("ockm-fill-every", not fon) end }
   -- v1.04 second half: the last bar of each phrase stays (same), turns to V (turnaround) or climbs to VII (climb). Tap to step
@@ -3146,6 +4026,14 @@ local function spick(v, roll)
 end
 -- v0.97: tapping a style rolls a fresh combination from its lists every time, always inside the style; classic (or
 -- apply_style(i, true)) plays the first of every list, the canonical version. Undo puts the previous one back
+-- v1.49 the mood: a word for where it is, and where each style starts it (0.5 is the style as written)
+function ui.MOOD_WORD(v)
+  local w = { "chill", "warm", "groove", "lift", "peak" }
+  return w[math.max(1, math.min(5, math.floor(v * 5) + 1))]
+end
+ui.STYLE_MOOD = { ["deep house"] = 0.35, ["dub techno"] = 0.3, minimal = 0.4, chicago = 0.5, ["classic house"] = 0.5, ["italo piano"] = 0.5,
+                  ["nu disco"] = 0.5, progressive = 0.5, detroit = 0.5, ["filter house"] = 0.55, ["tech house"] = 0.55, acid = 0.6,
+                  trance = 0.65, ["peak time"] = 0.7, ["hard techno"] = 0.8 }
 function ui:apply_style(i, classic)
   local shuf = not classic
   local st = STYLES[i]
@@ -3162,6 +4050,7 @@ function ui:apply_style(i, classic)
     if (self.v["ockm-fill-every"] or 0) > 0 then self:send("ockm-fill-every", n) end
   else self:send("ockm-turn-every", 0) end
   self:send("ockm-drum-punch", st.punch or 0.5)
+  self:send("ockm-mood", ui.STYLE_MOOD[st[1]] or 0.5)   -- v1.49 where the style's mood starts
   local root, scale = spick(st.root, shuf), spick(st.scale, shuf)
   self:send("ockm-root", root); self:send("ockm-scale", scale)
   for slot = 1, #SLOTS do
@@ -3174,6 +4063,10 @@ function ui:apply_style(i, classic)
       d = nil
     elseif self:kit_of(slot) then   -- on a kit: back to the synth sound (your own samples stay)
       self:send("ockm-"..nm.."-sample", 0)
+    end
+    -- v1.49 no kit samples: the synth kit of the same name (808, 909, 909 long), or the lab's own sound
+    if not ks and math.floor(self.v["ockm-"..nm.."-sample"] or 0) == 0 and not self:current_preset(slot) then
+      self:send("ockm-"..nm.."-labkit", (st.kit and ui.STYLE_KIT[st.kit]) or 0)
     end
     if d and math.floor(self.v["ockm-"..nm.."-sample"] or 0) == 0 and not self:current_preset(slot) then
       self:send("ockm-"..nm.."-tune", d[1]); self:send("ockm-"..nm.."-decay", d[2])
@@ -3216,8 +4109,10 @@ function ui:apply_style(i, classic)
       if ps.move then self:set_bass_move(ps.move) end
       if ps.outside then self:send("ockm-lead-outside", ps.outside) end
       self:send("ockm-"..part.."-half", ps.half or 0)
-      self:send("ockm-"..part.."-sidechain", ps.sidechain or 0)
-      self:send("ockm-"..part.."-scshape", ps.shape or 1)
+      -- v1.49 a style that doesn't say gets a light duck (the quick dip under each kick), so the kick always has room
+      local LIGHT = { bass = 0.15, lead = 0.1, chord = 0.2 }
+      self:send("ockm-"..part.."-sidechain", ps.sidechain or LIGHT[part] or 0)
+      self:send("ockm-"..part.."-scshape", ps.shape or (ps.sidechain and 1 or 0))
       self:send("ockm-"..part.."-verb", ps.verb or 0); self:send("ockm-"..part.."-delay", ps.delay or 0)
       self:send("ockm-"..part.."-chorus", ps.chorus or 0)
       local lf = ps.lfo   -- v1.08: a slow sweep on the cutoff (k1), e.g. { 7, 0.3 }: over 8 bars, 0.3 deep
@@ -3239,6 +4134,7 @@ function ui:apply_style(i, classic)
       said[#said + 1] = eng_label(e[eng + 1])
     end
   end
+  -- v1.38 styles leave the samples part alone (its steps, sends and pitch are yours). st.vox is kept for reference
   self:send("ockm-style", i - 1)
   self.evo = nil   -- evolve starts again from this take
   local key = NOTES[root + 1] .. " " .. SCALE_NAMES[scale + 1]
@@ -3279,7 +4175,13 @@ function ui:sidechain_row(add, p, ix, y, iw)
          tap=function() self:send(shk, i - 1) end }
   end
   local px = ix + bw + 6 + 3 * (cw + 4) + 2
-  add{ kind="scpic", x=px, y=y, w=ix + iw - px, h=30, shape=shp, amt=self.v["ockm-"..p.."-sidechain"] or 0 }
+  -- v1.49 links (after PERF-1): on the bass, each kick opens its filter; on the chords, each snare or clap. In the
+  -- picture's place there (the lead keeps the picture)
+  if p == "bass" or p == "chord" then
+    add{ kind="hbar", x=px, y=y, w=ix + iw - px, h=30, hook="ockm-"..p.."-link", lo=0, hi=1, label=(p == "bass") and "kick link" or "snare link", bold=true }
+  else
+    add{ kind="scpic", x=px, y=y, w=ix + iw - px, h=30, shape=shp, amt=self.v["ockm-"..p.."-sidechain"] or 0 }
+  end
 end
 -- how far a sidechain shape has dipped, t beats after the kick (0 to 1): the same curves as the engine
 local function sc_dip(shape, t)
@@ -3395,10 +4297,9 @@ function ui:gen_controls(add, p, ix, cy, iw, k)
     add{ kind="choice", x=ix + 2 * (w3b + 6), y=482, w=w3b, h=30, small=true, accent=true, sel=(oc > 0), label=(oc > 0) and "high (mid bass)" or "low (sub)",
          tap=function() self:send(okey, (oc > 0) and 0 or 1) end }
   else
-    -- v1.06: density thins the rhythm the same way every bar; rests skip a few notes, different in every bar
-    local hw = (iw - 6) / 2
-    add{ kind="hbar", x=ix, y=482, w=hw, h=30, hook="ockm-lead-density", lo=0, hi=2, label="density", bold=true }
-    add{ kind="hbar", x=ix + hw + 6, y=482, w=hw, h=30, hook="ockm-lead-rests", lo=0, hi=1, label="rests", bold=true }
+    -- v1.49 one density (rests merged in: density already thins differently in every bar, so the two did the same job).
+    -- ockm-lead-rests still plays underneath, for the styles and old scenes that set it
+    add{ kind="hbar", x=ix, y=482, w=iw, h=30, hook="ockm-lead-density", lo=0, hi=2, label="density: fewer < notes > more", bold=true }
   end
   local skey = "ockm-"..p.."-seed"
   local seed = math.floor(self.v[skey] or 0)
@@ -3411,7 +4312,7 @@ function ui:gen_controls(add, p, ix, cy, iw, k)
     add{ kind="btn", x=ix + (mw + 6), y=520, w=mw, h=34, label="back", quiet=not (h and #h > 0), tap=function() self:mutate_back(p) end }
     add{ kind="btn", x=ix + 2 * (mw + 6), y=520, w=mw, h=34, label="original", quiet=(seed == 0), tap=function()
       self.seedhist = self.seedhist or {}; self.seedhist[p] = {}; self:send(skey, 0) end }
-    add{ kind="btn", x=ix + 3 * (mw + 6), y=520, w=mw, h=34, small=true, label="make it for me", quiet=not self:part_yours(p), tap=function()
+    add{ kind="btn", x=ix + 3 * (mw + 6), y=520, w=mw, h=34, small=true, label="back to auto", quiet=not self:part_yours(p), tap=function()
       self:send("ockm-"..p.."-mode", 0); psend("ockm-"..p.."-gen", "bang", {}); self.claim_harm = self.claim_harm or {}; self.claim_harm[p] = nil end }
   end
   if p == "lead" then
@@ -3514,9 +4415,6 @@ function ui:job_step()
   if f then f() end
   if self.jobs and #self.jobs > 0 then self.jobclock:delay(80) else self.jobs = nil; self:dirty() end
 end
--- ------------------------------------------------------------------ arrange
--- One loop, many arrangements: a row of 16-bar units with a transition at each joint. Being built in steps
--- (see the design doc); for now the tab says what's coming.
 -- ------------------------------------------------------------------ arrange: versions (v1.28)
 -- A version is a running order of the project's scenes: each plays for a number of bars (whole loops), and each join has
 -- a transition: a recipe that runs over the end of the section before, then the next scene drops in on the 1. A project
@@ -3583,8 +4481,7 @@ function ui:vers_save(base)
   local p = self:vers_path(base)
   if not (t and p) then return end
   psend("ockm-mkdir", "symbol", { self._loadpath .. "../versions" })
-  local f = io.open(p, "w")
-  if f then f:write("-- OCKM_GENERATOR versions of " .. base .. "\nreturn " .. lua_str(t) .. "\n"); f:close() end
+  ockm_write(p, "-- OCKM_GENERATOR versions of " .. base .. "\nreturn " .. lua_str(t) .. "\n")
 end
 function ui:arr_base() return ockm_base(self:home()) end
 function ui:arr_version()
@@ -3685,7 +4582,7 @@ function ui:arr_bar()
     r.moves = mv
     r.bars = n
     psend("ockm-mute-quant", "float", { 0 })   -- its mutes land now, on this bar line
-    self:macro_go(5, r, true)
+    self:macro_go(8, r, true)   -- v1.49 slot 8: an arrangement's join (1-6 are yours, 7 try it)
     psend("ockm-mute-quant", "float", { self.v["ockm-mute-quant-was"] or 0 })
     if self.macro then
       -- counted like a tapped recipe: on_bar adds this bar straight after, and ends it at the start of its last bar
@@ -3918,7 +4815,7 @@ end
 -- ------------------------------------------------------------------ export
 -- Audio (a stereo mix and/or stems: drums, bass, lead, chords, effects) is recorded as it plays, in real time.
 -- MIDI is written straight away from the patterns. Files go to the exports folder, or a USB stick when one is in.
-local STEM_NAMES = { "drums", "bass", "lead", "chord", "fx" }
+local STEM_NAMES = { "drums", "bass", "lead", "chord", "vox", "fx" }
 local GM_DRUM = { [0] = 36, [1] = 38, [2] = 39, [3] = 37, [4] = 42, [5] = 46, [6] = 45, [7] = 56 }   -- by sound
 local USB_SKIP = { ["Macintosh HD"] = 1, ["Recovery"] = 1, ["Data"] = 1, ["Preboot"] = 1, ["VM"] = 1, ["Update"] = 1 }
 
@@ -4248,7 +5145,7 @@ function ui:clean_saved(n)
       for _, bus in ipairs(BUSES) do
         if not (self.fx_latch and self.fx_latch[bus]) then out = out:gsub("(ockm%-bfx%-" .. bus .. "%-on) [^;]*;", "%1 0;") end
       end
-      if out ~= src then local w = io.open(d .. fn, "w"); if w then w:write(out); w:close() end end
+      if out ~= src then ockm_write(d .. fn, out) end
     end
   end
   if self.skv then self.skv[n] = nil end
@@ -4330,7 +5227,7 @@ function ui:var_duplicate(n)
 end
 function ui:proj_act(fn) return function() self:preview_end(); fn() end end
 local PT_COLS, PT_ROWS, PT_H = 4, 5, 68
-local VT_COLS, VT_ROWS, VT_H = 4, 5, 52
+local VT_COLS, VT_ROWS, VT_H = 3, 5, 52   -- v1.47 three across: the projects table is wider
 function ui:layout_project(add)
   local home = self:home()
   -- what's open now, and what you can do with it
@@ -4356,35 +5253,77 @@ function ui:layout_project(add)
     add{ kind="btn", x=x, y=80, w=a[2], h=40, small=true, label=a[1], accent=(i >= 4), tap=self:proj_act(a[3]) }
     x = x - 6
   end
-  -- the projects: newest first, a tile each, scrolled a row at a time
+  -- v1.47 the projects as a table: name, made, last saved, scenes, tempo and key, style. Tap a heading to sort by it
+  -- (again to flip), a row to pick it (its scenes on the right), the triangle to hear it
   local groups, order = self:proj_groups()
-  -- the open project is picked when the page opens or what's open changes
   if self.pg_home ~= home then self.pg_home = home; self.pgroup = ockm_base(home); self.vsel = nil; self.vscroll = 0 end
   if not (self.pgroup and groups[self.pgroup]) then self.pgroup = groups[ockm_base(home)] and ockm_base(home) or order[1] end
-  add{ kind="text", x=16, y=134, w=300, h=12, label="your projects (" .. #order .. ")", size=10 }
-  add{ kind="card", x=16, y=150, w=572, h=H - 150 - 10 }
-  local tw = (572 - 16 - (PT_COLS - 1) * 6) / PT_COLS
-  local rows = math.ceil(#order / PT_COLS)
-  self.pscroll = clamp(self.pscroll or 0, 0, math.max(0, rows - PT_ROWS))
-  local pvs = { row = PT_H + 6, get = function() return self.pscroll end, set = function(v) self.pscroll = clamp(v, 0, math.max(0, rows - PT_ROWS)) end }
-  for k = 1, PT_COLS * PT_ROWS do
-    local b = order[self.pscroll * PT_COLS + k]
-    if not b then break end
+  local rowinfo = {}
+  for _, b in ipairs(order) do
     local g = groups[b]
-    local col, row = (k - 1) % PT_COLS, math.floor((k - 1) / PT_COLS)
-    local tx, ty = 24 + col * (tw + 6), 158 + row * (PT_H + 6)
-    local info = self:var_info(g[1])
-    add{ kind="ptile", x=tx, y=ty, w=tw, h=PT_H, label=ockm_pretty(b):match("^[^·]+"):gsub("%s+$", ""), style=info.style or "",
-         sub=((ockm_pretty(b):match("· (.+)$") and (ockm_pretty(b):match("· (.+)$") .. " · ")) or "") .. #g .. (#g == 1 and " scene" or " scenes"),
-         sel=(b == self.pgroup), open=(b == ockm_base(home)), vs=pvs,
-         tap=function() self.pgroup = b; self.vsel = nil; self.vscroll = 0; self.confirm = nil end }
-    add{ kind="pbtn", x=tx + tw - 36, y=ty + PT_H - 36, w=30, h=30, on=(self.pv and self.playing ~= 0 and ockm_base(self.pv.n) == b), vs=pvs,
-         tap=function() self.pgroup = b; self.vsel = nil; self:preview_play(g[1]) end }
+    local last = 0
+    for _, n in ipairs(g) do local vi = self:var_info(n); if vi.saved and vi.saved > last then last = vi.saved end end
+    local info, kv = self:var_info(g[1]), self:scene_kv(g[1])
+    local y, mo, d = b:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)")
+    local made = y and os.time({ year = tonumber(y), month = tonumber(mo), day = tonumber(d), hour = 12 }) or 0
+    local tk = (kv["ockm-bpm"] and string.format("%d", math.floor(kv["ockm-bpm"] + 0.5)) or "")
+    if kv["ockm-root"] then tk = tk .. "  " .. (NOTES[math.floor(kv["ockm-root"]) % 12 + 1] or "") .. " " .. ((SCALE_NAMES[math.floor(kv["ockm-scale"] or 0) + 1] or ""):sub(1, 3)) end
+    rowinfo[b] = { name = ockm_pretty(b):match("^[^·]+"):gsub("%s+$", ""), made = made, last = last, scenes = #g, tk = tk, style = info.style or "" }
   end
-  if rows > PT_ROWS then add{ kind="vbar", x=582, y=158, w=4, h=PT_ROWS * (PT_H + 6) - 6, pos=self.pscroll / rows, frac=PT_ROWS / rows } end
+  local sk, sdir = self.psort or "made", self.psortdir or -1
+  local sorted = {}
+  for _, b in ipairs(order) do sorted[#sorted + 1] = b end
+  table.sort(sorted, function(a, b)
+    local x, y = rowinfo[a][sk], rowinfo[b][sk]
+    if x == y then return a > b end
+    if sdir < 0 then return x > y end
+    return x < y
+  end)
+  local tx0, tw0 = 16, 612
+  add{ kind="text", x=16, y=134, w=300, h=12, label="your projects (" .. #order .. ")", size=10 }
+  add{ kind="card", x=tx0, y=150, w=tw0, h=H - 150 - 10 }
+  local COLS = { { nil, "", 34 }, { "name", "name", 150 }, { "made", "made", 64 }, { "last", "last saved", 104 }, { "scenes", "scenes", 58 },
+                 { "tk", "tempo  key", 98 }, { "style", "style", 92 } }
+  local cx = tx0 + 8
+  for _, c in ipairs(COLS) do
+    if c[1] then
+      local on = (sk == c[1])
+      add{ kind="choice", x=cx, y=156, w=c[3] - 4, h=26, small=true, sel=on, label="",
+           tap=function()
+             if self.psort == c[1] or (not self.psort and c[1] == "made") then self.psortdir = -(self.psortdir or -1)
+             else self.psort = c[1]; self.psortdir = (c[1] == "name") and 1 or -1 end
+             self.pscroll = 0
+           end }
+      add{ kind="text", x=cx + 4, y=164, w=c[3] - 8, h=12, size=10, col=on and "bg" or "txt", label=c[2] .. (on and ((sdir < 0) and "  v" or "  ^") or "") }
+    end
+    c.x = cx; cx = cx + c[3]
+  end
+  local RH, RN = 40, 9
+  self.pscroll = clamp(self.pscroll or 0, 0, math.max(0, #sorted - RN))
+  local pvs = { row = RH + 4, get = function() return self.pscroll end, set = function(v) self.pscroll = clamp(v, 0, math.max(0, #sorted - RN)) end }
+  for k = 1, RN do
+    local b = sorted[self.pscroll + k]
+    if not b then break end
+    local r, g = rowinfo[b], groups[b]
+    local ry = 188 + (k - 1) * (RH + 4)
+    local picked = (b == self.pgroup)
+    add{ kind="choice", x=tx0 + 6, y=ry, w=tw0 - ((#sorted > RN) and 20 or 12), h=RH, label="", sel=picked, vs=pvs,
+         tap=function() self.pgroup = b; self.vsel = nil; self.vscroll = 0; self.confirm = nil end }
+    add{ kind="pbtn", x=COLS[1].x, y=ry + 6, w=28, h=28, on=(self.pv and self.playing ~= 0 and ockm_base(self.pv.n) == b), vs=pvs,
+         tap=function() self.pgroup = b; self.vsel = nil; self:preview_play(g[1]) end }
+    local tc = picked and "bg" or "txt"
+    local cells = { r.name, (r.made > 0) and os.date("%d %b", r.made) or "", (r.last > 0) and os.date("%d %b %H:%M", r.last) or "",
+                    tostring(r.scenes), r.tk, r.style }
+    for j, txt in ipairs(cells) do
+      local c = COLS[j + 1]
+      add{ kind="text", x=c.x + 4, y=ry + 14, w=c[3] - 8, h=12, size=(j == 1) and 12 or 11, col=tc, label=txt }
+    end
+    if b == ockm_base(home) then add{ kind="text", x=COLS[2].x + 4, y=ry + 28, w=120, h=10, size=8, col=picked and "bg" or "acc", label="open now" } end
+  end
+  if #sorted > RN then add{ kind="vbar", x=tx0 + tw0 - 6, y=188, w=4, h=RN * (RH + 4) - 4, pos=self.pscroll / #sorted, frac=RN / #sorted } end
   -- the project picked: its variations
   local g = self.pgroup and groups[self.pgroup]
-  local px = 596
+  local px = 636
   local pw = W - 16 - px
   add{ kind="card", x=px, y=150, w=pw, h=H - 150 - 10 }
   if not g then
@@ -4494,9 +5433,9 @@ function ui:var_meta(n)
   return (ok and type(t) == "table") and t or {}
 end
 function ui:var_write(n, t)
-  local d = self:proj_dir(n); local f = d and io.open(d .. "variation.txt", "w")
-  if not f then return end
-  f:write(string.format("return { saved = %d, keep = %s }\n", math.floor(t.saved or 0), t.keep and "true" or "false")); f:close()
+  local d = self:proj_dir(n)
+  if not d then return end
+  ockm_write(d .. "variation.txt", string.format("return { saved = %d, keep = %s }\n", math.floor(t.saved or 0), t.keep and "true" or "false"))
 end
 function ui:var_stamp(n)
   local m = self:var_meta(n); m.saved = os.time(); self:var_write(n, m)
@@ -4571,6 +5510,814 @@ function ui:var_delete(n)
   psend("ockm-project-delete", "symbol", { n }); psend("ockm-project-list", "bang", {})
   if self.vcache then self.vcache[n] = nil end
 end
+-- ------------------------------------------------------------------ samples (v1.38; the screen is still "vox" inside)
+-- One row of steps. Arm a sample and an effect below, then tap steps: the same pair clears a step, anything else
+-- replaces it. A sample plays whole, until the next one starts. Sample numbers: 1-96 the spoken lines
+-- (set * 32 + voice * 16 + line), then 1000 * folder + n for your files: 1001 on voice, 2001 loops, 3001 hits. Effects: 0 off, 1 stutter, 2 delay, 3 verb.
+local SMPK = { T = "ockm-pat-vox-smp", FX = "ockm-pat-vox-fx", FXN = { [0] = "off", "stutter", "delay", "verb" }, Y = 116, H = 100 }   -- one local: the file is at Lua's limit
+function ui:smp_name(id)
+  id = math.floor(id or 0)
+  if id >= 1 and id <= 96 then
+    local k = id - 1
+    local lines = VOX_LINES[(k // 32) + 1]
+    return lines and lines[(k % 16) + 1] or ("line " .. ((k % 16) + 1))
+  elseif id >= 1001 and id < 4000 then
+    local g, n = id // 1000, id % 1000
+    return self.unames[g][n] or ("file " .. n)
+  end
+  return ""
+end
+-- the armed sample: hear it when stopped (while playing, "hear it" plays it over the part)
+function ui:smp_arm(id)
+  self.sb.id = id
+  if self.playing == 0 then psend("ockm-smp-play", "list", { id, self.sb.fx }) end
+  self:say(self:smp_name(id) .. ": tap steps to place it")
+end
+function ui:smp_tap(k)
+  local i = self:shown_block() * 16 + k
+  local id, fx = self:get(SMPK.T, i), self:get(SMPK.FX, i)
+  local b = self.sb
+  local nid, nfx
+  if b.id <= 0 then
+    if id <= 0 then self:say("pick a sample below first"); return end
+    nid, nfx = 0, 0
+  elseif id == b.id and fx == b.fx then nid, nfx = 0, 0
+  else nid, nfx = b.id, b.fx end
+  psend(SMPK.T, "list", { i, nid }); psend(SMPK.FX, "list", { i, nfx })
+  self:dirty()
+end
+function ui:layout_vox(add)
+  -- the steps
+  local pitch = (W - 32) / 16
+  for k = 0, 15 do
+    add{ kind="smpstep", x=16 + k * pitch + 3, y=SMPK.Y, w=pitch - 6, h=SMPK.H, i=k, tap=function() self:smp_tap(k) end }
+  end
+  -- the brush: which sample (left), which effect (right)
+  local lx, lw = 16, 632
+  add{ kind="text", x=lx, y=232, w=200, h=16, label="sample", size=12 }
+  -- four lists: your voice, loops and hits (samples/user/<folder>), and the robot lines (set and voice picked inside)
+  local groups = { "voice", "loops", "hits", "robot" }
+  for g, lab in ipairs(groups) do
+    add{ kind="choice", x=lx + (g - 1) * 102, y=252, w=96, h=40, label=lab, sel=(self.sgroup == g),
+         tap=function() self.sgroup = g; self.spage = 0 end }
+  end
+  local gy, cw, ch = 300, (lw - 18) / 4, 46
+  local ids = {}
+  if self.sgroup <= 3 then
+    local g = self.sgroup
+    local count = self.ucount[g] or 0
+    local pages = math.max(1, math.ceil(count / 16))
+    self.spage = clamp(self.spage, 0, pages - 1)
+    for n = self.spage * 16 + 1, math.min(count, self.spage * 16 + 16) do ids[#ids + 1] = g * 1000 + n end
+    if count == 0 then
+      add{ kind="text", x=lx + 8, y=gy + 20, w=lw - 16, h=16, label="none yet: drop WAVs in samples/user/" .. groups[g] .. " and come back to this tab", size=12, col="txt" }
+      add{ kind="text", x=lx + 8, y=gy + 44, w=lw - 16, h=16, label="mono, trimmed to start on the hit; loops a bar or two long", size=11 }
+    end
+    if pages > 1 then
+      local ax = lx + lw - 44
+      add{ kind="arrow", x=ax - 130, y=252, w=44, h=40, dir=-1, on=(self.spage > 0), tap=function() self.spage = math.max(0, self.spage - 1) end }
+      add{ kind="text", x=ax - 80, y=266, w=76, h=12, label=string.format("%d of %d", self.spage + 1, pages), size=11 }
+      add{ kind="arrow", x=ax, y=252, w=44, h=40, dir=1, on=(self.spage < pages - 1), tap=function() self.spage = math.min(pages - 1, self.spage + 1) end }
+    end
+  else
+    -- robot: which lines (hooks, jack, techno) and which voice, then the 16 lines
+    for si, lab in ipairs(VOX_SETS) do
+      local sv = si - 1
+      add{ kind="choice", x=lx + (si - 1) * 102, y=gy, w=96, h=36, small=true, label=lab, sel=(self.sset == sv), tap=function() self.sset = sv end }
+    end
+    for vi, lab in ipairs(VOX_VOICES) do
+      local vv = vi - 1
+      add{ kind="choice", x=lx + lw - 2 * 76 + (vi - 1) * 76 + 6, y=gy, w=70, h=36, small=true, label=lab, sel=(self.svoice == vv),
+           tap=function() self.svoice = vv end }
+    end
+    gy = gy + 44
+    for line = 1, 16 do ids[#ids + 1] = self.sset * 32 + self.svoice * 16 + line end
+  end
+  for j, id in ipairs(ids) do
+    local c, r = (j - 1) % 4, (j - 1) // 4
+    add{ kind="choice", x=lx + c * (cw + 6), y=gy + r * (ch + 6), w=cw, h=ch, small=true, label=self:smp_name(id),
+         sel=(self.sb.id == id), tap=function() self:smp_arm(id) end }
+  end
+  local rx, rw = 672, W - 16 - 672
+  add{ kind="text", x=rx, y=232, w=200, h=16, label="effect", size=12 }
+  local ew = (rw - 6) / 2
+  for e = 0, 3 do
+    local c, r = e % 2, e // 2
+    add{ kind="choice", x=rx + c * (ew + 6), y=252 + r * 46, w=ew, h=40, label=SMPK.FXN[e], sel=(self.sb.fx == e),
+         tap=function() self.sb.fx = e end }
+  end
+  add{ kind="hbar", x=rx, y=356, w=rw, h=40, hook="ockm-vox-pitch", lo=-12, hi=12, bold=true, label="pitch" }
+  add{ kind="btn", x=rx, y=404, w=ew, h=44, label="hear it", disabled=(self.sb.id <= 0),
+       tap=function() if self.sb.id > 0 then psend("ockm-smp-play", "list", { self.sb.id, self.sb.fx }) end end }
+  add{ kind="btn", x=rx + ew + 6, y=404, w=ew, h=44, label=self.smp_clear and "sure?" or "clear all", live=self.smp_clear,
+       tap=function()
+         if self.smp_clear then
+           self.smp_clear = nil
+           psend(SMPK.T, "const", { 0 }); psend(SMPK.FX, "const", { 0 })
+           self:say("samples cleared")
+         else self.smp_clear = true end
+       end }
+  -- v1.49 one line each, short enough not to wrap on the Pi (the first used to wrap into the second)
+  for i, ln in ipairs({ "tap a step to place the sample with", "its effect. the same pair again", "clears it. each plays to its end,", "or until the next one starts." }) do
+    add{ kind="text", x=rx, y=460 + (i - 1) * 17, w=rw, h=14, label=ln, size=11 }
+  end
+end
+
+-- ------------------------------------------------------------------ instruments (v1.39): the start screen, Bass and Analog
+-- Each instrument has a perform screen (every control on one page) and a steps screen (the sequencer and generator).
+-- Its settings go out as <prefix>-<name> (0 to 1); its steps are the tables ockm-pat-<prefix>-on / note / acc / slide / mod.
+-- Opening one switches its sound on (<prefix>-on 1) and takes the groovebox out of the mix (ockm-inst-mode 1).
+ui.INSTK = {
+  order = { "ib", "ia", "iz" },
+  -- v1.40 drmz: eight drum voices (z1-z8, the groovebox's drum voices), its grooves are in its Lua (iz-gstyle picks one)
+  iz = { name = "drmz", title = "DRMZ", defaults = {}, sounds = {},
+    voices = { "kick", "snare", "clap", "perc", "hat", "open hat", "tom", "perc 2" },
+    grooves = { "four floor", "house", "deep house", "chicago", "jackin", "disco", "soulful", "afro house", "funky house", "ghetto house", "nu disco", "rolling",
+                "tech house", "minimal", "techno", "dub techno", "detroit", "berlin", "industrial", "hypnotic", "acid techno", "electro", "lofi hip hop", "big beat" },
+    keys = { "sound", "sample", "synth", "tone", "drive", "tune", "decay", "level", "labchar", "labmorph", "labrseed", "labramt", "labpseed", "mute" } },
+  ib = { name = "bass", title = "BASS",
+    defaults = { wave = 0, swarm = 0.3, sub = 0.5, noise = 0, tune = 0.5, cutoff = 0.3, resonance = 0.35, env = 0.35, accent = 0.6, key = 0.3,
+                 filter = 0, attack = 0.02, decay = 0.35, release = 0.15, fdecay = 0.35, pdecay = 0.15, ["pitch-amt"] = 0, amode = 0,
+                 ["lfo-rate"] = 0.4, ["lfo-amt"] = 0, ["lfo-to"] = 0, drive = 0.3, glide = 0.3, level = 0.8 },
+    sounds = {
+      { "rubber acid", { wave = 0, swarm = 0, sub = 0.3, cutoff = 0.22, resonance = 0.8, env = 0.6, accent = 0.8, fdecay = 0.3, decay = 0.4, drive = 0.5, glide = 0.3, ["pitch-amt"] = 0, filter = 0, ["lfo-amt"] = 0 } },
+      { "screamer", { wave = 0, swarm = 0, sub = 0.2, cutoff = 0.32, resonance = 0.92, env = 0.7, accent = 0.9, fdecay = 0.25, decay = 0.35, drive = 0.85, glide = 0.35, ["pitch-amt"] = 0, filter = 0, ["lfo-amt"] = 0 } },
+      { "big swarm", { wave = 1, swarm = 0.9, sub = 0.8, cutoff = 0.25, resonance = 0.4, env = 0.5, fdecay = 0.45, decay = 0.6, drive = 0.35, ["pitch-amt"] = 0, filter = 0, ["lfo-amt"] = 0 } },
+      { "zap", { wave = 2, swarm = 0.4, sub = 0.7, cutoff = 0.3, resonance = 0.5, env = 0.45, fdecay = 0.35, decay = 0.45, drive = 0.4, ["pitch-amt"] = 0.4, pdecay = 0.25, filter = 0, ["lfo-amt"] = 0 } },
+      { "band rider", { wave = 0, swarm = 0.5, sub = 0.6, cutoff = 0.3, resonance = 0.7, filter = 1, env = 0.6, ["lfo-amt"] = 0.5, ["lfo-to"] = 0, ["lfo-rate"] = 0.55, decay = 0.3, ["pitch-amt"] = 0 } },
+      { "sub rumble", { wave = 2, swarm = 0.1, sub = 1, cutoff = 0.15, resonance = 0.2, env = 0.25, decay = 0.7, drive = 0.2, ["pitch-amt"] = 0.15, pdecay = 0.2, filter = 0, ["lfo-amt"] = 0 } },
+    },
+  },
+  ia = { name = "analog", title = "ANALOG",
+    defaults = { pulse = 0.8, saw = 0, sub = 0.4, ["sub-mode"] = 0, noise = 0, width = 0.2, pwm = 0, tune = 0.5, cutoff = 0.45, resonance = 0.4,
+                 env = 0.45, key = 0.5, ["lfo-filter"] = 0, attack = 0.02, decay = 0.4, sustain = 0.6, release = 0.15, amode = 0,
+                 ["lfo-rate"] = 0.4, ["lfo-shape"] = 0, ["lfo-pitch"] = 0, glide = 0, level = 0.8,
+                 mode = 0, uni = 0.3, ch1 = 3, ch2 = 7, ch3 = 0 },
+    sounds = {
+      { "blip lead", { pulse = 0.8, saw = 0, sub = 0.3, width = 0.6, pwm = 0, cutoff = 0.5, resonance = 0.55, env = 0.5, decay = 0.15, sustain = 0, release = 0.1, ["lfo-shape"] = 2, ["lfo-rate"] = 0.6, ["lfo-filter"] = 0.6, glide = 0, ["lfo-pitch"] = 0 } },
+      { "pwm bass", { pulse = 0.9, saw = 0, sub = 0.8, ["sub-mode"] = 0, width = 0.1, pwm = 0.3, ["lfo-shape"] = 0, ["lfo-rate"] = 0.25, ["lfo-filter"] = 0, cutoff = 0.32, resonance = 0.45, env = 0.55, decay = 0.25, sustain = 0.2, glide = 0, ["lfo-pitch"] = 0 } },
+      { "glide lead", { pulse = 0.6, saw = 0.7, sub = 0.4, width = 0.5, pwm = 0.7, cutoff = 0.5, resonance = 0.3, env = 0.3, attack = 0.2, decay = 0.5, sustain = 0.7, release = 0.4, glide = 0.5, ["lfo-pitch"] = 0.15, ["lfo-rate"] = 0.45, ["lfo-filter"] = 0 } },
+      { "random drops", { pulse = 0.5, saw = 0.5, sub = 0.2, cutoff = 0.4, resonance = 0.75, env = 0.35, decay = 0.2, sustain = 0, ["lfo-shape"] = 2, ["lfo-rate"] = 0.7, ["lfo-filter"] = 0.9, glide = 0, ["lfo-pitch"] = 0 } },
+      { "deep sub", { pulse = 0.3, saw = 0, sub = 1, ["sub-mode"] = 1, width = 0, cutoff = 0.25, resonance = 0.2, env = 0.3, decay = 0.4, sustain = 0.5, glide = 0.2, ["lfo-filter"] = 0, ["lfo-pitch"] = 0 } },
+    },
+  },
+  seq = { len = 16, gstyle = 0, gbusy = 0.6, grange = 0.4, gacc = 0.4, gslide = 0.25, arp = 0, ["arp-oct"] = 1 },
+  zdef = { level = { 1.0, 0.75, 0.75, 0.6, 0.55, 0.5, 0.65, 0.6 } },
+  fields = { "on", "note", "acc", "slide", "mod" },
+  styles = { "acid", "rolling", "offbeat", "octaves", "sparse" },
+  sy = { steps = 116, build = 484 }, sh = { steps = 84, build = 56 },   -- v1.45 the perform page has no steps of its own
+}
+
+function ui:inst_hooks(h)
+  for k = 1, 8 do for _, key in ipairs(ui.INSTK.iz.keys) do h[#h + 1] = "ockm-z" .. k .. "-" .. key end end
+  h[#h + 1] = "iz-gbusy"
+  for _, pre in ipairs({ "ib", "ia" }) do   -- v1.41 build
+    for _, k in ipairs({ "rhythm", (pre == "ib") and "riff" or "notes", "sync", "seed", "density", "slideamt", "outside", "octave", "repeat", "rests", "mode" }) do h[#h + 1] = "ockm-" .. pre .. "-" .. k end
+    h[#h + 1] = pre .. "-style"; h[#h + 1] = pre .. "-evolve-every"; h[#h + 1] = pre .. "-evolve-mode"
+  end
+  for _, pre in ipairs(ui.INSTK.order) do
+    for k in pairs(ui.INSTK[pre].defaults) do h[#h + 1] = pre .. "-" .. k end
+    for k in pairs(ui.INSTK.seq) do h[#h + 1] = pre .. "-" .. k end
+  end
+end
+function ui:inst_defaults(v)
+  for k = 1, 8 do
+    v["ockm-z" .. k .. "-sound"] = k - 1; v["ockm-z" .. k .. "-level"] = ui.INSTK.zdef.level[k]; v["ockm-z" .. k .. "-tune"] = 0
+    v["ockm-z" .. k .. "-decay"] = 100; v["ockm-z" .. k .. "-tone"] = 0; v["ockm-z" .. k .. "-mute"] = 0
+  end
+  for _, pre in ipairs(ui.INSTK.order) do
+    for k, d in pairs(ui.INSTK[pre].defaults) do v[pre .. "-" .. k] = d end
+    for k, d in pairs(ui.INSTK.seq) do v[pre .. "-" .. k] = d end
+  end
+  v["iz-gbusy"] = 0.3
+end
+function ui:iv(k) return self.v[self.inst .. "-" .. k] or ui.INSTK[self.inst].defaults[k] or ui.INSTK.seq[k] or 0 end
+function ui:iset(k, v) self:send(self.inst .. "-" .. k, v) end
+function ui:ilen() return math.max(16, math.floor(self:iv("len"))) end
+function ui:iget(f, i) return self:get("ockm-pat-" .. self.inst .. "-" .. f, i) end
+function ui:iput(f, i, v)
+  psend("ockm-pat-" .. self.inst .. "-" .. f, "list", { i, v })
+  if self.inst ~= "iz" then psend("ockm-" .. self.inst .. "-mode", "float", { 1 }); self.v["ockm-" .. self.inst .. "-mode"] = 1 end   -- v1.41 yours now
+end
+
+-- v1.45 a synth's page, over the groovebox: the groovebox keeps playing; back returns to where you were
+function ui:open_inst(pre)
+  if self.screen ~= "inst" then self.inst_from = self.screen end
+  self.inst = pre
+  if self.itab ~= "keys" then self.itab = "perform" end
+  self.isel = 0
+  self.last_inst = pre
+  self.inst_live = true
+  self:open("inst")
+end
+-- leaving an instrument for the groovebox: its sound off, the groovebox back in the mix
+function ui:inst_leave()
+  if not self.inst_live then return end
+  if self.ikeys then for n in pairs(self.ikeys) do psend(self.inst .. "-play", "off", { n }) end end   -- keys held on screen let go
+  self.ikeys = {}
+  self.inst_live = false
+end
+
+function ui:layout_home(add)
+  add{ kind="text", x=24, y=22, w=300, h=30, label="OCKM", size=26, col="txt" }
+  add{ kind="text", x=24, y=58, w=300, h=16, label="pick an instrument", size=13 }
+  add{ kind="text", x=W - 80, y=30, w=60, h=12, label=VERSION, size=11 }
+  local tiles = {
+    { "groovebox", "patterns, parts, perform, arrange", "grid", function() self:open("live") end },
+    { "bass", "big modern bass: swarm, sub, pitch zaps, acid", "saw", function() self:open_inst("ib") end },
+    { "analog", "classic mono: pulse, LFO, glide", "pulse", function() self:open_inst("ia") end },
+    { "drmz", "drum machine: eight voices, the grooves", "drums", function() self:open_inst("iz") end },
+  }
+  local tw, th = (W - 48 - 16) / 2, 220
+  for i, t in ipairs(tiles) do
+    local x, y = 24 + ((i - 1) % 2) * (tw + 16), 96 + ((i - 1) // 2) * (th + 16)
+    local last = (t[1] == "bass" and self.last_inst == "ib") or (t[1] == "analog" and self.last_inst == "ia") or (t[1] == "drmz" and self.last_inst == "iz")
+    add{ kind="tile", x=x, y=y, w=tw, h=th, label=t[1], sub=t[2], icon=t[3], last=last, tap=t[4] }
+  end
+  if self.msg then add{ kind="toast", x=W / 2 - 330, y=H - 50, w=660, h=38, label=self.msg } end
+end
+
+function ui:layout_inst_top(add)
+  add{ kind="arrow", x=16, y=12, w=52, h=48, dir=-1, on=true, tap=function()   -- v1.45 back to the groovebox
+    local to = self.inst_from or "synth"
+    if to == "inst" or to == "home" then to = "synth" end
+    self:open(to)
+  end }
+  add{ kind="play", x=76, y=12, w=64, h=48, tap=function()
+    if self.playing ~= 0 then self:send("ockm-play", 0) else self:send("ockm-play", 1) end
+  end }
+  add{ kind="bpm", x=150, y=12, w=110, h=48 }   -- drag it up or down
+  add{ kind="text", x=226, y=66, w=100, h=12, label="", size=10 }
+  local x = 270
+  for _, t in ipairs((self.inst == "iz") and { { "perform", 84 }, { "steps", 70 } } or { { "perform", 84 }, { "keys", 62 } }) do
+    add{ kind="tab", x=x, y=12, w=t[2], h=48, label=t[1], sel=(self.itab == t[1]), tap=function() self.itab = t[1] end }
+    x = x + t[2] + 4
+  end
+  add{ kind="text", x=x + 10, y=30, w=120, h=16, label=ui.INSTK[self.inst].title, size=14, col="txt" }
+  if self.inst ~= "iz" then   -- v1.44 the synth's volume, on every tab
+    add{ kind="hbar", x=W - 262, y=12, w=134, h=48, hook=self.inst .. "-level", lo=0, hi=1, label="volume", bold=true,
+         valtext=function(v) return string.format("%d", math.floor(v * 100 + 0.5)) end }
+  end
+  add{ kind="disc", x=W - 120, y=12, w=50, h=48, tap=function() self:save_variation() end }
+  add{ kind="menubtn", x=W - 66, y=12, w=50, h=48, sel=self.menu, tap=function() self.menu = not self.menu end }
+end
+
+-- a knob: drag up or down. fmt shows the value
+function ui:iknob(add, x, y, r, k, label, fmt, big)
+  add{ kind="knob", x=x - r - 8, y=y - r - 8, w=2 * r + 16, h=2 * r + 30, cx=x, cy=y, r=r, hook=self.inst .. "-" .. k, label=label, fmt=fmt, big=big, lo=0, hi=1 }
+end
+function ui:ichoice(add, x, y, w, h, k, items, small)
+  local cur = math.floor(self:iv(k) + 0.5)
+  local bw = (w - (#items - 1) * 4) / #items
+  for i, it in ipairs(items) do
+    add{ kind="choice", x=x + (i - 1) * (bw + 4), y=y, w=bw, h=h, label=it[1], small=small, sel=(cur == it[2]), tap=function() self:iset(k, it[2]) end }
+  end
+end
+ui.INSTK.pct = function(v) return string.format("%d", math.floor(v * 100 + 0.5)) end
+ui.INSTK.semis = function(v) local s = math.floor((v - 0.5) * 24 + 0.5); return (s > 0 and "+" or "") .. s end
+
+-- the sounds to step through: the factory ones, then yours (saved in my-settings.lua, for every project)
+function ui:inst_sounds()
+  local out = {}
+  for _, x in ipairs(ui.INSTK[self.inst].sounds) do out[#out + 1] = { x[1], x[2] } end
+  for i, x in ipairs((self.me and self.me.isounds) or {}) do
+    if x.inst == self.inst then out[#out + 1] = { x.name, x.p, mine = i } end
+  end
+  return out
+end
+-- v1.49 a sound is the whole sound: everything goes back to the synth's starting point first (except its volume and how it
+-- plays: mono, poly or chord), so nothing left over from random or your knob turns colours the next sound
+function ui:inst_reset_sound()
+  local keep = { level = true, mode = true, ch1 = true, ch2 = true, ch3 = true }
+  for k, v in pairs(ui.INSTK[self.inst].defaults) do if not keep[k] then self:iset(k, v) end end
+end
+function ui:inst_sound(n)
+  local list = self:inst_sounds()
+  n = ((n - 1) % #list) + 1
+  self.isound = self.isound or {}
+  self.isound[self.inst] = n
+  self:inst_reset_sound()
+  for k, v in pairs(list[n][2]) do self:iset(k, v) end
+  self:say(list[n][1])
+end
+-- keep every setting of this instrument's sound as one of yours, named "bass 1", "analog 2" ...
+function ui:inst_save_sound()
+  local name, used, n = ui.INSTK[self.inst].name, {}, 1
+  for _, x in ipairs(self.me.isounds) do used[x.name] = true end
+  while used[name .. " " .. n] do n = n + 1 end
+  local p = {}
+  for k in pairs(ui.INSTK[self.inst].defaults) do p[k] = self:iv(k) end
+  table.insert(self.me.isounds, { inst = self.inst, name = name .. " " .. n, p = p })
+  self:save_settings()
+  self.isound = self.isound or {}
+  self.isound[self.inst] = #self:inst_sounds()
+  self:flash_btn("save")
+  self:say("saved as " .. name .. " " .. n .. ": it's in the sounds list for every project")
+end
+function ui:inst_delete_sound(i)
+  local nm = self.me.isounds[i] and self.me.isounds[i].name
+  table.remove(self.me.isounds, i)
+  self:save_settings()
+  self.isound[self.inst] = nil
+  self:say((nm or "the sound") .. " deleted")
+end
+function ui:inst_random()
+  local d = ui.INSTK[self.inst].defaults
+  local r = function(a, b) return a + math.random() * (b - a) end
+  self:inst_reset_sound()   -- v1.49 from the starting point, not on top of the last random
+  if self.inst == "ib" then
+    -- v1.49 kept to ranges that sound like a bass: not so much resonance and drive that it screams, the filter never shut
+    for k, v in pairs({ wave = math.random(0, 2), swarm = r(0, 0.8), sub = r(0.35, 0.9), cutoff = r(0.18, 0.45), resonance = r(0.15, 0.8), env = r(0.3, 0.7),
+                        fdecay = r(0.2, 0.55), decay = r(0.25, 0.65), drive = r(0.1, 0.6), ["pitch-amt"] = (math.random() < 0.2) and r(0.1, 0.35) or 0,
+                        filter = (math.random() < 0.15) and 1 or 0 }) do self:iset(k, (k == "wave" or k == "filter") and v or math.floor(v * 100 + 0.5) / 100) end
+  else
+    for k, v in pairs({ pulse = r(0.3, 1), saw = r(0, 0.8), sub = r(0, 0.9), width = r(0, 0.8), pwm = r(0, 0.6), cutoff = r(0.2, 0.6), resonance = r(0.1, 0.8),
+                        env = r(0.2, 0.7), decay = r(0.1, 0.6), sustain = r(0, 0.8), ["lfo-shape"] = math.random(0, 3), ["lfo-filter"] = r(0, 0.5) }) do
+      self:iset(k, (k == "lfo-shape") and v or math.floor(v * 100 + 0.5) / 100)
+    end
+  end
+  self:say("random sound: keep turning knobs, or pick a sound")
+end
+
+function ui:layout_inst(add)
+  local pct, semis = ui.INSTK.pct, ui.INSTK.semis
+  self:layout_inst_top(add)
+  if self.inst == "iz" then
+    if self.itab == "steps" then return self:layout_drmz_steps(add) end
+    return self:layout_drmz(add)
+  end
+  if self.itab == "keys" then return self:layout_inst_keys(add) end
+  local card = function(x, y, w, h, t) add{ kind="card", x=x, y=y, w=w, h=h }; add{ kind="text", x=x + 12, y=y + 9, w=w - 24, h=12, label=t, size=12, col="mute" } end
+  if self.inst == "ib" then
+    card(16, 76, 236, 300, "OSCILLATOR"); card(260, 76, 236, 300, "FILTER"); card(504, 76, 216, 300, "ENVELOPES"); card(728, 76, 216, 300, "MOD + DRIVE")
+    self:ichoice(add, 28, 104, 212, 32, "wave", { { "saw", 0 }, { "both", 1 }, { "square", 2 } }, true)
+    self:iknob(add, 134, 200, 42, "swarm", "swarm", pct, true)
+    self:iknob(add, 66, 316, 26, "sub", "sub", pct); self:iknob(add, 134, 316, 26, "noise", "noise", pct); self:iknob(add, 202, 316, 26, "tune", "tune", semis)
+    self:ichoice(add, 272, 104, 212, 32, "filter", { { "low-pass", 0 }, { "band-pass", 1 } }, true)
+    self:iknob(add, 332, 200, 42, "cutoff", "cutoff", pct, true); self:iknob(add, 432, 200, 42, "resonance", "resonance", pct, true)
+    self:iknob(add, 310, 316, 26, "env", "env", pct); self:iknob(add, 378, 316, 26, "accent", "accent", pct); self:iknob(add, 446, 316, 26, "key", "key", pct)
+    add{ kind="text", x=528, y=104, w=40, h=12, label="amp", size=11, col="txt" }; add{ kind="text", x=584, y=104, w=40, h=12, label="filter", size=11, col="txt" }; add{ kind="text", x=646, y=104, w=40, h=12, label="pitch", size=11, col="txt" }
+    self:iknob(add, 548, 150, 22, "decay", "decay", pct); self:iknob(add, 608, 150, 22, "fdecay", "decay", pct); self:iknob(add, 668, 150, 22, "pdecay", "decay", pct)
+    self:iknob(add, 572, 254, 24, "pitch-amt", "pitch amt", pct); self:iknob(add, 656, 254, 24, "attack", "attack", pct)
+    self:ichoice(add, 516, 330, 192, 34, "amode", { { "decay", 0 }, { "gate", 1 } }, true)
+    self:iknob(add, 778, 146, 24, "lfo-rate", "lfo rate", pct); self:iknob(add, 890, 146, 24, "lfo-amt", "lfo amt", pct)
+    self:ichoice(add, 740, 196, 192, 30, "lfo-to", { { "filter", 0 }, { "FM", 1 }, { "pitch", 2 } }, true)
+    self:iknob(add, 796, 292, 32, "drive", "drive", pct, true); self:iknob(add, 890, 292, 24, "glide", "glide", pct)
+  else
+    card(16, 76, 264, 300, "OSCILLATOR"); card(288, 76, 220, 300, "FILTER"); card(516, 76, 240, 300, "ENVELOPE"); card(764, 76, 180, 300, "LFO")
+    for j, k in ipairs({ "pulse", "saw", "sub", "noise" }) do
+      add{ kind="islider", x=32 + (j - 1) * 40, y=110, w=24, h=150, hook=self.inst .. "-" .. k, label=k, lo=0, hi=1 }
+    end
+    self:iknob(add, 230, 146, 28, "width", "width", pct); self:iknob(add, 230, 238, 28, "pwm", "PWM", pct)
+    self:ichoice(add, 28, 300, 240, 30, "sub-mode", { { "-1 oct", 0 }, { "-2 oct", 1 }, { "-2 pulse", 2 } }, true)
+    self:iknob(add, 345, 180, 42, "cutoff", "cutoff", pct, true); self:iknob(add, 452, 180, 30, "resonance", "resonance", pct)
+    self:iknob(add, 320, 300, 24, "env", "env", pct); self:iknob(add, 395, 300, 24, "lfo-filter", "LFO", pct); self:iknob(add, 468, 300, 24, "key", "key", pct)
+    for j, k in ipairs({ "attack", "decay", "sustain", "release" }) do
+      add{ kind="islider", x=534 + (j - 1) * 50, y=110, w=28, h=170, hook=self.inst .. "-" .. k, label=string.upper(string.sub(k, 1, 1)), lo=0, hi=1 }
+    end
+    self:ichoice(add, 528, 320, 216, 34, "amode", { { "env", 0 }, { "gate", 1 } }, true)
+    self:iknob(add, 854, 148, 30, "lfo-rate", "rate", pct)
+    local shp = math.floor(self:iv("lfo-shape") + 0.5)
+    for j, lab in ipairs({ "tri", "square", "random", "noise" }) do
+      add{ kind="choice", x=776 + ((j - 1) % 2) * 82, y=214 + ((j - 1) // 2) * 38, w=78, h=32, small=true, label=lab, sel=(shp == j - 1), tap=function() self:iset("lfo-shape", j - 1) end }
+    end
+    self:iknob(add, 854, 322, 20, "lfo-pitch", "to pitch", pct)
+  end
+  -- under the cards: the sound, random, glide (Analog), then the steps of this bar
+  local list = self:inst_sounds()
+  local picked = (self.isound or {})[self.inst]
+  if picked and not list[picked] then picked = nil end
+  local n = picked or 0
+  add{ kind="arrow", x=16, y=388, w=40, h=40, dir=-1, on=true, tap=function() self:inst_sound((n > 1) and n - 1 or #list) end }
+  add{ kind="btn", x=60, y=388, w=140, h=40, label=picked and list[n][1] or "sounds", quiet=(picked == nil), tap=function() self:inst_sound(math.max(1, n)) end }
+  add{ kind="arrow", x=204, y=388, w=40, h=40, dir=1, on=true, tap=function() self:inst_sound(n + 1) end }
+  -- v1.40 save this sound as one of yours; on one of yours, the bin deletes it
+  if picked and list[n].mine then
+    local mi = list[n].mine
+    add{ kind="bin", x=252, y=388, w=44, h=40, lit=(self.flashing == "save"), tap=function() self:inst_delete_sound(mi) end }
+  else
+    add{ kind="disc", x=252, y=388, w=44, h=40, lit=(self.flashing == "save"), tap=function() self:inst_save_sound() end }
+  end
+  add{ kind="btn", x=304, y=388, w=90, h=40, label="random", tap=function() self:inst_random() end }
+  if self.inst == "ia" then
+    self:iknob(add, 420, 404, 13, "glide", "glide", pct)
+    -- the arpeggiator: hold keys on a keyboard and they play one at a time, a 16th apart
+    local ar = math.floor(self:iv("arp") + 0.5)
+    for j, lab in ipairs({ "arp off", "up", "down", "up/dn", "random" }) do
+      add{ kind="choice", x=446 + (j - 1) * 76, y=388, w=72, h=40, small=true, label=lab, sel=(ar == j - 1), tap=function() self:iset("arp", j - 1) end }
+    end
+    local oc = math.floor(self:iv("arp-oct") + 0.5)
+    add{ kind="btn", x=830, y=388, w=114, h=40, small=true, label=oc .. ((oc == 1) and " octave" or " octaves"), tap=function() self:iset("arp-oct", (oc % 3) + 1) end }
+  else
+    add{ kind="text", x=410, y=402, w=530, h=12, size=11, label="the bass part plays it. the keys tab plays it too" }
+  end
+end
+
+-- the 16 steps on screen (the page's bar)
+function ui:inst_strip(add, tab)
+  local pitch = (W - 32) / 16
+  local y, h = ui.INSTK.sy[tab], ui.INSTK.sh[tab]
+  for k = 0, 15 do
+    local i = self.page * 16 + k
+    add{ kind="istep", x=16 + k * pitch + 3, y=y, w=pitch - 6, h=h, i=i, tap=function()
+      if tab == "perform" or tab == "build" then
+        self:inst_toggle(i)
+      elseif self.isel == i then self:inst_toggle(i)
+      else self.isel = i; if self:iget("on", i) <= 0 then self:inst_toggle(i) end end
+    end }
+  end
+end
+function ui:inst_root_note()
+  local base = (self.inst == "ib") and 33 or 57
+  return base - 9 + math.floor(self.v["ockm-root"] or 9)
+end
+-- v1.41 a note moved up or down by steps of the key (the groovebox's root and scale); a note off the key lands on it
+function ui:inst_shift(n, steps)
+  local sc, root = self:scale(), math.floor(self.v["ockm-root"] or 9) % 12
+  local rel = n - root
+  local o, pc = math.floor(rel / 12), rel % 12
+  local idx = 0
+  for k = 1, 7 do if sc[k] <= pc then idx = k - 1 end end
+  local d = idx + 7 * o + steps
+  local m = root + sc[(d % 7) + 1] + 12 * math.floor(d / 7)
+  return clamp(m, 24, 96)
+end
+function ui:inst_toggle(i)
+  local on = self:iget("on", i) > 0
+  if not on and self:iget("note", i) <= 0 then self:iput("note", i, self:inst_root_note()) end
+  self:iput("on", i, on and 0 or 1)
+  self.isel = i
+  self:dirty()
+end
+
+function ui:layout_inst_steps(add)
+  local pct = ui.INSTK.pct
+  local n = math.max(1, self:ilen() // 16)
+  self.page = clamp(self.page, 0, n - 1)
+  add{ kind="arrow", x=16, y=NAV_Y, w=44, h=NAV_H, dir=-1, on=(self.page > 0), tap=function() self.page = math.max(0, self.page - 1) end }
+  add{ kind="btn", x=64, y=NAV_Y, w=104, h=NAV_H, small=true, label=string.format("%d-%d", self.page * 16 + 1, self.page * 16 + 16) }
+  add{ kind="arrow", x=172, y=NAV_Y, w=44, h=NAV_H, dir=1, on=(self.page < n - 1), tap=function() self.page = math.min(n - 1, self.page + 1) end }
+  add{ kind="text", x=236, y=NAV_Y + 12, w=200, h=12, label=string.format("pattern %d %s", n, (n == 1) and "bar" or "bars"), size=11 }
+  local len = self:ilen()
+  for j, l in ipairs({ 16, 32, 64 }) do
+    local b = l // 16
+    add{ kind="choice", x=W - 16 - 70 - 8 - 3 * 56 + (j - 1) * 56, y=NAV_Y, w=52, h=NAV_H, small=true, sel=(len == l), label=b .. ((b == 1) and " bar" or " bars"),
+         tap=function() self:inst_len(l) end }
+  end
+  add{ kind="btn", x=W - 86, y=NAV_Y, w=70, h=NAV_H, small=true, label="double", disabled=(len >= 64), tap=function() if len < 64 then self:inst_len(len * 2) end end }
+  self:inst_strip(add, "steps")
+  -- the chosen step: its note, octave, accent, slide, rest
+  local i = self.isel or 0
+  add{ kind="card", x=16, y=220, w=440, h=166 }
+  add{ kind="text", x=28, y=229, w=200, h=12, size=12, label="STEP " .. (i + 1) }
+  local note = math.floor(self:iget("note", i))
+  if note <= 0 then note = self:inst_root_note() end
+  for j = 0, 11 do
+    add{ kind="choice", x=28 + (j % 6) * 70, y=246 + (j // 6) * 42, w=64, h=36, label=NOTES[j + 1], sel=(note % 12 == j) and self:iget("on", i) > 0,
+         tap=function() self:iput("note", i, note - (note % 12) + j); self:iput("on", i, 1); self:dirty() end }
+  end
+  local acc, sl, on = self:iget("acc", i) > 0, self:iget("slide", i) > 0, self:iget("on", i) > 0
+  local row = {
+    { "oct -", false, function() self:iput("note", i, math.max(12, note - 12)); self:dirty() end },
+    { "oct +", false, function() self:iput("note", i, math.min(96, note + 12)); self:dirty() end },
+    { "accent", acc, function() self:iput("acc", i, acc and 0 or 1); self:dirty() end },
+    { "slide", sl, function() self:iput("slide", i, sl and 0 or 1); self:dirty() end },
+    { "rest", not on, function() self:iput("on", i, on and 0 or 1); self:dirty() end },
+  }
+  for j, r in ipairs(row) do add{ kind="choice", x=28 + (j - 1) * 84, y=338, w=80, h=36, small=true, label=r[1], sel=r[2], live=r[2] and (j == 3 or j == 4), tap=r[3] } end
+  -- the generator
+  add{ kind="card", x=472, y=220, w=472, h=166 }
+  add{ kind="text", x=484, y=229, w=200, h=12, size=12, label="GENERATOR" }
+  local st = math.floor(self:iv("gstyle") + 0.5)
+  for j, lab in ipairs(ui.INSTK.styles) do
+    add{ kind="choice", x=484 + (j - 1) * 90, y=246, w=84, h=36, small=true, label=lab, sel=(st == j - 1), tap=function() self:iset("gstyle", j - 1) end }
+  end
+  self:iknob(add, 520, 330, 20, "gbusy", "busy", pct); self:iknob(add, 590, 330, 20, "grange", "range", pct)
+  self:iknob(add, 660, 330, 20, "gacc", "accent", pct); self:iknob(add, 730, 330, 20, "gslide", "slide", pct)
+  add{ kind="btn", x=780, y=294, w=76, h=40, label="new", live=true, tap=function() psend(self.inst .. "-gen", "bang", {}); self:say("a new " .. ui.INSTK.styles[st + 1] .. " pattern"); self:repaint() end }
+  add{ kind="btn", x=860, y=294, w=76, h=40, label="mutate", tap=function() psend(self.inst .. "-mutate", "bang", {}); self:say("a few notes moved") end }
+  local SN = { "minor", "major", "dorian", "phrygian", "mixo", "harm min" }
+  add{ kind="btn", x=780, y=340, w=156, h=36, small=true, label=NOTES[math.floor(self.v["ockm-root"] or 9) + 1] .. " " .. (SN[math.floor(self.v["ockm-scale"] or 0) + 1] or ""),
+       tap=function() self:say("the key is the groovebox's: change it on build") end }
+  -- the filter move on each step
+  add{ kind="card", x=16, y=398, w=W - 32, h=150 }
+  add{ kind="text", x=28, y=407, w=300, h=12, size=12, label="FILTER MOVE PER STEP" }
+  local p2 = (W - 48) / 16
+  for k = 0, 15 do
+    add{ kind="imod", x=24 + k * p2 + 3, y=424, w=p2 - 6, h=114, i=self.page * 16 + k }
+  end
+  add{ kind="text", x=16, y=560, w=600, h=12, size=11, label="drag up or down on a bar to draw the sweep. new writes one too" }
+  if self.msg then add{ kind="toast", x=W / 2 - 330, y=H - 50, w=660, h=38, label=self.msg } end
+end
+-- v1.41 build: the groovebox's generator for one synth. Styles (rhythm, riff or tune, chords, key and swing in one tap;
+-- new rolls another take inside the style), every rhythm, riff (Bass) or tune (Analog), the key and chord progression,
+-- mutate and original, density, slides or inside to outside, octave, and evolve (a new variation every few bars, coming
+-- home). It's written into the steps by this synth's own line maker. Edit a step and it's yours: build and evolve leave it
+-- alone until you pick something here again
+ui.INSTK.pick_k = { ib = { 0.3, 0.35, 0.35, 0.35 } }   -- v1.46 the Bass synth picked on the bass tab: measured to sit with the other bass engines
+ui.INSTK.lead_fallback = { rhythm = { 10, 0, 1 }, notes = { 15, 16, 9 }, outside = 0.35 }   -- for styles without a lead
+function ui:ib_send(k, v)
+  self:send("ockm-" .. self.inst .. "-" .. k, v)
+  self.v["ockm-" .. self.inst .. "-mode"] = 0
+end
+function ui:inst_style(i, roll)
+  local st = STYLES[i]
+  if not st then return end
+  local ib = (self.inst == "ib")
+  local ps = ib and st.bass or (st.lead or ui.INSTK.lead_fallback)
+  if not ps then return end
+  local pick = function(v) if type(v) ~= "table" then return v end return roll and v[math.random(#v)] or v[1] end
+  self.v[self.inst .. "-style"] = i - 1; self:send(self.inst .. "-style", i - 1)
+  self:send("ockm-root", pick(st.root)); self:send("ockm-scale", pick(st.scale))
+  self:send("ockm-swing", st.swing)
+  if math.floor(self.v["ockm-sync"] or 0) == 0 then self:send("ockm-bpm", st.bpm) end   -- following a clock: its tempo stays
+  self:send("ockm-chord-prog", pick(st.prog))
+  self:ib_send("seed", 0)
+  if ps.rhythm then self:ib_send("rhythm", pick(ps.rhythm)) end
+  if ib then
+    local OLD2RIFF = { [0] = 0, [1] = 1, [2] = 2, [3] = 6, [4] = 5, [5] = 3, [6] = 4, [7] = 0, [8] = 7, [9] = 7 }
+    if ps.notes then self:ib_send("riff", OLD2RIFF[pick(ps.notes)] or 0) end
+    self:ib_send("slideamt", ps.slide or 0); self:ib_send("octave", ps.octave or 0)
+    self:ib_send("sync", (ps.move == 0) and 0 or 1)
+  else
+    if ps.notes then self:ib_send("notes", pick(ps.notes)) end
+    self:ib_send("octave", pick(ps.octave or 0)); self:ib_send("repeat", pick(ps.rep or 0)); self:ib_send("rests", ps.rests or 0)
+    self:ib_send("outside", ps.outside or 0.35); self:ib_send("sync", 1)
+  end
+  self:say(st[1] .. (roll and ": a new take" or "") .. " written")
+end
+-- evolve for the open synth: at the start of each phrase the line steps to a variation and comes home, as the groovebox's
+-- evolve does (gentle A B A C A B A D, lively A B C D). A line that's yours (edited) is left alone
+function ui:inst_evo_bar()
+  local pre = self.inst
+  if not (self.inst_live and (pre == "ib" or pre == "ia")) or self.playing == 0 then return end
+  local n = math.floor(self.v[pre .. "-evolve-every"] or 0)
+  if n <= 0 or math.floor(self.v["ockm-" .. pre .. "-mode"] or 1) ~= 0 then return end
+  self.ievo = self.ievo or {}
+  local e = self.ievo[pre]
+  local cur = math.floor(self.v["ockm-" .. pre .. "-seed"] or 0)
+  if not e or (cur ~= e.home + (e.off or 0)) then e = { home = cur, off = 0, k = 0, bar = e and e.bar or 0 }; self.ievo[pre] = e end
+  e.bar = e.bar + 1
+  if e.bar <= 1 or (e.bar - 1) % n ~= 0 then return end
+  local seq = ({ { 1, 0, 2, 0, 1, 0, 3, 0 }, { 1, 2, 3, 0 } })[math.floor(self.v[pre .. "-evolve-mode"] or 1)] or { 1, 0, 2, 0 }
+  e.k = e.k + 1
+  e.off = seq[((e.k - 1) % #seq) + 1]
+  self:send("ockm-" .. pre .. "-seed", e.home + e.off)
+  self:dirty()
+end
+function ui:layout_inst_build(add)
+  local pre = self.inst
+  local ib = (pre == "ib")
+  local hk = function(k) return "ockm-" .. pre .. "-" .. k end
+  -- shown as the line maker starts (not sent: sending would rewrite the steps)
+  for k, d in pairs({ density = 1, sync = 1, seed = 0, outside = 0.35, slideamt = 0, octave = 0, ["repeat"] = 0, rests = 0 }) do
+    if self.v[hk(k)] == nil then self.v[hk(k)] = d end
+  end
+  local card = function(x, y, w, h, t) add{ kind="card", x=x, y=y, w=w, h=h }; add{ kind="text", x=x + 12, y=y + 9, w=w - 24, h=12, label=t, size=12, col="mute" } end
+  local pick = function(k, after) return function(v) self.v[hk("mode")] = 0; if after then after(v) end end end
+  -- GENERATE: style, rhythm, riff or tune
+  card(16, 76, 456, 222, "GENERATE")
+  local si = math.floor(self.v[pre .. "-style"] or -1)
+  local sn = {}
+  for k, st in ipairs(STYLES) do sn[k] = { st[1] } end
+  add{ kind="arrow", x=28, y=98, w=40, h=52, dir=-1, on=(si > 0), tap=function() self:inst_style(math.max(1, si), false) end }
+  add{ kind="preset", x=72, y=98, w=220, h=52, num=(si >= 0) and STYLES[si + 1][1] or "pick a style", label="style", sel=(si >= 0) }
+  add{ kind="arrow", x=296, y=98, w=40, h=52, dir=1, on=(si < #STYLES - 1), tap=function() self:inst_style(math.min(#STYLES, si + 2), false) end }
+  add{ kind="btn", x=344, y=98, w=116, h=52, label="new", accent=true, tap=function() self:inst_style(math.max(1, si + 1), true) end }
+  self:stepper(add, 28, 160, 432, 52, ib and BASS_RHYTHMS or RHYTHMS, hk("rhythm"), pick("rhythm"), nil, ib and BASS_RHY_ORDER or LEAD_RHY_ORDER)
+  if ib then
+    self:stepper(add, 28, 220, 432, 52, BASS_RIFFS, hk("riff"), pick("riff"))
+  else
+    local tunes = {}
+    for k, nm in ipairs(MONO_NOTES) do tunes[k] = { nm } end
+    for k, nm in pairs(LEAD_TUNE_NAME) do tunes[k + 1] = { nm } end
+    self:stepper(add, 28, 220, 432, 52, tunes, hk("notes"), pick("notes"), nil, { 0, 1, 8, 9, 18, 15, 16, 12, 13, 14, 17 })
+  end
+  add{ kind="text", x=28, y=280, w=430, h=12, size=10, label=ib and "style: the groovebox's bass for it. new: another take" or "style: the groovebox's lead for it. new: another take" }
+  -- VARY: mutate, original, density, slides or inside to outside
+  card(16, 306, 456, 168, "VARY")
+  local sd = math.floor(self.v[hk("seed")] or 0)
+  add{ kind="btn", x=28, y=328, w=120, h=44, label="mutate", accent=true, tap=function()
+    self:ib_send("seed", sd + 1); self:say("variation " .. (sd + 1) .. ": original goes back") end }
+  add{ kind="btn", x=154, y=328, w=120, h=44, label="original", quiet=(sd == 0), tap=function() self:ib_send("seed", 0) end }
+  add{ kind="text", x=286, y=345, w=180, h=12, size=12, label=(sd == 0) and "the original" or ("variation " .. sd) }
+  add{ kind="hbar", x=28, y=380, w=432, h=40, hook=hk("density"), lo=0, hi=2, label="fewer  <  notes  >  more", bold=true }
+  if ib then
+    add{ kind="hbar", x=28, y=426, w=432, h=40, hook=hk("slideamt"), lo=0, hi=1, label="slides", bold=true }
+  else
+    add{ kind="hbar", x=28, y=426, w=432, h=40, hook=hk("outside"), lo=0, hi=1, label="inside  <  >  outside", bold=true,
+         valtext=function(v) return outside_zone(v) end }
+  end
+  -- KEY AND CHORDS
+  card(488, 76, 456, 168, "KEY AND CHORDS")
+  local root = math.floor(self.v["ockm-root"] or 9) % 12
+  add{ kind="arrow", x=500, y=98, w=40, h=48, dir=-1, on=true, tap=function() self:send("ockm-root", (root + 11) % 12) end }
+  add{ kind="preset", x=544, y=98, w=84, h=48, num=NOTES[root + 1], label="key", sel=true }
+  add{ kind="arrow", x=632, y=98, w=40, h=48, dir=1, on=true, tap=function() self:send("ockm-root", (root + 1) % 12) end }
+  local scn = {}
+  for k, nm in ipairs(SCALE_NAMES) do scn[k] = { nm } end
+  self:stepper(add, 680, 98, 252, 48, scn, "ockm-scale")
+  local sy = (self.v[hk("sync")] or 1) > 0
+  self:stepper(add, 500, 152, 300, 48, PROGS, "ockm-chord-prog", function() self:say(sy and "chords changed: the line follows" or "chords changed. follow is off") end)
+  add{ kind="choice", x=806, y=152, w=126, h=48, small=true, label="follow chords", sel=sy, tap=function()
+    self:ib_send("sync", sy and 0 or 1)
+    self:say(sy and "the line stays on the key" or "the line follows the chords")
+  end }
+  add{ kind="text", x=500, y=214, w=430, h=12, size=10, label="key, chords and tempo are shared with the rest of the box" }
+  -- LINE: octave, and on the Analog repeat and rests
+  card(488, 252, 456, 104, "LINE")
+  local oc = math.floor(self.v[hk("octave")] or 0)
+  for k, o in ipairs({ { -1, "oct down" }, { 0, "normal" }, { 1, "oct up" } }) do
+    add{ kind="choice", x=500 + (k - 1) * 74, y=274, w=70, h=40, small=true, label=o[2], sel=(oc == o[1]), tap=function() self:ib_send("octave", o[1]) end }
+  end
+  if ib then
+    add{ kind="text", x=730, y=290, w=200, h=12, size=10, label="slides and density are under vary" }
+  else
+    local rp = (self.v[hk("repeat")] or 0) > 0
+    add{ kind="choice", x=728, y=274, w=204, h=40, small=true, label=rp and "loose: the phrase wanders" or "tight: the phrase repeats", sel=rp,
+         tap=function() self:ib_send("repeat", rp and 0 or 1) end }
+    add{ kind="hbar", x=500, y=318, w=432, h=30, hook=hk("rests"), lo=0, hi=1, label="rests: space between phrases", bold=false }
+  end
+  -- EVOLVE
+  card(488, 364, 456, 110, "EVOLVE: A NEW VARIATION EVERY FEW BARS, THEN HOME")
+  local ev, em = math.floor(self.v[pre .. "-evolve-every"] or 0), math.floor(self.v[pre .. "-evolve-mode"] or 1)
+  for k, o in ipairs({ { 0, "off" }, { 1, "gentle" }, { 2, "lively" } }) do
+    local on = (o[1] == 0) and (ev == 0) or (ev > 0 and em == o[1])
+    add{ kind="choice", x=500 + (k - 1) * 74, y=386, w=70, h=36, small=true, label=o[2], sel=on, live=on and o[1] > 0, tap=function()
+      if o[1] == 0 then self:send(pre .. "-evolve-every", 0)
+      else self:send(pre .. "-evolve-mode", o[1]); if ev == 0 then self:send(pre .. "-evolve-every", 4) end end
+      self.ievo = nil
+    end }
+  end
+  for k, b in ipairs({ 2, 4, 8, 16 }) do
+    add{ kind="choice", x=728 + (k - 1) * 52, y=386, w=48, h=36, small=true, label=b .. " bars", sel=(ev == b), disabled=(ev == 0),
+         tap=function() self:send(pre .. "-evolve-every", b); if em == 0 then self:send(pre .. "-evolve-mode", 1) end end }
+  end
+  add{ kind="btn", x=500, y=428, w=140, h=36, small=true, label="keep this one", tap=function()
+    self.ievo = nil; self:say("kept: this variation is the new original") end }
+  add{ kind="text", x=652, y=440, w=280, h=12, size=10, label="your edited steps are never changed" }
+  self:inst_strip(add, "build")
+  if self.msg then add{ kind="toast", x=W / 2 - 330, y=H - 50, w=660, h=38, label=self.msg } end
+end
+-- v1.40 the keys: a keyboard on screen. Hold keeps keys down until tapped again (for chords, the arpeggiator and poly)
+function ui:inst_key(n, down)
+  self.ikeys = self.ikeys or {}
+  if down then self.ikeys[n] = true else self.ikeys[n] = nil end
+  psend(self.inst .. "-play", down and "note" or "off", down and { n, 100 } or { n })
+  self:dirty()
+end
+function ui:layout_inst_keys(add)
+  local ia = (self.inst == "ia")
+  self.ioct = self.ioct or {}
+  local oct = self.ioct[self.inst] or (ia and 4 or 2)
+  local hold = self.ihold
+  local y = 76
+  if ia then
+    add{ kind="text", x=16, y=y + 2, w=200, h=12, size=12, label="voices" }
+    local md = math.floor(self:iv("mode") + 0.5)
+    for j, lab in ipairs({ "mono", "unison", "chord", "poly" }) do
+      add{ kind="choice", x=16 + (j - 1) * 96, y=y + 20, w=90, h=44, label=lab, sel=(md == j - 1), tap=function()
+        self:iset("mode", j - 1)
+        self:say(({ "mono: one note at a time, with glide", "unison: four voices on one note, detuned", "chord: each key plays the chord. hold keys and tap set chord to change it", "poly: four notes at once" })[j])
+      end }
+    end
+    self:iknob(add, 430, y + 42, 20, "uni", "detune", ui.INSTK.pct)
+    local ch = { math.floor(self:iv("ch1")), math.floor(self:iv("ch2")), math.floor(self:iv("ch3")) }
+    local parts = {}
+    for _, c in ipairs(ch) do if c ~= 0 then parts[#parts + 1] = "+" .. c end end
+    add{ kind="text", x=480, y=y + 2, w=200, h=12, size=12, label="chord: root " .. table.concat(parts, " ") }
+    add{ kind="btn", x=480, y=y + 20, w=150, h=44, label="set chord", tap=function()
+      local ks = {}
+      for k in pairs(self.ikeys or {}) do ks[#ks + 1] = k end
+      table.sort(ks)
+      if #ks < 2 then self:say("hold two to four keys first (turn hold on), then tap set chord"); return end
+      for j = 1, 3 do self:iset("ch" .. j, ks[j + 1] and (ks[j + 1] - ks[1]) or 0) end
+      self:iset("mode", 2)
+      self:say("chord set: each key now plays it")
+    end }
+  end
+  add{ kind="choice", x=W - 16 - 300, y=y + 20, w=96, h=44, label="hold", sel=hold, live=hold, tap=function()
+    self.ihold = not hold
+    if hold then for k in pairs(self.ikeys or {}) do self:inst_key(k, false) end end
+  end }
+  add{ kind="arrow", x=W - 16 - 196, y=y + 20, w=44, h=44, dir=-1, on=(oct > 0), tap=function() self.ioct[self.inst] = math.max(0, oct - 1) end }
+  add{ kind="btn", x=W - 16 - 148, y=y + 20, w=100, h=44, small=true, label="octave " .. oct }
+  add{ kind="arrow", x=W - 16 - 44, y=y + 20, w=44, h=44, dir=1, on=(oct < 7), tap=function() self.ioct[self.inst] = math.min(7, oct + 1) end }
+  -- two octaves of keys, C to B
+  local base = 12 * (oct + 1)
+  local kx, ky, kw, kh = 16, 160, W - 32, H - 160 - 16
+  local ww = kw / 14
+  local whites = { 0, 2, 4, 5, 7, 9, 11 }
+  for i = 0, 13 do
+    local n = base + 12 * (i // 7) + whites[(i % 7) + 1]
+    add{ kind="ikey", x=kx + i * ww + 2, y=ky, w=ww - 4, h=kh, n=n, black=false, label=(i % 7 == 0) and ("C" .. math.floor(n / 12 - 1)) or nil }
+  end
+  for i = 0, 13 do
+    if i % 7 ~= 2 and i % 7 ~= 6 and i ~= 13 then
+      local n = base + 12 * (i // 7) + whites[(i % 7) + 1] + 1
+      add{ kind="ikey", x=kx + (i + 1) * ww - ww * 0.32, y=ky, w=ww * 0.64, h=kh * 0.58, n=n, black=true }
+    end
+  end
+  if self.msg then add{ kind="toast", x=W / 2 - 330, y=H - 50, w=660, h=38, label=self.msg } end
+end
+-- v1.40 drmz perform: a column per voice: its pad (tap to hear it), mute, level, pitch, length, tone, and a new sound
+function ui:layout_drmz(add)
+  local cw, gap = (W - 32 - 7 * 8) / 8, 8
+  local names = ui.INSTK.iz.voices
+  for k = 1, 8 do
+    local x = 16 + (k - 1) * (cw + gap)
+    local nm = "ockm-z" .. k
+    add{ kind="card", x=x, y=76, w=cw, h=H - 76 - 12 }
+    add{ kind="btn", x=x + 6, y=84, w=cw - 12, h=64, label=names[k], tap=function() psend("iz-tap", "float", { k }) end }
+    local muted = (self.v[nm .. "-mute"] or 0) > 0
+    add{ kind="choice", x=x + 6, y=154, w=cw - 12, h=32, small=true, label=muted and "muted" or "mute", sel=muted, live=muted,
+         tap=function() self:send(nm .. "-mute", muted and 0 or 1) end }
+    local cx = x + cw / 2
+    local f0 = function(v) return string.format("%d", math.floor(v * 100 + 0.5)) end
+    local fs = function(v) local q = math.floor(v + 0.5); return (q > 0 and "+" or "") .. q end
+    local fd = function(v) return string.format("%d", math.floor(v + 0.5)) end
+    for j, kn in ipairs({ { "level", 0, 1.5, "level", f0 }, { "tune", -12, 12, "pitch", fs }, { "decay", 10, 400, "length", fd }, { "tone", -1, 1, "tone", f0 } }) do
+      local cy = 236 + (j - 1) * 82
+      add{ kind="knob", x=cx - 34, y=cy - 34, w=68, h=82, cx=cx, cy=cy, r=26, hook=nm .. "-" .. kn[1], label=kn[4], fmt=kn[5], lo=kn[2], hi=kn[3] }
+    end
+    add{ kind="btn", x=x + 6, y=H - 60, w=cw - 12, h=40, small=true, label="new sound", tap=function()
+      self:send(nm .. "-labrseed", math.random(1, 99999)); self:send(nm .. "-labramt", 0.35)
+      self:send(nm .. "-labpseed", math.random(1, 99999)); self:send(nm .. "-labmorph", 0)
+      psend("iz-tap", "float", { k })
+    end }
+  end
+  if self.msg then add{ kind="toast", x=W / 2 - 330, y=H - 50, w=660, h=38, label=self.msg } end
+end
+-- drmz steps: eight rows of 16, the groove picker and the generator
+function ui:layout_drmz_steps(add)
+  local n = math.max(1, self:ilen() // 16)
+  self.page = clamp(self.page, 0, n - 1)
+  add{ kind="arrow", x=16, y=NAV_Y, w=44, h=NAV_H, dir=-1, on=(self.page > 0), tap=function() self.page = math.max(0, self.page - 1) end }
+  add{ kind="btn", x=64, y=NAV_Y, w=104, h=NAV_H, small=true, label=string.format("%d-%d", self.page * 16 + 1, self.page * 16 + 16) }
+  add{ kind="arrow", x=172, y=NAV_Y, w=44, h=NAV_H, dir=1, on=(self.page < n - 1), tap=function() self.page = math.min(n - 1, self.page + 1) end }
+  local len = self:ilen()
+  for j, l in ipairs({ 16, 32, 64 }) do
+    local b = l // 16
+    add{ kind="choice", x=W - 16 - 70 - 8 - 3 * 56 + (j - 1) * 56, y=NAV_Y, w=52, h=NAV_H, small=true, sel=(len == l), label=b .. ((b == 1) and " bar" or " bars"),
+         tap=function() self:drmz_len(l) end }
+  end
+  add{ kind="btn", x=W - 86, y=NAV_Y, w=70, h=NAV_H, small=true, label="double", disabled=(len >= 64), tap=function() if len < 64 then self:drmz_len(len * 2) end end }
+  local names = ui.INSTK.iz.voices
+  local gx, cw = 92, (W - 16 - 92 - 15 * 4) / 16
+  for k = 1, 8 do
+    local y = 116 + (k - 1) * 38
+    add{ kind="btn", x=16, y=y, w=70, h=34, small=true, label=names[k], tap=function() psend("iz-tap", "float", { k }) end }
+    for c = 0, 15 do
+      local i = self.page * 16 + c
+      add{ kind="zstep", x=gx + c * (cw + 4), y=y, w=cw, h=34, k=k, i=i, tap=function()
+        local v = self:get("ockm-pat-z" .. k, i)
+        local nv = (v <= 0) and 1 or ((v < 1.5) and 2 or 0)
+        psend("ockm-pat-z" .. k, "list", { i, nv }); self:dirty()
+      end }
+    end
+  end
+  -- the generator: a groove (house, then techno), how busy, new, mutate; and the swing
+  local gy = 430
+  add{ kind="card", x=16, y=gy, w=W - 32, h=H - gy - 12 }
+  add{ kind="text", x=28, y=gy + 9, w=300, h=12, size=12, label="GROOVE" }
+  local gl = ui.INSTK.iz.grooves
+  local gs = math.floor(self:iv("gstyle") + 0.5) % #gl
+  add{ kind="arrow", x=28, y=gy + 30, w=44, h=48, dir=-1, on=true, tap=function() self:iset("gstyle", (gs - 1) % #gl) end }
+  add{ kind="btn", x=76, y=gy + 30, w=200, h=48, label=gl[gs + 1], tap=function() psend("iz-gen", "bang", {}); self:say(gl[gs + 1]) end }
+  add{ kind="arrow", x=280, y=gy + 30, w=44, h=48, dir=1, on=true, tap=function() self:iset("gstyle", (gs + 1) % #gl) end }
+  add{ kind="text", x=76, y=gy + 84, w=200, h=12, size=11, label=(gs < 12) and "house" or "techno" }
+  add{ kind="knob", x=356, y=gy + 22, w=70, h=86, cx=390, cy=gy + 56, r=24, hook="iz-gbusy", label="busy", fmt=ui.INSTK.pct, lo=0, hi=1 }
+  add{ kind="btn", x=452, y=gy + 30, w=110, h=48, label="new", live=true, tap=function() psend("iz-gen", "bang", {}); self:say("a new " .. gl[gs + 1] .. " groove"); self:repaint() end }
+  add{ kind="btn", x=570, y=gy + 30, w=110, h=48, label="mutate", tap=function() psend("iz-mutate", "bang", {}); self:say("a few hits moved"); self:repaint() end }
+  add{ kind="hbar", x=696, y=gy + 30, w=W - 16 - 12 - 696, h=48, hook="ockm-swing", lo=50, hi=75, label="swing", bold=true }
+  add{ kind="text", x=452, y=gy + 92, w=480, h=12, size=11, label="tap a step: on, accent, off. the arrows pick a groove; tap its name or new to write it" }
+  if self.msg then add{ kind="toast", x=W / 2 - 330, y=H - 50, w=660, h=38, label=self.msg } end
+end
+function ui:drmz_len(l)
+  local old = self:ilen()
+  if l > old then
+    for k = 1, 8 do for i = old, l - 1 do psend("ockm-pat-z" .. k, "list", { i, self:get("ockm-pat-z" .. k, i % old) }) end end
+  end
+  self:iset("len", l)
+  self.page = math.min(self.page, l // 16 - 1)
+end
+function ui:inst_drag(w, y)
+  local v = clamp(1 - (y - w.y) / w.h, 0, 1)
+  v = math.floor(v * 100 + 0.5) / 100
+  if w.kind == "imod" then self:iput("mod", w.i, v); self:dirty()
+  else self:send(w.hook, w.lo + v * (w.hi - w.lo)) end
+end
+function ui:inst_len(l)
+  local old = self:ilen()
+  if l > old then   -- longer: repeat what's there into the new bars
+    for i = old, l - 1 do
+      for _, f in ipairs(ui.INSTK.fields) do self:iput(f, i, self:iget(f, i % old)) end
+    end
+  end
+  self:iset("len", l)
+  self.page = math.min(self.page, l // 16 - 1)
+end
+
 -- ------------------------------------------------------------------ mute, solo, mixer
 function ui:soloing()
   for _, t in ipairs(TRACKS) do if (self.v["ockm-"..t.."-solo"] or 0) > 0 then return true end end
@@ -4582,6 +6329,7 @@ function ui:silent(t)
 end
 function ui:track_name(i)
   if i <= 8 then return SHORT[(self.v["ockm-"..SLOTS[i].."-sound"] or 0) + 1] end
+  if TRACKS[i] == "vox" then return "samples" end
   return SYNTHS[i - 8]
 end
 
@@ -4597,7 +6345,11 @@ function ui:layout_mixer(add)
       local t = TRACKS[i]
       add{ kind="strip", x=x, y=top, w=sw - 2, h=H - top - 8, label=self:track_name(i), silent=self:silent(t) }
       add{ kind="stripname", x=x, y=top, w=sw - 2, h=32,     -- tap the name to open that track
-           tap=function() if i <= 8 then self.slot = i; self:open("drums") else self.part = i - 8; self:open("synth") end end }
+           tap=function()
+             if t == "vox" then self:open("vox")
+             elseif i <= 8 then self.slot = i; self:open("drums")
+             else self.part = i - 8; self:open("synth") end
+           end }
       add{ kind="hbar", x=cx, y=top + 34, w=cw, h=26, hook="ockm-"..t.."-verb", lo=0, hi=1, label="rev" }
       add{ kind="hbar", x=cx, y=top + 66, w=cw, h=26, hook="ockm-"..t.."-delay", lo=0, hi=1, label="dly" }
       add{ kind="choice", x=cx, y=top + 100, w=cw, h=32, small=true, label="EQ", sel=not self:eq_flat(t), accent=true,
@@ -4627,7 +6379,10 @@ local EQ_DEF = { lowcut = 20, eqlow = 0, eqmid = 0, eqmidf = 400, eqhigh = 0 }
 local EQ_SLIDERS = { { "lowcut", 20, 800, "low cut", true }, { "eqlow", -12, 12, "low" }, { "eqmid", -12, 12, "mid" },
                      { "eqmidf", 150, 6000, "mid freq", true }, { "eqhigh", -12, 12, "high" } }
 function ui:eq_flat(t)
-  for k, d in pairs(EQ_DEF) do if math.abs((self.v["ockm-"..t.."-"..k] or d) - d) > 0.01 then return false end end
+  for k, d in pairs(EQ_DEF) do
+    local expect = (t == "vox" and k == "lowcut") and 120 or d
+    if math.abs((self.v["ockm-"..t.."-"..k] or d) - expect) > 0.01 then return false end
+  end
   return true
 end
 local function biquad_db(kind, db, f0, f, sr)
@@ -4665,7 +6420,7 @@ function ui:eq_response(t, f)
 end
 -- one tap to clear the low-mid fog: low cuts on everything except the kick and bass, a scoop on the chords
 local DEMUD = { kick = { 30 }, snare = { 120, -2, 400 }, perc = { 200 }, hat = { 300 }, ohat = { 250 }, tom = { 60 },
-                bass = { 30 }, lead = { 180 }, chord = { 160, -3, 300 } }
+                bass = { 30 }, lead = { 180 }, chord = { 160, -3, 300 }, vox = { 120 } }
 local SPEC_F = { 60, 120, 250, 500, 1000, 2000, 4000, 8000 }
 function ui:demud()
   if self.playing ~= 0 then
@@ -4785,13 +6540,21 @@ function ui:drum_vel(v)
   return math.max(v, 0)
 end
 -- drag in the lane: velocity or timing for the step under the finger (only steps that play)
-function ui:lane_set(w, x, y)
+function ui:lane_set(w, x, y, press)
   local pitch = (W - 32) / 16
   local i = clamp(math.floor((x - 16) / pitch), 0, 15)
   local nm, step = SLOTS[self.slot], self:dabs(i)
   if self:get("ockm-pat-"..nm, step) <= 0 then return end
   local f = clamp(1 - (y - w.y) / w.h, 0, 1)
-  if (self.lane or "vel") == "vel" then
+  if self.lane == "roll" then
+    -- v1.49 a tap steps the roll: one hit, then 2 to 6, then one again (dragging doesn't)
+    if not press then return end
+    local r = math.floor(self:get("ockm-pat-"..nm.."-rat", step))
+    -- v1.49 after x6: a flam (a soft grace note first), then a swell (four hits getting louder), then one hit again
+    local nx = (r < 2) and 2 or ((r >= 8) and 1 or r + 1)
+    psend("ockm-rat", nm, { step, nx })
+    self:say((nx == 1) and "one hit" or ((nx == 7) and "a flam: a soft grace note, then the hit" or ((nx == 8) and "a swell: four hits getting louder" or ("a roll of " .. nx))))
+  elseif (self.lane or "vel") == "vel" then
     local v = (f >= 0.9) and 2 or math.min(0.99, math.max(0.05, math.floor(f * 100 + 0.5) / 100))   -- the top tenth snaps to accent
     psend("ockm-edit", nm, { step, v })
   else
@@ -4869,7 +6632,8 @@ function ui:hit(x, y)
   for k = #L, 1, -1 do
     local w = L[k]
     if not w.off and inside(w, x, y) and (w.tap or w.swipe or w.kind == "slider" or w.kind == "bpm" or w.kind == "vfader" or w.kind == "hbar" or w.kind == "ms"
-       or w.kind == "dstep" or w.kind == "mstep" or w.kind == "cstep" or w.kind == "pad" or w.kind == "vlane" or w.kind == "hold" or w.kind == "xy") then return w end
+       or w.kind == "dstep" or w.kind == "mstep" or w.kind == "cstep" or w.kind == "pad" or w.kind == "vlane" or w.kind == "hold" or w.kind == "xy"
+       or w.kind == "knob" or w.kind == "islider" or w.kind == "imod" or w.kind == "ikey") then return w end
   end
   return nil
 end
@@ -4892,7 +6656,12 @@ function ui:press(x, y)
   elseif w.kind == "xy" then self.touch.mode = "xy"; w.down(self:xy_at(w, x, y))
   elseif w.kind == "slider" or w.kind == "vfader" or w.kind == "hbar" then self.touch.mode = "slider"; self:slide(w, x, y)
   elseif w.kind == "bpm" then self.touch.v0 = self.v["ockm-bpm"] or 124
-  elseif w.kind == "vlane" then self.touch.mode = "vlane"; self:lane_set(w, x, y)
+  elseif w.kind == "knob" then self.touch.mode = "knob"; self.touch.v0 = self.v[w.hook] or 0
+  elseif w.kind == "ikey" then
+    self.touch.mode = "ikey"
+    if self.ihold then self:inst_key(w.n, not (self.ikeys and self.ikeys[w.n])) else self:inst_key(w.n, true) end
+  elseif w.kind == "islider" or w.kind == "imod" then self.touch.mode = w.kind; self:inst_drag(w, y)
+  elseif w.kind == "vlane" then self.touch.mode = "vlane"; self:lane_set(w, x, y, true)
   elseif w.kind == "dstep" or w.kind == "pcell" or w.kind == "ms" then
     -- drum steps, mute and solo act the moment a finger lands, like the pads on a drum machine
     if w.kind == "ms" then
@@ -4939,6 +6708,13 @@ function ui:move(x, y)
   if t.mode == "slider" then self:slide(t.w, x, y); return end
   if t.mode == "xy" then t.w.drag(self:xy_at(t.w, x, y)); return end
   if t.mode == "vlane" then self:lane_set(t.w, x, y); return end
+  if t.mode == "knob" then   -- v1.39 up turns it up: 150 px for the whole way
+    local v = clamp(t.v0 - dy / 150 * (t.w.hi - t.w.lo), t.w.lo, t.w.hi)
+    v = math.floor(v * 100 + 0.5) / 100
+    if v ~= self.v[t.w.hook] then self:send(t.w.hook, v) end
+    return
+  end
+  if t.mode == "islider" or t.mode == "imod" then self:inst_drag(t.w, y); return end
   if t.mode == nil and t.w.kind == "bpm" and math.abs(dy) > 8 then t.mode = "bpm" end
   -- v1.26: a grid that scrolls a row at a time: drag up or down anywhere on it
   if t.mode == nil and t.w.vs then
@@ -4957,7 +6733,24 @@ function ui:move(x, y)
   if t.mode == nil and (math.abs(dx) > 24 or math.abs(dy) > 16) then
     if t.w.swipe and math.abs(dx) > math.abs(dy) then t.mode = "swipe"
     elseif (t.w.kind == "mstep" or t.w.kind == "cstep") and math.abs(dy) > math.abs(dx) and not self:locked() then t.mode = "note"
+    elseif t.w.kind == "istep" and math.abs(dy) > math.abs(dx) then   -- v1.41 an instrument's step: drag for its note
+      t.mode = "inote"; t.n0 = (self:iget("note", t.w.i) > 0) and math.floor(self:iget("note", t.w.i)) or self:inst_root_note()
     else t.mode = "cancel" end
+  end
+  if t.mode == "inote" then
+    local n = self:inst_shift(t.n0, -math.floor(dy / 18 + 0.5))
+    if n ~= t.last then
+      local i = t.w.i
+      t.last = n
+      self:iput("note", i, n); if self:iget("on", i) <= 0 then self:iput("on", i, 1) end
+      self.isel = i
+      if self.playing == 0 then   -- stopped: hear it while the finger's down
+        if t.aud then psend(self.inst .. "-note", "off", { t.aud }) end
+        psend(self.inst .. "-note", "note", { n, 90 }); t.aud = n
+      end
+      self:dirty()
+    end
+    return
   end
   if t.mode == "note" then
     self:claim(SYNTHS[self.part])
@@ -4986,6 +6779,8 @@ function ui:release(x, y)
   if t.mode == "pad" then
     self.pad_on = nil; psend(w.hook, "float", { 0 })
   elseif t.mode == "hold" then w.up()
+  elseif t.mode == "ikey" then if not self.ihold then self:inst_key(w.n, false) end
+  elseif t.mode == "inote" then if t.aud then psend(self.inst .. "-note", "off", { t.aud }) end
   elseif t.mode == "xy" then w.up()
   elseif t.mode == "slider" and w.spring then
     self:filter_spring()     -- let go: snap back to off
@@ -5035,8 +6830,16 @@ function ui:text(g, s, x, y, size, colname, w)
   self:col(g, colname or "mute")
   g:draw_text(s, x, y, w or 400, size or 12)
 end
+-- v1.49 how wide Pd draws a character: it rounds a text size down to one of its own fonts (8, 10, 12, 16, 24, 36),
+-- each with a fixed width (measured on the Pi). Used to centre and right-align text where it really lands
+local PD_CHARW = { { 36, 22 }, { 24, 14 }, { 16, 10 }, { 12, 7 }, { 10, 6 }, { 0, 5 } }
+function ockm_charw(size)
+  for _, f in ipairs(PD_CHARW) do if size >= f[1] then return f[2] end end
+  return 5
+end
 function ui:ctext(g, s, w, size, colname, dy)
-  local tw = #s * size * 0.6
+  local tw = #s * ockm_charw(size)
+  if tw > w.w - 4 and size > 9 then return self:ctext(g, s, w, size - 1, colname, dy) end   -- too wide: a size down rather than spill
   self:text(g, s, w.x + (w.w - tw) / 2, w.y + (w.h - size) / 2 + (dy or 0) - 1, size, colname, w.w)
 end
 
@@ -5065,7 +6868,7 @@ function ui:paint_layer_2(g)
   if self.playing == 0 then return end
   local i = self.step % 16      -- every part's length is whole bars, so the step within the bar is the same for all
   local pitch = (W - 32) / 16
-  if self.screen == "drums" and self.drums_all then
+  if self.screen == "drums" and self.drums_all and not self.drums_pads then   -- v1.49 not over the pads view
     if self:play_block() == self.page then
       local lw = (W - LANE_X - 16) / 16
       self:col(g, "acc"); g:fill_rect(LANE_X + i * lw + 2, LANE_Y - 6, lw - 4, 3)
@@ -5081,11 +6884,26 @@ function ui:paint_layer_2(g)
     end
   elseif self.screen == "live" then
     self:col(g, "acc")
-    for n = 1, 11 do
-      if self:track_sounding(n) then local x, y = live_tile(n); g:fill_rounded_rect(x + 10, y + 14, 10, 10, 5) end
+    for n = 1, #TRACKS do
+      if self:track_sounding(n) then local x, y = live_tile(n); g:fill_rounded_rect(x + 14, y + 36, 10, 10, 5) end
     end
-  elseif (self.screen == "drums" or self.screen == "synth") and self:play_block() == self.page then
-    -- under the step pads, over the beat marks
+  elseif self.screen == "inst" and self.inst == "iz" and self.itab == "steps" then
+    local s = self.step % self:ilen()
+    if s // 16 == self.page then
+      local cw = (W - 16 - 92 - 15 * 4) / 16
+      self:col(g, "acc"); g:fill_rect(92 + (s % 16) * (cw + 4), 110, cw, 4)
+    end
+  elseif self.screen == "inst" and self.inst and self.inst ~= "iz" and ui.INSTK.sy[self.itab] then
+    local L = self:ilen()
+    local s = self.step % L
+    if s // 16 == self.page then
+      local y = ui.INSTK.sy[self.itab] + ui.INSTK.sh[self.itab] + 3
+      self:col(g, "acc"); g:fill_rect(16 + (s % 16) * pitch + 3, y, pitch - 6, 4)
+    end
+  elseif self.screen == "vox" and self:play_block() == self.page then
+    self:col(g, "acc"); g:fill_rect(16 + i * pitch + 3, SMPK.Y + SMPK.H + 3, pitch - 6, 4)
+  elseif ((self.screen == "drums" and not self.drums_pads) or self.screen == "synth") and self:play_block() == self.page then
+    -- under the step pads, over the beat marks (v1.49: not on the pads view, which has no steps)
     local y = (self.screen == "drums") and (D_STEP_Y + D_STEP_H + 3) or (S_STEP_Y + S_STEP_H + 3)
     self:col(g, "acc"); g:fill_rect(16 + i * pitch + 3, y, pitch - 6, 4)
   end
@@ -5098,36 +6916,42 @@ function ui:draw(g, w)
     local on = (self.pad_on == w.hook)
     self:col(g, on and "acc" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
     if w.h < 50 then
-      self:ctext(g, w.label, w, 13, on and "#ffffff" or "txt")
+      self:ctext(g, w.label, w, 13, on and "accfg" or "txt")
     else
-      self:ctext(g, w.label, { x=w.x, y=w.y + 8, w=w.w, h=20 }, 14, on and "#ffffff" or "txt")
-      self:ctext(g, w.sub or "", { x=w.x, y=w.y + 32, w=w.w, h=16 }, 10, on and "#ffffff" or "mute")
+      self:ctext(g, w.label, { x=w.x, y=w.y + 8, w=w.w, h=20 }, 14, on and "accfg" or "txt")
+      self:ctext(g, w.sub or "", { x=w.x, y=w.y + 32, w=w.w, h=16 }, 10, on and "accfg" or "mute")
     end
   elseif k == "key" then
-    -- what the step colours mean
+    -- a hit is the grey, an accent is the same grey with a coloured bar
     local x = w.x + w.w - 290
     self:col(g, "on"); g:fill_rounded_rect(x, w.y, 12, 12, 3); self:text(g, "hit", x + 18, w.y - 1, 11, "mute", 40)
-    self:col(g, "acc"); g:fill_rounded_rect(x + 60, w.y, 12, 12, 3); self:text(g, "accent (louder)", x + 78, w.y - 1, 11, "mute", 110)
+    self:col(g, "on"); g:fill_rounded_rect(x + 60, w.y, 12, 12, 3)
+    self:col(g, "acc"); g:fill_rect(x + 62, w.y + 9, 8, 2)
+    self:text(g, "accent (louder)", x + 78, w.y - 1, 11, "mute", 110)
     self:text(g, "tap a step to cycle", x + 190, w.y - 1, 11, "mute", 110)
   elseif k == "sheet" then
     self:col(g, "bg"); g:fill_rounded_rect(w.x - 4, w.y - 4, w.w + 8, w.h + 8, 14)
     self:col(g, "card"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 12)
-    self:col(g, "acc"); g:stroke_rounded_rect(w.x, w.y, w.w, w.h, 12, 2)
+    self:col(g, "dim"); g:stroke_rounded_rect(w.x, w.y, w.w, w.h, 12, 2)
   elseif k == "toast" then
     self:col(g, "txt"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 19)
     self:ctext(g, w.label, w, 13, "bg")
   elseif k == "btn" then
-    local lit = w.accent or (w.flash and self.flashing == w.flash and not w.off)
-    self:col(g, lit and "acc" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
-    if w.edge and not lit then self:col(g, "acc"); g:stroke_rounded_rect(w.x + 1, w.y + 1, w.w - 2, w.h - 2, 6, 2) end
-    self:ctext(g, w.label, w, w.small and 12 or 14, lit and "#ffffff" or ((w.quiet or w.off) and "mute" or "txt"))
+    -- accent: a chosen or primary button, in the grey. live, or a flash: something happening, in the colour.
+    -- edge: the colour as an outline, for the scene that's on.
+    local flash = w.flash and self.flashing == w.flash and not w.off
+    local live = w.live or flash
+    local strong = w.accent and not live
+    self:col(g, live and "acc" or (strong and "on" or "off")); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
+    if w.edge and not live and not strong then self:col(g, "acc"); g:stroke_rounded_rect(w.x + 1, w.y + 1, w.w - 2, w.h - 2, 6, 2) end
+    self:ctext(g, w.label, w, w.small and 12 or 14, live and "accfg" or (strong and "bg" or ((w.quiet or w.off) and "mute" or "txt")))
   elseif k == "tab" then
     self:col(g, w.sel and "on" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
     self:ctext(g, w.label, w, 12, w.sel and "bg" or "txt")
   elseif k == "play" then
     local on = self.playing ~= 0
     self:col(g, on and "acc" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
-    self:col(g, on and "#ffffff" or "txt")
+    self:col(g, on and "accfg" or "txt")
     local cx, cy = w.x + w.w / 2, w.y + w.h / 2
     if on then g:fill_rect(cx - 9, cy - 9, 18, 18)
     else local p = Path(cx - 7, cy - 11); p:line_to(cx + 11, cy); p:line_to(cx - 7, cy + 11); p:close(); g:fill_path(p) end
@@ -5136,6 +6960,10 @@ function ui:draw(g, w)
     self:text(g, s, w.x + 4, w.y + 4, 32, "txt")
     self:text(g, "bpm", w.x + 8 + #s * 19, w.y + 26, 12, "mute")
     self:text(g, VERSION, w.x + 8 + #s * 19, w.y + 8, 9, "mute")
+    -- v1.47 the project you're in, and its scene, under the tempo (orange with unsaved changes, like the disc)
+    local p = self.project or "default"
+    local nm = (ockm_pretty(ockm_base(p)):match("^[^·]+") or p):gsub("%s+$", "") .. " · " .. scene_letter(ockm_ver(p))
+    self:text(g, nm, w.x + 6, w.y + 40, 9, self.unsaved and "acc" or "mute", 150)
   elseif k == "text" then
     self:text(g, w.label, w.x, w.y, w.size or 12, w.col or "mute", w.w)
   elseif k == "pattern" then
@@ -5145,23 +6973,34 @@ function ui:draw(g, w)
     if self.want == w.n then self:col(g, "acc"); g:stroke_rounded_rect(w.x + 1, w.y + 1, w.w - 2, w.h - 2, 6, 2) end
     self:ctext(g, string.format("%d", math.floor(w.n + 1)), w, (w.h > 44) and 22 or 13, playing and "bg" or ((w.used == false) and "mute" or "txt"))
   elseif k == "choice" then
-    local sel = w.sel
-    self:col(g, sel and (w.accent and "acc" or "on") or (w.onbar and "dim" or "off")); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
-    self:ctext(g, w.label, w, w.small and 11 or 13, sel and (w.accent and "#ffffff" or "bg") or (w.disabled and "mute" or "txt"))
+    -- chosen is the grey. live is the colour, and only while that thing is actually on (rise, latch, the colour itself).
+    local sel, live = w.sel, w.sel and w.live
+    self:col(g, live and "acc" or (sel and "on" or (w.onbar and "dim" or "off"))); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
+    if w.mark and not sel then self:col(g, w.mark); g:fill_rounded_rect(w.x + 8, w.y + (w.h - 14) / 2, 14, 14, 3) end
+    if w.ver then   -- v1.49 an engine's versions: the name, and a dot for each version (the one playing filled)
+      self:ctext(g, w.label, w, w.small and 11 or 13, sel and "bg" or "txt", -6)
+      local n, d = w.ver[2], 6
+      local x0 = w.x + (w.w - (n * d + (n - 1) * 4)) / 2
+      for j = 1, n do
+        self:col(g, (j == w.ver[1]) and "bg" or "dim"); g:fill_ellipse(x0 + (j - 1) * (d + 4), w.y + w.h - 12, d, d)
+      end
+    else
+      self:ctext(g, w.label, w, w.small and 11 or 13, live and "accfg" or (sel and "bg" or (w.disabled and "mute" or "txt")))
+    end
   elseif k == "recipe" then
     self:col(g, w.sel and "on" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 8)
     self:text(g, w.label, w.x + 12, w.y + w.h / 2 - 17, 14, w.sel and "bg" or "txt", w.w - 70)
     self:text(g, w.sub or "", w.x + 12, w.y + w.h / 2 + 3, 9, w.sel and "dim" or "mute", w.w - 20)
     if w.slot then
-      self:col(g, "acc"); g:fill_rounded_rect(w.x + w.w - 56, w.y + 8, 48, 20, 4)
-      self:ctext(g, "slot " .. w.slot, { x=w.x + w.w - 56, y=w.y + 8, w=48, h=20 }, 10, "#ffffff")
+      self:col(g, "on"); g:fill_rounded_rect(w.x + w.w - 56, w.y + 8, 48, 20, 4)
+      self:ctext(g, "slot " .. w.slot, { x=w.x + w.w - 56, y=w.y + 8, w=48, h=20 }, 10, "bg")
     end
   elseif k == "disc" then
-    -- save: a floppy disc, orange when there's something unsaved
+    -- save: a floppy disc, in the colour when there's something unsaved
     local on = self.unsaved
     if w.lit ~= nil then on = w.lit end
     self:col(g, on and "acc" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
-    local c = on and "#ffffff" or (w.off and "mute" or "txt")
+    local c = on and "accfg" or (w.off and "mute" or "txt")
     local cx, cy = w.x + w.w / 2, w.y + w.h / 2
     self:col(g, c); g:stroke_rounded_rect(cx - 11, cy - 11, 22, 22, 3, 2)
     g:fill_rect(cx - 6, cy - 11, 12, 7)
@@ -5171,7 +7010,7 @@ function ui:draw(g, w)
     -- delete one of your saved sounds: a small bin
     self:col(g, w.lit and "acc" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
     local cx, cy = w.x + w.w / 2, w.y + w.h / 2
-    self:col(g, w.lit and "#ffffff" or "txt")
+    self:col(g, w.lit and "accfg" or "txt")
     g:fill_rect(cx - 9, cy - 8, 18, 2); g:fill_rect(cx - 3, cy - 11, 6, 3)
     g:stroke_rounded_rect(cx - 7, cy - 5, 14, 16, 2, 2)
     g:fill_rect(cx - 2, cy - 2, 1, 10); g:fill_rect(cx + 1, cy - 2, 1, 10)
@@ -5194,12 +7033,15 @@ function ui:draw(g, w)
       self:text(g, w.label, w.x + 12, w.y + 15, 13, "txt", w.w - 16)
     end
   elseif k == "hold" then
-    if w.on then self:col(g, "acc"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 8)
-    else self:col(g, "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 8); self:col(g, "acc"); g:stroke_rounded_rect(w.x + 1, w.y + 1, w.w - 2, w.h - 2, 8, 2) end
-    self:ctext(g, w.label, { x=w.x, y=w.y + w.h / 2 - 20, w=w.w, h=20 }, 17, w.on and "#ffffff" or "txt")
-    self:ctext(g, w.sub or "", { x=w.x, y=w.y + w.h / 2 + 6, w=w.w, h=14 }, 10, w.on and "#ffffff" or "mute")
+    -- plain until you hold it; the colour is only while it's running
+    self:col(g, w.on and "acc" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 8)
+    local ly, sy = w.y + w.h / 2 - 20, w.y + w.h / 2 + 6
+    if w.h < 80 then ly, sy = w.y + 23, w.y + w.h - 19 end   -- v1.49 the shorter slots: the name below the v
+    self:ctext(g, w.label, { x=w.x, y=ly, w=w.w, h=20 }, 17, w.on and "accfg" or "txt")
+    self:ctext(g, w.sub or "", { x=w.x, y=sy, w=w.w, h=14 }, 10, w.on and "accfg" or "mute")
+    if w.letter then self:ctext(g, w.letter, { x=w.x + 4, y=w.y + 5, w=16, h=12 }, 10, w.on and "accfg" or "mute") end   -- v1.49 the slot
   elseif k == "mtile" then
-    -- a track on live: bright while it plays, dark when muted, an orange outline while a change waits for the beat or bar
+    -- in the mix: the grey. Muted: the resting surface. A wait: the colour as an edge. The dot (drawn with the playhead) means it's sounding.
     local muted, armed, txt
     if w.group then
       muted = true
@@ -5211,24 +7053,27 @@ function ui:draw(g, w)
       armed = p ~= nil
       local q = math.floor(self.v["ockm-mute-quant"] or 0)
       local when = (q == 1) and "beat" or "bar"
-      if not self:track_in(w.track) then muted = true; armed = false; txt = "off in this pattern"
+      if not self:track_in(w.track) then muted = true; armed = false; txt = "off in scene"
       elseif armed then txt = (p > 0 and "out on " or "in on ") .. when
       elseif muted then txt = "muted"
       elseif self:silent(w.track) then txt = "not soloed"
-      else txt = "playing" end
+      else txt = w.sub or "" end
     end
-    self:col(g, muted and "card" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 8)
+    self:col(g, (muted or w.group) and "off" or "on"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 8)
     if muted then self:col(g, "dim"); g:stroke_rounded_rect(w.x + 1, w.y + 1, w.w - 2, w.h - 2, 8, 1.5) end
     if armed then self:col(g, "acc"); g:stroke_rounded_rect(w.x + 1.5, w.y + 1.5, w.w - 3, w.h - 3, 8, 3) end
-    if not w.group then self:col(g, "dim"); g:fill_rounded_rect(w.x + 10, w.y + 14, 10, 10, 5) end
-    self:text(g, w.label, w.x + (w.group and 10 or 26), w.y + 10, 14, muted and "mute" or "txt", w.w - 30)
-    self:text(g, txt, w.x + 10, w.y + w.h - 26, 10, armed and "acc" or "mute", w.w - 50)
+    local name_col = (muted or w.group) and (muted and "mute" or "txt") or "bg"
+    self:text(g, w.label, w.x + (w.group and 10 or 14), w.y + 10, 14, name_col, w.group and (w.w - 20) or (w.w - 52))
+    local status = armed and (muted and "acc" or "bg") or "mute"
+    if not muted and not armed and w.sub and txt == w.sub then status = "bg" end
+    if #txt * ockm_charw(10) <= w.w - 52 then self:text(g, txt, w.x + 10, w.y + w.h - 26, 10, status, w.w - 50)
+    else self:text(g, txt, w.x + 14, w.y + w.h - 50, 10, status, w.w - 24) end   -- v1.49 too long beside the S: above it
   elseif k == "partbtn" then
     local out = not self:track_in(w.label)
     self:col(g, w.sel and "on" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
-    self:col(g, "dim"); g:fill_rounded_rect(w.x + 10, w.y + w.h / 2 - 5, 10, 10, 5)
+    self:col(g, w.sel and "bg" or "dim"); g:fill_rounded_rect(w.x + 10, w.y + w.h / 2 - 5, 10, 10, 5)
     self:text(g, out and (w.label .. " (off)") or w.label, w.x + 28, w.y + w.h / 2 - 8, 13, w.sel and "bg" or (out and "mute" or "txt"), w.w - 96)
-  elseif k == "card" then
+  elseif k == "card" or k == "plate" then   -- v1.49 plate: a block of top tabs
     self:col(g, "card"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 8)
   elseif k == "locked" then
     self:col(g, "card"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
@@ -5240,7 +7085,7 @@ function ui:draw(g, w)
     local hw = w.w / 2
     self:col(g, "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, w.h / 2)
     self:col(g, w.on and "acc" or "dim"); g:fill_rounded_rect(w.on and w.x or (w.x + hw), w.y, hw, w.h, w.h / 2)
-    self:ctext(g, "on", { x=w.x, y=w.y, w=hw, h=w.h }, 11, w.on and "bg" or "mute")
+    self:ctext(g, "on", { x=w.x, y=w.y, w=hw, h=w.h }, 11, w.on and "accfg" or "mute")
     self:ctext(g, "off", { x=w.x + hw, y=w.y, w=hw, h=w.h }, 11, w.on and "mute" or "txt")
   elseif k == "scpic" then   -- one beat of the sidechain: the part's level after each kick
     self:col(g, "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
@@ -5261,7 +7106,7 @@ function ui:draw(g, w)
     local hw = sw / 2
     self:col(g, "off"); g:fill_rounded_rect(sx, sy, sw, sh, sh / 2)
     self:col(g, w.on and "acc" or "dim"); g:fill_rounded_rect(w.on and sx or (sx + hw), sy, hw, sh, sh / 2)
-    self:ctext(g, "on", { x=sx, y=sy, w=hw, h=sh }, 11, w.on and "bg" or "mute")
+    self:ctext(g, "on", { x=sx, y=sy, w=hw, h=sh }, 11, w.on and "accfg" or "mute")
     self:ctext(g, "off", { x=sx + hw, y=sy, w=hw, h=sh }, 11, w.on and "mute" or "txt")
     self:text(g, w.l1 or "", w.x + 14, w.y + w.h - 44, 11, "mute", w.w - 24)
     self:text(g, w.l2 or "", w.x + 14, w.y + w.h - 25, 11, "mute", w.w - 24)
@@ -5292,7 +7137,7 @@ function ui:draw(g, w)
     local on = (w.lit ~= nil) and w.lit or ((self.v[w.hook or ""] or 0) > 0)
     local solo = w.label == "S"
     self:col(g, on and (solo and "acc" or "on") or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 4)
-    self:ctext(g, w.label, w, (w.h > 30) and 15 or 11, on and (solo and "#ffffff" or "bg") or "mute")
+    self:ctext(g, w.label, w, (w.h > 30) and 15 or 11, on and (solo and "accfg" or "bg") or "mute")
   elseif k == "strip" then
     self:col(g, "card"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
     self:ctext(g, w.label, { x=w.x, y=w.y + 6, w=w.w, h=16 }, 11, w.silent and "mute" or "txt")
@@ -5314,13 +7159,13 @@ function ui:draw(g, w)
     self:col(g, "acc"); g:fill_rect(w.x, w.y, w.w, w.h)
   elseif k == "chip" then
     -- a transition between two sections: a round button, its name under it
-    self:col(g, w.sel and "acc" or ((w.label == "cut") and "off" or "dim")); g:fill_rounded_rect(w.x, w.y, w.w, w.h, w.w / 2)
-    self:ctext(g, (w.label == "cut") and "|" or "~", w, 16, w.sel and "#ffffff" or "txt")
-    self:ctext(g, w.label, { x=w.x - 22, y=w.y + w.h + 4, w=w.w + 44, h=12 }, 8, w.sel and "acc" or "mute")
+    self:col(g, w.sel and "on" or ((w.label == "cut") and "off" or "dim")); g:fill_rounded_rect(w.x, w.y, w.w, w.h, w.w / 2)
+    self:ctext(g, (w.label == "cut") and "|" or "~", w, 16, w.sel and "bg" or "txt")
+    self:ctext(g, w.label, { x=w.x - 22, y=w.y + w.h + 4, w=w.w + 44, h=12 }, 8, w.sel and "txt" or "mute")
   elseif k == "pbtn" then
     -- ▶ or, while it plays, ❚❚
     self:col(g, w.on and "acc" or "dim"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, w.w / 2)
-    self:col(g, w.on and "#ffffff" or "txt")
+    self:col(g, w.on and "accfg" or "txt")
     local cx, cy, r = w.x + w.w / 2, w.y + w.h / 2, w.w * 0.22
     if w.on then g:fill_rect(cx - r, cy - r, r * 0.7, 2 * r); g:fill_rect(cx + r * 0.3, cy - r, r * 0.7, 2 * r)
     else local p = Path(cx - r * 0.7, cy - r); p:line_to(cx + r, cy); p:line_to(cx - r * 0.7, cy + r); p:close(); g:fill_path(p) end
@@ -5335,16 +7180,31 @@ function ui:draw(g, w)
     if w.fx == "filter" then self:col(g, "mute"); g:fill_rect(w.x + w.w / 2 - 1, w.y + 8, 2, w.h - 16) end
     local b = w.bus
     local on = (self.v["ockm-bfx-"..b.."-on"] or 0) > 0
-    self:text(g, b .. " bus: " .. w.fx, w.x + 16, w.y + 14, 16, "txt", w.w - 32)
-    self:text(g, on and "in" or "touch to play it", w.x + 16, w.y + 38, 11, on and "acc" or "mute", 200)
-    if w.axes then
-      self:text(g, "across: " .. w.axes[1], w.x + 16, w.y + w.h - 26, 11, "mute", w.w - 32)
-      self:text(g, "up: " .. w.axes[2], w.x + w.w - 16 - #("up: " .. w.axes[2]) * 6.6, w.y + 14, 11, "mute", 260)
-    end
     local px = w.x + w.w * (self.v["ockm-bfx-"..b.."-x"] or 0.5)
     local py = w.y + w.h * (1 - (self.v["ockm-bfx-"..b.."-y"] or 0.5))
     self:col(g, on and "acc" or "mute")
     g:fill_rect(px - 1, w.y + 8, 2, w.h - 16); g:fill_rect(w.x + 8, py - 1, w.w - 16, 2)
+    -- v1.49 the words go on top, each on a plate of the pad's colour, so the lines don't run through them
+    local function plate(s, x, y, size, col)
+      self:col(g, "off"); g:fill_rounded_rect(x - 4, y - 1, #s * ockm_charw(size) + 8, size + 5, 4)
+      self:text(g, s, x, y, size, col, 400)
+    end
+    plate(b .. " bus: " .. w.fx, w.x + 16, w.y + 14, 16, "txt")
+    local inw = "in"
+    if w.fx == "gate" then   -- v1.49 the gate says its rate (the pad's quarters)
+      inw = "in: " .. ({ "1/4", "1/8", "1/16", "1/32" })[math.min(4, math.floor((self.v["ockm-bfx-"..b.."-x"] or 0.5) * 4) + 1)]
+    end
+    plate(on and inw or "touch to play it", w.x + 16, w.y + 38, 11, on and "acc" or "mute")
+    if w.axes then
+      if w.fx == "gate" then   -- v1.49 the rates, one in each quarter
+        for q, rt in ipairs({ "1/4", "1/8", "1/16", "1/32" }) do
+          plate(rt, w.x + w.w * (q - 0.5) / 4 - #rt * ockm_charw(11) / 2, w.y + w.h - 26, 11, "mute")
+        end
+      else
+        plate("across: " .. w.axes[1], w.x + 16, w.y + w.h - 26, 11, "mute")
+      end
+      plate("up: " .. w.axes[2], w.x + w.w - 16 - #("up: " .. w.axes[2]) * ockm_charw(11), w.y + 14, 11, "mute")
+    end
     if on then g:fill_ellipse(px - 22, py - 22, 44, 44) else g:stroke_rounded_rect(px - 18, py - 18, 36, 36, 18, 2) end
   elseif k == "hbar" then
     local v = self.v[w.hook] or 0
@@ -5357,13 +7217,31 @@ function ui:draw(g, w)
       local vx = w.x + w.w * f
       local x0 = (w.lo < 0) and (w.x + w.w * (-w.lo) / (w.hi - w.lo)) or w.x
       self:col(g, "dim"); g:fill_rounded_rect(math.min(x0, vx), w.y, math.max(4, math.abs(vx - x0)), w.h, 4)
-      self:col(g, "acc"); g:fill_rect(clamp(vx - 2, w.x, w.x + w.w - 3), w.y, 3, w.h)
+      -- v1.49 the line at the value stops short of the words, so they stay readable
+      local lx = clamp(vx - 2, w.x, w.x + w.w - 3)
+      local tw = math.max(#(w.label or "") * ockm_charw(w.h >= 40 and 12 or 10), (w.h >= 40) and #(w.valtext and w.valtext(v) or fmt(v)) * ockm_charw(10) or 0)
+      local cx = w.x + w.w / 2
+      self:col(g, "acc")
+      local hit = lx + 3 > cx - tw / 2 - 3 and lx < cx + tw / 2 + 3
+      if w.ends then   -- the two ends' names, and what it's doing now in the middle
+        local c = w.valtext and w.valtext(v) or w.label or ""
+        local function near(a, b) return lx + 3 > a - 3 and lx < b + 3 end
+        hit = near(w.x + 10, w.x + 10 + #w.ends[1] * 6) or near(w.x + w.w - 10 - #w.ends[2] * 6, w.x + w.w - 10)
+              or near(cx - #c * 3.5, cx + #c * 3.5)
+      end
+      if hit then
+        local t0, t1 = (w.h >= 40) and (w.y + w.h / 2 - 18) or (w.y + w.h / 2 - 8), (w.h >= 40) and (w.y + w.h / 2 + 15) or (w.y + w.h / 2 + 8)
+        if t0 > w.y then g:fill_rect(lx, w.y, 3, t0 - w.y) end
+        if w.y + w.h > t1 then g:fill_rect(lx, t1, 3, w.y + w.h - t1) end
+      else
+        g:fill_rect(lx, w.y, 3, w.h)
+      end
     else
       self:col(g, "dim"); g:fill_rounded_rect(w.x, w.y, math.max(6, w.w * f), w.h, 4)
     end
     if w.ends then   -- a slider between two named ends: the ends at the sides, what it's doing now in the middle
       self:text(g, w.ends[1], w.x + 10, w.y + w.h / 2 - 6, 10, "mute", 80)
-      self:text(g, w.ends[2], w.x + w.w - 10 - #w.ends[2] * 6.2, w.y + w.h / 2 - 6, 10, "mute", 80)
+      self:text(g, w.ends[2], w.x + w.w - 10 - #w.ends[2] * ockm_charw(10), w.y + w.h / 2 - 6, 10, "mute", 80)
       self:ctext(g, w.valtext and w.valtext(v) or w.label, { x=w.x, y=w.y + w.h / 2 - 7, w=w.w, h=14 }, 12, "txt")
     elseif w.h >= 40 then
       self:ctext(g, w.label, { x=w.x, y=w.y + w.h / 2 - 16, w=w.w, h=14 }, 12, "txt")
@@ -5377,7 +7255,7 @@ function ui:draw(g, w)
     local tx = w.x + w.w / 2 - 4
     self:col(g, "off"); g:fill_rounded_rect(tx, w.y + 8, 8, w.h - 16, 4)
     local fy = w.y + 8 + (w.h - 16) * (1 - f)
-    self:col(g, w.master and "on" or "acc"); g:fill_rounded_rect(tx, fy, 8, w.y + w.h - 8 - fy, 4)
+    self:col(g, "on"); g:fill_rounded_rect(tx, fy, 8, w.y + w.h - 8 - fy, 4)
     g:fill_rounded_rect(w.x + 4, fy - 7, w.w - 8, 14, 4)
     local lbl = string.format("%d", math.floor(v * 100 + 0.5))
     if w.db then
@@ -5438,11 +7316,122 @@ function ui:draw(g, w)
     end
   elseif k == "steprow" or k == "stripname" or k == "pcell" then
     -- nothing to draw: it only catches swipes between the pads
+  elseif k == "smpstep" then
+    -- v1.38 a samples step: the sample's name, its effect along the bottom
+    local i = self:shown_block() * 16 + w.i
+    local id, fx = self:get("ockm-pat-vox-smp", i), self:get("ockm-pat-vox-fx", i)
+    local armed = id > 0 and id == self.sb.id and fx == self.sb.fx
+    self:col(g, (id > 0) and "on" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
+    if armed then self:col(g, "acc"); g:stroke_rounded_rect(w.x + 1, w.y + 1, w.w - 2, w.h - 2, 6, 2) end
+    if id > 0 then
+      local nm = self:smp_name(id)
+      local per = math.max(4, math.floor((w.w - 6) / 6))
+      local lines, cur = {}, ""
+      for word in string.gmatch(nm, "[^%s_%-]+") do   -- wrap on spaces, _ and -
+        if cur == "" then cur = word
+        elseif #cur + 1 + #word <= per then cur = cur .. " " .. word
+        else lines[#lines + 1] = cur; cur = word end
+      end
+      if cur ~= "" then lines[#lines + 1] = cur end
+      for ln = 1, math.min(3, #lines) do self:text(g, string.sub(lines[ln], 1, per), w.x + 4, w.y + 8 + (ln - 1) * 14, 10, "bg", w.w - 6) end
+      if fx > 0 then
+        self:col(g, "acc"); g:fill_rounded_rect(w.x + 4, w.y + w.h - 22, w.w - 8, 18, 4)
+        self:ctext(g, ({ "stut", "dly", "verb" })[math.floor(fx)] or "", { x=w.x + 4, y=w.y + w.h - 22, w=w.w - 8, h=18 }, 10, "accfg")
+      end
+    end
+    if w.i % 4 == 0 then self:col(g, "mute"); g:fill_rect(w.x, w.y + w.h + 8, w.w, 2) end
+  elseif k == "knob" then
+    -- v1.39 a knob: the ring's track, the value in the strong grey, a dot at the end, the number in the middle
+    local v = clamp(((self.v[w.hook] or 0) - w.lo) / (w.hi - w.lo), 0, 1)
+    local a0, span = math.rad(135), math.rad(270)
+    local th = w.big and 6 or 5
+    local function band(f0, f1, col)
+      if f1 <= f0 then return end
+      local n = math.max(2, math.floor((f1 - f0) * 28))
+      local p
+      for j = 0, n do local a = a0 + span * (f0 + (f1 - f0) * j / n); local x, y = w.cx + w.r * math.cos(a), w.cy + w.r * math.sin(a)
+        if j == 0 then p = Path(x, y) else p:line_to(x, y) end end
+      for j = n, 0, -1 do local a = a0 + span * (f0 + (f1 - f0) * j / n); p:line_to(w.cx + (w.r - th) * math.cos(a), w.cy + (w.r - th) * math.sin(a)) end
+      p:close(); self:col(g, col); g:fill_path(p)
+    end
+    band(0, 1, "dim"); band(0, v, "on")
+    local a = a0 + span * v
+    self:col(g, "txt"); g:fill_ellipse(w.cx + (w.r - th / 2) * math.cos(a) - 5, w.cy + (w.r - th / 2) * math.sin(a) - 5, 10, 10)
+    if w.fmt then self:ctext(g, w.fmt(self.v[w.hook] or 0), { x=w.cx - w.r, y=w.cy - 8, w=2 * w.r, h=16 }, w.big and 13 or 11, "txt") end
+    if w.label and w.label ~= "" then self:ctext(g, w.label, { x=w.cx - w.r - 20, y=w.cy + w.r + 4, w=2 * w.r + 40, h=14 }, w.big and 12 or 11, "mute") end
+  elseif k == "islider" then
+    local v = clamp(((self.v[w.hook] or 0) - w.lo) / (w.hi - w.lo), 0, 1)
+    self:col(g, "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 4)
+    if v > 0.01 then self:col(g, "on"); g:fill_rounded_rect(w.x, w.y + w.h * (1 - v), w.w, w.h * v, 4) end
+    self:ctext(g, w.label, { x=w.x - 10, y=w.y + w.h + 6, w=w.w + 20, h=14 }, 11, "mute")
+  elseif k == "istep" then
+    local on = self:iget("on", w.i) > 0
+    local sel = (self.itab == "steps") and (self.isel == w.i)
+    self:col(g, on and "on" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
+    if sel then self:col(g, "acc"); g:stroke_rounded_rect(w.x + 1, w.y + 1, w.w - 2, w.h - 2, 6, 2) end
+    if on then
+      local n = math.floor(self:iget("note", w.i))
+      self:ctext(g, NOTES[(n % 12) + 1] .. math.floor(n / 12 - 1), { x=w.x, y=w.y, w=w.w, h=w.h - 14 }, 15, "bg")
+      if self:iget("acc", w.i) > 0 then self:col(g, "acc"); g:fill_rect(w.x + 6, w.y + w.h - 12, w.w - 12, 4) end
+      if self:iget("slide", w.i) > 0 then self:col(g, "acc"); g:fill_rect(w.x - 8, w.y + w.h / 2 - 1, 12, 3) end
+    end
+    if w.i % 4 == 0 then self:col(g, "mute"); g:fill_rect(w.x, w.y + w.h + 5, w.w, 2) end
+  elseif k == "imod" then
+    local v = clamp(self:iget("mod", w.i), 0, 1)
+    self:col(g, "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 4)
+    if v > 0.01 then self:col(g, "on"); g:fill_rounded_rect(w.x, w.y + w.h * (1 - v), w.w, w.h * v, 4) end
+  elseif k == "tile" then
+    self:col(g, "card"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 14)
+    if w.last then self:col(g, "acc"); g:stroke_rounded_rect(w.x + 1, w.y + 1, w.w - 2, w.h - 2, 14, 2) end
+    self:text(g, w.label, w.x + 24, w.y + w.h - 78, 30, w.soon and "mute" or "txt", w.w - 48)
+    self:text(g, w.sub, w.x + 24, w.y + w.h - 34, 13, "mute", w.w - 48)
+    if w.last then self:text(g, "last used", w.x + w.w - 100, w.y + w.h - 70, 11, "acc", 80) end
+    local ix, iy, iw, ih = w.x + 24, w.y + 24, w.w - 48, 80
+    self:col(g, w.soon and "dim" or "on")
+    if w.icon == "grid" then
+      for r = 0, 3 do for c = 0, 15 do
+        local lit = (r == 0 and c % 4 == 0) or (r > 0 and (c + r) % 3 == 0)
+        self:col(g, lit and "on" or "off"); g:fill_rounded_rect(ix + c * (iw / 16), iy + r * 20, iw / 16 - 4, 16, 3)
+      end end
+    elseif w.icon == "saw" then
+      for j = 0, 4 do
+        local x0 = ix + j * iw / 5
+        local p = Path(x0, iy + ih); p:line_to(x0 + iw / 5, iy); p:line_to(x0 + iw / 5, iy + 5); p:line_to(x0 + 6, iy + ih); p:close(); g:fill_path(p)
+      end
+    elseif w.icon == "pulse" then
+      local xx = ix
+      for j = 0, 4 do
+        local wv = iw / 5; local hw = wv * (0.25 + 0.12 * j)
+        g:fill_rect(xx, iy, 4, ih); g:fill_rect(xx, iy, hw, 4); g:fill_rect(xx + hw - 4, iy, 4, ih); g:fill_rect(xx + hw - 4, iy + ih - 4, wv - hw + 4, 4)
+        xx = xx + wv
+      end
+    else
+      local hs = { 80, 34, 60, 24, 70, 30, 52, 40 }
+      for c = 0, 7 do g:fill_rounded_rect(ix + c * (iw / 8), iy + ih - hs[c + 1], iw / 8 - 10, hs[c + 1], 4) end
+    end
+  elseif k == "zstep" then
+    local v = self:get("ockm-pat-z" .. w.k, w.i)
+    self:col(g, (v > 0) and "on" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 5)
+    if v > 0 and v < 0.999 then self:col(g, "dim"); g:fill_rounded_rect(w.x + 4, w.y + 4, w.w - 8, w.h - 8, 4) end   -- a ghost
+    if v > 1 then self:col(g, "acc"); g:fill_rect(w.x + 5, w.y + w.h - 9, w.w - 10, 4) end
+    if w.i % 4 == 0 and w.k == 8 then self:col(g, "mute"); g:fill_rect(w.x, w.y + w.h + 4, w.w, 2) end
+  elseif k == "ikey" then
+    local down = self.ikeys and self.ikeys[w.n]
+    self:col(g, down and "acc" or (w.black and "bg" or "on")); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 4)
+    if w.label then self:text(g, w.label, w.x + 8, w.y + w.h - 24, 12, down and "accfg" or "bg", w.w) end
+  elseif k == "house" then
+    self:col(g, "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
+    self:col(g, "txt")
+    local cx, cy = w.x + w.w / 2, w.y + w.h / 2
+    local p = Path(cx - 13, cy); p:line_to(cx, cy - 12); p:line_to(cx + 13, cy); p:close(); g:fill_path(p)
+    g:fill_rect(cx - 8, cy, 16, 11)
   elseif k == "dstep" then
     local v = self:get("ockm-pat-"..SLOTS[self.slot], self:dabs(w.i))
-    local c = (v >= 2) and "acc" or ((v > 0) and "on" or "off")
-    self:col(g, c); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
+    self:col(g, (v > 0) and "on" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
+    if v >= 2 then self:col(g, "acc"); g:fill_rect(w.x + 6, w.y + w.h - 10, w.w - 12, 4) end
     if w.i % 4 == 0 then self:col(g, "mute"); g:fill_rect(w.x, w.y + w.h + 4, w.w, 2) end
+  elseif k == "showpage" then self:draw_showpage(g, w)
+  elseif k == "bloom" then self:draw_bloom(g, w)
   elseif k == "vlane" then
     local pitch = (W - 32) / 16
     local nm, timing = SLOTS[self.slot], (self.lane or "vel") == "time"
@@ -5451,7 +7440,30 @@ function ui:draw(g, w)
       local step = self:dabs(i)
       local v = self:get("ockm-pat-"..nm, step)
       self:col(g, "card"); g:fill_rounded_rect(x, w.y, bw, w.h, 4)
-      if v > 0 then
+      if v > 0 and self.lane == "roll" then
+        -- v1.49 a roll: its hits as little blocks, and x2 .. x6 under them
+        local r = math.floor(self:get("ockm-pat-"..nm.."-rat", step))
+        if r >= 7 then
+          -- v1.49 a flam (a small block, then a big one) or a swell (four blocks getting taller)
+          self:col(g, "on"); g:fill_rounded_rect(x, w.y, bw, w.h, 4)
+          self:col(g, "bg")
+          if r == 7 then
+            g:fill_rect(x + bw / 2 - 12, w.y + 12, 6, 6); g:fill_rect(x + bw / 2 - 3, w.y + 5, 12, 13)
+          else
+            local bb = (bw - 12 - 6) / 4
+            for k = 0, 3 do local hh = 4 + 3 * k; g:fill_rect(x + 6 + k * (bb + 2), w.y + 18 - hh, bb, hh) end
+          end
+          self:ctext(g, (r == 7) and "flam" or "swell", { x = x, y = w.y + 20, w = bw, h = 16 }, 11, "bg", 0)
+        elseif r >= 2 then
+          self:col(g, "on"); g:fill_rounded_rect(x, w.y, bw, w.h, 4)
+          local bx, bb = x + 6, (bw - 12 - (r - 1) * 2) / r
+          self:col(g, "bg")
+          for k = 0, r - 1 do g:fill_rect(bx + k * (bb + 2), w.y + 5, bb, 13) end
+          self:ctext(g, "x" .. r, { x = x, y = w.y + 20, w = bw, h = 16 }, 11, "bg", 0)
+        else
+          self:col(g, "mute"); g:fill_rect(x + bw / 2 - 5, w.y + w.h / 2 - 1, 10, 2)
+        end
+      elseif v > 0 then
         if timing then
           local n = self:get("ockm-pat-"..nm.."-nudge", step)
           local hh = math.abs(n) / 0.25 * (w.h / 2)
@@ -5460,42 +7472,43 @@ function ui:draw(g, w)
           if hh >= 1 then self:col(g, "acc"); g:fill_rect(x + 4, (n > 0) and (mid - hh) or mid, bw - 8, hh) end
         else
           local hv = self:drum_vel(v) * w.h
-          self:col(g, (v >= 2) and "acc" or "on"); g:fill_rounded_rect(x + 4, w.y + w.h - hv, bw - 8, hv, 3)
+          self:col(g, "on"); g:fill_rounded_rect(x + 4, w.y + w.h - hv, bw - 8, hv, 3)
+          if v >= 2 then self:col(g, "acc"); g:fill_rect(x + 4, w.y + w.h - hv, bw - 8, 3) end
         end
       end
     end
   elseif k == "mstep" then
     local on, acc = self:mono_get(w.i, "on"), self:mono_get(w.i, "acc")
     local auto = self:locked()
-    local c = (on > 0) and ((acc > 0) and "acc" or "on") or "off"
     if auto then
-      -- on auto the generator wrote these: outlines, locked
+      -- on auto the generator wrote these: outlines, locked. An accent is the coloured outline.
       self:col(g, "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
-      if on > 0 then self:col(g, c); g:stroke_rounded_rect(w.x + 1, w.y + 1, w.w - 2, w.h - 2, 6, 2) end
+      if on > 0 then self:col(g, (acc > 0) and "acc" or "on"); g:stroke_rounded_rect(w.x + 1, w.y + 1, w.w - 2, w.h - 2, 6, 2) end
     else
-      self:col(g, c); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
+      self:col(g, (on > 0) and "on" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
+      if on > 0 and acc > 0 then self:col(g, "acc"); g:fill_rect(w.x + 6, w.y + w.h - 10, w.w - 12, 4) end
     end
     if on > 0 then
       local m = self:mono_get(w.i, "note")
-      local tc = auto and ((acc > 0) and "acc" or "txt") or ((acc > 0) and "#ffffff" or "bg")
+      local tc = auto and "txt" or "bg"
       self:ctext(g, self:note_name(m), w, 15, tc, -8)
       self:ctext(g, tostring(math.floor(m / 12) - 1), w, 11, tc, 12)
-      if self:mono_get(w.i, "slide") > 0 then self:col(g, "acc"); g:fill_rect(w.x + w.w - 2, w.y + w.h / 2 - 3, 10, 6) end
+      if self:mono_get(w.i, "slide") > 0 then self:col(g, auto and "acc" or "txt"); g:fill_rect(w.x + w.w - 2, w.y + w.h / 2 - 3, 10, 6) end
     end
-    if w.i == self.sel_step and not auto then self:col(g, "mute"); g:stroke_rounded_rect(w.x - 2, w.y - 2, w.w + 4, w.h + 4, 7, 2) end
+    if w.i == self.sel_step and not auto then self:col(g, "txt"); g:stroke_rounded_rect(w.x - 2, w.y - 2, w.w + 4, w.h + 4, 7, 2) end
     if w.i % 4 == 0 then self:col(g, "mute"); g:fill_rect(w.x, w.y + w.h + 4, w.w, 2) end
   elseif k == "cstep" then
     local v = self:chord_get(w.i, "on")
     local auto = self:locked()
-    local c = (v >= 2) and "acc" or ((v > 0) and "on" or "off")
     if auto then
       self:col(g, "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
-      if v > 0 then self:col(g, c); g:stroke_rounded_rect(w.x + 1, w.y + 1, w.w - 2, w.h - 2, 6, 2) end
+      if v > 0 then self:col(g, (v >= 2) and "acc" or "on"); g:stroke_rounded_rect(w.x + 1, w.y + 1, w.w - 2, w.h - 2, 6, 2) end
     else
-      self:col(g, c); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
+      self:col(g, (v > 0) and "on" or "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
+      if v >= 2 then self:col(g, "acc"); g:fill_rect(w.x + 6, w.y + w.h - 10, w.w - 12, 4) end
     end
-    if v > 0 then self:ctext(g, ROMAN[(math.floor(self:chord_get(w.i, "deg")) % 7) + 1], w, 15, auto and ((v >= 2) and "acc" or "txt") or ((v >= 2) and "#ffffff" or "bg")) end
-    if w.i == self.sel_step then self:col(g, "mute"); g:stroke_rounded_rect(w.x - 2, w.y - 2, w.w + 4, w.h + 4, 7, 2) end
+    if v > 0 then self:ctext(g, ROMAN[(math.floor(self:chord_get(w.i, "deg")) % 7) + 1], w, 15, auto and "txt" or "bg") end
+    if w.i == self.sel_step then self:col(g, "txt"); g:stroke_rounded_rect(w.x - 2, w.y - 2, w.w + 4, w.h + 4, 7, 2) end
     if w.i % 4 == 0 then self:col(g, "mute"); g:fill_rect(w.x, w.y + w.h + 4, w.w, 2) end
   elseif k == "deg" then
     local part = SYNTHS[self.part]
@@ -5510,9 +7523,9 @@ function ui:draw(g, w)
       label = self:note_name(m)
       w.oct = tostring(math.floor(m / 12) - 1)
     end
-    self:col(g, sel and "acc" or ((w.d == 0) and "dim" or "off")); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
-    self:ctext(g, label, w, 13, sel and "#ffffff" or "txt", w.oct and -6 or 0)
-    if w.oct then self:ctext(g, w.oct, w, 10, sel and "#ffffff" or "mute", 10) end
+    self:col(g, sel and "on" or ((w.d == 0) and "dim" or "off")); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
+    self:ctext(g, label, w, 13, sel and "bg" or "txt", w.oct and -6 or 0)
+    if w.oct then self:ctext(g, w.oct, w, 10, sel and "bg" or "mute", 10) end
   elseif k == "slider" then
     local v = self.v[w.hook] or w.lo
     local f = clamp((v - w.lo) / (w.hi - w.lo), 0, 1)
@@ -5520,9 +7533,9 @@ function ui:draw(g, w)
     self:text(g, w.label, w.x, w.y + w.h / 2 - 7, 13, "txt", 100)
     local sx, sw = w.x + 110, w.w - 180
     self:col(g, "off"); g:fill_rounded_rect(sx, w.y + w.h / 2 - 5, sw, 10, 5)
-    self:col(g, "acc"); g:fill_rounded_rect(sx, w.y + w.h / 2 - 5, math.max(10, sw * f), 10, 5)
-    g:fill_ellipse(sx + sw * f - 10, w.y + w.h / 2 - 10, 20, 20)
-    self:text(g, fmt(v) .. (w.log and " Hz" or ""), w.x + w.w - 56, w.y + w.h / 2 - 7, 13, "mute", 70)
+    self:col(g, "dim"); g:fill_rounded_rect(sx, w.y + w.h / 2 - 5, math.max(10, sw * f), 10, 5)
+    self:col(g, "acc"); g:fill_ellipse(sx + sw * f - 10, w.y + w.h / 2 - 10, 20, 20)
+    self:text(g, w.fmt and w.fmt(v) or (fmt(v) .. (w.log and " Hz" or "")), w.x + w.w - 56, w.y + w.h / 2 - 7, 13, "mute", 70)
   elseif k == "eqcurve" then
     -- the response from 20 Hz to 20 kHz, +-15 dB, as thin columns from the 0 dB line
     self:col(g, "off"); g:fill_rounded_rect(w.x, w.y, w.w, w.h, 6)
@@ -5546,7 +7559,7 @@ function ui:draw(g, w)
         end
       end
     end
-    self:col(g, "acc")
+    self:col(g, "txt")
     local cols = 90
     for c = 0, cols - 1 do
       local f = 20 * 1000 ^ ((c + 0.5) / cols)

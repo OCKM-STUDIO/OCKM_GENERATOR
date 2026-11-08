@@ -36,6 +36,7 @@ class P:
         s.L.append(line); s.n+=1; return s.n-1
     def raw(s,line): s.L.append(line)
     def con(s,a,b,c,d): s.C.append((a,b,c,d))
+    def dis(s,a,b,c,d): s.C.remove((a,b,c,d))   # v1.49 take a connection out again (to insert something in it)
     def text(s,header,tail=()):
         return header+"\n"+"\n".join(s.L)+"\n"+"".join(f"#X connect {a} {b} {c} {d};\n" for a,b,c,d in s.C)+"".join(t+"\n" for t in tail)
     def save(s,fn,header,tail=()):
@@ -62,6 +63,7 @@ def header_text(p,txt): p.add(f"#X text 20 10 {txt};")
 
 # ---------------- samples ----------------
 # One folder per drum sound. Perc 1 and perc 2 share the perc folder. Files are numbered in name order (01, 02...).
+USER_DIRS=["voice","loops","hits"]   # v1.38 the samples part's own folders, under samples/user (1 voice, 2 loops, 3 hits)
 SAMPLE_DIRS=["kick","snare","clap","perc","hat","open-hat","tom"]
 SOUND_DIR=["kick","snare","clap","perc","hat","open-hat","tom","perc"]   # by sound number
 AUDIO_EXT=["wav","WAV","aif","aiff","AIF","AIFF","Wav","Aif"]
@@ -124,6 +126,97 @@ mul=p.add("#X obj 30 300 *~;"); out=p.add("#X obj 30 340 outlet~;")
 for c in [(pk,0,tll,0),(tll,1,mph,0),(tll,0,mam,0),(mph,0,vph,0),(vph,0,trd,0),(mam,0,vam,0),(trd,0,mul,0),(vam,0,mul,1),(mul,0,out,0)]: p.con(*c)
 p.save("voices/ockm-sampler.pd","#N canvas 150 150 1300 820 12;")
 
+# spoken lines: one file, played from the start to the end. ockm-vox (Lua) decides which file and when.
+p=P(); header_text(p,"Samples player (v1.38: was the vox player). ockm-vox-load is a path under samples (vox/set/voice/01.wav). ockm-smp-user <folder> <n> plays the nth file of samples/user/<folder> (voice \\, loops or hits). The whole file plays from the start to its end: no gate. A new file takes over. Only stopping the transport fades it out. ockm-vox-pitch is semitones. ockm-smp-stut 0 plays through \\, 1 chops a 16th (set per hit).")
+p.add(f"#X obj 700 30 table {D}0-vox;")
+lb=p.add("#X obj 40 40 loadbang;")
+rp=p.add("#X obj 420 40 r ockm-vox-pitch;"); vp=p.add("#X obj 420 70 v ockm_voxpitch;"); zpi=p.add("#X msg 500 40 0;")
+p.con(rp,0,vp,0); p.con(lb,0,zpi,0); p.con(zpi,0,vp,0)
+rl=p.add("#X obj 40 80 r ockm-vox-load;"); ts=p.add("#X obj 40 110 t b s;"); rel=p.add("#X obj 280 140 symbol;")
+p.con(rl,0,ts,0); p.con(ts,1,rel,1)   # store the path; the bang below asks for the samples folder, then plays it
+base=samples_base(p,40,160,ts,0)
+tb=p.add("#X obj 40 290 t b s;"); dsym=p.add("#X obj 40 320 symbol;"); tb2=p.add("#X obj 200 320 t b b;")
+ppk=p.add("#X obj 40 360 pack s s;"); fj=p.add("#X obj 40 390 file join;")
+p.con(base,0,tb,0); p.con(tb,1,dsym,1); p.con(tb,0,tb2,0)
+p.con(tb2,1,rel,0); p.con(rel,0,ppk,1); p.con(tb2,0,dsym,0); p.con(dsym,0,ppk,0); p.con(ppk,0,fj,0)
+lat=p.add(f"#X obj 40 420 list append {D}0-vox;"); lpr=p.add("#X obj 40 450 list prepend read -resize;")
+ltr=p.add("#X obj 40 480 list trim;"); sf=p.add("#X obj 40 510 soundfiler;")
+for c in [(fj,0,lat,0),(lat,0,lpr,0),(lpr,0,ltr,0),(ltr,0,sf,0)]: p.con(*c)
+mo=p.add("#X obj 40 510 moses 1;"); tf=p.add("#X obj 40 540 t f f;"); ns=p.add("#X obj 220 540 f;")
+p.con(sf,0,mo,0); p.con(mo,1,tf,0); p.con(tf,1,ns,1)
+# v1.38 the same file again: ockm-smp-again replays what's loaded without reading the disc (the Lua knows what's in)
+lastn=p.add("#X obj 220 480 f;"); p.con(sf,0,lastn,1); rag=p.add("#X obj 220 455 r ockm-smp-again;"); p.con(rag,0,lastn,0); p.con(lastn,0,mo,0)
+# v1.38 the file's own sample rate (your files may be 44.1k): soundfiler's info comes out before the length
+srx=p.add("#X obj 400 540 unpack f;"); srv=p.add("#X obj 400 565 v ockm_voxsr;"); p.con(sf,1,srx,0); p.con(srx,0,srv,0)
+sr0=p.add("#X msg 520 540 48000;"); p.con(lb,0,sr0,0); p.con(sr0,0,srv,0)
+ex=p.add(f"#X obj 40 570 expr {D}f1*1000/(max(8000\\, ockm_voxsr)*pow(2\\, max(-24\\, min(24\\, ockm_voxpitch))/12));")
+p.con(tf,0,ex,0)
+td=p.add("#X obj 40 600 t b f;"); pk=p.add("#X obj 40 640 pack f f;")
+mph=p.add(f"#X msg 40 670 0 \\, {D}1 {D}2;")
+ax=p.add(f"#X obj 260 640 expr max(8\\, {D}f1-15);"); mam=p.add(f"#X msg 260 670 0 \\, 1 4 \\, 0 15 {D}1;")
+p.con(ex,0,td,0); p.con(td,1,pk,1); p.con(ns,0,pk,0); p.con(pk,0,mph,0); p.con(td,1,ax,0); p.con(ax,0,mam,0)
+# the bang fires the whole-file ramp first. outlet 0 is last, so a stutter can replace that ramp in the same turn
+tgo=p.add("#X obj 40 590 t b b b b;")
+p.con(td,0,tgo,0); p.con(tgo,3,ns,0)   # whole-file ramp first. the stutter branch is wired once the delay exists
+vph=p.add("#X obj 40 710 vline~;"); trd=p.add(f"#X obj 40 740 tabread4~ {D}0-vox;")
+vam=p.add("#X obj 260 710 vline~;"); mul=p.add("#X obj 40 780 *~;"); out=p.add("#X obj 40 820 outlet~;")
+for c in [(mph,0,vph,0),(vph,0,trd,0),(mam,0,vam,0),(trd,0,mul,0),(vam,0,mul,1),(mul,0,out,0)]: p.con(*c)
+# v1.37 stutter. 0 plays through. 1 retriggers the start of the line every 16th, 2 every 8th.
+# each slice fades in over 2 ms and out just before the next one, so the jump back to the start does not click
+rvs=p.add("#X obj 800 40 r ockm-smp-stut;"); vvs=p.add("#X obj 800 70 v ockm_voxstut;"); zvs=p.add("#X msg 900 40 0;")   # v1.38: per hit, from the step
+p.con(rvs,0,vvs,0); p.con(lb,0,zvs,0); p.con(zvs,0,vvs,0)
+fsamp=p.add("#X obj 800 560 f;"); p.con(ns,0,fsamp,1)   # the file length, kept for the slice. storing it does not replay
+xon=p.add("#X obj 800 600 expr ockm_voxstut>0;"); son=p.add("#X obj 800 625 sel 1;")
+p.con(tgo,0,xon,0); p.con(xon,0,son,0)
+arm=p.add("#X obj 800 900 spigot 0;"); a1=p.add("#X msg 900 650 1;"); a0=p.add("#X msg 980 650 0;")
+sk=p.add("#X obj 800 960 f 0;"); sk1=p.add("#X msg 900 680 1;"); sk0=p.add("#X msg 980 680 0;")
+cnt=p.add("#X obj 800 1100 f 0;"); zc=p.add("#X msg 900 710 0;")
+tst=p.add("#X obj 800 650 t b b b b;")   # arm, skip the step that started the line, zero the count, then play the first slice
+p.con(son,0,tst,0); p.con(tst,3,a1,0); p.con(a1,0,arm,1); p.con(tst,2,sk1,0); p.con(sk1,0,sk,1)
+p.con(tst,1,zc,0); p.con(zc,0,cnt,1); p.con(tst,0,fsamp,0)
+sx=p.add(f"#X obj 800 760 expr min({D}f1\\, ockm_stepms*max(1\\, ockm_voxstut)*max(8000\\, ockm_voxsr)/1000*pow(2\\, max(-24\\, min(24\\, ockm_voxpitch))/12)) \\; ockm_stepms*max(1\\, ockm_voxstut);")
+fn=p.add("#X obj 800 800 f;"); fm=p.add("#X obj 920 800 f;")
+pk2=p.add("#X obj 800 830 pack f f;"); pm=p.add(f"#X msg 800 860 0 \\, {D}1 {D}2;")
+fax=p.add(f"#X obj 980 830 expr max(4\\, {D}f1-5);"); pam=p.add(f"#X msg 980 860 0 \\, 1 2 \\, 0 3 {D}1;")
+p.con(fsamp,0,sx,0)
+p.con(sx,1,fm,1); p.con(sx,1,pk2,1); p.con(sx,1,fax,0)   # ms first (the right outlet), so the pack's cold inlet is set before the samples
+p.con(sx,0,fn,1); p.con(sx,0,pk2,0); p.con(pk2,0,pm,0); p.con(pm,0,vph,0); p.con(fax,0,pam,0); p.con(pam,0,vam,0)
+# later steps: skip the one that opened the line, then retrigger every stut-th step after that
+rstep=p.add("#X obj 800 890 r ockm-step;"); tb0=p.add("#X obj 800 930 t b;")
+p.con(rstep,0,arm,0); p.con(arm,0,tb0,0); p.con(tb0,0,sk,0)
+ssk=p.add("#X obj 800 990 sel 1;"); p.con(sk,0,ssk,0); p.con(ssk,0,sk0,0); p.con(sk0,0,sk,1)
+inc=p.add("#X obj 860 1100 + 1;"); md=p.add(f"#X obj 800 1130 expr {D}f1 % max(1\\, ockm_voxstut);"); sm0=p.add("#X obj 800 1160 sel 0;")
+trr=p.add("#X obj 800 1190 t b b;")
+nb=p.add("#X obj 800 1060 t b;")   # sel's miss outlet is the number. a bang keeps it from writing 0 over the count
+p.con(ssk,1,nb,0); p.con(nb,0,cnt,0); p.con(cnt,0,inc,0); p.con(inc,0,cnt,1); p.con(inc,0,md,0); p.con(md,0,sm0,0); p.con(sm0,0,trr,0)
+p.con(trr,1,fm,0); p.con(trr,0,fn,0)   # ms into the pack first, then the samples, which sends the ramp
+p.con(fm,0,pk2,1); p.con(fm,0,fax,0); p.con(fn,0,pk2,0)
+dl=p.add("#X obj 460 640 delay;"); lon=p.add("#X msg 460 600 1;"); lof=p.add("#X msg 460 680 0;")
+sl=p.add("#X obj 460 710 s ockm-vox-lit;")
+p.con(td,1,dl,1); p.con(tgo,2,dl,0); p.con(tgo,1,lon,0); p.con(lon,0,sl,0); p.con(dl,0,lof,0); p.con(lof,0,sl,0)
+p.con(dl,0,a0,0); p.con(a0,0,arm,1)   # the line has finished: stop chopping
+rst=p.add("#X msg 260 780 0 20;"); zlt=p.add("#X msg 460 780 0;")
+p.con(rst,0,vam,0); p.con(rst,0,a0,0); p.con(zlt,0,sl,0)
+# v1.38 only the transport stops a sample (the old vox on/off no longer cuts it)
+for recv,yy in (("ockm-playing",40),):
+    r=p.add(f"#X obj 620 {yy} r {recv};"); s0=p.add(f"#X obj 620 {yy+25} sel 0;")
+    p.con(r,0,s0,0); p.con(s0,0,rst,0); p.con(s0,0,zlt,0)
+# v1.38 your own files: ockm-smp-user <folder> <n> finds the nth audio file in samples/user/<folder> (name order) and plays it like a line
+rus=p.add("#X obj 1200 15 r ockm-smp-user;"); tua=p.add("#X obj 1200 35 t a a;"); p.con(rus,0,tua,0)
+ud1=p.add("#X obj 1400 35 unpack s f;"); udp=p.add("#X obj 1400 60 list prepend user;"); uda=p.add("#X obj 1400 85 list append *;")
+ud2=p.add("#X obj 1200 50 unpack s f;"); tus=p.add("#X obj 1200 65 t b f;")
+ula=p.add("#X obj 1200 200 list append user voice *;")
+for c in [(tua,1,ud1,0),(ud1,0,udp,0),(udp,0,uda,0),(uda,0,ula,1),(tua,0,ud2,0),(ud2,1,tus,0)]: p.con(*c)
+ubase=samples_base(p,1200,100,tus,0)
+ufj=p.add("#X obj 1200 225 file join;"); utp=p.add("#X obj 1200 250 t s b;")
+ucnt=p.add("#X obj 1300 400 f;"); uinc=p.add("#X obj 1350 400 + 1;"); utc=p.add("#X obj 1300 425 t f f;"); uz=p.add("#X msg 1360 280 0;")
+ueq=p.add("#X obj 1300 450 ==;"); us1=p.add("#X obj 1300 475 sel 1;")
+ugi,ugo=audio_glob(p,1200,280)
+utbs=p.add("#X obj 1200 500 t b s;"); uhp=p.add("#X obj 1200 525 symbol;")
+for c in [(ubase,0,ula,0),(ula,0,ufj,0),(ufj,0,utp,0),(utp,1,uz,0),(uz,0,ucnt,1),(utp,0,ugi,0),(ugo,0,utbs,0),(utbs,1,uhp,1),(utbs,0,ucnt,0),
+          (ucnt,0,uinc,0),(uinc,0,utc,0),(utc,1,ucnt,1),(utc,0,ueq,0),(tus,1,ueq,1),(us1,0,uhp,0),(ueq,0,us1,0),(uhp,0,lat,0)]: p.con(*c)
+p.save("voices/ockm-voxplay.pd","#N canvas 80 80 980 880 12;")
+
 # the sample library: counts the files in each folder for the screen (ockm-sample-counts, in SAMPLE_DIRS order)
 p=P(); header_text(p,"Sample library: counts the audio files in each samples folder. ockm-samples-scan to count again. Answers ockm-sample-counts "+" ".join(SAMPLE_DIRS)+".")
 lb=p.add("#X obj 30 50 loadbang;"); tlb=p.add("#X obj 30 75 t b b;"); rsc=p.add("#X obj 130 50 r ockm-samples-scan;"); p.con(lb,0,tlb,0)
@@ -144,6 +237,22 @@ for i,d in enumerate(SAMPLE_DIRS):
     pkn=p.add(f"#X obj {x+120} 610 list append;"); lpn=p.add(f"#X obj {x+120} 760 list prepend {i};"); ltn=p.add(f"#X obj {x+120} 785 list trim;")
     snm=p.add(f"#X obj {x+120} 810 s ockm-sample-name;")
     for c in [(go,0,tn,0),(tn,1,spn,0),(spn,0,ls1,0),(ls1,1,spe,0),(spe,0,ls2,0),(ls2,0,pkn,1),(tn,0,tb,0),(inc,0,pkn,0),(pkn,0,lpn,0),(lpn,0,ltn,0),(ltn,0,snm,0)]: p.con(*c)
+# v1.38 the samples part's own folders, samples/user/voice, loops and hits: ockm-smp-count <g> <n>, then ockm-smp-name <g> <n> <file name>
+# for each file, in name order (g: 1 voice, 2 loops, 3 hits)
+tuu=p.add(f"#X obj {30+nd*260} 150 t "+" ".join(["b"]*len(USER_DIRS))+";"); p.con(tlb,0,tuu,0); p.con(rsc,0,tuu,0)
+for gi,ud in enumerate(USER_DIRS):
+    g=gi+1; ux=30+(nd+gi)*260
+    uhb=p.add(f"#X obj {ux} 200 symbol;"); p.con(base,0,uhb,1); p.con(tuu,gi,uhb,0)
+    ula=p.add(f"#X obj {ux} 225 list append user {ud} *;"); ufj=p.add(f"#X obj {ux} 250 file join;"); ut3=p.add(f"#X obj {ux} 275 t b s b;")
+    uz=p.add(f"#X msg {ux+150} 300 0;"); ugi,ugo=audio_glob(p,ux,320)
+    utb=p.add(f"#X obj {ux} 560 t b;"); ucn=p.add(f"#X obj {ux} 585 f;"); uin=p.add(f"#X obj {ux+50} 585 + 1;"); urd=p.add(f"#X obj {ux} 700 f;")
+    for c in [(uhb,0,ula,0),(ula,0,ufj,0),(ufj,0,ut3,0),(ut3,2,uz,0),(uz,0,ucn,1),(uz,0,urd,1),(ut3,1,ugi,0),(utb,0,ucn,0),(ucn,0,uin,0),(uin,0,ucn,1),(uin,0,urd,1),(ut3,0,urd,0)]: p.con(*c)
+    ucp=p.add(f"#X obj {ux} 730 list prepend {g};"); uct=p.add(f"#X obj {ux} 755 list trim;"); p.con(urd,0,ucp,0); p.con(ucp,0,uct,0)
+    p.con(uct,0,p.add(f"#X obj {ux} 780 s ockm-smp-count;"),0)
+    utn=p.add(f"#X obj {ux} 610 t b s;"); usp=p.add(f"#X obj {ux+60} 635 file splitname;"); uls=p.add(f"#X obj {ux+60} 660 list split 1;")
+    use=p.add(f"#X obj {ux+60} 685 file splitext;"); ul2=p.add(f"#X obj {ux+60} 710 list split 1;")
+    upk=p.add(f"#X obj {ux+120} 610 list append;"); upg=p.add(f"#X obj {ux+120} 760 list prepend {g};"); ult=p.add(f"#X obj {ux+120} 785 list trim;"); usn=p.add(f"#X obj {ux+120} 810 s ockm-smp-name;")
+    for c in [(ugo,0,utn,0),(utn,1,usp,0),(usp,0,uls,0),(uls,1,use,0),(use,0,ul2,0),(ul2,0,upk,1),(utn,0,utb,0),(uin,0,upk,0),(upk,0,upg,0),(upg,0,ult,0),(ult,0,usn,0)]: p.con(*c)
 p.save("seq/ockm-samplelib.pd","#N canvas 150 150 1900 880 12;")
 
 # ---------------- transition sounds: a riser and an impact ----------------
@@ -289,7 +398,7 @@ spo=p.add("#X restore 30 470 pd spectrum;"); p.con(b3,0,spo,0)
 p.save("voices/ockm-eq.pd","#N canvas 120 120 1000 560 12;")
 
 # ---------------- recorder: the mix and stems to WAV files ----------------
-STEMS=["drums","bass","lead","chord","fx"]
+STEMS=["drums","bass","lead","chord","vox","fx"]
 p=P(); header_text(p,"Recorder. ockm-rec-<name>-open <path> then ockm-rec-<name>-start for mix (stereo) and the stems "+" ".join(STEMS)+" (mono). ockm-rec-stop stops them all. 24-bit WAV. Also: ockm-exports-dir on load \\, ockm-usb-scan finds USB sticks \\, ockm-mkdir <path>.")
 rstop=p.add("#X obj 30 40 r ockm-rec-stop;")
 mr=p.add("#X obj 30 80 r~ ockm-master;")
@@ -300,7 +409,16 @@ for i,nm in enumerate(["mix"]+STEMS):
     w=p.add(f"#X obj {x} 260 writesf~ {2 if nm=='mix' else 1};")
     for c in [(ro,0,lp,0),(lp,0,lt,0),(lt,0,w,0),(rs,0,ms,0),(ms,0,w,0),(rstop,0,mstp,0),(mstp,0,w,0)]: p.con(*c)
     if nm=="mix": p.con(mr,0,w,0); p.con(mr,0,w,1)
-    else: p.con(p.add(f"#X obj {x} 230 catch~ ockm-stem-{nm};"),0,w,0)
+    else:
+        ct_=p.add(f"#X obj {x} 230 catch~ ockm-stem-{nm};"); p.con(ct_,0,w,0)
+        # v1.48 USB audio out: each part on its own output, after the mix: 3 the kick (drum slot 1), 4 the rest of the drums,
+        # 5 bass, 6 lead, 7 chords, 8 samples, 9 effects. With only the DAC open (two outputs) these go nowhere
+        if nm=="drums":
+            ck=p.add(f"#X obj {x+60} 260 catch~ ockm-usb-kick;"); rest=p.add(f"#X obj {x} 290 -~;")
+            p.con(ct_,0,rest,0); p.con(ck,0,rest,1)
+            p.con(ck,0,p.add(f"#X obj {x+60} 320 dac~ 3;"),0); p.con(rest,0,p.add(f"#X obj {x} 320 dac~ 4;"),0)
+        else:
+            p.con(ct_,0,p.add(f"#X obj {x} 290 dac~ {i+3};"),0)
 # exports folder: OCKM_GENERATOR/exports, made on load and announced
 lb=p.add("#X obj 30 330 loadbang;"); md=p.add("#X msg 30 355 dir;"); pc=p.add("#X obj 30 380 pdcontrol;")
 la=p.add("#X obj 30 405 list append ../exports;"); fj=p.add("#X obj 30 430 file join;"); te=p.add("#X obj 30 455 t s s;")
@@ -386,10 +504,25 @@ tnd=p.add("#X obj 30 152 t f f;"); nrd=p.add(f"#X obj 300 160 tabread ockm-pat-{
 nex=p.add(f"#X obj 300 185 expr ({D}f1+0.25)*ockm_stepms;"); npp=p.add("#X obj 70 240 pipe 0;")
 p.add(f"#X obj 300 300 table ockm-pat-{D}1-nudge {STEPS};")
 kspg=p.add("#X obj 120 270 spigot;"); kis=p.add("#X obj 200 245 == 0;"); skh=p.add("#X obj 120 295 s ockm-kick-hit;")   # a kick: tell the pump
-tfi=p.add("#X obj 30 135 t f f;"); dlp=p.add(f"#X obj 30 148 expr if(ockm_drumlen>0 \\, {D}f1 % ockm_drumlen \\, {D}f1);"); fix=p.add(f"#X obj 160 135 expr int({D}f1)%16 + 16*{D}f2;"); rsn=p.add(f"#X obj 260 110 r ockm-{D}1-sound;")
+# v1.49 a snare or clap: tell the chords' link (ockm-snare-hit, its strength)
+sspg=p.add("#X obj 240 270 spigot;"); sis=p.add(f"#X obj 300 245 expr {D}f1==1 || {D}f1==2;"); ssh_=p.add("#X obj 240 295 s ockm-snare-hit;")
+tfi=p.add("#X obj 30 135 t f f f;"); dlp=p.add(f"#X obj 30 148 expr if(ockm_drumlen>0 \\, {D}f1 % ockm_drumlen \\, {D}f1);"); fix=p.add(f"#X obj 160 135 expr int({D}f1)%16 + 16*{D}f2;"); rsn=p.add(f"#X obj 260 110 r ockm-{D}1-sound;")
 frd=p.add("#X obj 160 160 tabread ockm-fillx;"); fsel=p.add(f"#X obj 30 175 expr if((ockm_fill_on || ockm_fill_end) && {D}f2>=0 \\, {D}f2 \\, {D}f1);")
-for c in [(inl,0,tfi,0),(tfi,1,fix,0),(rsn,0,fix,1),(fix,0,frd,0),(frd,0,fsel,1),(tfi,0,dlp,0),(dlp,0,tnd,0),(tnd,1,nrd,0),(nrd,0,nex,0),(nex,0,npp,1),(tnd,0,tr,0),(tr,0,fsel,0),(fsel,0,sel,0),
-          (sel,1,vel,0),(racc,0,vel,1),(vel,0,npp,0),(npp,0,out,0),(npp,0,kspg,0),(kspg,0,skh,0),(rsn,0,kis,0),(kis,0,kspg,1),(upk,1,offs,0),(offs,0,tw,1),(upk,0,tw,0)]: p.con(*c)
+# v1.49 the 4 bar build: while it plays, its pattern (ockm-buildx: this sound's 64 steps) wins over the fill and yours
+bix=p.add(f"#X obj 600 135 expr ockm_build_pat*512 + {D}f2*64 + min(63\\, ockm_build_bar*16 + int({D}f1)%16);"); brd=p.add("#X obj 600 160 tabread ockm-buildx;")
+bsel=p.add(f"#X obj 30 178 expr if(ockm_build_on && {D}f2>=0 \\, {D}f2 \\, {D}f1);")
+p.con(tfi,2,bix,0); p.con(rsn,0,bix,1); p.con(bix,0,brd,0); p.con(brd,0,bsel,1); p.con(fsel,0,bsel,0)
+# v1.49 the lane: chance, thinning by importance, a bar condition, drift and rolls decide what plays (seq/ockm-lane.pd_lua)
+lane=p.add(f"#X obj 30 182 ockm-lane {D}1;"); p.add(f"#X obj 30 330 table ockm-pat-{D}1-rat {STEPS};")
+p.con(bsel,0,lane,0)   # v1.49 the build (or the fill, or yours) into the lane
+# v1.49 drums out over MIDI: every hit, as it plays (ockm-drums-notes-out <slot> <strength>, to [ockm-midiout drums]). On
+# MIDI only (ockm-drums-midi 1) the box's own drum stops sounding; the kick and snare still tell the pump and the links
+dmo=p.add(f"#X obj 400 270 list prepend {D}1;"); dms=p.add("#X obj 400 295 s ockm-drums-notes-out;")
+dsp=p.add("#X obj 70 250 spigot 1;"); rdm=p.add("#X obj 470 220 r ockm-drums-midi;"); dmx=p.add(f"#X obj 470 245 expr {D}f1!=1;")
+for c in [(npp,0,dmo,0),(dmo,0,dms,0),(rdm,0,dmx,0),(dmx,0,dsp,1)]: p.con(*c)
+p.con(tnd,1,lane,1); p.con(lane,0,sel,0)
+for c in [(inl,0,tfi,0),(tfi,1,fix,0),(rsn,0,fix,1),(fix,0,frd,0),(frd,0,fsel,1),(tfi,0,dlp,0),(dlp,0,tnd,0),(tnd,1,nrd,0),(nrd,0,nex,0),(nex,0,npp,1),(tnd,0,tr,0),(tr,0,fsel,0),
+          (sel,1,vel,0),(racc,0,vel,1),(vel,0,npp,0),(npp,0,dsp,0),(dsp,0,out,0),(npp,0,kspg,0),(kspg,0,skh,0),(rsn,0,kis,0),(kis,0,kspg,1),(npp,0,sspg,0),(sspg,0,ssh_,0),(rsn,0,sis,0),(sis,0,sspg,1),(upk,1,offs,0),(offs,0,tw,1),(upk,0,tw,0)]: p.con(*c)
 for i in range(16):
     x=102+i*20+(i//4)*6
     t=p.add(f"#X obj {x} 22 tgl 18 0 empty ockm-sq-{D}1-{i} empty 17 7 0 10 #fcfcfc #000000 #000000 0 1;")
@@ -414,6 +547,10 @@ for c in [(re,0,ro,0),(ro,0,up,0),(up,1,fv,1),(up,0,ti,0),(ti,2,ase,1),(ti,1,fv,
 rnu=p.add("#X obj 1150 440 r ockm-nudge;"); rou=p.add(f"#X obj 1150 465 route {D}1;"); unu=p.add("#X obj 1150 490 unpack f f;")
 asn=p.add(f"#X obj 1150 520 array set ockm-pat-{D}1-nudge;"); fnu=p.add("#X obj 1210 495 f;"); tnu=p.add("#X obj 1150 495 t b f;")
 for c in [(rnu,0,rou,0),(rou,0,unu,0),(unu,1,fnu,1),(unu,0,tnu,0),(tnu,1,asn,1),(tnu,0,fnu,0),(fnu,0,asn,0)]: p.con(*c)   # step first, then the value
+# v1.49 roll hook: ockm-rat <track> <step> <1 one hit .. 6 a roll of six>
+rra=p.add("#X obj 1150 560 r ockm-rat;"); rora=p.add(f"#X obj 1150 585 route {D}1;"); ura=p.add("#X obj 1150 610 unpack f f;")
+asr=p.add(f"#X obj 1150 640 array set ockm-pat-{D}1-rat;"); fra=p.add("#X obj 1210 615 f;"); tra=p.add("#X obj 1150 615 t b f;")
+for c in [(rra,0,rora,0),(rora,0,ura,0),(ura,1,fra,1),(ura,0,tra,0),(tra,1,asr,1),(tra,0,fra,0),(fra,0,asr,0)]: p.con(*c)
 # extend: when a pattern gets longer, repeat what's there to fill the new steps
 rx=p.add("#X obj 1400 120 r ockm-drum-extend;"); ux=p.add("#X obj 1400 150 unpack f f;")
 cnt=p.add(f"#X obj 1400 210 expr {D}f2-{D}f1;"); txo=p.add("#X obj 1400 180 t f f;")
@@ -422,9 +559,11 @@ ci=p.add("#X obj 1460 300 f;"); cip=p.add("#X obj 1510 300 + 1;"); tci=p.add("#X
 md=p.add(f"#X obj 1460 360 expr {D}f1 % {D}f2;"); xr=p.add(f"#X obj 1460 390 tabread ockm-pat-{D}1;"); xw=p.add(f"#X obj 1460 420 tabwrite ockm-pat-{D}1;")
 xr2=p.add(f"#X obj 1600 390 tabread ockm-pat-{D}1-nudge;"); xw2=p.add(f"#X obj 1600 420 tabwrite ockm-pat-{D}1-nudge;")
 p.con(md,0,xr2,0); p.con(xr2,0,xw2,0)
+xr3=p.add(f"#X obj 1750 390 tabread ockm-pat-{D}1-rat;"); xw3=p.add(f"#X obj 1750 420 tabwrite ockm-pat-{D}1-rat;")   # v1.49 rolls repeat too
+p.con(md,0,xr3,0); p.con(xr3,0,xw3,0)
 for c in [(rx,0,ux,0),(ux,1,cnt,1),(ux,0,txo,0),(txo,1,ci,1),(txo,1,md,1),(txo,0,cnt,0),(cnt,0,mo,0),
           (ux2,0,ci,0),(ci,0,cip,0),(cip,0,ci,1),(ci,0,tci,0),(tci,1,xw,1),(tci,0,md,0),(md,0,xr,0),(xr,0,xw,0)]: p.con(*c)
-p.con(tci,1,xw2,1)
+p.con(tci,1,xw2,1); p.con(tci,1,xw3,1)
 tbf2=p.add("#X obj 1400 270 t b f;"); p.con(mo,1,tbf2,0); p.con(tbf2,1,ux2,0); p.con(tbf2,0,tr2,0)
 p.add("#X text 100 120 step in -> look it up -> send hit strength out (accent = 1 \\, normal = 1 minus accent amount);")
 p.add("#X text 900 90 refresh: update the squares after a pattern loads;")
@@ -491,14 +630,15 @@ p.save("seq/ockm-monoseq.pd","#N canvas 150 150 1800 760 12;")
 # ---------------- main patch ----------------
 # six drum slots: (slot, default sound number)
 SLOTS=[("d1",0),("d2",1),("d3",2),("d4",4),("d5",5),("d6",7),("d7",3),("d8",6)]
+MIX_TRACKS=[n for n,_ in SLOTS]+["bass","lead","chord","vox"]
 VERB=[0]*8   # default reverb send per sound: new projects start dry, you add it
 DLY=[0]*8    # default delay send per sound: likewise
 MONO=["note","on","acc","slide"]; CHORD=["on","deg"]
 def show(h): return "ockm-show-"+h[5:]
 # Settings registry: (hook, default, hook the store listens to if different)
-BFX=["filter","crush","drive","saturate"]   # v1.23 bus effects, in ockm-bfx-<bus>-type order
+BFX=["filter","crush","drive","saturate","gate"]   # v1.23 bus effects, in ockm-bfx-<bus>-type order (v1.49 gate)
 BFX_DEF={"drums":1,"music":0,"master":3}   # each bus's effect out of the box
-BFX_P={"filter":0,"crush":0.2,"drive":0.3,"saturate":0.4}
+BFX_P={"filter":0,"crush":0.2,"drive":0.3,"saturate":0.4,"gate":0}
 PROJECT_KEYS=[("ockm-drum-punch",0.5,None),("ockm-bpm",124,"ockm-tempo"),("ockm-volume",1,None),("ockm-accent",0.3,None),("ockm-filter",0,"ockm-filter-now"),("ockm-drive",0,None),
     ("ockm-delay-mix",0.5,None),("ockm-delay-fb",0.4,None),("ockm-delay-steps",3,None),("ockm-verb-mix",0.3,None),
     ("ockm-verb-size",0.6,None),("ockm-verb-tone",0.5,None),("ockm-sync",0,None),("ockm-clock-out",1,None)]
@@ -509,27 +649,104 @@ for nm,snd in SLOTS:
     PROJECT_KEYS+=[(f"ockm-{nm}-sound",snd,None),(f"ockm-{nm}-sample",0,None),(f"ockm-{nm}-synth",0,None),(f"ockm-{nm}-tone",0,None),
                    (f"ockm-{nm}-drive",0,None),(f"ockm-{nm}-start",0,None),(f"ockm-{nm}-tune",0,None),(f"ockm-{nm}-decay",100,None),
                    (f"ockm-{nm}-level",MIX_DRUM[snd],None),(f"ockm-{nm}-verb",VERB[snd],None),(f"ockm-{nm}-delay",DLY[snd],None),
-                   (f"ockm-{nm}-labchar",0,None),(f"ockm-{nm}-labmorph",0,None),(f"ockm-{nm}-labrseed",0,None),(f"ockm-{nm}-labramt",0,None),(f"ockm-{nm}-labpseed",1,None)]
+                   (f"ockm-{nm}-labchar",0,None),(f"ockm-{nm}-labmorph",0,None),(f"ockm-{nm}-labrseed",0,None),(f"ockm-{nm}-labramt",0,None),(f"ockm-{nm}-labpseed",1,None),
+                   (f"ockm-{nm}-labkit",0,None)]   # v1.49 the synth kit (0 the lab's own, 1 808, 2 909, 3 909 long)
 for _t in [n for n,_ in SLOTS]+["bass","lead","chord"]:
     PROJECT_KEYS+=[(f"ockm-{_t}-{k}",v,None) for k,v in EQ_DEF.items()]
+PROJECT_KEYS+=[(f"ockm-vox-{k}",(120 if k=="lowcut" else v),None) for k,v in EQ_DEF.items()]   # vox: a low cut so it doesn't rumble with the kick
 # v1.23 bus effects: which effect each bus has, its glide, and each effect's mix and setting; the bass's bus (1 drums, 0 music)
 PROJECT_KEYS+=[("ockm-bass-bus",1,None)]
 for _b,_k in BFX_DEF.items():
     PROJECT_KEYS+=[(f"ockm-bfx-{_b}-type",_k,None),(f"ockm-bfx-{_b}-glide",0.15,None)]
     for _e in BFX: PROJECT_KEYS+=[(f"ockm-bfx-{_b}-{_e}-mix",1,None),(f"ockm-bfx-{_b}-{_e}-p",BFX_P[_e],None)]
 LFO_DEF={"lfo-shape":0,"lfo-rate":4,"lfo-depth":0,"lfo-target":1,"chorus":0}   # sine, one bar, off, the first knob; chorus off
-SYNTH_DEFAULTS={"bass":dict(engine=5,mode=0,sync=1,walk=0,riff=-1,slideamt=0,octave=0,sidechain=0,scshape=1,half=0,lock=0,density=1,seed=0,level=0.85,k1=0.42,k2=0.25,k3=0.45,k4=0.45,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
-                "lead":dict(engine=4,mode=0,sync=1,octave=0,repeat=0,rests=0,sidechain=0,scshape=1,half=0,lock=0,density=1,seed=0,outside=0.35,level=0.7,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
-                "chord":dict(engine=0,mode=0,sidechain=0,scshape=1,half=0,level=0.65,rate=1,push=0,vary=0,drift=0,k1=0.45,k2=0.5,k3=0,k4=0.32,type=0,smooth=1,verb=0,delay=0,rhythm=0,prog=0,voicing=0,strum=0,hands=0,**LFO_DEF)}   # v1.20 hands: 0 one, 1-5 the left hand's pattern
+# v1.49 sounds: named recipes on the engines, stepped through on each part's tab ("analogue 1", "analogue 2", "donk 1"
+# ...). Each is (engine, k1, k2, k3, k4, drive, trim). The first of each engine is its sweet spot. trim levels it with
+# the part's other sounds: measured by tools/measure_sounds.py (it renders each one and compares its loudness with the
+# part's first sound). A synth engine (bass 8, lead 7) has one entry with no knobs: its own page has its sounds
+SOUNDS={
+ "bass":[(5,0.42,0.25,0.45,0.45,0,1.0),(5,0.3,0.9,0.3,0.4,0,0.95),(5,0.6,0.1,0.6,0.7,0,1.01),(5,0.25,0.5,0.2,0.55,0,0.93),
+         (0,0.35,0.6,0.55,0.4,0,0.53),(0,0.25,0.8,0.75,0.35,0,0.44),(0,0.5,0.3,0.3,0.5,0,0.5),
+         (1,0.45,0.3,0.35,0.55,0,0.34),(1,0.2,0.2,0.25,0.8,0,0.36),(1,0.8,0.5,0.4,0.5,0.3,0.86),
+         (3,0.45,0.5,0.35,0.5,0,0.66),(3,0.3,0.7,0.25,0.6,0,0.64),(3,0.55,0.6,0.5,0.45,0.4,1.21),
+         (2,0.4,0.35,0.45,0.4,0,0.53),(2,0.3,0.6,0.3,0.6,0,0.51),(2,0.6,0.8,0.6,0.35,0,0.46),
+         (6,0.5,0.5,0.35,0.45,0,0.49),(6,0.4,0.7,0.7,0.5,0,0.42),(6,0.65,0.2,0.2,0.4,0,0.52),
+         (7,0.3,0.75,0.6,0.35,0,0.51),(7,0.4,0.4,0.1,0.45,0,0.75),(7,0.35,0.9,0.9,0.3,0,0.36),
+         (8,None,None,None,None,0,1.12),
+         (9,0.35,0.35,0.3,0.45,0,0.89),(9,0.45,0.75,0.2,0.4,0,0.98),(9,0.4,0.5,0.8,0.5,0,0.86)],
+ "lead":[(4,0.55,0.3,0.4,0.45,0,1.0),(4,0.7,0.4,0.5,0.4,0,1.11),(4,0.4,0.15,0.25,0.6,0,0.9),
+         (2,0.45,0.1,0.25,0.5,0,0.46),(2,0.5,0.37,0.2,0.45,0,0.39),(2,0.2,0.62,0.2,0.7,0,0.48),(2,0.12,0.88,0.2,0.7,0,0.66),
+         (3,0.4,0.55,0.5,0.45,0,0.42),(3,0.7,0.6,0.7,0.4,0,0.43),(3,0.25,0.4,0.3,0.5,0,0.45),
+         (5,0.55,0.55,0.3,0.5,0,1.03),(5,0.25,0.6,0.2,0.45,0,1.07),(5,0.85,0.5,0.5,0.6,0,0.95),
+         (6,0.55,0.82,0.7,0.35,0,0.42),(6,0.4,0.5,0.2,0.4,0,0.65),
+         (7,None,None,None,None,0,1.09)],
+ "chord":[(0,0.45,0.5,0.0,0.32,0,1.0),(0,0.25,0.4,0.0,0.22,0,1.21),(0,0.4,0.6,0.7,0.8,0,0.54),(0,0.75,0.3,0.05,0.35,0,0.77),
+          (6,0.45,0.6,0.6,0.3,0,0.87),(6,0.7,0.5,0.8,0.25,0,1.12),(6,0.3,0.3,0.3,0.35,0,0.72),
+          (1,0.5,0.4,0.3,0.4,0,0.48),(1,0.8,0.2,0.6,0.5,0,0.36),(1,0.3,0.8,0.1,0.25,0,0.51),
+          (3,0.5,0.3,0.4,0.4,0,0.52),(3,0.3,0.2,0.2,0.6,0,0.53),(3,0.75,0.6,0.6,0.35,0,0.4),
+          (4,0.5,0.4,0.3,0.5,0,0.88),(4,0.6,0.8,0.1,0.45,0,0.73),(4,0.4,0.2,0.7,0.7,0,0.74)],
+}
+ENGINE_GAIN={pt:{} for pt in SOUNDS}   # v1.49 each engine's level match: its first sound's measured trim
+for _pt,_l in SOUNDS.items():
+    for _snd in _l:
+        if _snd[0] not in ENGINE_GAIN[_pt]: ENGINE_GAIN[_pt][_snd[0]]=_snd[6]
+def sound_trim(pt,snd): return round(snd[6]/ENGINE_GAIN[pt][snd[0]],3)   # a sound's trim on top of its engine's
+SYNTH_DEFAULTS={"bass":dict(answer=0,engine=5,mode=0,sync=1,walk=0,riff=-1,slideamt=0,octave=0,sidechain=0.15,scshape=0,half=0,lock=0,density=1,seed=0,level=0.85,k1=0.42,k2=0.25,k3=0.45,k4=0.45,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
+                "lead":dict(answer=0,engine=4,mode=0,sync=1,octave=0,repeat=0,rests=0,sidechain=0.1,scshape=0,half=0,lock=0,density=1,seed=0,outside=0.35,level=0.7,k1=0.55,k2=0.3,k3=0.4,k4=0.45,drive=0,verb=0,delay=0,rhythm=0,notes=0,**LFO_DEF),
+                "chord":dict(engine=0,mode=0,sidechain=0.2,scshape=0,half=0,level=0.65,rate=1,push=0,vary=0,drift=0,k1=0.45,k2=0.5,k3=0,k4=0.32,type=0,smooth=1,verb=0,delay=0,rhythm=0,prog=0,voicing=0,strum=0,hands=0,**LFO_DEF)}   # v1.20 hands: 0 one, 1-5 the left hand's pattern
 PATTERN_KEYS=[("ockm-end",0,None),("ockm-impact",0,None),("ockm-pump",0,None),("ockm-bass-on",1,None),("ockm-lead-on",1,None),("ockm-chord-on",1,None),("ockm-rise",0,None),("ockm-drum-len",16,None),("ockm-bass-len",64,None),("ockm-lead-len",64,None),("ockm-chord-len",64,None),("ockm-swing",56,"ockm-swing-now"),("ockm-root",9,None),("ockm-scale",0,None),("ockm-leader",0,None),("ockm-drum-groove",-1,None),("ockm-fill-every",0,None),("ockm-fill-style",0,None),("ockm-drums-on",1,None),("ockm-turn-every",0,None),("ockm-turn-to",4,None),("ockm-style",-1,None),
               ("ockm-evolve-every",0,None),("ockm-evolve-mode",1,None),("ockm-evolve-parts",15,None)]   # v1.00 evolve: phrase bars, 1 gentle 2 lively, which parts (1 drums 2 bass 4 lead 8 chords)
 for t,d in SYNTH_DEFAULTS.items():
     PATTERN_KEYS+=[(f"ockm-{t}-{k}",v,None) for k,v in d.items()]
+    PATTERN_KEYS+=[(f"ockm-{t}-sound",1,None),(f"ockm-{t}-trim",1,None)]   # v1.49 after the engine: a new engine resets the trim to 1
 # v1.28 a save is a snapshot of everything in place (but not movement): mutes and solos, and each bus effect's in/out and
 # pad position (the screen saves a bus effect as out unless it's latched)
-PATTERN_KEYS+=[(f"ockm-{t}-{k}",0,None) for t in [n for n,_ in SLOTS]+["bass","lead","chord"] for k in ("mute","solo")]
+PATTERN_KEYS+=[(f"ockm-{t}-{k}",0,None) for t in MIX_TRACKS for k in ("mute","solo")]
+# v1.34 vox: off until a style or the sheet turns it on. The set, voice, how often, pitch and mix travel with the loop
+PATTERN_KEYS+=[("ockm-vox-on",0,None),("ockm-vox-set",0,None),("ockm-vox-voice",0,None),("ockm-vox-every",8,None),("ockm-vox-pitch",0,None),("ockm-vox-seed",1,None),("ockm-vox-level",1,None),("ockm-vox-verb",0,None),("ockm-vox-delay",0,None)]   # v1.38: dry unless a step sends it
+PATTERN_KEYS+=[("ockm-vox-pick",65535,None)]   # v1.36 which lines are in the deck. bit 0 is line 1, and 65535 is all of them
+PATTERN_KEYS+=[("ockm-vox-stut",0,None)]   # v1.37 0 plays through, 1 chops a 16th, 2 an 8th (v1.38: kept for old scenes, unused)
+PATTERN_KEYS+=[("ockm-drum-drift-every",0,None),("ockm-drum-drift-mode",1,None)]   # v1.49 drum drift: 0 off, 4, 8, 16 bars; 1 shift, 2 morph
+PATTERN_KEYS+=[("ockm-slice",0,None),("ockm-humanize",0,None)]   # v1.49 slice and humanize on the drums
+PATTERN_KEYS+=[("ockm-bass-link",0,None),("ockm-chord-link",0,None)]   # v1.49 links: kick to the bass filter, snare/clap to the chords
+PATTERN_KEYS+=[("ockm-vox-len",16,None)]
+# v1.39 the instruments (Bass ib, Analog ia): every setting, saved with the scene. Their step tables are in TABLES
+INST_PARAMS={
+ "ib":[("wave",0),("swarm",0.3),("sub",0.5),("noise",0),("tune",0.5),("cutoff",0.3),("resonance",0.35),("env",0.35),   # v1.46 darker: it was fizzy in the groovebox("accent",0.6),("key",0.3),
+       ("filter",0),("attack",0.02),("decay",0.35),("release",0.15),("fdecay",0.35),("pdecay",0.15),("pitch-amt",0),("amode",0),
+       ("lfo-rate",0.4),("lfo-amt",0),("lfo-to",0),("drive",0.3),("glide",0.3),("level",0.8)],
+ "ia":[("pulse",0.8),("saw",0),("sub",0.4),("sub-mode",0),("noise",0),("width",0.2),("pwm",0),("tune",0.5),("cutoff",0.45),("resonance",0.4),
+       ("env",0.45),("key",0.5),("lfo-filter",0),("attack",0.02),("decay",0.4),("sustain",0.6),("release",0.15),("amode",0),
+       ("lfo-rate",0.4),("lfo-shape",0),("lfo-pitch",0),("glide",0),("level",0.8),
+       ("mode",0),("uni",0.3),("ch1",3),("ch2",7),("ch3",0)],   # v1.40 mono, unison, chord, poly
+}
+BASS_SYNTH_GAIN=2.0; ANALOG_SYNTH_GAIN=1.05   # v1.45 level-matched with the bass and lead's other engines (measured)
+INST_SEQ=[("len",16),("gstyle",0),("gbusy",0.6),("grange",0.4),("gacc",0.4),("gslide",0.25),("arp",0),("arp-oct",1)]
+INST_FIELDS=["on","note","acc","slide","mod"]
+# v1.40 drmz, the drum machine: eight voices z1-z8 (the groovebox's drum voices: kick snare clap perc hat open-hat tom perc),
+# each with its own settings, and its steps in ockm-pat-z1 .. z8 (0 off, 1 hit, 2 accent, between: a softer hit)
+DRMZ=[(f"z{i+1}",i) for i in range(8)]
+for nm_,snd_ in DRMZ:
+    PATTERN_KEYS+=[(f"ockm-{nm_}-sound",snd_,None),(f"ockm-{nm_}-sample",0,None),(f"ockm-{nm_}-synth",0,None),(f"ockm-{nm_}-tone",0,None),
+                   (f"ockm-{nm_}-drive",0,None),(f"ockm-{nm_}-start",0,None),(f"ockm-{nm_}-tune",0,None),(f"ockm-{nm_}-decay",100,None),
+                   (f"ockm-{nm_}-level",MIX_DRUM[snd_],None),(f"ockm-{nm_}-labchar",0,None),(f"ockm-{nm_}-labmorph",0,None),
+                   (f"ockm-{nm_}-labrseed",0,None),(f"ockm-{nm_}-labramt",0,None),(f"ockm-{nm_}-labpseed",1,None)]
+for nm_,_ in SLOTS:   # v1.49 smarter drum lanes, per scene
+    PATTERN_KEYS+=[(f"ockm-{nm_}-chance",1,None),(f"ockm-{nm_}-thin",0,None),(f"ockm-{nm_}-when",0,None),(f"ockm-{nm_}-drift",0,None)]
+PATTERN_KEYS+=[("ockm-mood",0.5,None)]   # v1.49 the mood: 0 chill, 0.5 as set, 1 peak
+PATTERN_KEYS+=[("iz-len",16,None),("iz-gstyle",0,None),("iz-gbusy",0.3,None)]
+PATTERN_KEYS+=[("ockm-ib-mode",1,None),("ockm-ia-mode",1,None)]
+for pre_ in ("ib","ia"):   # v1.41 build: the line maker's settings, the style picked, and evolve
+    PATTERN_KEYS+=[(f"ockm-{pre_}-{k}",d,None) for k,d in ((("riff",0),) if pre_=="ib" else (("notes",0),))+(("rhythm",0),("sync",1),("seed",0),("density",1),("slideamt",0),("outside",0.35),("octave",0),("repeat",0),("rests",0))]
+    PATTERN_KEYS+=[(f"{pre_}-style",-1,None),(f"{pre_}-evolve-every",0,None),(f"{pre_}-evolve-mode",1,None)]   # v1.41 build: 0 follows the key and chords, 1 your own (kept per scene)
+for pre_,pl_ in INST_PARAMS.items():
+    PATTERN_KEYS+=[(f"{pre_}-{k}",v,None) for k,v in pl_+INST_SEQ]   # v1.38 the samples part's length in steps (1 to 16 bars), like the other parts
 PATTERN_KEYS+=[(f"ockm-bfx-{b}-{k}",d,None) for b in ("drums","music","master") for k,d in (("on",0),("x",0.5),("y",0.5))]
 TABLES=[f"ockm-pat-{n}" for n,_ in SLOTS]+[f"ockm-pat-{n}-nudge" for n,_ in SLOTS]+[f"ockm-pat-{t}-{f}" for t in ("bass","lead") for f in MONO]+[f"ockm-pat-chord-{f}" for f in CHORD]
+TABLES+=["ockm-pat-vox-smp","ockm-pat-vox-fx"]
+TABLES+=[f"ockm-pat-{pre_}-{f_}" for pre_ in ("ib","ia") for f_ in ("on","note","acc","slide","mod")]   # v1.39 the instruments' steps
+TABLES+=[f"ockm-pat-{n}-rat" for n,_ in SLOTS]   # v1.49 rolls per drum step
+TABLES+=[f"ockm-pat-z{i+1}" for i in range(8)]   # v1.40 drmz's steps   # v1.38 samples: which sample on each step (0 none), and its effect (0 off, 1 stutter, 2 delay, 3 verb)
 PROJ_DIR="projects/default"
 p=P()
 p.raw("#X declare -path voices -path seq -path lab;")
@@ -587,10 +804,10 @@ p.add("#X obj 880 140 ockm-lengths;")   # each part's length, and the loop lengt
 rvb=p.add("#X obj 810 50 bng 25 250 50 0 empty empty empty 17 7 0 10 #fcfcfc #000000 #000000;"); p.add("#X text 842 52 revert;")
 p.con(rvb,0,p.add("#X obj 810 85 s ockm-revert;"),0)
 p.add("#X obj 1100 420 ockm-store;")
-p.add(f"#X obj 1250 450 table ockm-solos {len(SLOTS)+3};")
+p.add(f"#X obj 1250 450 table ockm-solos {len(MIX_TRACKS)};")
 _sum=p.add("#X obj 1250 560 array sum ockm-solos;"); _ss=p.add("#X obj 1250 585 s ockm-soloing;")
 p.con(_sum,0,_ss,0)
-for _i,_t in enumerate([n for n,_ in SLOTS]+["bass","lead","chord"]):
+for _i,_t in enumerate(MIX_TRACKS):
     _r=p.add(f"#X obj {1250+(_i%6)*110} {480+(_i//6)*40} r ockm-{_t}-solo;"); _ne=p.add(f"#X obj {1250+(_i%6)*110} {500+(_i//6)*40} != 0;")
     # v1.15 fix: tabwrite takes its index on the right inlet (an argument doesn't set it), so every solo used to land in
     # slot 0 and the count only knew about the last one pressed
@@ -611,6 +828,14 @@ p.con(mix,0,fx,0); p.con(fx,0,stut,0);
 # all, for the last <steps> of the bar, and the drop comes back in on the 1. 0 lets go straight away (so does stopping)
 hsh=p.add("#X obj 600 1044 *~;"); hln=p.add("#X obj 700 1100 vline~;"); mafx=p.add("#X obj 640 1042 ockm-busfx master 1;"); p.con(stut,0,mafx,0); p.con(mafx,0,hsh,0); p.con(hsh,0,vol,0); p.con(hln,0,hsh,1)
 hlb=p.add("#X msg 700 1075 1;"); p.con(lb,0,hlb,0); p.con(hlb,0,hln,0)
+# v1.49 ockm-rewind-arm <steps>: a recipe's rewind before the drop. On the step that many before the bar line, the mix
+# spins back until the bar line, then the drop comes in live (seq/ockm-stutter.pd, ockm-rewind-to). 0 lets go
+rra=p.add("#X obj 1650 1000 r ockm-rewind-arm;"); vra=p.add("#X obj 1650 1025 v ockm_rwarm;"); p.con(rra,0,vra,0)
+rrs=p.add("#X obj 1650 1050 r ockm-step;"); xrs=p.add(f"#X obj 1650 1075 expr if(ockm_rwarm>0 && ({D}f1%16)==16-ockm_rwarm \\, ockm_rwarm*ockm_stepms-4 \\, 0);")
+mrs=p.add("#X obj 1650 1100 moses 1;"); trs_=p.add("#X obj 1700 1125 t f b;"); z_rw=p.add("#X msg 1750 1150 0;"); vra2=p.add("#X obj 1750 1175 v ockm_rwarm;")
+srt=p.add("#X obj 1700 1175 s ockm-rewind-to;")
+rpr=p.add("#X obj 1850 1050 r ockm-playing;"); spr=p.add("#X obj 1850 1075 sel 0;")
+for c in [(rrs,0,xrs,0),(xrs,0,mrs,0),(mrs,1,trs_,0),(trs_,1,z_rw,0),(z_rw,0,vra2,0),(trs_,0,srt,0),(rpr,0,spr,0),(spr,0,z_rw,0)]: p.con(*c)
 rga=p.add("#X obj 900 1000 r ockm-gap-arm;"); tga=p.add("#X obj 900 1020 t f f;"); vga=p.add("#X obj 900 1045 v ockm_gaparm;"); sga0=p.add("#X obj 960 1045 sel 0;")
 hoff=p.add("#X msg 900 1100 1 3;"); vh0=p.add("#X msg 960 1100 0;"); vhd=p.add("#X obj 960 1125 v ockm_hushed;")
 rhs=p.add("#X obj 1080 1000 r ockm-step;"); xhs=p.add(f"#X obj 1080 1020 expr ockm_gaparm>0 && ({D}f1%16)==16-ockm_gaparm;"); shs=p.add("#X obj 1080 1045 sel 1;")
@@ -623,7 +848,17 @@ for c in [(rga,0,tga,0),(tga,1,vga,0),(tga,0,sga0,0),(sga0,0,hoff,0),(sga0,0,vh0
           (rhb,0,xhb,0),(xhb,0,shb,0),(shb,0,thb,0),(thb,1,qhb,0),(qhb,0,dhb,1),(thb,0,dhb,0),(dhb,0,ga0,0),
           (rhp,0,shp,0),(shp,0,gp0,0)]: p.con(*c)
 p.con(rvol,0,x2v,0); p.con(x2v,0,pvol,0); p.con(pvol,0,lvol,0); p.con(lvol,0,vol,1)
-p.con(vol,0,lim,0); p.con(lim,0,dac,0); p.con(lim,0,dac,1); p.con(lim,0,smaster,0)
+# v1.49 (from PERF-1) the master, at the very end (after the fader): a gentle glue compressor (2:1 above about -10 dB,
+# slow), then a look-ahead limiter (the sound waits 3 ms while its gain comes down ahead of the peak, ceiling 0.79). The
+# soft limiter after it is only a last safety now
+cev=p.add("#X obj 900 1240 env~ 1024 256;"); cgx=p.add(f"#X obj 900 1265 expr pow(10\\, -max(0\\, {D}f1-90)*0.5/20);")
+cpk=p.add("#X obj 900 1290 pack f 40;"); cln=p.add("#X obj 900 1315 line~;"); cmul=p.add("#X obj 760 1240 *~;")
+lab=p.add("#X obj 1050 1340 abs~;"); lenv=p.add(f"#X obj 1050 1365 fexpr~ max({D}x1\\, {D}y1*0.9999);")   # releases over about 0.2 s (slow enough to hold through the 3 ms wait)
+lgx=p.add(f"#X obj 1050 1390 expr~ min(1\\, 0.775/max({D}v1\\, 0.0001));"); lsm=p.add("#X obj 1050 1415 lop~ 400;")
+ldw=p.add(f"#X obj 760 1340 delwrite~ {D}0-la 20;"); ldr=p.add(f"#X obj 760 1380 delread~ {D}0-la 3;"); lmul=p.add("#X obj 760 1420 *~;")
+for c in [(vol,0,cev,0),(cev,0,cgx,0),(cgx,0,cpk,0),(cpk,0,cln,0),(vol,0,cmul,0),(cln,0,cmul,1),
+          (cmul,0,lab,0),(lab,0,lenv,0),(lenv,0,lgx,0),(lgx,0,lsm,0),(cmul,0,ldw,0),(ldr,0,lmul,0),(lsm,0,lmul,1),(lmul,0,lim,0)]: p.con(*c)
+p.con(lim,0,dac,0); p.con(lim,0,dac,1); p.con(lim,0,smaster,0)
 # the gap before a drop: no new hits for a beat, the synths let go, the effects ring on
 gsp=p.add("#X obj 250 340 spigot 1;"); p.con(pipe,0,gsp,0)
 rgp=p.add("#X obj 400 340 r ockm-gap;"); ngp=p.add("#X obj 400 365 == 0;"); p.con(rgp,0,ngp,0); p.con(ngp,0,gsp,1)
@@ -632,6 +867,9 @@ gof=p.add("#X msg 470 390 off;")
 p.con(sg1,0,gof,0)
 # drop (perform): hold it and nothing new plays (the same gap as above, the effects ring on); let go and everything
 # comes back on the next bar. Stopped, it comes back straight away
+# v1.49 the mood near peak pumps the synths a little (up to 0.2 at the top), under any pump of their own
+rmd=p.add("#X obj 1700 300 r ockm-mood;"); xmd=p.add(f"#X obj 1700 325 expr max(0 \\, {D}f1-0.6)*0.5;"); vmd=p.add("#X obj 1700 350 v ockm_moodpump;")
+p.con(rmd,0,xmd,0); p.con(xmd,0,vmd,0)
 rpv=p.add("#X obj 1500 300 r ockm-playing;"); vpv=p.add("#X obj 1500 325 v ockm_playv;"); p.con(rpv,0,vpv,0)
 rdr=p.add("#X obj 1650 300 r ockm-drop;"); sdr=p.add("#X obj 1650 325 sel 1;")
 don=p.add("#X msg 1650 350 \\; ockm-gap 1;")
@@ -653,7 +891,7 @@ rbr=p.add("#X obj 2350 300 r ockm-bar;"); xbr=p.add("#X obj 2350 325 expr ockm_m
 rps=p.add("#X obj 2450 300 r ockm-playing;"); sps=p.add("#X obj 2450 325 sel 0;")
 stk=p.add("#X obj 2250 380 s ockm-mute-tick;")
 for c in [(rbt,0,xbt,0),(xbt,0,sbt1,0),(sbt1,0,stk,0),(rbr,0,xbr,0),(xbr,0,sbr1,0),(sbr1,0,stk,0),(rps,0,sps,0),(sps,0,stk,0)]: p.con(*c)
-for _i,_t in enumerate([n for n,_ in SLOTS]+["bass","lead","chord"]):
+for _i,_t in enumerate(MIX_TRACKS):
     x=2100+_i*120
     rq=p.add(f"#X obj {x} 420 r ockm-{_t}-mute-q;"); tq=p.add(f"#X obj {x} 445 t f f;"); fq=p.add(f"#X obj {x+60} 520 f;")
     now=p.add(f"#X obj {x} 470 expr if(ockm_playv>0 && (ockm_mq>0 || ockm_mqb>0) \\, -1 \\, {D}f1);"); mo=p.add(f"#X obj {x} 495 moses 0;")
@@ -686,6 +924,17 @@ for k,(msg,post,name) in enumerate([(f"{D}1 3 \\, 0 {D}2 {D}3","sqrt(max($v1\\,0
 lbv=p.add("#X obj 820 1000 loadbang;"); onev=p.add("#X msg 820 1020 1;"); p.con(lbv,0,onev,0); p.con(onev,0,x2v,0)
 # the drums in or out of this pattern (ockm-drums-on): out stops every drum row
 dgo=p.add("#X obj 250 360 spigot 1;"); p.con(gsp,0,dgo,0); p.con(p.add("#X obj 320 340 r ockm-drums-on;"),0,dgo,1)
+# v1.49 slice (after PERF-1's phrase slice): the drums play the bar's steps in another order. ockm-slice 0 off, 1 halves
+# swapped, 2 stutter (the first beat of each half again), 3 reversed, 4 mirror (the second half backwards), 5 double (the
+# first half twice), 6 auto (one of them on the last bar of every four, a different one each time). Never in fills or builds
+sbr=p.add("#X obj 1500 300 r ockm-bar;"); sbf=p.add("#X obj 1500 325 f 0;"); sbi=p.add("#X obj 1550 325 + 1;"); sbv=p.add("#X obj 1500 350 v ockm_slice_bar;")
+sbp=p.add("#X obj 1600 300 r ockm-play;"); sbz=p.add("#X msg 1600 325 -1;")
+for c in [(sbr,0,sbf,0),(sbf,0,sbi,0),(sbi,0,sbf,1),(sbi,0,sbv,0),(sbp,0,sbz,0),(sbz,0,sbf,1)]: p.con(*c)
+rsl=p.add("#X obj 1700 300 r ockm-slice;"); vsl=p.add("#X obj 1700 325 v ockm_slice;"); p.con(rsl,0,vsl,0)
+stb=p.add("#X obj 250 362 t f b;")
+smx=p.add(f"#X obj 400 362 expr if(ockm_slice==6 \\, if(int(ockm_slice_bar)%4==3 \\, 1+int(ockm_slice_bar/4)%5 \\, 0) \\, ockm_slice);"); smv=p.add("#X obj 400 386 v ockm_slice_m;")
+srm=p.add(f"#X obj 250 372 expr if(ockm_fill_on || ockm_build_on || ockm_slice_m<1 \\, {D}f1 \\, int({D}f1/16)*16 + if(ockm_slice_m==1 \\, (int({D}f1)%16+8)%16 \\, if(ockm_slice_m==2 \\, if(int({D}f1)%16<8 \\, int({D}f1)%4 \\, 8+int({D}f1)%4) \\, if(ockm_slice_m==3 \\, 15-int({D}f1)%16 \\, if(ockm_slice_m==4 \\, if(int({D}f1)%16<8 \\, int({D}f1)%16 \\, 15-int({D}f1)%16) \\, int({D}f1)%8)))));")
+for c in [(dgo,0,stb,0),(stb,1,smx,0),(smx,0,smv,0),(stb,0,srm,0)]: p.con(*c)
 for r,(nm,snd) in enumerate(SLOTS):
     y=380+r*40
     p.add(f"#X text 20 {y+2} {nm} {SOUND_NAMES[snd].replace(' ','-')};")
@@ -693,8 +942,9 @@ for r,(nm,snd) in enumerate(SLOTS):
     if r==0: p.add(f"#X obj 1200 {y} ockm-samplelib;"); p.add(f"#X obj 1200 {y+25} ockm-recorder;"); p.add(f"#X obj 1200 {y+50} ockm-transitions;")
     gt=p.add(f"#X obj 660 {y+2} ockm-gate {nm} nolevel;")
     eqd=p.add(f"#X obj 710 {y+2} ockm-eq {nm};")
-    p.con(dgo,0,row,0); p.con(row,0,v,0); p.con(v,0,gt,0); p.con(gt,0,eqd,0); p.con(eqd,0,p.add(f"#X obj 640 {y+22} throw~ ockm-drumbus;"),0); v=eqd   # to the drum bus
+    p.con(srm,0,row,0); p.con(row,0,v,0); p.con(v,0,gt,0); p.con(gt,0,eqd,0); p.con(eqd,0,p.add(f"#X obj 640 {y+22} throw~ ockm-drumbus;"),0); v=eqd   # to the drum bus
     p.con(eqd,0,p.add(f"#X obj 700 {y+22} throw~ ockm-stem-drums;"),0)
+    if r==0: p.con(eqd,0,p.add(f"#X obj 700 {y+36} throw~ ockm-usb-kick;"),0)   # v1.48 slot 1 (the kick) on its own USB channel
     # v1.30: the sends go through the drums bus's effect too (so a filter or crush takes the tails with it)
     vs=p.add(f"#X obj 760 {y+2} *~ 0;"); vt=p.add(f"#X obj 830 {y+2} throw~ ockm-rev-drums;"); vr=p.add(f"#X obj 760 {y-18} r ockm-{nm}-verb;")
     p.con(v,0,vs,0); p.con(vs,0,vt,0); p.con(vr,0,vs,1)
@@ -706,8 +956,10 @@ dstut=p.add("#X obj 400 990 ockm-stutter 0 1;"); p.con(dbus,0,dstut,0)   # v1.17
 # v1.23 the bus effects: drums (plus the bass when it's with the drums, after the repeat), music (lead, chords and the bass
 # when it's with them), and the master (below)
 dfxs=p.add("#X obj 400 1000 +~;"); p.con(dstut,0,dfxs,0); p.con(p.add("#X obj 470 1000 catch~ ockm-dfxin;"),0,dfxs,1)
-dfx=p.add("#X obj 400 1010 ockm-busfx drums 0.25;"); p.con(dfxs,0,dfx,0); p.con(dfx,0,mix,0)
-mfx=p.add("#X obj 300 1010 ockm-busfx music 0.25;"); p.con(p.add("#X obj 300 1000 catch~ ockm-musbus;"),0,mfx,0); p.con(mfx,0,mix,0)
+dfx=p.add("#X obj 400 1010 ockm-busfx drums 0.25;"); p.con(dfxs,0,dfx,0)
+mfx=p.add("#X obj 300 1010 ockm-busfx music 0.25;"); p.con(p.add("#X obj 300 1000 catch~ ockm-musbus;"),0,mfx,0)
+# v1.39 the groovebox's two buses into the mix through one gain, which an instrument's screen turns down (ockm-inst-mode)
+gbs=p.add("#X obj 350 1030 +~;"); gbg=p.add("#X obj 350 1050 *~;"); p.con(dfx,0,gbs,0); p.con(mfx,0,gbs,1); p.con(gbs,0,gbg,0); p.con(gbg,0,mix,0)
 # v1.30 each bus's reverb and delay sends go through a copy of its effect (same settings) on the way to the master's reverb and delay
 for k,busn in enumerate(("drums","music")):
     for j,(kind,dest) in enumerate((("rev","ockm-revbus"),("dly","ockm-dlybus"))):
@@ -781,7 +1033,14 @@ for r,(nm,seqo,voi) in enumerate(SYN):
     # sidechain: dips by its amount (ockm-<part>-sidechain, 1 = silent) in its shape (ockm-<part>-scshape 0 duck, 1 pump, 2 gate),
     # or by the Perform pump (always the pump shape) when that's deeper
     gt0=p.add(f"#X obj 660 {y} ockm-gate {nm} level;")
-    gdk=p.add(f"#X obj 660 {y+14} expr~ {D}v1*(1 - max({D}f3*if({D}f4 < 0.5 \\, {D}v5 \\, if({D}f4 < 1.5 \\, {D}v2 \\, {D}v6)) \\, 0.75*ockm_pumpv*{D}v2));"); p.con(gt0,0,gdk,0)
+    if nm in ENGINE_GAIN:   # v1.49 each engine at the same loudness (measured), and a new engine starts its sound's trim at 1
+        eg=ENGINE_GAIN[nm]; ex_="0"
+        for e_,g_ in sorted(eg.items(),reverse=True): ex_=f"if({D}f1=={e_} \\, {g_} \\, {ex_ if ex_!='0' else 1})"
+        ren=p.add(f"#X obj 1150 {y} r ockm-{nm}-engine;"); tbf_=p.add(f"#X obj 1150 {y+12} t b f;")
+        exg=p.add(f"#X obj 1260 {y+12} expr {ex_};"); seg=p.add(f"#X obj 1260 {y+24} s ockm-{nm}-egain;")
+        one_=p.add(f"#X msg 1150 {y+24} 1;"); str_=p.add(f"#X obj 1180 {y+24} s ockm-{nm}-trim;")
+        for c in [(ren,0,tbf_,0),(tbf_,1,exg,0),(exg,0,seg,0),(tbf_,0,one_,0),(one_,0,str_,0)]: p.con(*c)
+    gdk=p.add(f"#X obj 660 {y+14} expr~ {D}v1*(1 - max({D}f3*if({D}f4 < 0.5 \\, {D}v5 \\, if({D}f4 < 1.5 \\, {D}v2 \\, {D}v6)) \\, max(0.75*ockm_pumpv \\, ockm_moodpump)*{D}v2));"); p.con(gt0,0,gdk,0)   # v1.49 and the mood's pump near peak
     p.con(p.add(f"#X obj 740 {y+14} r~ ockm-duck;"),0,gdk,1); p.con(p.add(f"#X obj 820 {y+14} r ockm-{nm}-sidechain;"),0,gdk,2)
     p.con(p.add(f"#X obj 900 {y+14} r ockm-{nm}-scshape;"),0,gdk,3)
     p.con(p.add(f"#X obj 980 {y+14} r~ ockm-duck-short;"),0,gdk,4); p.con(p.add(f"#X obj 1060 {y+14} r~ ockm-duck-gate;"),0,gdk,5)
@@ -798,10 +1057,21 @@ for r,(nm,seqo,voi) in enumerate(SYN):
     rhf=p.add(f"#X obj 300 {y-40} r ockm-{nm}-half;"); p.con(rhf,0,p.add(f"#X obj 300 {y-28} v ockm_{nm}_half;"),0)
     p.con(lq,0,hx,0); p.con(hx,0,hm,0)
     for c in [(hm,1,pon,0),(pon,0,sq,0),(ron,0,ton,0),(ton,1,pon,1),(ton,0,s0n,0),(s0n,0,ofn,0),(ofn,0,vo,0)]: p.con(*c)
+    if nm in ("bass","lead"):   # v1.45 notes played live (its MIDI channel): note accent 0 1 (held) / off
+        p.con(p.add(f"#X obj 560 {y-18} r ockm-{nm}-live;"),0,vo,0)
     cho=p.add(f"#X obj 560 {y+20} ockm-chorus {nm};")
-    p.con(sq,0,vo,0); p.con(vo,0,cho,0); p.con(cho,0,gt0,0)
+    p.con(sq,0,vo,0); p.con(cho,0,gt0,0)
+    # v1.40 MIDI out: the part's notes to a synth on the USB ports (ockm-<part>-midi 1 MIDI only, 2 both; -mch the channel).
+    # On MIDI only, the box's own sound for the part is silenced
+    mob=p.add(f"#X obj 1300 {y+28} ockm-midiout {nm};"); p.con(mob,0,p.add(f"#X obj 1300 {y+48} midiout;"),0)
+    if nm=="bass":   # v1.49 the drums' MIDI out lives beside the bass's
+        dmob=p.add(f"#X obj 1300 {y+68} ockm-midiout drums;"); p.con(dmob,0,p.add(f"#X obj 1300 {y+88} midiout;"),0)
+    rmi=p.add(f"#X obj 1420 {y+28} r ockm-{nm}-midi;"); imx=p.add(f"#X obj 1420 {y+48} expr {D}f1!=1;"); imm=p.add(f"#X msg 1420 {y+68} {D}1 15;"); iml=p.add(f"#X obj 1420 {y+88} line~;")
+    ig=p.add(f"#X obj 600 {y+10} *~;"); ilb=p.add(f"#X obj 1520 {y+28} loadbang;"); i1=p.add(f"#X msg 1520 {y+48} 1;")
+    for c in [(rmi,0,imx,0),(imx,0,imm,0),(imm,0,iml,0),(ilb,0,i1,0),(i1,0,iml,0),(vo,0,ig,0),(iml,0,ig,1),(ig,0,cho,0)]: p.con(*c)
     if nm=="bass":   # v1.23: the bass goes with the drums (ockm-bass-bus 1) or with the music (0), for the bus effects
         rbb=p.add(f"#X obj 1150 {y} r ockm-bass-bus;"); bbx=p.add(f"#X obj 1150 {y+14} expr {D}f1>0.5 \\; {D}f1<=0.5;")
+        p.con(rbb,0,bbx,0)   # the choice reaches the crossfade; without this only the loadbang's 1 does, so the bass stays with the drums
         bass_gain=[]
         for j,(bus) in enumerate(("ockm-dfxin","ockm-musbus")):
             pb=p.add(f"#X obj {1150+j*90} {y+28} pack f 20;"); lb_=p.add(f"#X obj {1150+j*90} {y+42} line~;"); gb=p.add(f"#X obj {1150+j*90} {y+56} *~;")
@@ -826,6 +1096,51 @@ for r,(nm,seqo,voi) in enumerate(SYN):
         vlh=p.add(f"#X obj 560 {y+34} ockm-chord-lh chord;")
         for c in [(sq,1,vlh,0),(vlh,0,cho,0),(ofn,0,vlh,0)]: p.con(*c)
         synth_voice["chord-lh"]=vlh
+# vox: spoken lines, one file from start to end, on the music bus. ockm-vox picks the line; ockm-voxplay plays it
+vy=1900
+p.add(f"#X text 20 {vy} vox;")
+p.add(f"#X obj 70 {vy} ockm-vox;")
+vpl=p.add(f"#X obj 220 {vy} ockm-voxplay;")
+vgt=p.add(f"#X obj 400 {vy} ockm-gate vox level;")
+veq=p.add(f"#X obj 560 {vy} ockm-eq vox;")
+p.con(vpl,0,vgt,0); p.con(vgt,0,veq,0)
+p.con(veq,0,p.add(f"#X obj 700 {vy} throw~ ockm-musbus;"),0)
+p.con(veq,0,p.add(f"#X obj 860 {vy} throw~ ockm-stem-vox;"),0)
+vvs=p.add(f"#X obj 1000 {vy} *~ 0;"); p.con(veq,0,vvs,0); p.con(p.add(f"#X obj 1000 {vy-18} r ockm-vox-verb;"),0,vvs,1)
+p.con(vvs,0,p.add(f"#X obj 1000 {vy+20} throw~ ockm-rev-music;"),0)
+vds=p.add(f"#X obj 1160 {vy} *~ 0;"); p.con(veq,0,vds,0); p.con(p.add(f"#X obj 1160 {vy-18} r ockm-vox-delay;"),0,vds,1)
+p.con(vds,0,p.add(f"#X obj 1160 {vy+20} throw~ ockm-dly-music;"),0)
+# v1.38 samples: the steps (which sample, which effect), and a step's own delay or verb: a send for as long as that sample plays
+p.add(f"#X obj 70 {vy+60} table ockm-pat-vox-smp {STEPS};"); p.add(f"#X obj 300 {vy+60} table ockm-pat-vox-fx {STEPS};")
+rfx=p.add(f"#X obj 1320 {vy-18} r ockm-smp-fx;")
+p.add(f"#X obj 1600 {vy-18} r ockm-vox-which;")   # v1.39 bound, so the Lua's send has somewhere to go (pdlua errors on a send nobody hears)
+fxg=p.add(f"#X obj 1320 {vy} expr ({D}f1==2)*0.55 \\; ({D}f1==3)*0.6;")
+p.con(rfx,0,fxg,0)
+for j,(bus,xx) in enumerate((("ockm-dly-music",1320),("ockm-rev-music",1480))):
+    pk_=p.add(f"#X obj {xx} {vy+20} pack f 8;"); ln_=p.add(f"#X obj {xx} {vy+40} line~;"); g_=p.add(f"#X obj {xx} {vy+60} *~;")
+    for c in [(fxg,j,pk_,0),(pk_,0,ln_,0),(veq,0,g_,0),(ln_,0,g_,1),(g_,0,p.add(f"#X obj {xx} {vy+80} throw~ {bus};"),0)]: p.con(*c)
+# v1.39 the instruments: Bass (ib) and Analog (ia), each with its sequencer. ockm-inst-mode 1 (an instrument's screen is
+# open) takes the groovebox's buses out of the mix, so the box is that instrument; 0 puts them back. The instrument plays
+# into the master (its effects, the volume), level-matched with the bass part
+iy=vy+140
+imr=p.add(f"#X obj 1100 {iy} r ockm-inst-mode;"); imx=p.add(f"#X obj 1100 {iy+25} expr 1-({D}f1>0);"); imm=p.add(f"#X msg 1100 {iy+50} {D}1 40;"); iml=p.add(f"#X obj 1100 {iy+75} line~;")
+for c in [(imr,0,imx,0),(imx,0,imm,0),(imm,0,iml,0)]: p.con(*c)
+p.con(iml,0,gbg,1)   # the groovebox's buses, down while an instrument plays
+# v1.40 drmz: its eight voices (switched off until it's picked) and its sequencer, into the master like the others
+dz=p.add(f"#X obj 900 {iy} ockm-drmz;"); dzg=p.add(f"#X obj 900 {iy+30} *~ 1.6;"); p.con(dz,0,dzg,0); p.con(dzg,0,mix,0)
+p.con(dzg,0,p.add(f"#X obj 980 {iy+30} throw~ ockm-stem-inst;"),0)
+p.add(f"#X obj 900 {iy+60} ockm-drmzseq;")
+for i in range(8): p.add(f"#X obj {900+(i%4)*110} {iy+90+(i//4)*25} table ockm-pat-z{i+1} 64;")
+ilb=p.add(f"#X obj 1300 {iy} loadbang;"); ioff=p.add(f"#X msg 1300 {iy+25} \\; iz-on 0;"); p.con(ilb,0,ioff,0)   # v1.45 drmz's own engine stays off (its voices are the drums')
+ione=p.add(f"#X msg 1450 {iy+25} 1;"); p.con(ilb,0,ione,0); p.con(ione,0,iml,0)   # the groovebox heard from the start
+for j,(kind,pre_) in enumerate((("bass","ib"),("analog","ia"))):
+    x=70+j*420
+    # v1.45 the synth itself is an engine of the bass (Bass) or lead (Analog) part: voices/ockm-mono-swarm.pd and
+    # voices/ockm-lead-pulse.pd. This sequencer is kept for the keys and the arpeggiator (its own steps no longer play)
+    p.add(f"#X obj {x+180} {iy+30} ockm-instseq {pre_};")
+    # v1.41 the build tab: the groovebox's line maker, writing this instrument's steps (manual until you pick something)
+    p.add(f"#X obj {x+180} {iy+60} ockm-linemaker {pre_} {24 if pre_=='ia' else 0} 0 0 1 1 {1 if pre_=='ia' else 0} 1;")
+    for k,f_ in enumerate(INST_FIELDS): p.add(f"#X obj {x+k*80} {iy+100} table ockm-pat-{pre_}-{f_} 64;")
 s0b=p.add("#X obj 400 80 sel 0;"); offm=p.add("#X msg 400 105 off;")
 p.con(ttg,1,s0b,0); p.con(s0b,0,offm,0)
 p.con(s0b,0,p.add("#X msg 460 105 \\; ockm-rise-now 0;"),0)
@@ -928,12 +1243,12 @@ q=P()
 q.add("#X text 20 10 Track gate: mute \\, solo and level. Gain = (not muted) x (soloed \\, or nothing is soloed) x level. Fades over 10 ms so it never clicks.;")
 i_=q.add("#X obj 20 60 inlet~;"); m_=q.add("#X obj 20 300 *~;"); o_=q.add("#X obj 20 340 outlet~;")
 vals=[]
-for j,(hook,d) in enumerate([(f"ockm-{D}1-mute",0),(f"ockm-{D}1-solo",0),("ockm-soloing",0),(f"ockm-{D}1-{D}2",1)]):
+for j,(hook,d) in enumerate([(f"ockm-{D}1-mute",0),(f"ockm-{D}1-solo",0),("ockm-soloing",0),(f"ockm-{D}1-{D}2",1),(f"ockm-{D}1-trim",1),(f"ockm-{D}1-egain",1)]):   # v1.49 the engine's level match, and the sound's on top
     x=200+j*130
     r=q.add(f"#X obj {x} 60 r {hook};"); t=q.add(f"#X obj {x} 85 t b f;"); fv=q.add(f"#X obj {x} 160 f {d};")
     q.con(r,0,t,0); q.con(t,1,fv,1); vals.append((t,fv))
-tb=q.add("#X obj 200 125 t b b b b;")
-ex=q.add(f"#X obj 200 200 expr (1-({D}f1!=0)) * if({D}f3>0 \\, ({D}f2!=0) \\, 1) * {D}f4;")
+tb=q.add("#X obj 200 125 t b b b b b b;")
+ex=q.add(f"#X obj 200 200 expr (1-({D}f1!=0)) * if({D}f3>0 \\, ({D}f2!=0) \\, 1) * {D}f4 * {D}f5 * {D}f6;")
 pk=q.add("#X obj 200 230 pack f 10;"); ln=q.add("#X obj 200 260 line~;")
 lb=q.add("#X obj 560 125 loadbang;"); q.con(lb,0,tb,0)
 for j,(t,fv) in enumerate(vals):
@@ -1160,12 +1475,261 @@ engine("voices/ockm-mono-analogue.pd",5,"Analogue engine: saw to square with a s
 engine("voices/ockm-mono-donk.pd",6,"Donk engine: a hollow tone that bounces down onto each note and rings out. Bassline house \\, garage \\, M1 organ bass",donk,
        decay=f"120*pow(12\\,{D}f1)")   # its decay never gets shorter than a short donk (120 ms) and goes up to about 1.4 s
 
+# ================= instruments (v1.39): Bass and Analog =================
+# Two full mono synths you can play on their own (INST_BASS.pd, INST_ANALOG.pd: MIDI in) or that the groovebox can use.
+# The note logic (envelopes, glide, accent) is Lua: seq/ockm-instvoice.pd_lua. The sound is here.
+# Every setting arrives on <prefix>-<name>, 0 to 1 unless said, so a screen, a preset or MIDI can drive it.
+
+def svfk():
+    """The state-variable filter with its damping (1/Q) on inlet 4, so resonance can move. Outlets: 0 and 1 the states
+    (the band-pass is half of outlet 0 plus its last sample), 2 the low-pass."""
+    g=f"tan(3.14159265*min({D}x2[0]\\, 0.45*{D}f3)/max({D}f3\\, 1))"
+    a1=f"(1/(1+{g}*({g}+{D}f4)))"; a2=f"({g}*{a1})"; a3=f"({g}*{a2})"
+    v3=f"({D}x1[0]-{D}y2[-1])"
+    y1=f"2*({a1}*{D}y1[-1] + {a2}*{v3}) - {D}y1[-1]"
+    v2=f"({D}y2[-1] + {a2}*{D}y1[-1] + {a3}*{v3})"
+    y2=f"2*{v2} - {D}y2[-1]"
+    return f"fexpr~ {y1} \; {y2} \; {v2}"
+
+# a band-limited oscillator that blends saw (0) to square (1)
+q=P(); q.add("#X text 20 10 Band-limited saw to square: frequency in (signal) \\, blend on the right (0 saw \\, 1 square \\, 0.5 both).;")
+i_=q.add("#X obj 30 50 inlet~;"); bl=q.add("#X obj 200 50 inlet;"); ph=q.add("#X obj 30 90 phasor~;")
+lb=q.add("#X obj 300 40 loadbang;"); sr=q.add("#X obj 300 65 samplerate~;"); dv=q.add("#X obj 200 130 /~ 44100;")
+sh=q.add("#X obj 120 130 +~ 0.5;"); wr=q.add("#X obj 120 160 wrap~;")
+bsl=q.add(f"#X msg 200 80 {D}1 10;"); bln=q.add("#X obj 200 105 line~;")
+saw="2*"+D+"v1-1-("+BLEP.format(t=D+"v1",D=D)+")"
+sqr="if("+D+"v1<0.5 \\, 1 \\, -1)+("+BLEP.format(t=D+"v1",D=D)+")-("+BLEP.format(t=D+"v2",D=D)+")"
+ex=q.add(f"#X obj 30 220 expr~ ({saw})*(1-{D}v4) - ({sqr})*{D}v4*0.85;")   # the square flipped, so blending doesn't cancel the fundamental
+o=q.add("#X obj 30 300 outlet~;")
+for c in [(i_,0,ph,0),(i_,0,dv,0),(lb,0,sr,0),(sr,0,dv,1),(ph,0,sh,0),(sh,0,wr,0),(ph,0,ex,0),(wr,0,ex,1),(dv,0,ex,2),(bl,0,bsl,0),(bsl,0,bln,0),(bln,0,ex,3),(ex,0,o,0)]: q.con(*c)
+q.save("voices/ockm-blwave.pd","#N canvas 200 200 700 340 12;")
+
+# a band-limited pulse with a width you can sweep (PWM)
+q=P(); q.add("#X text 20 10 Band-limited pulse: frequency in (signal) \\, width on the right (signal \\, 0.03 to 0.97).;")
+i_=q.add("#X obj 30 50 inlet~;"); wi=q.add("#X obj 200 50 inlet~;"); ph=q.add("#X obj 30 90 phasor~;")
+lb=q.add("#X obj 300 40 loadbang;"); sr=q.add("#X obj 300 65 samplerate~;"); dv=q.add("#X obj 120 130 /~ 44100;")
+cw=q.add("#X obj 200 90 clip~ 0.03 0.97;")
+t2="("+D+"v1+1-"+D+"v2-int("+D+"v1+1-"+D+"v2))"
+bl1=BLEP.format(t=D+"v1",D=D).replace(D+"v3",D+"v3")
+bl2=BLEP.format(t=t2,D=D)
+ex=q.add(f"#X obj 30 220 expr~ if({D}v1<{D}v2 \\, 1 \\, -1)+({bl1})-({bl2})-(2*{D}v2-1);")   # minus its DC
+o=q.add("#X obj 30 300 outlet~;")
+for c in [(i_,0,ph,0),(i_,0,dv,0),(lb,0,sr,0),(sr,0,dv,1),(wi,0,cw,0),(ph,0,ex,0),(cw,0,ex,1),(dv,0,ex,2),(ex,0,o,0)]: q.con(*c)
+q.save("voices/ockm-blpulse.pd","#N canvas 200 200 700 340 12;")
+
+class IV:
+    """Helpers for an instrument voice patch: settings with defaults, smoothed into signals."""
+    def __init__(s, q):
+        s.q=q; s.lb=q.add("#X obj 1400 20 loadbang;"); s.n=0
+    def par(s, name, default):
+        q=s.q; x=1400+(s.n%6)*150; y=60+(s.n//6)*90; s.n+=1
+        r=q.add(f"#X obj {x} {y} r {D}1-{name};"); d=q.add(f"#X msg {x+90} {y} {default};"); t=q.add(f"#X obj {x} {y+25} t f;")
+        q.con(s.lb,0,d,0); q.con(d,0,t,0); q.con(r,0,t,0)
+        return t
+    def sig(s, name, default, ms=20):
+        q=s.q; t=s.par(name, default)
+        x,y=q_pos(q,t)
+        m=q.add(f"#X msg {x} {y+50} {D}1 {ms};"); l=q.add(f"#X obj {x} {y+75} line~;")
+        q.con(t,0,m,0); q.con(m,0,l,0)
+        return l
+
+def q_pos(q, i):
+    import re
+    m=re.match(r"#X \w+ (\d+) (\d+)", q.L[i]); return int(m.group(1)), int(m.group(2))
+
+def inst_common(q, kind, poly=False):
+    """The note brain and its four moving parts. Returns (pitch, amp, fenv, penv, accent) signal objects.
+    poly: one of several voices fed by ockm-instpoly. Its inlet also takes power 0/1 (this voice switched off when its
+    mode doesn't use it) and spread <semitones> (unison's detune); pitch then includes the spread."""
+    inl=q.add("#X obj 30 20 inlet;")
+    ctl=q.add(f"#X obj 30 50 ockm-instvoice {kind} {D}1;")
+    if poly:
+        rt=q.add("#X obj 30 35 route power spread;"); q.con(inl,0,rt,0); q.con(rt,2,ctl,0)
+    else:
+        q.con(inl,0,ctl,0)
+    pv=q.add("#X obj 30 90 vline~;"); av=q.add("#X obj 200 90 vline~;"); fv=q.add("#X obj 370 90 vline~;"); ev=q.add("#X obj 540 90 vline~;")
+    am=q.add(f"#X msg 710 90 {D}1 5;"); al=q.add("#X obj 710 115 line~;")
+    for k,o_ in enumerate((pv,av,fv,ev)): q.con(ctl,k,o_,0)
+    q.con(ctl,4,am,0); q.con(am,0,al,0)
+    # MIDI note 48 to begin with, so a first glide doesn't come up from 0
+    lb=q.add("#X obj 30 0 loadbang;"); m48=q.add("#X msg 100 0 48;"); q.con(lb,0,m48,0); q.con(m48,0,pv,0)
+    # <prefix>-on: 0 switches the sound off (no processing at all), 1 on (the default: the groovebox turns them off until picked)
+    ron=q.add(f"#X obj 900 0 r {D}1-on;"); m1=q.add("#X msg 1000 0 1;"); sw_=q.add("#X obj 900 25 switch~;")
+    q.con(lb,0,m1,0)
+    if not poly:
+        q.con(m1,0,sw_,0); q.con(ron,0,sw_,0)
+        return pv,av,fv,ev,al
+    # on (the instrument picked) and power (this voice in use): the voice runs only when both are 1
+    both=q.add(f"#X obj 900 80 expr {D}f1*{D}f2;"); pwf=q.add("#X obj 1000 55 f 1;"); tob=q.add("#X obj 900 50 t b f;"); tpw=q.add("#X obj 1100 30 t f f;")
+    for c in [(ron,0,tob,0),(tob,1,both,1),(tob,0,pwf,0),(pwf,0,both,0),(rt,0,tpw,0),(tpw,1,pwf,1),(tpw,0,both,0),(both,0,sw_,0),(m1,0,both,1),(m1,0,both,0)]: q.con(*c)
+    sm=q.add(f"#X msg 1200 30 {D}1 30;"); sl=q.add("#X obj 1200 55 line~;"); pp=q.add("#X obj 30 140 +~;")
+    q.con(rt,1,sm,0); q.con(sm,0,sl,0); q.con(pv,0,pp,0); q.con(sl,0,pp,1)
+    return pp,av,fv,ev,al
+
+def lfo_block(q, iv, x, y, shapes=False, fm=False):
+    """An LFO: rate (0.1 to 40 Hz). shapes: tri, square, random, noise (lfo-shape 0 to 3). fm: lfo-to 1 multiplies the
+    rate by 20 (into audio, for FM on the oscillator). Returns the LFO signal object, -1 to 1."""
+    rate=iv.par("lfo-rate", 0.4); rx=q.add(f"#X obj {x} {y} expr 0.1*pow(400\\, {D}f1);")
+    q.con(rate,0,rx,0)
+    if fm:
+        to=iv.par("lfo-to", 0); fx=q.add(f"#X obj {x} {y+25} expr {D}f1*if({D}f2>0.5 && {D}f2<1.5 \\, 20 \\, 1);")
+        q.con(rx,0,fx,0); q.con(to,0,fx,1); rx=fx
+        q.C=[c for c in q.C if c!=(to,0,fx,1)]
+        tt=q.add(f"#X obj {x+120} {y+25} t b f;"); q.con(to,0,tt,0); q.con(tt,1,fx,1); q.con(tt,0,rx,0)
+    rs=q.add(f"#X msg {x} {y+50} {D}1 30;"); rl=q.add(f"#X obj {x} {y+75} line~;"); ph=q.add(f"#X obj {x} {y+100} phasor~;")
+    q.con(rx,0,rs,0); q.con(rs,0,rl,0); q.con(rl,0,ph,0)
+    if not shapes:
+        tri=q.add(f"#X obj {x} {y+125} expr~ abs({D}v1*2-1)*2-1;"); q.con(ph,0,tri,0); return tri
+    nz=q.add(f"#X obj {x+150} {y+100} noise~;"); sh=q.add(f"#X obj {x+150} {y+125} samphold~;")
+    nl=q.add(f"#X obj {x+250} {y+125} lop~ 30;"); q.con(nz,0,sh,0); q.con(ph,0,sh,1); q.con(nz,0,nl,0)
+    shp=iv.par("lfo-shape", 0)
+    sel=q.add(f"#X obj {x} {y+160} expr~ if({D}f4<0.5 \\, abs({D}v1*2-1)*2-1 \\, if({D}f4<1.5 \\, if({D}v1<0.5 \\, 1 \\, -1) \\, if({D}f4<2.5 \\, {D}v2 \\, {D}v3*6)));")
+    for c in [(ph,0,sel,0),(sh,0,sel,1),(nl,0,sel,2),(shp,0,sel,3)]: q.con(*c)
+    return sel
+
+def svf_pair(q, x, y, src, co, k1, k2):
+    """Two state-variable stages in a row (24 dB low-pass). k1, k2: control objects for the damping. Returns (lp, bp1)."""
+    srn=q.add(f"#X obj {x+300} {y-30} loadbang;"); srs=q.add(f"#X obj {x+300} {y-5} samplerate~;"); q.con(srn,0,srs,0)
+    f1=q.add(f"#X obj {x} {y} {svfk()};"); f2=q.add(f"#X obj {x} {y+30} {svfk()};")
+    bp=q.add(f"#X obj {x+200} {y+30} rzero~ -1;"); bh=q.add(f"#X obj {x+200} {y+55} *~ 0.5;")
+    for c in [(src,0,f1,0),(co,0,f1,1),(co,0,f2,1),(srs,0,f1,2),(srs,0,f2,2),(k1,0,f1,3),(k2,0,f2,3),(f1,2,f2,0),(f1,0,bp,0),(bp,0,bh,0)]: q.con(*c)
+    return f2, bh   # f2 outlet 2 is the 24 dB low-pass
+
+# ---------- Bass (modern bass with an acid heart) ----------
+q=P(); q.add("#X text 20 -30 Bass instrument: one oscillator (saw \\, square or both) with a swarm of detuned copies \\, a sub and noise \\, an aggressive low-pass or band-pass filter \\, three envelopes (amp \\, filter \\, pitch) \\, an LFO to the filter \\, FM or pitch \\, and drive. Settings on <prefix>-<name>.;")
+iv=IV(q)
+pv,av,fv,ev,acc=inst_common(q,"bass")
+tune=iv.sig("tune",0.5); pamt=iv.sig("pitch-amt",0); lfoa=iv.sig("lfo-amt",0); lto=iv.par("lfo-to",0)
+lfo=lfo_block(q,iv,900,300,fm=True)
+# where the LFO goes: 0 filter, 1 FM (fast, deep), 2 pitch (vibrato)
+lfp=q.add(f"#X obj 600 300 expr~ {D}v1*{D}v2*if({D}f3>0.5 && {D}f3<1.5 \\, 24 \\, if({D}f3>1.5 \\, 1 \\, 0));")
+lff=q.add(f"#X obj 600 330 expr~ {D}v1*{D}v2*if({D}f3<0.5 \\, 3 \\, 0);")
+for c in [(lfo,0,lfp,0),(lfoa,0,lfp,1),(lto,0,lfp,2),(lfo,0,lff,0),(lfoa,0,lff,1),(lto,0,lff,2)]: q.con(*c)
+pitch=q.add(f"#X obj 30 200 expr~ {D}v1 + ({D}v2-0.5)*24 + {D}v3*{D}v4*36 + {D}v5;")
+for c in [(pv,0,pitch,0),(tune,0,pitch,1),(ev,0,pitch,2),(pamt,0,pitch,3),(lfp,0,pitch,4)]: q.con(*c)
+mt=q.add("#X obj 30 230 mtof~;"); q.con(pitch,0,mt,0)
+wave=iv.par("wave",0); wb=q.add(f"#X obj 300 160 expr {D}f1*0.5;"); q.con(wave,0,wb,0)   # 0 saw, 1 both, 2 square
+swarm=iv.sig("swarm",0.3); sub=iv.sig("sub",0.5); noise=iv.sig("noise",0)
+main=q.add("#X obj 30 270 ockm-blwave;"); q.con(mt,0,main,0); q.con(wb,0,main,1)
+cop=[]
+for j,cents in enumerate((-22,-9,9,22)):
+    r_=q.add(f"#X obj {150+j*110} 240 expr~ {D}v1*pow(2\\, {D}v2*{cents}/1200);"); w_=q.add(f"#X obj {150+j*110} 270 ockm-blwave;")
+    q.con(mt,0,r_,0); q.con(swarm,0,r_,1); q.con(r_,0,w_,0); q.con(wb,0,w_,1); cop.append(w_)
+hz=q.add("#X obj 600 240 *~ 0.5;"); sb=q.add("#X obj 600 270 ockm-blsquare;"); q.con(mt,0,hz,0); q.con(hz,0,sb,0)
+nz=q.add("#X obj 700 270 noise~;")
+mix=q.add(f"#X obj 30 320 expr~ ({D}v1 + ({D}v2+{D}v3+{D}v4+{D}v5)*{D}v6*0.6)/(1+{D}v6*1.4) - {D}v7*{D}v8*0.9 + {D}v9*{D}v10*0.6;")
+for c in [(main,0,mix,0),(cop[0],0,mix,1),(cop[1],0,mix,2),(cop[2],0,mix,3),(cop[3],0,mix,4),(swarm,0,mix,5),(sb,0,mix,6),(sub,0,mix,7),(nz,0,mix,8),(noise,0,mix,9)]: q.con(*c)
+dc=q.add("#X obj 30 350 hip~ 15;"); pre=q.add(f"#X obj 30 375 expr~ tanh(1.6*{D}v1)/tanh(1.6);"); q.con(mix,0,dc,0); q.con(dc,0,pre,0)
+# the filter: cutoff 40 Hz to 20 kHz, opened by the filter envelope (more on accents), the LFO and the key
+_ibd=dict(INST_PARAMS["ib"])   # v1.46 the starting values come from INST_PARAMS, one place
+cut=iv.par("cutoff",_ibd["cutoff"]); envamt=iv.par("env",_ibd["env"]); accamt=iv.par("accent",0.6); key=iv.par("key",0.3); res=iv.par("resonance",_ibd["resonance"]); mode=iv.par("filter",0)
+cx=q.add(f"#X obj 400 380 expr 40*pow(2\\, 9*{D}f1);"); q.con(cut,0,cx,0)
+co=q.add(f"#X obj 400 420 expr~ min(18000\\, max(30\\, {D}f5*pow(2\\, {D}v1*{D}f6*7*(1+{D}v2*{D}f7) + {D}v3 + {D}f8*({D}v4-48)/12 + {D}v9*3)));")
+cmod=iv.sig("cutmod",0)   # the step's filter move, from the sequencer (up to 3 octaves)
+for c in [(fv,0,co,0),(acc,0,co,1),(lff,0,co,2),(pitch,0,co,3),(cx,0,co,4),(envamt,0,co,5),(accamt,0,co,6),(key,0,co,7),(cmod,0,co,8)]: q.con(*c)
+# resonance: damping 1.4 (none) down to 0.06 (screaming); the second stage gentler, so it squelches but holds together
+# v1.40 the filters are C objects: bob~ (the 24 dB ladder, aggressive when driven) for low-pass, vcf~ for band-pass.
+# The state-variable filter cost ten times as much, too much for the Pi with the groovebox beside it
+rx=q.add(f"#X obj 700 380 expr 0.1+3.8*pow({D}f1\\, 1.1) \\; 1+30*pow({D}f1\\, 2);"); q.con(res,0,rx,0)
+rxm=q.add(f"#X msg 700 405 {D}1 20;"); rxl=q.add("#X obj 700 430 line~;"); q.con(rx,0,rxm,0); q.con(rxm,0,rxl,0)
+bob=q.add("#X obj 30 460 bob~;"); q.con(pre,0,bob,0); q.con(co,0,bob,1); q.con(rxl,0,bob,2)
+bpc=q.add("#X obj 200 460 clip~ 30 9000;"); q.con(co,0,bpc,0)
+vcf=q.add("#X obj 200 490 vcf~ 4;"); q.con(pre,0,vcf,0); q.con(bpc,0,vcf,1); q.con(rx,1,vcf,2)
+fm_=q.add(f"#X obj 30 560 expr~ if({D}f3<0.5 \\, {D}v1*1.9 \\, {D}v2*5.5+{D}v4*1.1);"); q.con(bob,0,fm_,0); q.con(vcf,0,fm_,1); q.con(mode,0,fm_,2)   # each levelled to the other
+# v1.49 band-pass kept its sub out and came out 6 dB quieter and thin: louder now, with the bottom of the sound (below
+# 140 Hz, where the sub lives) mixed back under it
+bpl=q.add("#X obj 120 520 lop~ 140;"); bpl2=q.add("#X obj 120 540 lop~ 140;"); q.con(pre,0,bpl,0); q.con(bpl,0,bpl2,0); q.con(bpl2,0,fm_,3)
+rc=q.add(f"#X obj 300 560 expr 1+1.6*{D}f1;"); rcm=q.add("#X obj 30 585 *~ 1;"); q.con(res,0,rc,0); q.con(rc,0,rcm,1); q.con(fm_,0,rcm,0)   # resonance thins the bass: give it back
+amp=q.add(f"#X obj 30 615 expr~ {D}v1*{D}v2*(1+0.4*{D}v3)*0.3;"); q.con(rcm,0,amp,0); q.con(av,0,amp,1); q.con(acc,0,amp,2)
+drv=iv.par("drive",0.3); dg=q.add(f"#X obj 300 640 expr 1+40*pow({D}f1\\, 1.5);"); q.con(drv,0,dg,0)
+dr=q.add(f"#X obj 30 645 expr~ (tanh({D}f2*{D}v1)+0.2*tanh({D}f2*{D}v1)*tanh({D}f2*{D}v1))*0.3/tanh(0.3*{D}f2);"); q.con(amp,0,dr,0); q.con(dg,0,dr,1)
+hp=q.add("#X obj 30 675 hip~ 20;"); lvl=iv.sig("level",0.8); g=q.add("#X obj 30 705 *~;"); o=q.add("#X obj 30 740 outlet~;")
+for c in [(dr,0,hp,0),(hp,0,g,0),(lvl,0,g,1),(g,0,o,0)]: q.con(*c)
+q.save("voices/ockm-inst-bass.pd","#N canvas 100 60 1300 800 12;")
+
+# ---------- Analog (classic mono, after the SH-101 and S-1) ----------
+q=P(); q.add("#X text 20 -30 Analog instrument: pulse (with PWM) \\, saw \\, a sub (one or two octaves down \\, or a narrow pulse) and noise in a mixer \\, a smooth 24 dB low-pass \\, one ADSR \\, an LFO (triangle \\, square \\, random \\, noise) to pitch \\, pulse width and filter \\, and glide. Settings on <prefix>-<name>.;")
+iv=IV(q)
+pv,av,fv,ev,acc=inst_common(q,"analog",poly=True)
+tune=iv.sig("tune",0.5); lfo=lfo_block(q,iv,900,300,shapes=True)
+lpa=iv.sig("lfo-pitch",0); pitch=q.add(f"#X obj 30 200 expr~ {D}v1 + ({D}v2-0.5)*24 + {D}v3*{D}v4*2;")
+for c in [(pv,0,pitch,0),(tune,0,pitch,1),(lfo,0,pitch,2),(lpa,0,pitch,3)]: q.con(*c)
+mt=q.add("#X obj 30 230 mtof~;"); q.con(pitch,0,mt,0)
+pw=iv.sig("width",0.2); pwm=iv.sig("pwm",0)
+wd=q.add(f"#X obj 300 230 expr~ 0.5-0.45*{D}v1 + {D}v2*{D}v3*0.4;"); q.con(pw,0,wd,0); q.con(lfo,0,wd,1); q.con(pwm,0,wd,2)
+pul=q.add("#X obj 30 270 ockm-blpulse;"); q.con(mt,0,pul,0); q.con(wd,0,pul,1)
+saw=q.add("#X obj 150 270 ockm-blsaw;"); q.con(mt,0,saw,0)
+subm=iv.par("sub-mode",0)
+s2=q.add("#X obj 300 270 *~ 0.5;"); s4=q.add("#X obj 400 270 *~ 0.25;"); q.con(mt,0,s2,0); q.con(mt,0,s4,0)
+sq2=q.add("#X obj 300 300 ockm-blsquare;"); sq4=q.add("#X obj 400 300 ockm-blsquare;"); p25=q.add("#X obj 500 300 ockm-blpulse;"); w25=q.add("#X obj 600 270 sig~ 0.25;")
+for c in [(s2,0,sq2,0),(s4,0,sq4,0),(s4,0,p25,0),(w25,0,p25,1)]: q.con(*c)
+subs=q.add(f"#X obj 300 330 expr~ if({D}f4<0.5 \\, {D}v1 \\, if({D}f4<1.5 \\, {D}v2 \\, {D}v3));")
+for c in [(sq2,0,subs,0),(sq4,0,subs,1),(p25,0,subs,2),(subm,0,subs,3)]: q.con(*c)
+lp_=iv.sig("pulse",0.8); ls_=iv.sig("saw",0.0); lsb=iv.sig("sub",0.4); lnz=iv.sig("noise",0); nz=q.add("#X obj 700 300 noise~;")
+mix=q.add(f"#X obj 30 360 expr~ ({D}v1*{D}v2 + {D}v3*{D}v4*0.9 - {D}v5*{D}v6*0.8 + {D}v7*{D}v8*1.1)*0.75;")
+for c in [(pul,0,mix,0),(lp_,0,mix,1),(saw,0,mix,2),(ls_,0,mix,3),(subs,0,mix,4),(lsb,0,mix,5),(nz,0,mix,6),(lnz,0,mix,7)]: q.con(*c)
+dc=q.add("#X obj 30 390 hip~ 15;"); q.con(mix,0,dc,0)
+cut=iv.par("cutoff",0.45); envamt=iv.par("env",0.45); lfofilt=iv.sig("lfo-filter",0); key=iv.par("key",0.5); res=iv.par("resonance",0.4)
+cx=q.add(f"#X obj 400 400 expr 40*pow(2\\, 9*{D}f1);"); q.con(cut,0,cx,0)
+co=q.add(f"#X obj 400 440 expr~ min(18000\\, max(30\\, {D}f5*pow(2\\, {D}v1*{D}f6*7 + {D}v2*{D}v3*3 + {D}f7*({D}v4-48)/12 + {D}v8*3)));")
+cmod=iv.sig("cutmod",0)
+for c in [(fv,0,co,0),(lfo,0,co,1),(lfofilt,0,co,2),(pitch,0,co,3),(cx,0,co,4),(envamt,0,co,5),(key,0,co,6),(cmod,0,co,7)]: q.con(*c)
+# v1.40 the filter is bob~, a 24 dB ladder (the state-variable filter cost six times as much: four voices wouldn't fit on the Pi)
+rx=q.add(f"#X obj 700 400 expr 0.1+3.75*pow({D}f1\\, 1.2);"); q.con(res,0,rx,0)
+rxm=q.add(f"#X msg 700 425 {D}1 20;"); rxl=q.add("#X obj 700 450 line~;"); q.con(rx,0,rxm,0); q.con(rxm,0,rxl,0)
+bob=q.add("#X obj 30 480 bob~;"); q.con(dc,0,bob,0); q.con(co,0,bob,1); q.con(rxl,0,bob,2)
+rc=q.add(f"#X obj 300 560 expr (1+1.6*{D}f1)/(1+2.5*pow({D}f1\\, 4));"); rcm=q.add("#X obj 30 585 *~ 1;"); q.con(res,0,rc,0); q.con(rc,0,rcm,1); q.con(bob,0,rcm,0)   # resonance thins it, and up top it rings on its own: hold the level
+amp=q.add(f"#X obj 30 615 expr~ tanh(0.6*{D}v1*{D}v2)/tanh(0.6)*0.6;"); q.con(rcm,0,amp,0); q.con(av,0,amp,1)   # level-matched with the Bass
+lvl=iv.sig("level",0.8); g=q.add("#X obj 30 650 *~;"); o=q.add("#X obj 30 690 outlet~;")
+for c in [(amp,0,g,0),(lvl,0,g,1),(g,0,o,0)]: q.con(*c)
+q.save("voices/ockm-inst-analog-voice.pd","#N canvas 100 60 1300 800 12;")
+
+# the Analog: four voices fed by ockm-instpoly (mono, unison, chord or poly: <prefix>-mode). Voices a mode doesn't use are switched off
+q=P(); q.add("#X text 20 10 Analog instrument: up to four voices. ia-mode 0 mono \\, 1 unison (four voices on one note \\, detuned by ia-uni) \\, 2 chord (each key plays the chord set in ia-ch1 to ia-ch3) \\, 3 poly. Settings on <prefix>-<name>.;")
+inl=q.add("#X obj 30 50 inlet;"); al=q.add(f"#X obj 30 80 ockm-instpoly {D}1;"); q.con(inl,0,al,0)
+vs=[q.add(f"#X obj {30+j*160} 130 ockm-inst-analog-voice {D}1;") for j in range(4)]
+sm=q.add("#X obj 30 180 +~;"); gm=q.add(f"#X msg 700 130 {D}1 30;"); gl=q.add("#X obj 700 155 line~;"); g=q.add("#X obj 30 210 *~;"); o=q.add("#X obj 30 250 outlet~;")
+for j,v_ in enumerate(vs): q.con(al,j,v_,0); q.con(v_,0,sm,0)
+for c in [(al,4,gm,0),(gm,0,gl,0),(sm,0,g,0),(gl,0,g,1),(g,0,o,0)]: q.con(*c)
+q.save("voices/ockm-inst-analog.pd","#N canvas 100 60 1300 800 12;")
+
+# ---------- drmz: eight drum voices (v1.40) ----------
+# iz-hit <slot 1-8> <strength 0-1> plays one. iz-on 0 switches them all off (no processing). Each voice is the groovebox's
+# drum voice (ockm-drum z1 .. z8), so its settings are ockm-z<n>-sound, -tune, -decay, -level, -lab... as on the drums tab
+q=P(); q.add("#X text 20 10 drmz: eight drum voices. iz-hit <slot 1-8> <strength> plays one. iz-on 0 switches them off.;")
+rh=q.add("#X obj 30 50 r iz-hit;"); ro=q.add("#X obj 30 80 route 1 2 3 4 5 6 7 8;"); q.con(rh,0,ro,0)
+sm=None
+for i in range(8):
+    tf_=q.add(f"#X obj {30+i*110} 100 t f;"); v_=q.add(f"#X obj {30+i*110} 120 ockm-drum z{i+1};"); q.con(ro,i,tf_,0); q.con(tf_,0,v_,0)   # a float, not a list
+    if sm is None: sm=v_
+    else:
+        a_=q.add(f"#X obj {30+i*110} 160 +~;"); q.con(sm,0,a_,0); q.con(v_,0,a_,1); sm=a_
+o=q.add("#X obj 30 220 outlet~;"); q.con(sm,0,o,0)
+lb=q.add("#X obj 1000 20 loadbang;"); m1=q.add("#X msg 1000 45 1;"); ron=q.add("#X obj 1100 20 r iz-on;"); sw=q.add("#X obj 1000 70 switch~;")
+for c in [(lb,0,m1,0),(m1,0,sw,0),(ron,0,sw,0)]: q.con(*c)
+# v1.41 each voice's own sound from the start: a scene saved before drmz existed has none of these, so without this every
+# voice stayed on sound 0, a kick. A scene that has them sends them after this
+_zd=[(h,d) for h,d,_ in PATTERN_KEYS if h.startswith("ockm-z") and h[6].isdigit()]
+zm=q.add("#X msg 1000 100 "+" ".join(f"\\; {h} {int(d) if float(d)==int(d) else d}" for h,d in _zd)+";"); q.con(lb,0,zm,0)
+q.save("voices/ockm-drmz.pd","#N canvas 100 100 1100 300 12;")
+
+# ---------- the instruments on their own: MIDI in, sound out ----------
+for kind,pre,title in (("bass","ib","Bass"),("analog","ia","Analog")):
+    p=P(); header_text(p,f"{title} instrument on its own (v1.39): play it from a MIDI keyboard or another sequencer. Settings on {pre}-<name>. Velocity 100 and up is an accent. {pre}-note takes note <n> <velocity> or off <n> too.")
+    ni=p.add("#X obj 30 50 notein;"); pk=p.add("#X obj 30 80 pack f f;")   # velocity arrives first (right to left), the note sends it
+    lp_=p.add("#X obj 30 110 list prepend note;"); lt=p.add("#X obj 30 135 list trim;")
+    v=p.add(f"#X obj 30 200 ockm-inst-{kind} {pre};"); rn=p.add(f"#X obj 200 170 r {pre}-note;")
+    lim=p.add("#X obj 30 240 clip~ -1 1;"); dac=p.add("#X obj 30 280 dac~;")
+    for c in [(ni,0,pk,0),(ni,1,pk,1),(pk,0,lp_,0),(lp_,0,lt,0),(lt,0,v,0),(rn,0,v,0),(v,0,lim,0),(lim,0,dac,0),(lim,0,dac,1)]: p.con(*c)
+    p.add("#X obj 400 50 declare -path voices -path seq;")
+    p.save(f"INST_{kind.upper()}.pd","#N canvas 100 100 700 400 12;\n#X declare -path voices -path seq;")
+
 # ================= bass wrapper =================
 q=P()
 q.add("#X text 20 10 Mono synth (bass or lead): six engines \\, one plays at a time (ockm-<track>-engine 0 to 5). Knobs k1-k4 and drive come in on hooks.;")
 inl=q.add("#X obj 30 50 inlet;")
 ks=[q.add(f"#X obj {200+i*130} 50 r ockm-{D}1-k{i+1}-m;") for i in range(4)]
-names=["acid","sub","fm","reese","analogue","donk","raw"]   # each knows its own engine number (4, pluck, retired in v0.98)
+names=["acid","sub","fm","reese","analogue","donk","raw","swarm","pulse"]   # each knows its own engine number (4, pluck, retired in v0.98)
 eng=[q.add(f"#X obj {30+i*130} 130 ockm-mono-{n} {D}1;") for i,n in enumerate(names)]
 sm=q.add("#X obj 30 200 +~;")
 for i,e in enumerate(eng):
@@ -1188,7 +1752,7 @@ q.save("voices/ockm-mono.pd","#N canvas 140 140 900 340 12;")
 # FM becomes DX (2), and the old default pluck (4) becomes Mini.
 # v0.98: acid (0) and juno (1) are retired (analogue with emphasis, and analogue with the chorus, do them); supersaw is 5.
 # The numbers stay as they were, so saved projects keep their engine; the screen moves retired ones on
-LEAD_ENGINES=[("dx",2),("sync",3),("mini",4),("supersaw",5),("raw",6)]
+LEAD_ENGINES=[("dx",2),("sync",3),("mini",4),("supersaw",5),("raw",6),("pulse",7)]   # v1.39 pulse, from the Analog instrument
 def lead_engine(name,idx,title,build): engine(f"voices/ockm-lead-{name}.pd",idx,title,build,core_name="ockm-lead-core",hook="voice",
                                                decay="60*pow(33\\,"+D+"f1)")   # v1.14: 60 ms to 2 s, so a quarter turn already rings past the step
 
@@ -1362,6 +1926,70 @@ def raw(q,core,ks,out,hpf=80,gain=0.8,top=9000):
               (ks[1],0,k2,0),(k2,0,bob,2),(bob,0,rgc,0),(rgc,0,dr,0),(ks[1],0,rgk,0),(rgk,0,rgc,1),(dr,0,t1,0),(t1,0,t2,0),(t2,0,am,0),(core,2,am,1),(am,0,g,0),(g,0,out,0),(mt,0,bs,0),(bs,0,wv,2)]: q.con(*c)
     q.add("#X text 200 110 k1 cutoff / k2 resonance (self-oscillates at the top) / k3 triangle to saw / k4 decay;")
 
+# v1.39 two engines from the instruments: swarm (the Bass instrument's detuned stack and sub) and pulse (the Analog's
+# pulse with PWM). Each through the instruments' 24 dB state-variable filter, opened by the step's filter envelope
+def inst_filter(q,core,ks,src,lo,span,amt,res,kenv=2,x=30,y=330):
+    """v1.40: bob~, the 24 dB ladder (cheap enough for the Pi). Returns the filter: its outlet 0 is the low-pass"""
+    cut=filt_env_mul(q,core,ks,lo,span,amt,kidx=kenv,x=450,y=y-130)
+    kd=q.add(f"#X msg 700 {y-40} {round(0.1+3.6*res,3)};"); lbk=q.add(f"#X obj 700 {y-65} loadbang;"); q.con(lbk,0,kd,0)
+    bob=q.add(f"#X obj {x} {y} bob~;"); q.con(src,0,bob,0); q.con(cut,0,bob,1); q.con(kd,0,bob,2)
+    mk=q.add(f"#X obj {x} {y+30} *~ 1.5;"); q.con(bob,0,mk,0)
+    return mk
+def swarm(q,core,ks,out):
+    # k1 cutoff / k2 swarm (detuned copies, up to 25 cents out) / k3 filter envelope / k4 decay
+    mt=q.add("#X obj 30 200 mtof~;"); q.con(core,0,mt,0)
+    ma=q.add("#X obj 30 230 ockm-blsaw;"); q.con(mt,0,ma,0)
+    sw=q.add(f"#X obj 200 170 expr {D}f1;"); q.con(ks[1],0,sw,0)
+    swl=q.add(f"#X msg 200 195 {D}1 20;"); swn=q.add("#X obj 200 220 line~;"); q.con(sw,0,swl,0); q.con(swl,0,swn,0)
+    cps=[]
+    for j,cents in enumerate((-25,-10,10,25)):
+        r_=q.add(f"#X obj {150+j*110} 250 expr~ {D}v1*pow(2\\, {D}v2*{cents}/1200);"); o_=q.add(f"#X obj {150+j*110} 280 ockm-blsaw;")
+        q.con(mt,0,r_,0); q.con(swn,0,r_,1); q.con(r_,0,o_,0); cps.append(o_)
+    hz=q.add("#X obj 600 250 *~ 0.5;"); so=q.add("#X obj 600 280 osc~;"); q.con(mt,0,hz,0); q.con(hz,0,so,0)
+    mx=q.add(f"#X obj 30 300 expr~ ({D}v1 + ({D}v2+{D}v3+{D}v4+{D}v5)*{D}v6*0.6)/(1+{D}v6*1.4) + {D}v7*0.45;")
+    for c in [(ma,0,mx,0),(cps[0],0,mx,1),(cps[1],0,mx,2),(cps[2],0,mx,3),(cps[3],0,mx,4),(swn,0,mx,5),(so,0,mx,6)]: q.con(*c)
+    dc=q.add("#X obj 30 320 hip~ 15;"); pre=q.add(f"#X obj 30 345 expr~ tanh(1.5*{D}v1)/tanh(1.5);"); q.con(mx,0,dc,0); q.con(dc,0,pre,0)
+    lp=inst_filter(q,core,ks,pre,45,8,10,0.55,y=400)
+    rg=q.add(f"#X obj 560 140 expr min(1\\, max(0\\, ({D}f1-0.6)*4));"); q.con(ks[3],0,rg,0)
+    ra=q.add(f"#X obj 200 470 expr~ max({D}v1\\, {D}f3*pow(min(1\\, max(0\\, {D}v2))\\, 1.5));"); q.con(core,2,ra,0); q.con(core,1,ra,1); q.con(rg,0,ra,2)
+    am=q.add("#X obj 30 500 *~;"); g=q.add("#X obj 30 530 *~ 1.3;")
+    for c in [(lp,0,am,0),(ra,0,am,1),(am,0,g,0),(g,0,out,0)]: q.con(*c)
+    q.add("#X text 200 110 k1 cutoff / k2 swarm (detuned copies: wide) / k3 filter envelope / k4 decay. With a sine sub an octave down.;")
+def pulse(q,core,ks,out,gain=0.75):
+    # k1 cutoff / k2 pulse width (square to thin) / k3 PWM (a slow sweep of the width) / k4 decay
+    mt=q.add("#X obj 30 200 mtof~;"); q.con(core,0,mt,0)
+    lf=q.add("#X obj 250 170 osc~ 0.7;"); kw=q.add(f"#X obj 200 140 expr 0.5-0.42*{D}f1;"); kp=q.add(f"#X obj 310 140 expr 0.38*{D}f1;")
+    q.con(ks[1],0,kw,0); q.con(ks[2],0,kp,0)
+    wl=q.add(f"#X msg 200 170 {D}1 20;"); wn=q.add("#X obj 200 195 line~;"); pl=q.add(f"#X msg 310 170 {D}1 20;"); pn=q.add("#X obj 310 195 line~;")
+    wd=q.add(f"#X obj 200 225 expr~ {D}v1 + {D}v2*{D}v3;")
+    for c in [(kw,0,wl,0),(wl,0,wn,0),(kp,0,pl,0),(pl,0,pn,0),(wn,0,wd,0),(lf,0,wd,1),(pn,0,wd,2)]: q.con(*c)
+    pu=q.add("#X obj 30 250 ockm-blpulse;"); q.con(mt,0,pu,0); q.con(wd,0,pu,1)
+    hz=q.add("#X obj 400 230 *~ 0.5;"); sq=q.add("#X obj 400 260 ockm-blsquare;"); q.con(mt,0,hz,0); q.con(hz,0,sq,0)
+    mx=q.add(f"#X obj 30 290 expr~ {D}v1 - {D}v2*0.4;"); q.con(pu,0,mx,0); q.con(sq,0,mx,1)
+    dc=q.add("#X obj 30 315 hip~ 15;"); q.con(mx,0,dc,0)
+    lp=inst_filter(q,core,ks,dc,50,8,6,0.35,kenv=None,y=400)
+    rg=q.add(f"#X obj 560 140 expr min(1\\, max(0\\, ({D}f1-0.6)*4));"); q.con(ks[3],0,rg,0)
+    ra=q.add(f"#X obj 200 470 expr~ max({D}v1\\, {D}f3*pow(min(1\\, max(0\\, {D}v2))\\, 1.5));"); q.con(core,2,ra,0); q.con(core,1,ra,1); q.con(rg,0,ra,2)
+    am=q.add("#X obj 30 500 *~;"); g=q.add(f"#X obj 30 530 *~ {gain};")
+    for c in [(lp,0,am,0),(ra,0,am,1),(am,0,g,0),(g,0,out,0)]: q.con(*c)
+    q.add("#X text 200 110 k1 cutoff / k2 pulse width (square to thin) / k3 PWM (a slow sweep of the width) / k4 decay. With a square sub.;")
+# v1.45 the full Bass synth as the bass part's engine 8 (it was swarm, a cut-down copy). Same file, so the wrapper is unchanged
+def synth_engine(fn,idx,kind,pre,hook,gain,title):
+    """A part's notes (note accent glide hold / off) into one of the synths, through ockm-partvoice. Keys and the
+    arpeggiator reach it on <pre>-note. Switched off (no processing) unless the part's engine is this one. The four knob
+    inlets are there for the wrapper; the synth's own settings are <pre>-<name>."""
+    q=P(); q.add(f"#X text 20 10 {title};")
+    inl=q.add("#X obj 30 50 inlet;"); [q.add(f"#X obj {200+i*110} 50 inlet;") for i in range(4)]
+    sp=q.add("#X obj 30 80 spigot 0;"); pv=q.add("#X obj 30 110 ockm-partvoice;")
+    v=q.add(f"#X obj 30 150 ockm-inst-{kind} {pre};"); rn=q.add(f"#X obj 200 120 r {pre}-note;")
+    g=q.add(f"#X obj 30 190 *~ {gain};"); o=q.add("#X obj 30 560 outlet~;")
+    re=q.add(f"#X obj 700 50 r ockm-{D}1-{hook};"); eq=q.add(f"#X obj 700 80 == {idx};"); tf=q.add("#X obj 700 110 t f f f;")
+    sw=q.add("#X obj 700 170 switch~;"); s0=q.add("#X obj 760 140 sel 0;"); pm=q.add("#X msg 760 170 panic;")
+    for c in [(inl,0,sp,0),(sp,0,pv,0),(pv,0,v,0),(rn,0,v,0),(v,0,g,0),(g,0,o,0),(re,0,eq,0),(eq,0,tf,0),(tf,2,sw,0),(tf,1,sp,1),(tf,0,s0,0),(s0,0,pm,0),(pm,0,pv,0)]: q.con(*c)
+    lb=q.add("#X obj 860 50 loadbang;"); z=q.add("#X msg 860 80 0;"); q.con(lb,0,z,0); q.con(z,0,sw,0)   # off until picked
+    q.save(fn,"#N canvas 160 160 900 620 12;")
+synth_engine("voices/ockm-mono-swarm.pd",8,"bass","ib","engine",BASS_SYNTH_GAIN,"Bass synth (v1.45): the full Bass synth as the bass part's engine 8. Its settings are ib-<name>. Edit opens its page")
+engine("voices/ockm-mono-pulse.pd",9,"Pulse engine (from the Analog instrument): a pulse with PWM and a square sub \\, through a 24 dB filter. The classic 101 bass",pulse)
 engine("voices/ockm-mono-raw.pd",7,"Raw engine (MS-20 style): triangle or saw into a screaming resonant filter \\, driven. Hypnotic techno and big tech house riffs",lambda q,c,k,o: raw(q,c,k,o,hpf=25,gain=1.15,top=3200))
 
 for nm,fnb,title in [
@@ -1369,9 +1997,11 @@ for nm,fnb,title in [
         ("sync",lead_sync,"Sync lead: a hard-synced saw that sweeps with the envelope. Tech house and electro"),
         ("mini",lead_mini,"Analogue lead (was mini): three oscillators driven into a ladder filter. Big and warm"),
         ("supersaw",lead_supersaw,"Supersaw lead: seven detuned saws. One saw to a trance stack \\, a hoover with a long decay"),
-        ("raw",raw,"Raw lead (MS-20 style): triangle or saw into a screaming resonant filter \\, driven. Hypnotic techno sequences")]:
+        ("raw",raw,"Raw lead (MS-20 style): triangle or saw into a screaming resonant filter \\, driven. Hypnotic techno sequences"),
+        ]:
     lead_engine(nm,dict(LEAD_ENGINES)[nm],title,fnb)
 
+synth_engine("voices/ockm-lead-pulse.pd",7,"analog","ia","voice",ANALOG_SYNTH_GAIN,"Analog synth (v1.45): the full Analog synth as the lead part's engine 7 (it was pulse). Its settings are ia-<name>. Edit opens its page")
 # ================= lead wrapper =================
 q=P()
 q.add("#X text 20 10 Lead synth: its own engines \\, one plays at a time (ockm-lead-engine: "+" ".join(f"{i} {n}" for n,i in LEAD_ENGINES)+"). Glides on slide steps and adds vibrato to held notes.;")
@@ -1423,6 +2053,11 @@ rpl=q.add("#X obj 260 300 r ockm-playing;"); rspg=q.add("#X obj 30 312 spigot 0;
 ron=q.add(f"#X obj 30 290 spigot {D}1;"); q.con(rrw,0,ron,0)
 for c in [(ron,0,rspg,0),(rpl,0,rspg,1),(rspg,0,trw,0),(trw,2,wet,0),(trw,1,spin,0),(spin,0,dv,0),(trw,0,drw,0),
           (drw,0,trs,0),(trs,2,rst,0),(trs,1,dry,0),(trs,0,zd,0)]: q.con(*c)
+# v1.49 ockm-rewind-to <ms>: the same spin back, for that long, then straight back to the live mix (the loop carries on:
+# a recipe's rewind ends right on the drop)
+rrt=q.add("#X obj 560 300 r ockm-rewind-to;"); rtsp=q.add(f"#X obj 560 320 spigot {D}1;"); trt=q.add("#X obj 560 345 t b b f;")
+drt=q.add("#X obj 560 375 delay;"); trt2=q.add("#X obj 560 400 t b b;")
+for c in [(rrt,0,rtsp,0),(rtsp,0,trt,0),(trt,2,drt,1),(trt,1,wet,0),(trt,1,spin,0),(trt,0,drt,0),(drt,0,trt2,0),(trt2,1,dry,0),(trt2,0,zd,0)]: q.con(*c)
 # --- beat repeat
 rrp=q.add("#X obj 30 460 r ockm-repeat;"); srp=q.add("#X obj 30 485 sel 1 0;")
 arm=q.add("#X obj 200 535 spigot 0;"); a1=q.add("#X msg 30 510 1;"); a0=q.add("#X msg 100 510 0;")
@@ -1448,9 +2083,9 @@ q.save("seq/ockm-stutter.pd","#N canvas 120 120 900 800 12;")
 
 # ================= bus effects (v1.23) =================
 # [ockm-busfx <bus>]: one effect slot on a bus (drums, music, master), played from the FX page's XY pad and from macros.
-# ockm-bfx-<bus>-type 0 filter 1 crush 2 drive 3 saturate; -on 0/1 (in or out, with a short fade); -x and -y 0-1 (the pad);
+# ockm-bfx-<bus>-type 0 filter 1 crush 2 drive 3 saturate 4 gate; -on 0/1 (in or out, with a short fade); -x and -y 0-1 (the pad);
 # -glide 0-1 (how fast x and y follow, 15 ms to 1 s). Per effect: ockm-bfx-<bus>-<effect>-mix (dry/wet) and -p (its setting:
-# filter none, crush tone, drive character, saturate bias). Only the effect in use runs (switch~), and only while it's in.
+# filter none, crush tone, drive character, saturate bias, gate pattern). Only the effect in use runs (switch~), and only while it's in.
 def busfx_effect(sp,k,name):
     """One effect, in its own subpatch (switched on only while it's the bus's effect and in). Params from $0-x/$0-y (smoothed)."""
     ii=sp.add("#X obj 20 20 inlet~;"); oo=sp.add("#X obj 20 420 outlet~;")
@@ -1485,6 +2120,32 @@ def busfx_effect(sp,k,name):
         dv=sp.add(f"#X obj 20 140 expr~ (tanh({D}f2*{D}v1+{D}f3)-tanh({D}f3))*{D}f4;")
         hp=sp.add("#X obj 20 170 hip~ 20;"); lp=sp.add("#X obj 20 195 lop~ 18000;")
         for c in [(pk,0,px,0),(ii,0,dv,0),(px,0,dv,1),(px,1,dv,2),(px,3,dv,3),(dv,0,hp,0),(hp,0,lp,0),(px,2,lp,1),(lp,0,mx,1)]: sp.con(*c)
+    elif name=="gate":
+        # v1.49 the gate (after PERF-1's Gate 8 / Gate 16 / gate pattern): the bus chopped in time. On each 16th step it
+        # works out the slots that start in that step and opens each one for 55% of its length. x: the rate (1/4, 1/8, 1/16,
+        # 1/32 across the pad), y: the depth (how far it closes: none at the bottom, silence at the top), setting: the
+        # pattern (0 straight, 1/3 3-3-2, 2/3 off-beats, 1 dotted). Steps arrive swung, so the gate swings with the drums
+        F1,F2,F3,F4=f"int({D}f1)",f"{D}f2",f"{D}f3",f"{D}f4"
+        dd=f"min(3\\, int({F2}*4))"
+        nn=f"if({dd}==0\\, 4\\, if({dd}==1\\, 2\\, 1))"
+        LL=f"(ockm_stepms*if({dd}==0\\, 4\\, if({dd}==1\\, 2\\, if({dd}==2\\, 1\\, 0.5))))"
+        pt=f"int({F4}*3.99)"
+        def op(sl): return f"if({pt}==0\\, 1\\, if({pt}==1\\, (({sl})%8==0 || ({sl})%8==3 || ({sl})%8==6)\\, if({pt}==2\\, ({sl})%2==1\\, (({sl})%16)%3==0)))"
+        sA=f"if({dd}==3\\, 2*{F1}\\, int({F1}/{nn}))"; sB=f"(2*{F1}+1)"
+        fl=f"(1-{F3})"
+        gA=f"if({op(sA)}\\, 1\\, {fl})"
+        outs=[gA, fl, f"{LL}*0.55", f"if({dd}==3\\, if({op(sB)}\\, 1\\, {fl})\\, {gA})", f"if({dd}==3\\, {LL}\\, 0)", fl,
+              f"if({dd}==3\\, {LL}\\, 0)+{LL}*0.55", f"{dd}==3 || ({F1}%{nn})==0"]
+        rs=sp.add("#X obj 300 140 r ockm-step;"); up=sp.add("#X obj 400 110 unpack f f f;")
+        ex=sp.add(f"#X obj 300 170 expr {' \; '.join(outs)};")
+        pg=sp.add("#X obj 300 210 pack f f f f f f f;"); sg=sp.add("#X obj 300 235 spigot;")
+        mg=sp.add(f"#X msg 300 260 {D}1 2 0 \\, {D}2 4 {D}3 \\, {D}4 2 {D}5 \\, {D}6 4 {D}7;")
+        vl=sp.add("#X obj 200 290 vline~;"); gm=sp.add("#X obj 20 320 *~;")
+        # stopped: open (so it never sits silent); and open as it loads
+        rpl=sp.add("#X obj 500 210 r ockm-playing;"); s0=sp.add("#X obj 500 235 sel 0;"); one=sp.add("#X msg 500 260 1 5;"); glb=sp.add("#X obj 580 235 loadbang;")
+        for c in [(pk,0,up,0),(up,0,ex,1),(up,1,ex,2),(up,2,ex,3),(rs,0,ex,0),(ex,7,sg,1),(sg,0,mg,0),(mg,0,vl,0),(pg,0,sg,0),
+                  (ii,0,gm,0),(vl,0,gm,1),(gm,0,mx,1),(rpl,0,s0,0),(s0,0,one,0),(glb,0,one,0),(one,0,vl,0)]: sp.con(*c)
+        for j in range(7): sp.con(ex,j,pg,j)
     else:  # saturate
         # gentle: tanh around a bias (even harmonics, like tape), scaled so quiet signals pass at the same level and only the
         # peaks round off. x: how much (1 to 7 times), y: warmth (rolls the top off, lifts the low end), setting: bias
@@ -1495,7 +2156,7 @@ def busfx_effect(sp,k,name):
         for c in [(pk,0,px,0),(ii,0,sv,0),(px,0,sv,1),(px,1,sv,2),(px,2,sv,3),(sv,0,wm,0),(sv,0,l1,0),(sv,0,l2,0),(l1,0,wm,1),(l2,0,wm,2),
                   (px,3,wm,3),(px,4,wm,4),(wm,0,hp,0),(hp,0,mx,1)]: sp.con(*c)
 q=P()
-q.add("#X text 20 10 Bus effect (v1.23): one slot on a bus. ockm-bfx-<bus>-type 0 filter 1 crush 2 drive 3 saturate \\, -on \\, -x \\, -y \\, -glide \; per effect -<effect>-mix and -<effect>-p.;")
+q.add("#X text 20 10 Bus effect (v1.23): one slot on a bus. ockm-bfx-<bus>-type 0 filter 1 crush 2 drive 3 saturate 4 gate \\, -on \\, -x \\, -y \\, -glide \; per effect -<effect>-mix and -<effect>-p.;")
 inl=q.add("#X obj 30 50 inlet~;"); out=q.add("#X obj 30 500 outlet~;")
 # x and y, smoothed (glide)
 rgl=q.add(f"#X obj 600 40 r ockm-bfx-{D}1-glide;"); gx=q.add(f"#X obj 600 65 expr 15+985*{D}f1*{D}f1;")
@@ -1540,7 +2201,7 @@ q.add("#X text 20 10 Master effects: reverb and delay returns \\, DJ filter \\, 
 inl0=q.add("#X obj 30 30 inlet~;"); ctch=q.add("#X obj 150 30 catch~ ockm-revbus;"); verb=q.add("#X obj 150 55 ockm-verb;"); vm=q.add("#X obj 150 75 *~ 0.3;")
 rvm=q.add("#X obj 300 30 r ockm-verb-mix;"); pre=q.add("#X obj 30 70 +~;"); inl=q.add("#X obj 30 90 +~;")
 dcat=q.add("#X obj 200 300 catch~ ockm-dlybus;")
-for c in [(inl0,0,pre,0),(ctch,0,verb,0),(verb,0,vm,0),(vm,0,pre,1),(rvm,0,vm,1),(pre,0,inl,0)]: q.con(*c)
+for c in [(inl0,0,pre,0),(ctch,0,verb,0),(verb,0,vm,0),(vm,0,pre,1),(pre,0,inl,0)]: q.con(*c)   # the reverb level arrives through the mood (below)
 inl2=q.add("#X obj 30 100 +~;")   # plus the dub throw's echoes
 h1=q.add("#X obj 30 90 hip~ 10;"); h2=q.add("#X obj 30 115 hip~ 10;"); l1=q.add("#X obj 30 140 lop~ 20000;"); l2=q.add("#X obj 30 165 lop~ 20000;")
 rf0=q.add("#X obj 300 20 r ockm-filter;"); pkf=q.add("#X obj 300 40 pack f 25;"); rgl=q.add("#X obj 400 20 r ockm-filter-glide;")
@@ -1561,9 +2222,31 @@ rfb=q.add("#X obj 500 330 r ockm-delay-fb;"); rmx=q.add("#X obj 500 380 r ockm-d
 tff=q.add("#X obj 620 280 t b f;"); fs=q.add("#X obj 500 220 f 121;")
 sm=q.add("#X obj 30 440 +~;"); lim=q.add(f"#X obj 30 470 expr~ if(abs({D}v1)<0.8 \\, {D}v1 \\, (0.8+0.2*tanh((abs({D}v1)-0.8)/0.2))*({D}v1/abs({D}v1)));"); out=q.add("#X obj 30 510 outlet~;")   # limiter: clean below 0.8
 for c in [(inl,0,inl2,0),(inl2,0,h1,0),(h1,0,h2,0),(h2,0,l1,0),(l1,0,l2,0),(tfn,0,rmx_,0),(rmx_,0,fx,0),(fx,0,h1,1),(fx,0,h2,1),(fx,1,l1,1),(fx,1,l2,1),
-          (rdv,0,dvx,0),(dvx,0,th,1),(l2,0,th,0),(dcat,0,dw,0),(dr,0,fb,0),(fb,0,dw,0),(dr,0,mx,0),(mx,0,inl,1),
-          (rst,0,fs,0),(fs,0,dtm,0),(rsteps,0,tff,0),(tff,1,dtm,1),(tff,0,fs,0),(dtm,0,dr,0),(rfb,0,fb,1),(rmx,0,mx,1),
-          (th,0,lim,0),(lim,0,out,0)]: q.con(*c)
+          (dvx,0,th,1),(l2,0,th,0),(dcat,0,dw,0),(dr,0,fb,0),(fb,0,dw,0),(dr,0,mx,0),(mx,0,inl,1),
+          (rst,0,fs,0),(fs,0,dtm,0),(rsteps,0,tff,0),(tff,1,dtm,1),(tff,0,fs,0),(dtm,0,dr,0),(rfb,0,fb,1),
+          (lim,0,out,0)]: q.con(*c)
+# v1.49 (from PERF-1) the delay's repeats darken and thin each time round (a high-pass and a low-pass in the loop), and the
+# feedback is capped at 0.85 so it can't run away
+dhp=q.add("#X obj 200 315 hip~ 180;"); dlp=q.add("#X obj 200 340 lop~ 3800;"); fbc=q.add("#X obj 500 355 clip 0 0.85;")
+q.dis(dr,0,fb,0); q.dis(rfb,0,fb,1)
+for c in [(dr,0,dhp,0),(dhp,0,dlp,0),(dlp,0,fb,0),(rfb,0,fbc,0),(fbc,0,fb,1)]: q.con(*c)
+# v1.49 the reverb and delay returns dip a little with each kick (the quick duck), so the tails don't cloud the kick.
+# ockm-fx-duck: how far (0 off, 1 all the way), 0.3 out of the box
+rdk=q.add("#X obj 800 120 r~ ockm-duck-short;"); rfd=q.add("#X obj 920 95 r ockm-fx-duck;"); lfd=q.add("#X obj 1020 95 loadbang;"); m3=q.add("#X msg 1020 120 0.3;")
+dkx=q.add(f"#X obj 800 150 expr~ 1-{D}f2*{D}v1;"); vdk=q.add("#X obj 150 95 *~;"); mdk=q.add("#X obj 260 420 *~;")
+q.dis(vm,0,pre,1); q.dis(mx,0,inl,1)
+for c in [(rdk,0,dkx,0),(rfd,0,dkx,1),(lfd,0,m3,0),(m3,0,dkx,1),(vm,0,vdk,0),(dkx,0,vdk,1),(vdk,0,pre,1),(mx,0,mdk,0),(dkx,0,mdk,1),(mdk,0,inl,1)]: q.con(*c)
+q.con(th,0,lim,0)
+# v1.49 the mood (ockm-mood, 0 chill to 1 peak, 0.5 as set) on the effects: wetter towards chill, drier and a touch more
+# driven towards peak. Each setting is scaled as it arrives, and again when the mood moves
+def mood_on(src, dst, inlet, ex, x, y):
+    mf=q.add(f"#X obj {x} {y} expr {ex};"); hold=q.add(f"#X obj {x+150} {y} f;"); rmo=q.add(f"#X obj {x+150} {y-25} r ockm-mood;")
+    tm=q.add(f"#X obj {x+150} {y+25} t b f;"); lb_=q.add(f"#X obj {x+250} {y-25} loadbang;"); m5=q.add(f"#X msg {x+250} {y} 0.5;")
+    q.con(src,0,mf,0); q.con(src,0,hold,1); q.con(rmo,0,tm,0); q.con(lb_,0,m5,0); q.con(m5,0,tm,0)
+    q.con(tm,1,mf,1); q.con(tm,0,hold,0); q.con(hold,0,mf,0); q.con(mf,0,dst,inlet)
+mood_on(rvm,vm,1,f"{D}f1*(1.25-0.5*{D}f2)",700,700)
+mood_on(rmx,mx,1,f"{D}f1*(1.25-0.5*{D}f2)",700,800)
+mood_on(rdv,dvx,0,f"{D}f1+max(0\\, {D}f2-0.5)*0.3",700,900)
 q.add("#X text 500 410 delay time = step length x delay steps (3 = dotted 8th);")
 # dub throw: while held, the whole mix goes into its own echo line; let go and the echoes ring out
 rth=q.add("#X obj 700 450 r ockm-delay-throw;"); thm=q.add(f"#X msg 700 475 {D}1 15;"); thl=q.add("#X obj 700 500 line~;")
@@ -1614,8 +2297,12 @@ rst=q.add("#X obj 330 200 r ockm-stepms;"); d6=q.add("#X obj 330 230 / 6;")
 met=q.add("#X obj 30 270 metro 20;"); m248=q.add("#X msg 30 300 248;")
 mo=q.add("#X obj 30 360 midiout;"); scs=q.add("#X obj 120 360 s ockm-clock-sent;")
 tpl=q.add("#X obj 30 90 t b f;")
+# v1.49 the clock goes out a quarter step late, as the engine plays (it runs a quarter step behind so hits can be early):
+# gear following it lands with the box rather than 30 ms ahead. Start, the clocks and stop all move together
+lag=q.add("#X obj 30 195 pipe 0;"); lq=q.add("#X obj 400 230 * 0.25;")
+q.con(rst,0,lq,0); q.con(lq,0,lag,1)
 for c in [(rpl,0,tpl,0),(tpl,1,fpl,1),(tpl,0,fpl,0),(rsy,0,pk,0),(rco,0,tco,0),(tco,1,pk,1),(tco,0,pk,0),(pk,0,allow,0),
-          (allow,0,tal,0),(tal,1,go,1),(tal,0,fpl,0),(fpl,0,go,0),(go,0,tgo,0),(tgo,1,ch,0),(ch,0,sel,0),(sel,0,m252,0),(sel,1,m250,0),(tgo,0,met,0),
+          (allow,0,tal,0),(tal,1,go,1),(tal,0,fpl,0),(fpl,0,go,0),(go,0,lag,0),(lag,0,tgo,0),(tgo,1,ch,0),(ch,0,sel,0),(sel,0,m252,0),(sel,1,m250,0),(tgo,0,met,0),
           (rst,0,d6,0),(d6,0,met,1),(met,0,m248,0),(m248,0,mo,0),(m250,0,mo,0),(m252,0,mo,0),(m248,0,scs,0),(m250,0,scs,0),(m252,0,scs,0)]: q.con(*c)
 # --- follower: receive clock ---
 mri=q.add("#X obj 500 60 midirealtimein;"); rrt=q.add("#X obj 650 60 r ockm-midi-rt;")
@@ -1870,6 +2557,16 @@ def _groove_line(sw,parts):
     for nm in _SND: vals+=[{".":0,"x":1,"X":2,"g":0.35,"o":0.65}[c] for c in parts.get(nm,"."*16)]   # v0.86: g ghost, o soft
     return " ".join(str(v) for v in [sw]+vals)
 PRE["groove"]=[(nm,_groove_line(sw,parts)) for nm,sw,parts in GROOVES]
+# v1.40 drmz's sequencer: # its sequencer: Lua, with the groovebox's house and techno grooves written in
+_gl=[]
+for _bank,_idx in GROOVE_BANKS:
+    for _i in _idx:
+        _nm,_sw,_parts=GROOVES[_i]
+        _vals=[]
+        for _snd in _SND: _vals.append("{"+",".join(str({".":0,"x":1,"X":2,"g":0.35,"o":0.65}[c]) for c in _parts.get(_snd,"."*16))+"}")
+        _gl.append('{ name = "%s", bank = "%s", swing = %d, rows = { %s } }' % (_nm.replace("-"," "),_bank,_sw,", ".join(_vals)))
+_src=open(os.path.join(os.path.dirname(os.path.abspath(__file__)),"..","seq","ockm-drmzseq.lua.in")).read()
+open(os.path.join(R,"seq","ockm-drmzseq.pd_lua"),"w").write(_src.replace("--GROOVES--","\n  ".join(g+"," for g in _gl)))
 # drum fills: what changes on the last bar of a phrase. Per drum sound, 16 steps: '.' keep your pattern, '-' silent, 'x' hit, 'X' accent.
 FILLS=[
  ("snare-roll",dict(snare="........x-x-xxXX",clap="........--------")),
@@ -1881,6 +2578,26 @@ FILLS=[
  ("breakbeat",dict(kick="X.x.......Xx....",snare="....X..x.x..X..x",hat="x.x.x.x.x.x.x.x.",clap="----------------",ohat="----------------",
                    tom="----------------",perc1="----------------",perc2="----------------")),
 ]
+# v1.49 the 4 bar build (the recipe's "snare build" move): 64 steps per drum sound, played in place of the pattern
+# for four bars, then the drop. '.' keep your pattern, '-' silent, 'o' soft, 'x' hit, 'X' accent, '2' and '3' an
+# accented roll of 2 or 3 (32nds and triplet 32nds). The snare climbs quarters, 8ths, 16ths, then rolls; the clap joins
+# in bar 3; the hats go to 16ths; the kick and the rest drop out for the last bar
+BUILD=dict(kick="."*48+"-"*16,
+           snare="o---o---o---o---"+"o-o-o-o-x-x-x-x-"+"xxxxxxxxxxxxXXXX"+"XXXXXXXX22223333",
+           clap="."*32+"x-x-x-x-x-x-x-x-"+"X-X-X-X-XXXXXXXX",
+           hat="."*32+"x"*32, ohat="."*32+"-"*32, tom="."*32+"-"*32, perc1="."*32+"-"*32, perc2="."*32+"-"*32)
+# v1.49 the 4 bar rush (after PERF-1's build): the kick and the rest drop out while the snare climbs, then in the last
+# bar the kick comes back four to the floor and the open hat plays every 8th, into the drop
+RUSH=dict(kick="-"*48+"X---x---x---x---",
+          snare="x---x---x---x---"+"x-x-x-x-x-x-x-x-"+"xxxxxxxxxxxxxxxx"+"XXXXXXXX2222XXXX",
+          clap="-"*64, hat="."*48+"-"*16, ohat="-"*48+"x-x-x-x-x-x-x-x-", tom="-"*64, perc1="-"*64, perc2="-"*64)
+def _build_values():
+    vals=[]
+    for pat in (BUILD,RUSH):   # ockm-buildx: the build's 512 values, then the rush's
+        for nm in _SND:
+            row=pat.get(nm,"."*64); assert len(row)==64, (nm,len(row))
+            vals+=[{".":-1,"-":0,"o":0.6,"x":1,"X":2,"2":22,"3":32}[c] for c in row]
+    return vals
 def _fill_line(parts):
     for k,v in parts.items(): assert k in _SND and len(v)==16, (k,v)
     vals=[]
@@ -2098,6 +2815,7 @@ if os.path.exists(_ui_src):
             "local CHORD_RHY = "+_lua_list([(n.replace("-"," "),) for n,_ in PRE["chordrhythm"]])+"\n"
             "local PROGS = "+_lua_list([(n.replace("-"," "),lab) for n,lab,_ in PROGS])+"\n"
             "local SPICE = "+_lua_list([(i,lab) for i,lab in SPICE])+"\n"
+            "ockm_SOUNDS = { "+", ".join(f'{pt} = {{ '+", ".join("{ "+", ".join("nil" if v is None else str(v) for v in snd[:6])+f", {sound_trim(pt,snd)} }}" for snd in l)+" }" for pt,l in SOUNDS.items())+" }\n"
             "local FILLS = { "+", ".join(f'"{n.replace("-"," ")}"' for n,_ in FILLS)+" }\n"
             "local GROOVES = { "+", ".join(f'"{n.replace("-"," ")}"' for n,_,_ in GROOVES)+" }\n"
             "local GROOVE_BANKS = { "+", ".join(f'{{ "{n}", {{ '+", ".join(str(x) for x in l)+' } }' for n,l in GROOVE_BANKS)+" }\n"
@@ -2120,8 +2838,8 @@ p.save("seq/ockm-presets.pd","#N canvas 200 200 820 200 12;")
 # Older loop files hold one length (ockm-len) and maybe a drums loop (ockm-drum-loop): while loading, those set the parts.
 # Until the screens have a length per part: ockm-length sets every part (drums stay shorter if they were),
 # ockm-drum-loop sets the drum length (0 = as long as the synths), ockm-drum-double doubles the drums.
-PARTS=["drum","bass","lead","chord"]
-LOOPX="max(max(ockm_drumlen\\,ockm_basslen)\\,max(ockm_leadlen\\,ockm_chordlen))"
+PARTS=["drum","bass","lead","chord","vox"]   # v1.38: vox is the samples part
+LOOPX="max(max(max(ockm_drumlen\\,ockm_basslen)\\,max(ockm_leadlen\\,ockm_chordlen))\\,ockm_voxlen)"
 SYNX="max(ockm_basslen\\,max(ockm_leadlen\\,ockm_chordlen))"
 p=P()
 p.add("#X text 20 10 Part lengths: each part repeats inside the loop \\, and the loop is as long as the longest part.;")
@@ -2148,9 +2866,9 @@ for i,pt in enumerate(PARTS):
     for c in [(rr,0,cl,0),(cl,0,t3,0),(t3,2,t2,0),(t2,1,pk,1),(t2,0,ex,0),(ex,0,mo,0),(mo,1,pk,0),(pk,0,sx,0),
               (t3,1,mx,0),(mx,0,vmx,0),(t3,0,tbf,0),(tbf,1,vl,0),(tbf,0,lbang,0)]: p.con(*c)
 # loaded: each part has reached its own length; send the loop length (and the drums' share) once
-s0=p.add("#X obj 1100 40 sel 0;"); p.con(rld,0,s0,0); tl=p.add("#X obj 1100 65 t b b b b b;"); p.con(s0,0,tl,0)
+s0=p.add("#X obj 1100 40 sel 0;"); p.con(rld,0,s0,0); tl=p.add("#X obj 1100 65 t "+" ".join(["b"]*(len(PARTS)+1))+";"); p.con(s0,0,tl,0)
 for i,pt in enumerate(PARTS):
-    e=p.add(f"#X obj {1100+i*120} 95 expr ockm_{pt}len;"); v=p.add(f"#X obj {1100+i*120} 120 v ockm_{pt}max;"); p.con(tl,4-i,e,0); p.con(e,0,v,0)
+    e=p.add(f"#X obj {1100+i*120} 95 expr ockm_{pt}len;"); v=p.add(f"#X obj {1100+i*120} 120 v ockm_{pt}max;"); p.con(tl,len(PARTS)-i,e,0); p.con(e,0,v,0)
 fl=p.add("#X obj 1100 160 t b b;"); p.con(tl,0,fl,0)
 fx2=p.add(f"#X obj 1100 190 expr if(ockm_drumlen<{SYNX} \\, ockm_drumlen \\, 0);"); p.con(fl,1,lbang,0); p.con(fl,0,fx2,0)
 st=p.add(f"#X msg 1100 220 set {D}1;"); p.con(fx2,0,st,0); p.con(st,0,dch,0); p.con(fx2,0,sdl,0)
@@ -2203,7 +2921,8 @@ for PT in ("bass","lead","chord"):
     for k in range(1,5):
         x=20+(k-1)*200
         rk=p.add(f"#X obj {x} 60 r ockm-{PT}-k{k};"); tk=p.add(f"#X obj {x} 85 t f f;"); vk=p.add(f"#X obj {x+60} 110 v ockm_{PT}_b{k};")
-        ok=p.add(f"#X obj {x} 140 expr if(ockm_{PT}_lt=={k} \\, min(1 \\, max(0 \\, {D}f1+ockm_{PT}_mv)) \\, {D}f1);")
+        lk=f"+ockm_{PT}_kl" if (k==1 and PT in ("bass","chord")) else ""   # v1.49 knob 1 carries the link too (bass and chords)
+        ok=p.add(f"#X obj {x} 140 expr min(1 \\, max(0 \\, {D}f1+if(ockm_{PT}_lt=={k} \\, ockm_{PT}_mv \\, 0){lk}));")
         sk=p.add(f"#X obj {x} 170 s ockm-{PT}-k{k}-m;")
         for c in [(rk,0,tk,0),(tk,1,vk,0),(tk,0,ok,0),(ok,0,sk,0)]: p.con(*c)
     for nm,dflt in [("shape",0),("rate",4),("depth",0)]:
@@ -2234,8 +2953,24 @@ for PT in ("bass","lead","chord"):
     vwas=p.add(f"#X obj 160 650 v ockm_{PT}_was;")
     tb1=p.add("#X obj 120 605 t b f;"); tb2=p.add("#X obj 120 645 t b;")   # store the swing, then the expressions that read it (they want a bang)
     for k in range(1,5):
-        mx=p.add(f"#X obj {20+(k-1)*120} 710 expr min(1 \\, max(0 \\, ockm_{PT}_b{k}+ockm_{PT}_mv));"); ms=p.add(f"#X obj {20+(k-1)*120} 735 s ockm-{PT}-k{k}-m;")
+        lk=f"+ockm_{PT}_kl" if (k==1 and PT in ("bass","chord")) else ""
+        mx=p.add(f"#X obj {20+(k-1)*120} 710 expr min(1 \\, max(0 \\, ockm_{PT}_b{k}+ockm_{PT}_mv{lk}));"); ms=p.add(f"#X obj {20+(k-1)*120} 735 s ockm-{PT}-k{k}-m;")
         p.con(sel2,k-1,mx,0); p.con(mx,0,ms,0)
+    # v1.49 links (after PERF-1): each kick opens the bass's first knob (its filter, on most engines), each snare or clap
+    # the chords', by ockm-<part>-link (0 off, 1 a big push), closing again over about a beat. Added to the knob with the LFO
+    if PT in ("bass","chord"):
+        src={"bass":"ockm-kick-hit","chord":"ockm-snare-hit"}[PT]
+        rlk=p.add(f"#X obj 900 420 r ockm-{PT}-link;"); vla=p.add(f"#X obj 900 445 v ockm_{PT}_la;"); p.con(rlk,0,vla,0)
+        rhit=p.add(f"#X obj 1000 420 r {src};"); kick=p.add(f"#X obj 1000 445 expr ockm_{PT}_la*0.45*min(1\\, {D}f1+0.3) \\; ockm_{PT}_kl;"); p.con(rhit,0,kick,0)
+        vkl=p.add(f"#X obj 1000 470 v ockm_{PT}_kl;"); p.con(kick,0,vkl,0)
+        met2=p.add("#X obj 900 500 metro 20;"); lb2=p.add("#X obj 900 475 loadbang;"); p.con(lb2,0,met2,0)
+        act=p.add(f"#X obj 900 525 expr ockm_{PT}_kl>0.002 || ockm_{PT}_klw>0;"); sa=p.add("#X obj 900 550 sel 0;"); p.con(met2,0,act,0); p.con(act,0,sa,0)
+        dec=p.add(f"#X obj 960 575 expr ockm_{PT}_kl*exp(-20/max(30\\, ockm_stepms*1.6)) \\; ockm_{PT}_kl>0.002;")
+        tdec=p.add("#X obj 960 600 t f f;"); vkl2=p.add(f"#X obj 1060 625 v ockm_{PT}_kl;"); vklw=p.add(f"#X obj 1150 600 v ockm_{PT}_klw;")
+        out1=p.add(f"#X obj 960 650 expr min(1\\, max(0\\, ockm_{PT}_b1 + if(ockm_{PT}_lt==1\\, ockm_{PT}_mv\\, 0) + ockm_{PT}_kl));"); so1=p.add(f"#X obj 960 675 s ockm-{PT}-k1-m;")
+        ttk=p.add("#X obj 960 550 t b b;")
+        for c in [(sa,1,ttk,0),(ttk,1,dec,0),(dec,0,tdec,0),(tdec,0,vkl2,0),(dec,1,vklw,0),(ttk,0,out1,0),(out1,0,so1,0)]: p.con(*c)
+        # the LFO's own sends of knob 1 add the link too
     rst=p.add("#X obj 400 420 r ockm-step;"); s0=p.add("#X obj 400 445 sel 0;"); z=p.add("#X msg 400 470 0;"); vz=p.add(f"#X obj 400 495 v ockm_{PT}_ph;")
     for c in [(lbm,0,met,0),(met,0,ph,0),(ph,1,wr,1),(ph,0,tph,0),(tph,1,vph,0),(tph,1,wr,0),(wr,0,wsel,0),(wsel,0,rnd,0),(rnd,0,rsc,0),(rsc,0,vsh,0),
               (tph,0,shp,0),(shp,0,mv,0),(mv,0,tb1,0),(tb1,1,vmv,0),(tb1,0,tgw,0),(tgw,1,gate,0),(tgw,0,wasx,0),(wasx,0,vwas,0),(gate,0,spg,0),(spg,1,tb2,0),(tb2,0,go,0),(go,0,sel2,0),
@@ -2374,6 +3109,11 @@ rb=p.add("#X obj 500 260 r ockm-bar;"); tbb=p.add("#X obj 500 285 t b b;"); cnt=
 on=p.add(f"#X obj 500 360 expr if({D}f2>0 \\, ({D}f1 % {D}f2) == {D}f2-1 \\, 0);"); von=p.add("#X obj 500 385 v ockm_fill_on;")
 sfo=p.add("#X obj 600 385 s ockm-fill-now;")
 for c in [(rb,0,tbb,0),(tbb,1,fev,0),(fev,0,on,1),(tbb,0,cnt,0),(cnt,0,inc,0),(inc,0,cnt,1),(cnt,0,on,0),(on,0,von,0),(on,0,sfo,0)]: p.con(*c)
+# v1.49 the 4 bar build: its pattern (8 drums x 64 steps) and the controller that runs it for four bars (seq/ockm-build.pd_lua)
+p.add("#X obj 1300 20 table ockm-buildx 1024;")
+lbb=p.add("#X obj 1300 50 loadbang;"); bmsg=p.add("#X msg 1300 75 \\; ockm-buildx 0 "+" ".join(str(v) for v in _build_values())+";"); p.con(lbb,0,bmsg,0)
+bctl=p.add("#X obj 1300 120 ockm-build;"); p.con(bctl,0,p.add("#X obj 1300 150 v ockm_build_on;"),0); p.con(bctl,1,p.add("#X obj 1400 150 v ockm_build_bar;"),0)
+p.con(bctl,2,p.add("#X obj 1500 150 v ockm_build_pat;"),0)   # 0 the build, 1 the rush
 # turnaround: on the last bar of every 4, 8 or 16 bars the harmony goes to V (major) and leads back to the start
 rtv=p.add("#X obj 820 140 r ockm-turn-every;"); ftv=p.add("#X obj 820 165 f 0;"); p.con(rtv,0,ftv,1)
 # v1.04 second half: where the turnaround bar goes, 4 (V, major) or 6 (VII, the climb)
@@ -2434,7 +3174,9 @@ def chord_voice(sp,kind):
         # k3 attack (v0.98): the bottom third is all stab, so old projects' snap settings stay stabs; up to about 0.9 s
         x1=sp.add(f"#X obj 600 140 expr 150*pow(2\\,6*{D}f1);"); x2=sp.add(f"#X obj 690 140 expr 1-(0.008*{D}f1+0.035*{D}f1*{D}f1*{D}f1) \\; 1-0.4*(0.008*{D}f1+0.035*{D}f1*{D}f1*{D}f1) \\; 1+0.4*(0.008*{D}f1+0.035*{D}f1*{D}f1*{D}f1) \\; 1+(0.008*{D}f1+0.035*{D}f1*{D}f1*{D}f1);"); x3=sp.add(f"#X obj 780 140 expr 2+1200*pow({D}f1\\, 2.2);"); x4=sp.add(f"#X obj 870 140 expr 40+3000*{D}f1*{D}f1;")
         for j in range(4): sp.con(tf,3-j,dm[j],0); sp.con(dm[j],0,po[j],0); sp.con(po[j],0,ce,j); sp.con(x2,j,dm[j],1)
-        for c in [(mt,0,tf,0),(ce,0,l1,0),(l1,0,l2,0),(l2,0,am,0),
+        # v1.39 level make-up at the bright end of k1 (fully open it measured 10 dB under closed: right on the knob test's line)
+        mku=sp.add("#X obj 80 330 *~ 1;"); mkx=sp.add(f"#X obj 600 170 expr 1+0.5*(pow({D}f1\\, 2)-0.25);")   # unchanged at the middle; sp.con(k[0],0,mkx,0); sp.con(mkx,0,mku,1)
+        for c in [(mt,0,tf,0),(ce,0,l1,0),(l1,0,l2,0),(l2,0,mku,0),(mku,0,am,0),
                   (fe,0,fa,0),(fa,0,fb,0),(fb,0,fc,0),(fc,0,l1,1),(fc,0,l2,1),
                   (tb,0,tbb,0),(tbb,1,fv,0),(fv,0,pa,0),(pa,0,ma,0),(ma,0,av,0),(tbb,0,dk,0),(mpk,0,mf,0),(mf,0,fe,0),
                   (k[0],0,x1,0),(x1,0,fb,1),(k[1],0,x2,0),(k[2],0,x3,0),(x3,0,pa,2),(x3,0,mpk,2),(k[3],0,x4,0),(x4,0,dk,1),(x4,0,pa,1)]: sp.con(*c)
@@ -2689,10 +3431,12 @@ play=q.add(f"#X msg 620 1330 {D}1 rewind \\, {D}1 bang;"); fcur=q.add("#X obj 62
 l0=q.add("#X msg 700 1330 0;"); sl0=q.add("#X obj 700 1355 s ockm-loading;")
 rf=q.add("#X msg 760 1330 \; ockm-refresh bang;")
 # settings older pattern files don't have: back to their defaults before the pattern plays in
-nwd=q.add("#X msg 560 1380 \\; ockm-drum-loop 0 \\; "+" \\; ".join(f"ockm-pat-{n}-nudge const 0" for n,_ in SLOTS)+";"); q.con(tl,4,nwd,0)
+nwd=q.add("#X msg 560 1380 \\; ockm-drum-loop 0 \\; "+" \\; ".join(f"ockm-pat-{n}-nudge const 0 \\; ockm-pat-{n}-rat const 0 \\; ockm-{n}-chance 1 \\; ockm-{n}-thin 0 \\; ockm-{n}-when 0 \\; ockm-{n}-drift 0" for n,_ in SLOTS)+" \\; ockm-pat-vox-smp const 0 \\; ockm-pat-vox-fx const 0 \\; ockm-vox-len 16"+"".join(f" \\; ockm-pat-{pre_}-on const 0" for pre_ in ("ib","ia"))+"".join(f" \\; ockm-pat-z{i+1} const 0" for i in range(8))+";"); q.con(tl,4,nwd,0)   # v1.38: a scene from before has no samples steps
+# v1.49 call and answer off for scenes from before it, once the parts know a load is on (so they don't rebuild)
+tlo=q.add("#X obj 560 1345 t b f;"); nwa=q.add("#X msg 620 1400 \\; ockm-bass-answer 0 \\; ockm-lead-answer 0 \\; ockm-bass-trim 1 \\; ockm-lead-trim 1 \\; ockm-chord-trim 1 \\; ockm-mood 0.5;")   # v1.49 and sounds at their own level
 syn=q.add(f"#X obj 820 1330 s {D}0-sync;"); one=q.add("#X msg 880 1330 1;")
 for c in [(rl,0,tfb,0),(tfb,1,started,0),(started,0,scap,0),(tfb,0,tl,0),
-          (tl,5,cur,1),(tl,5,lpp,1),(tl,5,fcur,1),(tl,4,l1,0),(l1,0,sl1,0),(tl,3,fcur,0),(fcur,0,play,0),(play,0,sq,0),
+          (tl,5,cur,1),(tl,5,lpp,1),(tl,5,fcur,1),(tl,4,l1,0),(l1,0,tlo,0),(tlo,1,sl1,0),(tlo,0,nwa,0),(tl,3,fcur,0),(fcur,0,play,0),(play,0,sq,0),
           (tl,2,l0,0),(l0,0,sl0,0),(tl,1,rf,0),(tl,0,syn,0),(tl,0,one,0),(one,0,started,1)]: q.con(*c)
 def _fmtv(v): return str(int(v)) if float(v)==int(v) else str(v)
 # --- projects: each project is a folder in projects/ holding project.txt and p1.txt to p8.txt ---
@@ -2709,6 +3453,19 @@ def cmd(src,outlet,word,x,y,target):
     a=q.add(f"#X obj {x} {y} list prepend {word};"); b=q.add(f"#X obj {x} {y+25} list trim;")
     q.con(src,outlet,a,0); q.con(a,0,b,0); q.con(b,0,target,0)
 def sender(key,x,y): return q.add(f"#X obj {x} {y} s {D}0-{key};")
+def safe_write(src,outlet,x,y,target,prefix=None):
+    """v1.49 src's path -> write <path>.new into target (with '<prefix> ' in front, for the pattern buffers), then move
+    <path>.new over <path>: a rename, so a power cut mid-save leaves the old file whole instead of an empty one"""
+    t=q.add(f"#X obj {x} {y} t s s s;"); q.con(src,outlet,t,0)
+    m1=q.add(f"#X obj {x+120} {y+25} makefilename %s.new;"); a=q.add(f"#X obj {x+120} {y+50} list prepend write;")
+    q.con(t,2,m1,0); q.con(m1,0,a,0)
+    if prefix is not None:
+        b=q.add(f"#X obj {x+120} {y+75} list prepend {prefix};"); q.con(a,0,b,0); q.con(b,0,target,0)
+    else:
+        b=q.add(f"#X obj {x+120} {y+75} list trim;"); q.con(a,0,b,0); q.con(b,0,target,0)
+    la=q.add(f"#X obj {x} {y+50} list append;"); m2=q.add(f"#X obj {x} {y+25} makefilename %s.new;")
+    mv=q.add(f"#X obj {x} {y+75} file move;")
+    q.con(t,1,la,1); q.con(t,0,m2,0); q.con(m2,0,la,0); q.con(la,0,mv,0)
 Y0=1450
 # read every file of the open project into the buffers, then play the project settings
 rra=q.add(f"#X obj 20 {Y0} r {D}0-readall;"); dr=holder("dir",20,Y0+50); q.con(rra,0,dr,0)
@@ -2743,11 +3500,10 @@ rwa=q.add(f"#X obj 20 {Y1} r {D}0-writeall;"); dw=holder("dir",20,Y1+50); q.con(
 tw9=q.add(f"#X obj 20 {Y1+75} t b "+" ".join(["s"]*(SLOTN+1))+";"); q.con(dw,0,tw9,0)
 for n in range(SLOTN):
     x=240+n*140; pf=joined(tw9,SLOTN+1-1-n,LOOP_FILE,x,Y1+100)
-    a=q.add(f"#X obj {x} {Y1+150} list prepend write;"); b=q.add(f"#X obj {x} {Y1+175} list prepend {n};")
-    q.con(pf,0,a,0); q.con(a,0,b,0); q.con(b,0,sq,0)
+    safe_write(pf,0,x,Y1+150,sq,prefix=n)   # v1.49
 pw=joined(tw9,SLOTN+1,"project.txt",20,Y1+100); tjw=q.add(f"#X obj 20 {Y1+150} t s b b;")
 cj=q.add(f"#X msg 160 {Y1+175} clear;"); scj=sender("cap-j",100,Y1+200)
-q.con(pw,0,tjw,0); q.con(tjw,2,cj,0); q.con(cj,0,saj,0); q.con(tjw,1,scj,0); cmd(tjw,0,"write",20,Y1+225,saj)
+q.con(pw,0,tjw,0); q.con(tjw,2,cj,0); q.con(cj,0,saj,0); q.con(tjw,1,scj,0); safe_write(tjw,0,20,Y1+225,saj)   # v1.49
 sgq=q.add(f"#X obj 20 {Y1+250} spigot 1;"); q.con(tw9,0,sgq,0); q.con(q.add(f"#X obj 120 {Y1+225} r {D}0-announce;"),0,sgq,1)
 q.con(sgq,0,q.add(f"#X msg 20 {Y1+275} \; ockm-saved bang;"),0)
 # remember the open project in projects/current.txt, and tell the screens its name
@@ -2759,7 +3515,7 @@ nmh=holder("name",160,Y2+75); lst=q.add(f"#X obj 160 {Y2+100} list;"); ins=q.add
 ann=q.add(f"#X obj 260 {Y2+125} s ockm-project-name;")
 bh=holder("base",20,Y2+75); cp=joined(bh,0,"current.txt",20,Y2+100)
 for c in [(rrm,0,trm,0),(trm,1,nmh,0),(nmh,0,lst,0),(lst,0,ins,0),(nmh,0,ann,0),(trm,0,bh,0)]: q.con(*c)
-cmd(cp,0,"write",20,Y2+150,sender("curcmd",20,Y2+200))
+safe_write(cp,0,20,Y2+150,sender("curcmd",20,Y2+250))   # v1.49
 # set the name: $0-name, and $0-dir = base/name
 Y3=Y2+300
 rsn=q.add(f"#X obj 20 {Y3} r {D}0-setname;"); tsn=q.add(f"#X obj 20 {Y3+25} t s s;")
@@ -2937,6 +3693,10 @@ bch=holder("base",250,Y9+400); lpc=q.add(f"#X obj 250 {Y9+425} list append;"); f
 q.con(tchk,1,lpc,1); q.con(tchk,0,bch,0); q.con(bch,0,lpc,0); q.con(lpc,0,fjc,0); q.con(fjc,0,isd,0)
 s01=q.add(f"#X obj 250 {Y9+500} sel 0;"); tb1=q.add(f"#X obj 330 {Y9+525} t b;"); q.con(isd,0,s01,0); q.con(isd,1,dflt,0); q.con(s01,0,dflt,0); q.con(s01,1,tb1,0); q.con(tb1,0,nhold,0)
 sop=q.add(f"#X obj 20 {Y9+525} s ockm-project-open;"); q.con(dflt,0,sop,0); q.con(nhold,0,sop,0)
+# v1.49 a restart keeps unsaved work: tools/pi/ockm-restart.sh sends "keep;" here (UDP port 3091) first, and the screen
+# stashes what's open if it isn't saved (ockm-keep). Only "keep" is listened to
+nrk=q.add(f"#X obj 600 {Y9+450} netreceive -u 3091;"); rtk=q.add(f"#X obj 600 {Y9+475} route keep;"); skp=q.add(f"#X obj 600 {Y9+500} s ockm-keep;")
+q.con(nrk,0,rtk,0); q.con(rtk,0,skp,0)
 q.save("seq/ockm-store.pd","#N canvas 60 60 2200 1960 12;")
 
 # ================= project files =================
@@ -2993,6 +3753,9 @@ build_project(reset=args.reset_patterns, demo=args.demo)
 def build_samples():
     base=os.path.join(R,"samples")
     for d in SAMPLE_DIRS: os.makedirs(os.path.join(base,d),exist_ok=True)
+    for s in ("hooks","jack","techno"):
+        for vce in ("deep","flat"): os.makedirs(os.path.join(base,"vox",s,vce),exist_ok=True)
+    for ud in USER_DIRS: os.makedirs(os.path.join(base,"user",ud),exist_ok=True)   # v1.38 the samples part's own folders
     readme=os.path.join(base,"README.md")
     if True:  # always refresh the readme
         open(readme,"w").write("""# Samples
@@ -3004,6 +3767,10 @@ One folder per drum sound: """+", ".join(SAMPLE_DIRS)+""". Perc 1 and perc 2 bot
 - The screen shows samples by number, in file-name order: `01.wav` is sample 1. Numbering your files keeps it predictable
 - Mono or stereo (only the left channel plays), any sample rate
 - Up to about 64 per folder keeps browsing quick on the 10-inch screen
+
+**Vox** (`vox/<set>/<voice>/01.wav` and on): spoken lines, mono 48 kHz, played whole. The lines are in `tools/vox_lines.txt`. `tools/make_vox.py` renders them. The box never makes the voice itself.
+
+**Samples part** (`user/voice`, `user/loops`, `user/hits`): your own sounds for the samples tab, one folder per tab on the screen. Drop WAVs in and they show in that tab in file-name order. Each plays whole, from the start to its end, so trim loops to a bar or two at your tempo. Mono is best. The spoken lines above are under **robot**.
 
 Audio files in here aren't saved to git (they're big). Back the folder up yourself.
 """)

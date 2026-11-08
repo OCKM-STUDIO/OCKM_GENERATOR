@@ -1,0 +1,12 @@
+[Unit]
+Description=OCKM USB audio out (the Pi as a 14-channel USB audio interface)
+After=sys-kernel-config.mount
+ConditionPathIsDirectory=/sys/class/udc
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/home/simon/OCKM_GENERATOR/tools/pi/ockm-usb-audio.sh
+
+[Install]
+WantedBy=multi-user.target

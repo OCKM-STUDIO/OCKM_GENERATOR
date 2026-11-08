@@ -585,6 +585,50 @@ def listens(t):
     txt = open(os.path.join(R, "lab", f"ockm-lab-{t}.pd")).read()
     return sorted(set(re.findall(r"\\\$1-([A-Za-z]+)", txt)))
 DRUM_TYPES = ["kick", "snare", "clap", "hat", "tom", "rim", "conga", "shaker"]   # their switch numbers; 8 = the sample player
+# v1.49 synth kits: the classic machines as settings for the lab's own voices (no samples), in the spirit of the
+# PERF-1 firmware's kits. Each changes the starting point of a voice; tune, decay, character, morph and randomise all
+# still work on top. Values are in each setting's own units (Hz, semitones, ms, 0 to 1). ockm-<slot>-labkit picks one
+# (0 the lab's own sound, then these in order). A sound a kit doesn't name stays the lab's
+SYNTH_KITS = [
+ ("808", {
+   # the boom: a near-pure sine around 50 Hz, a small quick drop, a long tail, almost no click
+   "kick":  {"pitch": 50, "sweep": 9, "sweeptime": 22, "decay": 820, "second": 0, "noise": 0.08, "ntone": 2500, "ndecay": 3, "drive": 0.12},
+   # two tuned tones and a bright, short noise: more tone than rattle
+   "snare": {"pitch": 238, "ratio": 2.0, "drop": 2, "droptime": 12, "bodydec": 150, "wires": 6500, "wwidth": 1.2, "wdecay": 120, "click": 0.2, "mix": 0.4, "drive": 0.15},
+   # three loose bursts into a short, dark room
+   "clap":  {"bursts": 3, "gap": 12, "jitter": 0.45, "bdecay": 7, "toneA": 950, "toneB": 1900, "width": 2.6, "tail": 230, "tailtone": 1000, "room": 0.45, "drive": 0.2},
+   # six squares beating: strongly metallic, a long open hat
+   "hat":   {"pitch": 0.95, "ring": 0.85, "tone": 7600, "focus": 1.6, "bright": 6800, "closed": 42, "open": 380, "drive": 0.15},
+   # a round sine tom with a slow, gentle drop
+   "tom":   {"pitch": 110, "sweep": 4, "sweeptime": 90, "decay": 480, "second": 0.05, "noise": 0.08, "drive": 0.1},
+   # the clave and rim: a high wooden click
+   "rim":   {"pitch": 1100, "sweep": 0, "decay": 28, "second": 0.25, "ratio": 2.4, "noise": 0.15, "drive": 0.2},
+   "conga": {"pitch": 300, "sweep": 1, "decay": 260, "second": 0.1, "noise": 0.12},
+ }),
+ ("909", {
+   # the punch: a fast big drop, a short body, a hard click, a little saturation
+   "kick":  {"pitch": 52, "sweep": 30, "sweeptime": 24, "decay": 360, "second": 0, "noise": 0.6, "ntone": 4200, "nfocus": 1.0, "ndecay": 4, "drive": 0.4},
+   # a pitched body that drops onto its note, and plenty of bright snap
+   "snare": {"pitch": 195, "ratio": 1.6, "drop": 6, "droptime": 18, "bodydec": 110, "wires": 5200, "wwidth": 1.0, "wdecay": 210, "click": 0.55, "mix": 0.65, "drive": 0.35},
+   # four tight bursts, brighter, a quick tail
+   "clap":  {"bursts": 4, "gap": 8, "jitter": 0.2, "bdecay": 5, "toneA": 1250, "toneB": 3000, "width": 2.0, "tail": 160, "tailtone": 1500, "room": 0.3, "drive": 0.45},
+   # brighter and noisier, less ring; a long open hat
+   "hat":   {"pitch": 1.1, "ring": 0.35, "tone": 10000, "focus": 0.8, "bright": 8500, "closed": 36, "open": 460, "drive": 0.3},
+   "tom":   {"pitch": 130, "sweep": 7, "sweeptime": 50, "decay": 300, "second": 0.2, "noise": 0.35, "ntone": 2200, "drive": 0.3},
+   "rim":   {"pitch": 520, "sweep": 0, "decay": 22, "second": 0.7, "ratio": 3.4, "noise": 0.55, "ntone": 4500, "drive": 0.45},
+ }),
+ ("909 long", {
+   # the long kick, the low snare, the low tom: the 909 for deep house and dub techno
+   "kick":  {"pitch": 47, "sweep": 26, "sweeptime": 30, "decay": 720, "second": 0, "noise": 0.45, "ntone": 3600, "ndecay": 4, "drive": 0.3},
+   "snare": {"pitch": 165, "ratio": 1.55, "drop": 5, "droptime": 22, "bodydec": 160, "wires": 4400, "wwidth": 0.9, "wdecay": 260, "click": 0.45, "mix": 0.6, "drive": 0.3},
+   "clap":  {"bursts": 4, "gap": 9, "jitter": 0.25, "bdecay": 6, "toneA": 1100, "toneB": 2600, "width": 2.2, "tail": 240, "tailtone": 1250, "room": 0.4, "drive": 0.35},
+   "hat":   {"pitch": 1.05, "ring": 0.4, "tone": 9500, "focus": 0.8, "bright": 8000, "closed": 44, "open": 560, "drive": 0.25},
+   "tom":   {"pitch": 100, "sweep": 6, "sweeptime": 70, "decay": 480, "second": 0.2, "noise": 0.3, "ntone": 1800, "drive": 0.25},
+   "rim":   {"pitch": 500, "sweep": 0, "decay": 26, "second": 0.7, "ratio": 3.4, "noise": 0.5, "drive": 0.4},
+ }),
+]
+def lua_synth_kits():
+    return "{ " + ", ".join("{ name = \"" + n + "\", " + ", ".join(f"{t} = {{ " + ", ".join(f"{k} = {v}" for k, v in d.items()) + " }" for t, d in kits.items()) + " }" for n, kits in SYNTH_KITS) + " }"
 open(os.path.join(R, "voices", "ockm-labdrum.pd_lua"), "w").write('''-- A drum slot's synth sounds: the drum lab's voices, with randomise, character and morph.
 -- Written by tools/build_lab.py: change it there.
 local labdrum = pd.Class:new():register("ockm-labdrum")
@@ -594,6 +638,8 @@ local KIT = {
 local CHARACTER = { ''' + ", ".join(f'{w} = {{ name = "{n}", w = {{ ' + ", ".join(f"{k} = {v}" for k, v in m.items()) + " } }" for w, (n, m) in CHARACTER.items()) + ''' }
 local MORPH_SCALE = { ''' + ", ".join(f"{k} = {v}" for k, v in MORPH_SCALE.items()) + ''' }
 local MORPH_POINTS = 4
+-- v1.49 synth kits (tools/build_lab.py SYNTH_KITS): the classic machines as starting points for the lab's voices
+local SYNTH_KITS = ''' + lua_synth_kits() + '''
 local TYPES = { ''' + ", ".join(f'"{t}"' for t in DRUM_TYPES) + ''' }
 -- the settings each voice listens for (the rest only shape its envelopes, played from here)
 local LISTEN = { ''' + ", ".join(f'{t} = {{ ' + ", ".join(f'["{n}"] = true' for n in listens(t)) + " }" for t in DRUM_TYPES) + ''' }
@@ -616,7 +662,7 @@ end
 function labdrum:initialize(sel, atoms)
   self.inlets, self.outlets = 1, 0
   self.slot = tostring(atoms[1] or "d1")
-  self.s = { sound = 0, sample = 0, synth = 0, tune = 0, decay = 100, level = 1, labchar = 0, labmorph = 0, labrseed = 0, labramt = 0, labpseed = 1 }
+  self.s = { sound = 0, sample = 0, synth = 0, tune = 0, decay = 100, level = 1, labchar = 0, labmorph = 0, labrseed = 0, labramt = 0, labpseed = 1, labkit = 0 }
   self.sent = {}
   return true
 end
@@ -649,6 +695,8 @@ function labdrum:settings(t)
   local k, s = KIT[t], self.s
   local v = {}
   for _, p in ipairs(k.params) do v[p[1]] = p[4] end
+  local kit = SYNTH_KITS[math.floor(s.labkit or 0)]   -- v1.49 a synth kit's starting point
+  if kit and kit[t] then for name, x in pairs(kit[t]) do if v[name] ~= nil then v[name] = x end end end
   if s.labrseed > 0 and s.labramt > 0 then
     local r = rng(s.labrseed)
     for _, p in ipairs(k.params) do

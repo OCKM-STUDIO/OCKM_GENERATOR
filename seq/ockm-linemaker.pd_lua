@@ -1,9 +1,11 @@
 -- The bass and lead generator: a rhythm, a riff (or tune) and the shared key and chords, written across a mono part.
 -- Hand-written: edit this file. Only the PRESETS block is filled in by tools/build.py (from its PRE lists).
 --
--- [ockm-linemaker <track> <octave> <rhythm> <notes> <mode> <sync> <lead>]
+-- [ockm-linemaker <track> <octave> <rhythm> <notes> <mode> <sync> <lead> [inst]]
 --   octave: semitones added to every note (the lead sits 24 up); rhythm, notes: defaults; mode 0 auto; sync 1: follow
---   the chords; lead 1: the lead's rules (notes snap to the chord, inside to outside, no pickup bar).
+--   the chords; lead 1: the lead's rules (notes snap to the chord, inside to outside, no pickup bar) and the lead's rhythms.
+--   inst 1 (v1.41): an instrument's build tab (track ib or ia): its length comes from <track>-len, and it doesn't take
+--   the chords' length.
 -- Writes ockm-pat-<track>-note, -on, -acc and -slide. Listens to ockm-<track>-<setting> for rhythm, notes, riff, repeat,
 -- octave, lock, density, seed, outside, rests, slideamt, sync, mode, gen and len, plus ockm-root, ockm-scale,
 -- ockm-loading, ockm-chord-changed, ockm-chord-edit, ockm-chord-len, ockm-edit, ockm-drums-changed and ockm-bass-riff.
@@ -231,6 +233,66 @@ function lm.line(s, t, len, last)
   return note, on, acc, slide, last
 end
 
+-- ---------------------------------------------------------------- call and answer (v1.49)
+-- Every <every> bars (2, 4 or 8), the last bar answers the bar before it: the same rhythm and phrase, changed one of eight
+-- ways. Which way is picked per answer from the mutate seed, so mutate gives new answers. Notes stay in the key.
+-- 1 an octave up (down on the lead when it's high), 2 a fifth up, 3 a third up, 4 mirrored (the shape upside down round
+-- its first note), 5 backwards, 6 a beat later, 7 thinned (every other plain note out), 8 just the accents
+lm.ANSWERS = { "octave", "fifth", "third", "mirror", "backwards", "a beat later", "thinned", "accents" }
+local function in_scale(n, root, sc)   -- a MIDI note -> its scale step (counted from the root at MIDI 0), snapped down into the key
+  local rel = n - root
+  local o, pc = math.floor(rel / 12), rel % 12
+  local idx = 0
+  for k = 1, 7 do if sc[k] <= pc then idx = k - 1 end end
+  return idx + 7 * o
+end
+local function from_scale(d, root, sc) return root + sc[(d % 7) + 1] + 12 * math.floor(d / 7) end
+function lm.answer(s, note, on, acc, slide, len, sc)
+  local every = math.floor(s.answer or 0)
+  if every < 2 or not sc then return end
+  local root = math.floor(s.root or 0) % 12
+  local bars = math.floor(len / 16)
+  for b = every - 1, bars - 1, every do
+    local c0, a0 = (b - 1) * 16, b * 16          -- the call (the bar before) and the answer bar, 0-based steps
+    local kind = math.floor(h_std(b, (s.seed or 0) + 1, 9.3) * 8) + 1
+    local cn, co, ca, cs = {}, {}, {}, {}
+    for k = 1, 16 do cn[k], co[k], ca[k], cs[k] = note[c0 + k], on[c0 + k], acc[c0 + k], slide[c0 + k] end
+    local first
+    for k = 1, 16 do if co[k] > 0 and cn[k] then first = cn[k]; break end end
+    local nn, no, na, ns = {}, {}, {}, {}
+    for k = 1, 16 do nn[k], no[k], na[k], ns[k] = cn[k], co[k], ca[k], cs[k] end
+    local shift = function(k) return function(n) return from_scale(in_scale(n, root, sc) + k, root, sc) end end
+    local f = nil
+    if kind == 1 then f = function(n) return (s.lead and n >= 72) and n - 12 or n + 12 end
+    elseif kind == 2 then f = shift(4)
+    elseif kind == 3 then f = shift(2)
+    elseif kind == 4 and first then
+      local d0 = in_scale(first, root, sc)
+      f = function(n) return from_scale(2 * d0 - in_scale(n, root, sc), root, sc) end
+    elseif kind == 5 then   -- backwards: the notes in reverse order, on the same rhythm
+      local seq = {}
+      for k = 1, 16 do if co[k] > 0 and cn[k] then seq[#seq + 1] = cn[k] end end
+      local j = #seq
+      for k = 1, 16 do if co[k] > 0 and cn[k] then nn[k] = seq[j]; j = j - 1 end end
+    elseif kind == 6 then   -- a beat later: the bar turned round by four steps
+      for k = 1, 16 do local src = ((k - 1 - 4) % 16) + 1; nn[k], no[k], na[k], ns[k] = cn[src], co[src], ca[src], cs[src] end
+    elseif kind == 7 then   -- thinned: every other plain note rests
+      local c = 0
+      for k = 1, 16 do if co[k] > 0 and ca[k] == 0 then c = c + 1; if c % 2 == 0 then no[k] = 0; ns[k] = 0 end end end
+    else                    -- just the accents (or the first note, if it has none)
+      local any = false
+      for k = 1, 16 do if ca[k] > 0 and co[k] > 0 then any = true end end
+      for k = 1, 16 do if co[k] > 0 and not (ca[k] > 0 or (not any and cn[k] == first)) then no[k] = 0; ns[k] = 0 end end
+    end
+    if f then for k = 1, 16 do if nn[k] then nn[k] = math.max(12, math.min(108, f(nn[k]))) end end end
+    for k = 1, 16 do
+      if a0 + k <= len then
+        note[a0 + k], on[a0 + k], acc[a0 + k], slide[a0 + k] = nn[k], no[k], na[k], ns[k]
+      end
+    end
+  end
+end
+
 -- ---------------------------------------------------------------- the Pd object
 function lm:initialize(sel, atoms)
   self.inlets, self.outlets = 0, 0
@@ -241,6 +303,7 @@ function lm:initialize(sel, atoms)
              riff = -1, rep = 0, sync = (a(6, 0) ~= 0) }
   self.bass_riff = 0
   self.mode = a(5, 0)
+  self.inst = (a(8, 0) ~= 0)
   self.len = 128
   self.loading = false
   self.last = 0
@@ -257,7 +320,7 @@ function lm:postinitialize()
   end
   -- settings: store, then rebuild and go back to auto
   for hook, key in pairs({ rhythm = "rhythm", notes = "notes", riff = "riff", ["repeat"] = "rep", octave = "octave", lock = "lock",
-                            density = "density", seed = "seed", outside = "outside", rests = "rests", slideamt = "slideamt" }) do
+                            density = "density", seed = "seed", outside = "outside", rests = "rests", slideamt = "slideamt", answer = "answer" }) do
     on("ockm-" .. t .. "-" .. hook, function(x) s[key] = x; self:explicit() end)
   end
   on("ockm-" .. t .. "-gen", function() self:explicit() end)
@@ -268,18 +331,31 @@ function lm:postinitialize()
   on("ockm-loading", function(x) self.loading = (x ~= 0) end)
   on("ockm-bass-riff", function(x) self.bass_riff = x end)
   on("ockm-" .. t .. "-sync", function(x) s.sync = (x ~= 0) end)
+  -- v1.49 the mood: an auto part follows it (rebuilt when it moves by a step of 0.05)
+  on("ockm-mood", function(x)
+    local q = math.floor(x * 20 + 0.5) / 20
+    if q ~= self.mood then self.mood = q; if not self.inst then self:implicit() end end
+  end)
   -- the chords changed: a synced part follows
   on("ockm-chord-changed", function() if s.sync then self:implicit() end end)
   on("ockm-chord-edit", function() if s.sync then self:implicit() end end)
   -- the chords' length: a synced part takes it too
-  on("ockm-chord-len", function(x)
-    if not self.loading and s.sync then pd.send("ockm-" .. t .. "-len", "float", { x }) end
-  end)
+  if not self.inst then
+    -- v1.49 when the chords take their length from the progression (ockm-chord-fitting comes first), a following lead
+    -- keeps at least 4 bars: a one-chord progression is a single bar, and a lead that repeats every bar gets old fast (the
+    -- bass can loop a bar: that's the style). A length you set yourself goes to the lead as it is
+    on("ockm-chord-fitting", function(x) self.fit_next = x end)
+    on("ockm-chord-len", function(x)
+      if t == "lead" and self.fit_next == x then x = math.max(x, 64) end
+      self.fit_next = nil
+      if not self.loading and s.sync then pd.send("ockm-" .. t .. "-len", "float", { x }) end
+    end)
+  end
   -- the kick changed under a part locked to it
   local function drums() if s.lock ~= 0 then self:implicit() end end
   on("ockm-edit", drums); on("ockm-drums-changed", drums)
   -- a new length: an auto part rebuilds to fill it, once everything else has heard the new length
-  on("ockm-" .. t .. "-len", function(x) self.len = x; if not self.loading then self.lenclock:delay(0) end end)
+  on(self.inst and (t .. "-len") or ("ockm-" .. t .. "-len"), function(x) self.len = x; if not self.loading then self.lenclock:delay(0) end end)
   self.lenclock = pd.Clock:new():register(self, "refill")
 end
 
@@ -314,8 +390,21 @@ function lm:tables()
     if nn == ANSWER then notes = BASS_RIFFS[math.max(0, math.floor(self.bass_riff)) + 1]
     else notes = NOTES[nn + 1] end
   end
-  return { rhythm = RHYTHMS[self.track == "lead" and "lead" or "bass"][math.floor(s.rhythm) + 1],
+  return { rhythm = RHYTHMS[s.lead and "lead" or "bass"][math.floor(s.rhythm) + 1],
            notes = notes, scale = SCALES[math.floor(s.scale) + 1] }
+end
+
+-- v1.49 the mood (0 chill, 0.5 as set, 1 peak) on a part's settings: fewer notes and more space towards chill, more notes
+-- and slides towards peak. Returns a copy; the settings themselves stay as you set them
+function lm.moodded(s, mood)
+  mood = mood or 0.5
+  if math.abs(mood - 0.5) < 0.01 then return s end
+  local o = {}
+  for k, v in pairs(s) do o[k] = v end
+  o.density = math.max(0, math.min(2, (s.density or 1) * (0.6 + 0.8 * mood)))
+  o.slideamt = math.min(1, (s.slideamt or 0) + math.max(0, mood - 0.5) * 0.4)
+  if s.lead then o.rests = math.min(1, (s.rests or 0) + math.max(0, 0.5 - mood) * 0.5) end
+  return o
 end
 
 function lm:build()
@@ -329,8 +418,10 @@ function lm:build()
   t.chord_deg = read_table("ockm-pat-chord-deg", len)
   t.kick = read_table("ockm-pat-d1", len)
   t.bass_on = read_table("ockm-pat-bass-on", len)
-  local note, on, acc, slide, last = lm.line(self.s, t, len, self.last)
+  local s = self.inst and self.s or lm.moodded(self.s, self.mood)
+  local note, on, acc, slide, last = lm.line(s, t, len, self.last)
   self.last = last
+  lm.answer(self.s, note, on, acc, slide, len, t.scale)   -- v1.49 call and answer
   local tr = self.track
   local tn, to, ta, ts = pd.Table:new():sync("ockm-pat-" .. tr .. "-note"), pd.Table:new():sync("ockm-pat-" .. tr .. "-on"),
                          pd.Table:new():sync("ockm-pat-" .. tr .. "-acc"), pd.Table:new():sync("ockm-pat-" .. tr .. "-slide")

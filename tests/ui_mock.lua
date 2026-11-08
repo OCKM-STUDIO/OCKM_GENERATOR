@@ -53,6 +53,19 @@ local function engine(name, sel, atoms)
   elseif part == "chord" then
     arr("ockm-pat-chord-on")[atoms[1]] = atoms[2]; arr("ockm-pat-chord-deg")[atoms[1]] = atoms[3]
   end
+  -- tables the screen writes straight to (v1.38 samples): "list i v" and "const v"
+  if name:match("^ockm%-pat%-vox%-") or name:match("^ockm%-pat%-i[ab]%-") or name:match("^ockm%-pat%-z%d$") then
+    if sel == "list" then arr(name)[atoms[1]] = atoms[2]
+    elseif sel == "const" then local t = arr(name); for i = 0, 127 do t[i] = atoms[1] end end
+  end
+  if name == "ockm-samples-scan" then
+    local mine = { { "vox everybody on your feet 124", "vox i feel good yall 124", "vox word yeah" },
+                   { "loop disco keys 120 C#m", "loop funky 123 Fm" }, { "hit detroit stab C", "hit organ C" } }
+    for g, names in ipairs(mine) do
+      for n, nm in ipairs(names) do local t = { g, n }; for w in nm:gmatch("%S+") do t[#t + 1] = w end; pd.send("ockm-smp-name", "list", t) end
+      pd.send("ockm-smp-count", "list", { g, #names })
+    end
+  end
   if name == "ockm-length" then pd.send("ockm-len", "float", { atoms[1] }) end
   if name == "ockm-play" then pd.send("ockm-playing", "float", { atoms[1] }) end
   -- projects: a pretend projects folder
@@ -91,7 +104,7 @@ function G:fill_rect(x, y, w, h) emit(string.format("rect %g %g %g %g", x, y, w,
 function G:fill_rounded_rect(x, y, w, h, r) emit(string.format("rrect %g %g %g %g %g", x, y, w, h, r)) end
 function G:stroke_rounded_rect(x, y, w, h, r, t) emit(string.format("srrect %g %g %g %g %g %g", x, y, w, h, r, t)) end
 function G:fill_ellipse(x, y, w, h) emit(string.format("ellipse %g %g %g %g", x, y, w, h)) end
-function G:draw_text(s, x, y, w, size) emit(string.format("text %g %g %g %s", x, y, size, s)) end
+function G:draw_text(s, x, y, w, size) emit(string.format("textw %g", w or 0)); emit(string.format("text %g %g %g %s", x, y, size, s)) end   -- textw: the width it wraps at
 function G:fill_path(p) emit("path " .. table.concat(p.pts, " ")) end
 function Path(x, y)
   local p = { pts = { x, y } }

@@ -1,5 +1,173 @@
 # Changelog
 
+## v1.49 (30 October 2026)
+
+Ideas borrowed from the PERF-1 firmware for the FM-1.
+
+- **Sequencer mode.** Drums now go out over MIDI too (a note per hit, by sound or on pads 36-43). Settings, MIDI out has **sequencer mode** (every part out at once, the box as the brain), **all on this box**, and a **device** (general, MPC, MC-101) that sets the channels and drum notes. Each part can still be set by itself
+- **Clock in time.** MIDI clock goes out a quarter step late, as the engine plays, so gear following it lands with the box rather than 30 ms ahead
+- **Top tabs in three blocks.** Making first (build, drums, bass, lead, chord, samples), then playing (perform, fx, mixer), then arrange. Each block sits on a faint plate
+- **Gate (bus effect).** A fifth effect on every bus: it chops the sound in time. Across the pad picks the rate (1/4 to 1/32), up the pad the depth, and its settings pick the pattern (straight, 3-3-2, off-beats, dotted). On the music bus it's a trance gate on the synths
+- **Six macro slots.** Perform B now has six recipe pads, A to F, in two rows of three. The XY pad is a little shorter to make room. New ones start with the 8 bar lift, the 4 bar rush and dub out on the bottom row; your settings keep A, B and C and fill D, E and F once
+- **Power-cut safe saving.** Every save (scenes, the project, the settings, versions) now writes a new file first and swaps it in once it's complete. Pull the plug halfway through a save and you keep the last good copy instead of a half-written one
+- **Call and answer (engine).** The bass and the lead can answer themselves: every 2, 4 or 8 bars, the last bar turns the bar before it into a reply. It might go up an octave, move up a fifth or a third, mirror the shape, play it backwards, slip it a beat later, thin it out or keep just the accents. Every answer stays in the key. Off by default; old scenes load with it off
+- **Smarter drum lanes (engine).** Each drum now has:
+  - **chance:** how likely each hit is to play
+  - **thin:** density by importance. The off-beat 16ths go first, then the 8ths, then beats 2 and 4, then beat 3. The 1 always stays
+  - **plays in:** every bar, bars 1 and 3, bars 2 and 4, the last or first bar of four, only in fills, or never in fills
+  - **drift:** each bar a little different. The odd off-beat hit drops out and the odd ghost note turns up, but the beats and the accents never move
+  - **rolls:** any step can be a roll of 2 to 6 hits, each a little softer than the last
+  
+  All of these are saved with the scene. Out of the box they change nothing. The screens for them come next (mock-ups in docs/mockups/v149-*.png)
+- **Versions of every sound, at the same loudness.** On the bass, lead and chord tabs, tap an engine button again for its next version: analogue has four, most have three, and the dots under the name show which one is playing. Each version is that engine set up differently (a deep square, a bright pluck, a squelchier acid, a dub chord, a swell, and so on). Every version, and every engine, is now levelled by measurement: before, some engines were 6 to 13 dB louder than others (sub 808, donk and the organ most), so swapping sounds jumped the mix. Measured as the ear weighs loudness, over a busy phrase and a long one (tools/measure_sounds.py works the levels out; a test keeps every version within 3 dB)
+- **Synth 808, 909 and 909 long kits.** The drum lab's own voices set up like the classic machines, no samples needed: on the drums tab they come after each drum's own synth sound ("808 kick", "909 clap"). The styles that load your 808 and 909 sample kits now play these when the samples aren't there, so a fresh download sounds right out of the box. Tune, decay, character and morph work on top. The idea comes from the PERF-1 firmware, whose kits are synthesised the same way
+- **Screen recording on the Pi:** `tools/pi/ockm-screenrec.sh start` and `stop` record the screen and the box's sound into a video in `exports/`, for demos (no phone held up to the screen)
+- **The name is OCKM GENERATOR** (it was OCKM_GNR8R in the docs): the README, the manual, the social image and the settings page. The repository will be `OCKM_GENERATOR`
+- **The GitHub page:** a new README with fresh screenshots of every main screen at the Pi's size, a social preview image, and `docs/github-setup.md` (what to paste where). `tools/screenshots.py` redraws them from any scene
+- Fix: the drums' pads view no longer shows a stray playhead line across the pads
+- **Your own drum samples:** `samples/README.md` is now a step-by-step guide (which folder, naming, picking them, making a kit, copying to the Pi). The sample folders are kept in git, empty, so a fresh download has them
+- **The mood.** One dial from chill to peak, on Perform (under the fx pad) and on the builder (next to the styles). The middle is the loop as you set it. Towards chill: the hats, percussion and toms thin out (the off-beat 16ths, then the 8ths), the bass and lead play fewer notes and the lead rests more, and the reverb and delay come up. Towards peak: ghost notes fill the hats, the bass and lead get busier and slide more, the reverb and delay pull back, a touch of drive and a little pump on the synths. The kick, snare and clap never change, and nothing you've set is overwritten: move it back and it's all as it was. Each style sets where it starts (dub techno and deep house low, peak time and hard techno high). Saved with the scene; MIDI learn can put it on a knob. A part you've edited yourself keeps its notes
+- **The drum lanes on screen.** On the drums tab: **rolls** next to velocity and timing (tap a hit: a roll of 2, 3, up to 6, then one again), and a **lane** button that swaps the sound controls for chance, thin, drift and plays in
+- **The show page.** Menu, **show**: a full-screen view for when the box is on display. The circle of fifths with the key lit as an arc and the chord playing as a shape on it, the bass and lead ringed on their notes, and in the middle the chord's name and number, a beat ticker, and eight petals that flash as each drum hits. The phrase fills the outer ring; where you are, the parts and the mood are on the right. Four colour schemes (dusk, neon, sunset, ink) on the colours button, and a second view, **bloom**: an evolving fractal kaleidoscope that plays along (the chord shapes it, the mood deepens it, the kick pushes it, the hats light it) and drifts on while stopped. Tap anywhere else to go back
+- **Delay repeats darken, and can't run away** (from PERF-1): filters inside the echo loop, and feedback capped at 0.85
+- **The reverb and delay duck under the kick** a little (`ockm-fx-duck`, 0.3 out of the box), and **the synths get a light duck by default** (new projects, and styles that don't set their own)
+- **A master compressor and look-ahead limiter** (from PERF-1), at the very end after the master fader: glue at 2:1 above about -10 dB, and peaks caught 3 ms ahead, so a pushed mix stays clean
+- **More from PERF-1:**
+  - **The 4 bar rush**, a second build: the kick and the rest drop out while the snare climbs, then in the last bar the kick comes back four to the floor and the open hat plays every 8th, two 16ths of silence, and the drop with a crash. In your recipes (pick it onto a slot with the v); the recipe list and picker now show up to nine
+  - **Crash and key change on the drop**, per recipe (the recipe editor, next to its length): a crash as it drops, and the key up 2, 3, 5 or 7 semitones; a breakdown (a recipe with a length but no drop) brings the key back
+  - **Links**: on the bass tab, **kick link** opens the bass's filter on each kick; on the chord tab, **snare link** opens the chords' on each snare or clap. Both close again over about a beat (in the sidechain row, where the picture was)
+  - **Drum drift** (drums tab): every 4, 8 or 16 bars your drums and a variation of them take turns, a new variation each time. Shift moves the odd hit a step; morph also adds the odd ghost note and takes out the odd weak hit. The kick, the clap and snares on the beat never move, and your pattern is never rewritten
+  - **Flam and swell** rolls: after x6, a tap on a hit gives a flam (a soft grace note first), then a swell (four hits getting louder). **Humanize** (drums tab): each hit a touch softer and later, at random. Not in fills and builds
+  - **Slice** (drums tab): the bar's drum steps in another order: halves swapped, stutter, reverse, mirror, double, or auto (a different one on the last bar of every four). Not in fills and builds
+- **Unlatching a bus effect puts its pad back in the centre** (on Perform and the fx page), as letting go of an unlatched pad does; it used to stay where it was
+- **Fix: an update restart lost unsaved work.** Restarting the box to install an update threw away anything not saved, so the project came back blank and played nothing. Now `tools/pi/ockm-restart.sh` asks the app to keep what's open first ("keep;" to UDP port 3091, the only thing it listens for): if there are unsaved changes they're stashed, not saved, and when the box starts again they come back, still unsaved, with a message saying so
+- **Fix: the save disc showed unsaved changes at every start.** Sending your MIDI-out settings at start-up counted as a change to the project
+- **The 4 bar build** (after PERF-1's build and drop), on Perform slot B. The drums play a build in place of your groove: the snare climbs from quarters to 8ths to 16ths to rolls, the clap joins in bar 3, the hats go to 16ths, and the kick and the rest drop out for the last bar. Under it the high-pass and the reverb rise, then a beat of silence and everything drops on the 1. Tap for four bars, or hold. It takes slot B if that still had the 4 bar lift (the rewind on A is the lift with a spin); the lift is still in your recipes. Any recipe can use it: the new **snare build** move
+- **Fix: the Bass and Analog synths' sounds and random.** A sound only set some of the knobs, so whatever random or your own turns had left elsewhere (drive, noise, pitch decay ...) carried on into the next sound, and after a few randoms every sound was harsh. Now a sound resets the synth to its starting point first (keeping your volume and mono/poly/chord), and random starts from there too, kept to ranges that sound like a bass (less resonance and drive, the filter never shut). The Bass synth's band-pass mode was 6 dB quieter than low-pass and thin (it cut the sub out): it's louder now, with the low end mixed back under it
+- **Lead: rests is gone from the tab.** Density already thins the lead differently in every bar, so the two did the same job; density is now one full-width bar. Old scenes and styles that set rests still play the same
+- **Call and answer on screen.** An **answer** button on the bass and lead tabs, next to half-time: tap to step through off, every 2 bars, every 4 bars and every 8 bars
+- **The lead is at least 4 bars.** A lead that follows the chords took their length, and the one-chord progression most techno styles use is a single bar, so the lead repeated every bar. It now follows the chords but never goes below 4 bars (the bass can still loop one bar). Old scenes load as they were
+- **"make it for me" is now "back to auto"** on the bass and lead tabs
+- **Perform:** **synths** moved from the mutes row to the bottom row, in all in's place (lit while the synths are out). "mutes land:" is now plainly a label. Slot A is the new **4 bar rewind**: the 4 bar lift with the mix spinning back over the last beat, stopping right on the 1 as the drums come back. It takes the 8 bar lift's slot in your settings (once); the 8 bar lift is still in your recipes. Any recipe with a length can have a rewind instead of a gap (the gap button in the macro editor)
+- **dx 3 and 4 (bell and glass) are softer.** They were too screechy: their high ratios put a lot of energy up top. Brightness is down (0.2 and 0.12) and the detune a touch lower; re-levelled
+- **Fix: the box froze (no sound, no touch) when the USB audio cable wasn't plugged into a computer.** The USB outputs were linked with nothing on the other end, so PipeWire stopped everything, Pd included. They're now linked only while a computer is attached, and unlinked when it goes. Pd's messages on the Pi now go to /tmp/ockm-pd.log
+- **A tidy-up of every screen, as the Pi really draws it.** The Pi draws text in Pd's own fonts, which round each size down (a 14 draws as a 12) and wrap text that doesn't fit. The previews now draw the same way, and a new check (tests/ui_review.py, and a test) looks over every screen for text spilling out of its box or into another, lines through words, and boxes that overlap or touch. Fixed:
+  - The red line on the bar controls (delay, feedback, cutoff and so on) no longer runs through the name and number; it stops short of them
+  - The fx pad's crosshair no longer runs through its words
+  - Labels are centred where they really land, and step down a size rather than spill (the bass tab's engine buttons: "bass synth" is now "synth")
+  - Perform's tiles: "out on bar" and "off in scene" (was "off in this pattern") sit above the S instead of wrapping out of the tile. The mutes row no longer touches the tiles
+  - The recipe pads: "let go to drop" (was "hold: drops when you let go", too long) and a smaller v that doesn't sit on the name
+  - The builder's "at the end of each phrase" and "all synths" labels, the recipe editor's run line and the samples tab's help no longer overlap their neighbours
+
+## v1.48 (30 October 2026)
+
+- **USB audio out to your computer.** Through the USB-C power/data splitter, the Pi is now a USB audio interface: plug the splitter's data socket into the Mac and the box shows up with 9 inputs (the Mac calls it "Capture Inactive" for now). Record a whole jam into Ableton, every part on its own track:
+  - 1-2 the mix, 3 the kick (drum slot 1), 4 the rest of the drums, 5 bass, 6 lead, 7 chords, 8 samples, 9 effects
+  - The speakers (the DAC) carry on as before. PipeWire keeps the DAC and the Mac in step, so there are no clicks from the two clocks drifting
+  - In Ableton: Preferences, Audio, Audio Input Device (Capture Inactive), then Input Config to switch the inputs on
+- **Full power to the USB sockets.** The splitter makes the Pi think it has a 3A supply, which limits the USB sockets; the Pi is now told to give them full power anyway. If the voltage dips with a lot plugged in, a powered USB hub for the AudioBox and keyboards fixes it
+
+## v1.47 (30 October 2026)
+
+- **Projects as a table.** The project page lists your projects with the date made, when each was last saved, how many scenes it has, its tempo and key, and its style. Newest first: tap a heading to sort by it (tap again to flip). Tap a row for its scenes on the right; the triangle has a listen without opening it
+- **What's open, on every screen.** The project you're in and its scene sit under the tempo ("quiet fox · S"), orange when there are unsaved changes
+- **New projects start with the lead empty,** like the bass and chords. It used to start on the same motif every time (the one that sounded like the Addams Family). Press start on the lead, or pick a style, to fill it
+
+## v1.46 (29 October 2026)
+
+- **The Bass synth is less fizzy.** On the groovebox's basslines it had about seven times the top end of the other bass engines: the resonance was high and the filter opened about four octaves on every note. It now starts darker (cutoff 30, resonance 35, envelope 35), measured to sit with the other bass engines at the same loudness. Picking **bass synth** on the bass tab loads that starting point, as the other engines load theirs. Turn the resonance and envelope up for the old acid bite
+
+## v1.45 (29 October 2026)
+
+- **One powerful groovebox.** The Bass and Analog synths are now engines of the groovebox's own parts, so they play with everything else instead of on their own
+  - **Bass synth** on the bass part (it replaces swarm, which was a cut-down copy of it) and **analog** on the lead (it replaces pulse). Pick them on the part's tab: the four quick knobs are the synth's cutoff, resonance, envelope and decay
+  - **Edit the bass synth** (or the analog) opens the synth's full page over the groovebox, which keeps playing: every control, your saved sounds, volume, and the keys tab (hold, and on the Analog the voices and the arpeggiator). The arrow takes you back
+  - Same generator, styles, scenes, arrange, mixer and effects as the rest of the groovebox. Old projects play as before
+- **Play the bass and lead from MIDI.** Notes on the bass's channel (1) play the bass, on the lead's channel (2) the lead, over whatever the part is playing. The MPC can play the box's Bass synth, or a keyboard can. Other channels still work the pads
+- **Pads on the drums tab.** drmz's view is now part of the drums: each drum in its own column with a pad to hear it, mute, level, pitch, length, drive (tone on a sample) and **new sound**. The **pads** button is next to **all drums**
+- **The start screen has gone:** the box opens straight into the groovebox again
+
+## v1.44 (29 October 2026)
+
+- **Volume on Bass and Analog.** A volume bar in the top bar, next to save, on every tab: drag it left or right
+
+## v1.43 (29 October 2026)
+
+- **Shut down, in the menu** (on the Pi). Tap it, then tap again to confirm: the box stops, says so, and the Pi switches off. Unplug when the screen goes dark. Pulling the power while the Pi is running can leave a file half written: on 29 October that blanked the Wi-Fi settings
+
+## v1.42 (26 October 2026)
+
+- **The groovebox's whole generator on Bass and Analog.** The build tab now has everything the groovebox does for its bass and lead:
+  - **Style:** pick deep house, tech house, acid, trance and the rest, and the synth gets that style's line, chords, key and swing in one tap. **New** rolls another take inside the style. Following the MPC's clock, the tempo stays the MPC's
+  - **Rhythm**, and the **riff** (Bass) or **tune** (Analog), from the groovebox's lists
+  - **Key, scale and chord progression**, and **follow chords** on or off
+  - **Mutate** and **original**, fewer or more notes, and slides (Bass) or inside to outside (Analog)
+  - **Line:** octave down or up; on the Analog, tight or loose phrases and rests between them
+  - **Evolve:** gentle or lively, every 2, 4, 8 or 16 bars. The line moves through variations and comes home, like the groovebox's evolve. **Keep this one** makes the current variation the new original
+- Edit a step and the line is yours: build and evolve leave it alone until you pick something on build again. All of it is saved with the scene
+
+## v1.41 (26 October 2026)
+
+- **drmz plays all eight drums.** Every voice was a kick on a box with scenes from before drmz (they have no drmz sounds saved, so each voice sat on sound 0). Now each voice starts on its own sound: kick, snare, clap, perc, hat, open hat, tom, perc 2
+- **Drag a step for its note** on Bass and Analog, on perform or steps, like the groovebox: up or down, in the key. Stopped, you hear it while your finger's down
+- **A build tab** on Bass and Analog: the groovebox's own rhythms and riffs (Bass) or rhythms and tunes (Analog). Pick one and the steps are written, in the key, following the groovebox's chords (or not: **follow the chords**). The key and scale are here too, plus variations, fewer or more notes, and slides (Bass) or inside to outside (Analog). Edit a step afterwards and build leaves your notes alone until you pick something again
+
+## v1.40 (26 October 2026)
+
+- **drmz, the drum machine, is open.** Its tile on the start screen works. **Perform:** eight voices side by side (kick, snare, clap, perc, hat, open hat, tom, perc 2), each with a pad to hear it, mute, level, pitch, length, tone, and **new sound** for a fresh one. **Steps:** an 8 by 16 grid (tap: on, accent, off), 1, 2 or 4 bars, and the **generator**: pick one of the 24 grooves from the groovebox, set how busy (ghost hats and percussion, the odd dropped hit, snare pickups), then **new** or **mutate**. A new groove brings its swing, and swing is right there too
+- **Save your own sounds** on Bass and Analog: the disc on the perform screen keeps the sound you've made ("bass 1", "analog 1" and on), and it joins the arrows' list. The bin deletes the one you're on
+- **A keys tab** on Bass and Analog: a two-octave keyboard on screen, octave up and down, and **hold** (keys stay down until you tap them again, which feeds the arpeggiator nicely)
+- **Analog plays chords.** A **voices** choice on perform: **mono** (as before), **unison** (four voices on one note, detuned by the **detune** knob: huge), **chord** (each key plays a chord you set: the key plus up to three notes above it, a minor triad to start) and **poly** (four notes at once). The arpeggiator works with all of them
+- **MIDI out to your synths.** Settings has a **MIDI out** page: for bass, lead and chord, pick **this box** (as now), **MIDI** (the part plays your synth and the box's own sound goes quiet) or **both**, and the channel. Accents go out harder, slides overlap the notes so a TD-3 or SH-101 style synth slides, and mutes and solos work. Anything plugged into the Pi's USB gets the MIDI out (and the clock), as soon as it's plugged in
+- **Lighter on the Pi.** The Bass, Analog and the groovebox's swarm and pulse engines use a cheaper filter (the same ladder filter as acid), about a fifth of the work it was. Levels are matched to before
+
+## v1.39 (25 October 2026)
+
+- **Two new synths: Bass and Analog.** The sound side of two instruments that will each get their own screens. **Bass** is a big modern bass with an acid heart (after the Erica Synths Bassline): a swarm of detuned copies, a sub, an aggressive low-pass or band-pass, a pitch envelope for zaps, an LFO that can do FM, and drive. **Analog** is the classic mono (after the SH-101 and S-1): pulse with PWM, saw, sub and noise in a mixer, a smooth filter, an ADSR and an LFO with random. Every control is measured to make a clear difference, and both play in tune at the same level. Play them now from a MIDI keyboard with `INST_BASS.pd` and `INST_ANALOG.pd`
+- **New engines in the groovebox:** **swarm** and **pulse** on the bass, **pulse** on the lead. Saved projects keep their engines: the new ones are added on the end
+- **A start screen.** The box can be the groovebox, **bass** or **analog**; **drmz**, the drum machine, has its tile waiting. On the Pi it starts here. From the groovebox, the menu has **start screen**; from an instrument, the house button
+- **Each instrument has two screens.** **Perform**: every control on one page, with a few sounds to start from, random, and the bar's steps along the bottom (tap one on or off). **Steps**: 1, 2 or 4 bars, a step editor (note, octave, accent, slide, rest), the **generator** (acid, rolling, offbeat, octaves, sparse; busy, range, accent, slide; new and mutate) in the groovebox's key, and a filter move you draw on each step
+- **Analog has an arpeggiator:** off, up, down, up and down, random, over 1 to 3 octaves. Hold keys on your MIDI keyboard
+- **Opening an instrument** switches its sound on and takes the groovebox out of the mix, so the box is that instrument. It plays from its own steps with the transport, and your MIDI keyboard plays it too. Back to the groovebox and it goes quiet again. Its settings and steps are saved with the scene
+- **Fixed:** a sample hit on the samples tab could log an error (a message with nowhere to go)
+- **Poly chords:** turning the first knob fully open no longer drops the level by 10 dB (it's unchanged in the middle)
+
+## v1.38 (23 October 2026)
+
+- **Samples.** The vox tab is now **samples**: a row of steps for vocals, one-shots and loops. Pick a sample and an effect underneath, then tap steps. Tap a step again with the same pair to clear it; a different pair replaces it. Each step keeps its own effect: off, stutter (restarts the start of the file every 16th), delay or verb (sends for as long as that sample plays)
+- **Samples play whole.** No gate: a sample plays to its end, and stops only when the next one starts or you stop. Pitch changes the speed. It's its own player, not the drum sampler
+- **Its own length,** 1, 2, 4, 8 or 16 bars, with double and bar pages like the other parts. A shorter part repeats inside the loop; a longer one makes the loop longer
+- **Four lists:** **voice**, **loops** and **hits** are your own files, one folder each in `samples/user`. Drop WAVs in and they show in name order next time you open the tab. 64 starters are in there: 24 vocal hooks, phrases and words, 20 loops at 110 to 128 bpm (chords, pads, bass, synths, guitar), and 20 hits (stabs, keys, bells, plucks, strings). Files at 44.1k play at the right pitch
+- **Robot** holds all the computer voices: pick hooks, jack or techno, then deep or flat
+- **The robot voices are robots now.** Each line goes through a vocoder: the words shape a buzz at one fixed pitch, so there's no human pitch or breath left. Deep is a low saw with a little metal; flat is a higher, hollow buzz with more wobble. `tools/robotise.py` makes them from the plain renders, kept in `samples/vox-plain`
+- **Old projects open quiet:** a scene from before has no sample steps, so the part stays silent. The old vox settings (on, how often, which lines) are ignored. New scenes start with the vox reverb and delay sends at 0, so an "off" step is dry. Styles leave the samples part alone
+
+## v1.37 (23 October 2026)
+
+- **Vox is louder**, and it can stutter. The voice starts at full level. Stutter, on the vox screen, chops the start of the line on a 16th or an 8th. It is off until you turn it on, and the choice is saved with the scene
+
+## v1.36 (23 October 2026)
+
+- **Vox phrases.** On the vox screen the lines of the set sit on the right. Tap to keep one or more. How often can be every bar, or every 2, 4, 8 or 16 bars. The choice is saved with the scene. An old scene still says every line
+
+## v1.35 (22 October 2026)
+
+- **Vox has a tab**, beside mixer. The builder tab reads **build**. On perform the tiles sit tighter, and the set button is gone: the tab is where you pick the lines
+
+## v1.34 (22 October 2026)
+
+- **Vox.** Spoken lines on perform, in the corner tile. On the 1 of every 4, 8 or 16 bars it says the next line and plays it to the end. Deep house uses the hooks, Chicago the jack lines, peak time and hard techno the techno lines. Every other style leaves it off. Set, voice, how often, pitch and delay are on the tile's **set** button, and they're saved with the scene. It's on the music bus, with its own fader. **Synths** on the mutes row mutes bass, lead and chord together
+
+## v1.33 (22 October 2026)
+
+- **Bass goes** on the fx page follows the choice. With music, the bass leaves the drum bus. It had been stuck with the drums
+
+## v1.32 (22 October 2026)
+
+- **Core grey, light and dark.** The screen is a grey. Anything you've chosen (a tab, a button, a note, a part that's in) is the strong grey. The colour is only for what is happening: play, a mute waiting for the beat or the bar, the playhead, a latched effect, a macro while you hold it, an unsaved save
+- **The colour is a setting** on this device, under light and dark. Red is the default. Orange, blue, teal, wine, green, violet, and plain (no colour) are there too. It's kept on the machine, not in the project
+- A hit and an accent are the same grey. The accent keeps a coloured bar, so louder is still easy to see. The active scene is an outline, not a filled button
+
 ## v1.31 (21 October 2026)
 
 - **Knobs pick up:** a learned knob takes over only once it reaches (or passes) where the control already is, so nothing jumps. Until then it tells you where to turn it. If something else moves the control, the knob picks up again
