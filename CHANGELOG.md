@@ -1,5 +1,11 @@
 # Changelog
 
+## Public alpha launch (8 November 2026)
+
+- Published under OCKM STUDIO as very early experimental software, with clear platform and testing limits
+- Refreshed the repository introduction, banner, download guidance and contribution templates
+- Expanded the acknowledgement of PERF-1 and deamonSLINKY, with links to explore their work
+
 ## Mac preview 0.1.1 (8 November 2026)
 
 - The title bar, window margins and status strip now follow the instrument’s light or dark background immediately

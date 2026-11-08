@@ -4,6 +4,17 @@ A standalone SwiftUI/AppKit Mac app using the same Pure Data sound engine and
 Lua instrument behaviour as the Raspberry Pi version. Players do not need Pd,
 plugdata, Lua or Python installed. Build tools are needed only by contributors.
 
+## Try the early alpha
+
+> [!WARNING]
+> **Very early experimental software.** Expect bugs, audio glitches and possible crashes or lost work. Keep project backups and use a low listening volume while testing. This build is not ready to depend on for live performance.
+
+Download **[Mac alpha 0.1.1](https://github.com/OCKM-STUDIO/OCKM_GENERATOR/releases/tag/mac-preview-0.1.1)** and choose `OCKM-GENERATOR-Mac-0.1.1-arm64.zip` under Assets. Unzip it and open `OCKM GENERATOR.app`. The download is for **Apple silicon** Macs running **macOS 13 or later**. Intel Macs have not been tested.
+
+The app is locally signed for development, **not Developer ID signed or notarised**. macOS may block the downloaded app. Building from source is available below; a notarised download remains future work. This is a standalone app, not an Audio Unit plug-in.
+
+The Mac wrapper uses version 0.1.x; the shared instrument currently shows v1.49 inside its screens. Both are early-stage work. See [verification notes](VERIFICATION.md) for the actual test coverage.
+
 ## Build
 
 On macOS 13 or later, install the Xcode command-line tools, Git and Python 3:
@@ -16,9 +27,6 @@ open "mac/dist/OCKM GENERATOR.app"
 The first build downloads the exact commits in `dependencies.json`, including
 their pinned submodules. Later builds can use `--skip-fetch`. Builds target the
 current Mac's architecture; the initial tested build is Apple Silicon.
-
-The app is signed locally for development. This is a private testing build,
-not a Developer ID signed/notarised public release or an Audio Unit plug-in.
 
 ## Play
 

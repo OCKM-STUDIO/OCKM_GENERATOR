@@ -24,8 +24,9 @@ its own isolated runtime and appends `mac/native-ui.lua` to the shared UI, so
 screens and musical/project behaviour are not duplicated in Swift.
 
 Read `mac/README.md` for build steps and `mac/VERIFICATION.md` for tested scope.
-The app is a private preview in `OCKM-STUDIO/OCKM_GENERATOR`; do not make it public
-until Simon has tried it and explicitly asks. Mac player files are separate from
+Simon authorised public release on 8 November 2026. The repository is published
+as a very early alpha in `OCKM-STUDIO/OCKM_GENERATOR`; keep that status prominent
+and Mac downloads marked as prereleases. Mac player files are separate from
 this checkout, under Application Support/ OCKM GENERATOR/Workspace.
 
 ## The shape of it

@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for looking. Issues, ideas and pull requests are all welcome. If you're planning something big, open an issue first so we can talk it through.
+OCKM is a very early alpha. Issues, musical feedback, documentation improvements and small pull requests are all welcome. If you're planning something big, open an issue first so we can talk it through.
 
 ## The one rule: the .pd files are generated
 
@@ -33,6 +33,19 @@ python3 tests/ui_preview.py out  # draws the screens to PNGs (needs lua and Pill
 
 All tests should pass. If you change what something does, change or add the test that checks it.
 
+For native Mac changes, build with `python3 mac/scripts/build.py`, run
+`python3 mac/scripts/test.py`, then check the affected screens and controls in the
+app. Include the platform, commands run and any checks you could not complete in
+your pull request. The [Mac guide](mac/README.md) explains the shared engine boundary.
+
+## Credit and shared sources
+
+Keep musical behaviour in the shared Pd/Lua sources so Mac and Pi benefit together.
+Preserve existing credits, including the PERF-1 references. When adapting work or
+ideas from another project, link the original and describe the connection; retain
+any required notices with the code. Avoid committing personal projects, recordings,
+sample packs, device credentials or local settings.
+
 ## House style
 
 - **Plain Pure Data.** Vanilla objects only (plus pd-lua), so the same patch runs in plugdata and on the Pi
@@ -48,4 +61,4 @@ The [manual](docs/manual.md) explains every screen, engine and internal hook (`o
 
 ## Working with AI
 
-Most of this code was written with Claude as a coding partner. You're welcome to work the same way or not at all; either way, you're responsible for what you submit: run it, test it, listen to it.
+This project uses Claude and OpenAI Codex as coding partners. You're welcome to work the same way or not at all; either way, you're responsible for what you submit: run it, test it, listen to it.

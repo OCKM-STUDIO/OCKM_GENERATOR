@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="420" viewBox="0 0 1280 420" role="img" aria-labelledby="title desc">
+  <title id="title">OCKM GENERATOR</title>
+  <desc id="desc">A generative groovebox for house and techno. Mac and Raspberry Pi. Very early alpha.</desc>
+  <rect width="1280" height="420" rx="24" fill="#252624"/>
+  <g font-family="Helvetica, Arial, sans-serif">
+    <text x="58" y="62" font-size="17" letter-spacing="4" fill="#b4b5ad">OCKM STUDIO / OPEN SOURCE INSTRUMENTS</text>
+    <text x="54" y="164" font-size="80" font-weight="700" letter-spacing="-3" fill="#efeee7">OCKM GENERATOR</text>
+    <rect x="58" y="195" width="66" height="6" fill="#df4540"/>
+    <text x="58" y="250" font-size="28" fill="#efeee7">A generative groovebox for house and techno.</text>
+    <text x="58" y="295" font-size="21" fill="#b4b5ad">Make a loop. Shape the sound. Play it your way.</text>
+    <text x="58" y="373" font-size="17" letter-spacing="2" fill="#b4b5ad">MAC + RASPBERRY PI</text>
+    <rect x="930" y="338" width="292" height="50" rx="25" fill="#df4540"/>
+    <text x="1076" y="370" text-anchor="middle" font-size="17" font-weight="700" letter-spacing="2" fill="#fff8ed">VERY EARLY ALPHA</text>
+  </g>
+  <g fill="none" stroke-width="18">
+    <path d="M1154 96 A80 80 0 1 0 1154 222" stroke="#efeee7"/>
+    <path d="M1104 159 H1140 L1154 130 L1174 188 L1191 159 H1222" stroke="#df4540" stroke-linejoin="round"/>
+  </g>
+</svg>
