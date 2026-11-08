@@ -23,8 +23,8 @@ import AppKit
                 }
                 .font(.system(size: 11)).padding(.horizontal, 14).frame(height: 28)
             }
-            .background(Color(white: 0.16))
-            .preferredColorScheme(.dark)
+            .background(Color(nsColor: engine.backgroundColor))
+            .preferredColorScheme(engine.isLightTheme ? .light : .dark)
             .sheet(isPresented: $engine.showingShortcuts) { ShortcutReference() }
             .onAppear { delegate.engine = engine; engine.start(); NSApp.activate(ignoringOtherApps: true) }
             .alert("OCKM GENERATOR", isPresented: Binding(get: { engine.error != nil }, set: { if !$0 { engine.error = nil } })) {

@@ -90,7 +90,7 @@ def main():
     plist = {
         "CFBundleExecutable": "OCKMGenerator", "CFBundleIdentifier": "studio.ockm.generator.mac",
         "CFBundleName": "OCKM GENERATOR", "CFBundleDisplayName": "OCKM GENERATOR",
-        "CFBundlePackageType": "APPL", "CFBundleShortVersionString": "0.1.0", "CFBundleVersion": "1",
+        "CFBundlePackageType": "APPL", "CFBundleShortVersionString": "0.1.1", "CFBundleVersion": "2",
         "CFBundleIconFile": "AppIcon",
         "LSMinimumSystemVersion": "13.0", "NSHighResolutionCapable": True, "NSPrincipalClass": "NSApplication",
         "NSHumanReadableCopyright": "OCKM GENERATOR contributors. GPL-3.0."

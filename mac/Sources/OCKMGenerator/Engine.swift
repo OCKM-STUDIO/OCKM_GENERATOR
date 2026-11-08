@@ -12,6 +12,8 @@ struct DrawCommand {
 
 @MainActor final class Engine: ObservableObject {
     @Published var drawing: [DrawCommand] = []
+    @Published var backgroundColor = NSColor(calibratedRed: 42/255, green: 42/255, blue: 40/255, alpha: 1)
+    @Published var isLightTheme = false
     @Published var error: String?
     @Published var playing = false
     @Published var unsaved = false
@@ -113,7 +115,7 @@ struct DrawCommand {
         defer { ockm_free(pointer) }
         guard let data = String(cString: pointer).data(using: .utf8),
               let items = try? JSONSerialization.jsonObject(with: data) as? [[Any]] else { return }
-        drawing = items.compactMap { row in
+        let commands: [DrawCommand] = items.compactMap { row in
             guard let kind = row.first as? String else { return nil }
             let command = DrawCommand(kind: kind, values: Array(row.dropFirst()))
             if kind == "state" {
@@ -122,6 +124,21 @@ struct DrawCommand {
             }
             return command
         }
+        // Use the actual instrument background, including its current theme,
+        // for all native chrome and unused space around the scaled canvas.
+        var color: NSColor?
+        for command in commands {
+            if command.kind == "color" {
+                color = NSColor(calibratedRed: command.number(0)/255, green: command.number(1)/255,
+                                blue: command.number(2)/255, alpha: 1)
+            } else if command.kind == "background", let color {
+                if !backgroundColor.isEqual(color) { backgroundColor = color }
+                let light = 0.2126 * color.redComponent + 0.7152 * color.greenComponent + 0.0722 * color.blueComponent > 0.5
+                if isLightTheme != light { isLightTheme = light }
+                break
+            }
+        }
+        drawing = commands
     }
 
     func command(_ selector: String, x: CGFloat? = nil, y: CGFloat? = nil, symbol: String? = nil) {

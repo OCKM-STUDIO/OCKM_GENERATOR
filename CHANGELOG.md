@@ -1,5 +1,9 @@
 # Changelog
 
+## Mac preview 0.1.1 (8 November 2026)
+
+- The title bar, window margins and status strip now follow the instrument’s light or dark background immediately
+
 ## Mac preview 0.1.0 (8 November 2026)
 
 - Standalone SwiftUI/AppKit host with the shared Pd/Lua instrument, native rendering and CoreMIDI device selection

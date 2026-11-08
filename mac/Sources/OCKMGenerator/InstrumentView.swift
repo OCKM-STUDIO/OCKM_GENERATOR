@@ -10,6 +10,9 @@ struct InstrumentView: NSViewRepresentable {
     }
     func updateNSView(_ view: InstrumentCanvas, context: Context) {
         view.commands = engine.drawing
+        view.backdropColor = engine.backgroundColor
+        view.isLightTheme = engine.isLightTheme
+        view.applyWindowTheme()
         view.needsDisplay = true
     }
 }
@@ -17,14 +20,29 @@ struct InstrumentView: NSViewRepresentable {
 final class InstrumentCanvas: NSView {
     weak var engine: Engine?
     var commands: [DrawCommand] = []
+    var backdropColor = NSColor(calibratedRed: 42/255, green: 42/255, blue: 40/255, alpha: 1)
+    var isLightTheme = false
     private var pressed = false
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { true }
     private var zoom: CGFloat { min(bounds.width / 960, bounds.height / 600) }
     private var origin: CGPoint { CGPoint(x: (bounds.width - 960 * zoom) / 2, y: (bounds.height - 600 * zoom) / 2) }
 
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        applyWindowTheme()
+    }
+
+    func applyWindowTheme() {
+        guard let window else { return }
+        let name: NSAppearance.Name = isLightTheme ? .aqua : .darkAqua
+        if window.appearance?.name != name { window.appearance = NSAppearance(named: name) }
+        window.backgroundColor = backdropColor
+        window.titlebarAppearsTransparent = true
+    }
+
     override func draw(_ dirtyRect: NSRect) {
-        NSColor(calibratedWhite: 0.12, alpha: 1).setFill(); bounds.fill()
+        backdropColor.setFill(); bounds.fill()
         guard let context = NSGraphicsContext.current?.cgContext else { return }
         context.saveGState()
         context.translateBy(x: origin.x, y: origin.y)
