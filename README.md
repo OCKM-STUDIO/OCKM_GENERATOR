@@ -55,6 +55,17 @@ A **mixer** with dB faders, sends, mute, solo and a four-band EQ on every track.
 - **The show page:** a full-screen view for when the box is on display: the circle of fifths with the key lit up and the chord as a shape, and the drums flashing in the middle
 - **Safe saving:** a power cut mid-save leaves you with the last good copy
 
+## Native Mac app (private preview)
+
+A standalone Swift app now lives in [`mac/`](mac/README.md). It embeds the same
+sound engine, generators and screen behaviour as the Pi, with a native Mac
+renderer, MIDI device selection, keyboard performance controls and its own icon.
+Players do not need to install plugdata or Pure Data.
+
+Build with `python3 mac/scripts/build.py`, then open
+`mac/dist/OCKM GENERATOR.app`. See the [Mac guide](mac/README.md) for requirements,
+shortcuts, project locations and the current preview limitations.
+
 ## Running it
 
 **Mac or PC:** install [plugdata](https://plugdata.org) (it has Lua built in) and open `OCKM_GENERATOR.pd`. Keep the folder together. If taps do nothing, the patch is in edit mode: Cmd+E (Ctrl+E). Vanilla Pure Data works too, with the [pd-lua](https://github.com/agraef/pd-lua) external. Windows and Linux should work the same way, but haven't been tried yet.

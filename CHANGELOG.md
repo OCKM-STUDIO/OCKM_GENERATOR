@@ -1,5 +1,14 @@
 # Changelog
 
+## Mac preview 0.1.0 (8 November 2026)
+
+- Standalone SwiftUI/AppKit host with the shared Pd/Lua instrument, native rendering and CoreMIDI device selection
+- Keyboard shortcuts for navigation, transport, track mutes and tap/hold performance moves; Help includes a shortcut reference
+- New charcoal, ivory and red app icon
+- Mac projects and recovery saves live separately from the source checkout and Pi projects
+- Reproducible engine build, isolated audio/save/reopen checks and shared Lua generator tests
+- Private preview for listening and hardware testing, not a notarised public release
+
 ## v1.49 (30 October 2026)
 
 Ideas borrowed from the PERF-1 firmware for the FM-1.

@@ -1,0 +1,6 @@
+Generated with the built-in image generation tool on 8 November 2026.
+Approved by Simon in the implementation chat. Original: AppIcon.png.
+AppIcon.icns is a standard multi-resolution Mac icon derived with sips/iconutil.
+
+Prompt:
+Create one polished macOS application icon for OCKM GENERATOR, a house and techno generative groovebox. Square 1024 x 1024 composition with genuine transparent space outside the rounded-square icon tile. The tile fills about 88% of the canvas, perfectly centred, straight-on orthographic view. Warm graphite charcoal ceramic/enamel tile with subtly rounded bevelled edges. A bold warm ivory broken circular sequencer ring forms an abstract letter O; a short vivid vermilion-red stepped waveform crosses its centre, suggesting a bass pulse and drum sequencer. Very simple, unmistakable silhouette that reads beautifully at 32 pixels. Tactile understated industrial design, sophisticated music production software, subtle soft studio lighting and restrained dimensionality, beautifully crisp edges. Palette charcoal #2A2A28, warm ivory #E8E8E4, red #C43732. No words, no lettering other than the abstract ring, no numerals, no extra buttons, no UI screenshot, no surrounding scene, no watermark. This is the final icon artwork, not a mockup.

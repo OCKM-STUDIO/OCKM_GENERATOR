@@ -15,6 +15,19 @@ Simon designs and plays it; the code has been written with an AI pair. He works 
 - **Big or ambiguous jobs:** discuss first, and show mock-ups (PNG at 960x600 in the app's style) before building screens. Small, clear requests: just do them
 - **Every version:** bump `VERSION` in `ui/ockm-ui.pd_lua`, add a `CHANGELOG.md` entry, update `docs/manual.md`, run the tests, then ship to the Mac repo and the Pi
 
+## Native Mac preview (8 November 2026)
+
+`mac/` now contains a SwiftUI/AppKit host, C++ libpd audio bridge, CoreMIDI
+connections, keyboard performance controls and an app icon. The Pi entry point
+and shared Lua/Pd source locations stay unchanged. The Mac build regenerates
+its own isolated runtime and appends `mac/native-ui.lua` to the shared UI, so
+screens and musical/project behaviour are not duplicated in Swift.
+
+Read `mac/README.md` for build steps and `mac/VERIFICATION.md` for tested scope.
+The app is a private preview in `OCKM-STUDIO/OCKM_GENERATOR`; do not make it public
+until Simon has tried it and explicitly asks. Mac player files are separate from
+this checkout, under Application Support/ OCKM GENERATOR/Workspace.
+
 ## The shape of it
 
 | Layer | Where | Notes |

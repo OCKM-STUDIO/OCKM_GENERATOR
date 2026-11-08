@@ -1,0 +1,4 @@
+{
+  "libpd": {"url": "https://github.com/libpd/libpd.git", "commit": "ba0dc63262901d658af8bbda5e619a60fa975e78"},
+  "pd-lua": {"url": "https://github.com/agraef/pd-lua.git", "commit": "4301f744a9023ea77b6fe0ba35918ad18e19276f"}
+}
